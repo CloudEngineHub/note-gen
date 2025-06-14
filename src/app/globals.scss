@@ -97,21 +97,6 @@ html, body {
   }
 }
 
-.md-editor-dark {
-  background-color: var(--foreground) !important;
-}
-
-.md-editor-preview-wrapper ul li {
-  list-style: disc;
-}
-.md-editor-preview-wrapper ol li {
-  list-style: decimal;
-}
-
-#aritcle-md-editor{
-  height: calc(100vh - 48px);
-}
-
 ::-webkit-scrollbar {
   @apply w-2 h-2;
 }
@@ -122,30 +107,6 @@ html, body {
 
 ::-webkit-scrollbar-thumb {
   @apply rounded-full bg-border border-[1px] border-transparent border-solid bg-clip-padding;
-}
-
-.md-editor-toolbar-wrapper, .md-editor-toolbar{
-  @apply flex gap-0 px-1 overflow-hidden w-full;
-}
-
-.md-editor-toolbar-item{
-  @apply size-6 flex items-center justify-center !mx-0; 
-}
-.md-editor-icon {
-  height: 20px !important;
-  width: 20px !important;
-}
-
-.md-editor-catalog-active>span {
-  @apply text-primary font-bold !important;
-}
-
-.md-editor-catalog-link>span:hover{
-  @apply text-primary !important;
-}
-
-.md-editor-catalog-indicator{
-  @apply bg-primary !important;
 }
 
 .setting-anchor{
