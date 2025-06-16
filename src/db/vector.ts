@@ -33,35 +33,30 @@ export async function initVectorDb() {
 
 // 插入或更新向量文档
 export async function upsertVectorDocument(doc: Omit<VectorDocument, 'id'>) {
-  await db.execute(`
-    insert into vector_documents (filename, chunk_id, content, embedding, updated_at)
-    values (?, ?, ?, ?, ?)
-    on conflict(filename, chunk_id) do update set
-    content = excluded.content,
-    embedding = excluded.embedding,
-    updated_at = excluded.updated_at
-  `, [doc.filename, doc.chunk_id, doc.content, doc.embedding, doc.updated_at]);
+  await db.execute(
+    "insert into vector_documents (filename, chunk_id, content, embedding, updated_at) values ($1, $2, $3, $4, $5) on conflict(filename, chunk_id) do update set content = excluded.content, embedding = excluded.embedding, updated_at = excluded.updated_at",
+    [doc.filename, doc.chunk_id, doc.content, doc.embedding, doc.updated_at]);
 }
 
 // 获取指定文件名的所有向量文档
 export async function getVectorDocumentsByFilename(filename: string) {
-  return await db.select<VectorDocument[]>(`
-    select * from vector_documents where filename = ? order by chunk_id
-  `, [filename]);
+  return await db.select<VectorDocument[]>(
+    "select * from vector_documents where filename = $1 order by chunk_id",
+    [filename]);
 }
 
 // 通过文件名删除向量文档
 export async function deleteVectorDocumentsByFilename(filename: string) {
-  await db.execute(`
-    delete from vector_documents where filename = ?
-  `, [filename]);
+  await db.execute(
+    "delete from vector_documents where filename = $1",
+    [filename]);
 }
 
 // 检查文件是否已存在于向量数据库中
 export async function checkVectorDocumentExists(filename: string) {
-  const result = await db.select<{ count: number }[]>(`
-    select count(*) as count from vector_documents where filename = ?
-  `, [filename]);
+  const result = await db.select<{ count: number }[]>(
+    "select count(*) as count from vector_documents where filename = $1",
+    [filename]);
   
   return result[0]?.count > 0;
 }

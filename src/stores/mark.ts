@@ -64,7 +64,7 @@ const useMarkStore = create<MarkState>((set) => ({
     const decodeRes = res.map(item => {
       return {
         ...item,
-        content: decodeURIComponent(item.content || '')
+        content: item.content || ''
       }
     }).filter((item) => item.deleted === 0)
     set({ marks: decodeRes })
@@ -74,7 +74,7 @@ const useMarkStore = create<MarkState>((set) => ({
     const decodeRes = res.map(item => {
       return {
         ...item,
-        content: decodeURIComponent(item.content || '')
+        content: item.content || ''
       }
     }).filter((item) => item.deleted === 1)
     set({ marks: decodeRes })
@@ -86,7 +86,7 @@ const useMarkStore = create<MarkState>((set) => ({
     const decodeRes = res.map(item => {
       return {
         ...item,
-        content: decodeURIComponent(item.content || '')
+        content: item.content || ''
       }
     }).filter((item) => item.deleted === 0)
     set({ allMarks: decodeRes })

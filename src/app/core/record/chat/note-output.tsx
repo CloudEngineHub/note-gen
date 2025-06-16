@@ -37,7 +37,7 @@ export function NoteOutput({chat}: {chat: Chat}) {
   const t = useTranslations('record.chat')
 
   async function handleTransform() {
-    const content = decodeURIComponent(chat?.content || '')
+    const content = chat?.content || ''
     const writePath = `${path}/${title.replace(/ /g, '_')}`
     
     // Use workspace functions instead of directly using BaseDirectory.AppData
