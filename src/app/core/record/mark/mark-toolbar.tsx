@@ -1,6 +1,6 @@
 "use client"
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { RotateCcw } from "lucide-react"
+import { Trash2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import * as React from "react"
 import { initMarksDb } from "@/db/marks"
@@ -52,7 +52,7 @@ export function MarkToolbar() {
                 size={"sm"}
               >
                 <div>
-                  <RotateCcw className="size-4" />
+                  <Trash2 className="size-4" />
                 </div>
               </Toggle>
             </TooltipTrigger>
