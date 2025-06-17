@@ -7,7 +7,7 @@ input, textarea, select, [contenteditable] {
 /* Fix for iOS viewport when keyboard appears */
 @supports (-webkit-touch-callout: none) {
   html, body {
-    height: 100vh;
+    height: 100%;
     position: fixed;
     overflow: hidden;
     -webkit-overflow-scrolling: touch;
@@ -18,10 +18,10 @@ input, textarea, select, [contenteditable] {
 
 /* Fix for Android viewport when keyboard appears */
 @media screen and (-webkit-min-device-pixel-ratio:0) {
-  body {
+  html, body {
     position: fixed;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);

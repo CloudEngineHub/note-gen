@@ -18,7 +18,7 @@ export function ChatHeader() {
       </div>
       <div className="flex items-center justify-center gap-1">
         <BotMessageSquare className="!size-4" />
-        <span className="line-clamp-1 flex-1">{model}</span>
+        <span className="line-clamp-1 flex-1 lg:flex-none">{model}</span>
         <span className="hidden lg:inline">({aiTitle})</span>
       </div>
       <div className="flex items-center gap-1">
