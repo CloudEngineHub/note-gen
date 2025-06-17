@@ -160,67 +160,55 @@ export async function processMarkdownFile(
  */
 async function getWorkspaceFiles(): Promise<DirTree[]> {
   const workspace = await getWorkspacePath();
-  let entries: DirEntry[];
   
-  if (workspace.isCustom) {
-    entries = await readDir(workspace.path);
-  } else {
-    entries = await readDir('article', { baseDir: BaseDirectory.AppData });
-  }
-  
-  // 转换为DirTree格式
-  const result: DirTree[] = [];
-  
-  for (const entry of entries) {
-    if (entry.name === '.DS_Store' || entry.name.startsWith('.')) continue;
-    if (!entry.isDirectory && !entry.name.endsWith('.md')) continue;
+  // 递归处理目录的辅助函数
+  async function processDirectory(dirPath: string, useCustomPath: boolean): Promise<DirTree[]> {
+    let entries: DirEntry[];
     
-    // 创建DirTree对象
-    const item: DirTree = {
-      name: entry.name,
-      isFile: !entry.isDirectory,
-      isDirectory: entry.isDirectory,
-      isSymlink: false, // Tauri FS API不直接提供isSymlink
-      children: [],
-      isLocale: true,
-      isEditing: false
-    };
-    
-    // 如果是目录，递归读取子目录
-    if (entry.isDirectory) {
-      const childPath = await join(workspace.isCustom ? workspace.path : 'article', entry.name);
-      
-      let childEntries: DirEntry[];
-      if (workspace.isCustom) {
-        childEntries = await readDir(childPath);
-      } else {
-        childEntries = await readDir(childPath, { baseDir: BaseDirectory.AppData });
-      }
-      
-      // 筛选有效文件
-      childEntries = childEntries.filter(file => 
-        file.name !== '.DS_Store' && 
-        !file.name.startsWith('.') && 
-        (file.isDirectory || file.name.endsWith('.md'))
-      );
-      
-      // 递归处理子目录
-      item.children = childEntries.map(childEntry => ({
-        name: childEntry.name,
-        isFile: !childEntry.isDirectory,
-        isDirectory: childEntry.isDirectory,
-        isSymlink: false,
-        children: [],
-        isLocale: true,
-        isEditing: false,
-        parent: item
-      }));
+    if (useCustomPath) {
+      entries = await readDir(dirPath);
+    } else {
+      entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
     }
     
-    result.push(item);
+    const result: DirTree[] = [];
+    
+    for (const entry of entries) {
+      if (entry.name === '.DS_Store' || entry.name.startsWith('.')) continue;
+      if (!entry.isDirectory && !entry.name.endsWith('.md')) continue;
+      
+      // 创建DirTree对象
+      const item: DirTree = {
+        name: entry.name,
+        isFile: !entry.isDirectory,
+        isDirectory: entry.isDirectory,
+        isSymlink: false, // Tauri FS API不直接提供isSymlink
+        children: [],
+        isLocale: true,
+        isEditing: false
+      };
+      
+      // 如果是目录，递归读取子目录
+      if (entry.isDirectory) {
+        const childPath = await join(dirPath, entry.name);
+        // 递归处理子目录
+        item.children = await processDirectory(childPath, useCustomPath);
+        
+        // 设置父级关系
+        item.children.forEach(child => {
+          child.parent = item;
+        });
+      }
+      
+      result.push(item);
+    }
+    
+    return result;
   }
   
-  return result;
+  // 开始处理根目录
+  const rootPath = workspace.isCustom ? workspace.path : 'article';
+  return await processDirectory(rootPath, workspace.isCustom);
 }
 
 /**
@@ -263,9 +251,7 @@ export async function processAllMarkdownFiles(): Promise<{
         }
       }
     }
-    
     await processTree(fileTree);
-    
     return result;
   } catch (error) {
     console.error('处理工作区Markdown文件失败:', error);
