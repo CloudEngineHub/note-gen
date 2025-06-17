@@ -1,13 +1,17 @@
 'use client'
 
-import { Book, BookCheck } from "lucide-react"
+import { Book, BookCheck, Loader2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { TooltipButton } from "@/components/tooltip-button"
 import useVectorStore from "@/stores/vector"
+import { checkEmbeddingModelAvailable } from "@/lib/rag"
+import { toast } from "@/hooks/use-toast"
+import { useState } from "react"
 
 export function RagSwitch() {
   const { isRagEnabled, setRagEnabled, isVectorDbEnabled, setVectorDbEnabled } = useVectorStore()
   const t = useTranslations('record.chat.input')
+  const [loading, setLoading] = useState(false)
 
   // 处理开关点击
   const handleClick = async () => {
@@ -15,6 +19,17 @@ export function RagSwitch() {
       // 如果已启用，则禁用
       await setRagEnabled(false)
     } else {
+      // 向量模型
+      setLoading(true)
+      const embeddingModelAvailable = await checkEmbeddingModelAvailable()
+      setLoading(false)
+      if (!embeddingModelAvailable) {
+        toast({
+          variant: "destructive",
+          description: t('rag.notSupported')
+        })
+        return
+      }
       // 如果未启用且向量数据库已启用，则启用RAG
       if (isVectorDbEnabled) {
         await setRagEnabled(true)
@@ -33,10 +48,14 @@ export function RagSwitch() {
         variant="ghost"
         size="icon"
         icon={
-          isRagEnabled ? (
-            <BookCheck />
+          loading ? (
+            <Loader2 className="animate-spin" />
           ) : (
-            <Book />
+            isRagEnabled ? (
+              <BookCheck />
+            ) : (
+              <Book />
+            )
           )
         }
         tooltipText={isRagEnabled ? t('rag.enabled') : t('rag.disabled')}

@@ -496,6 +496,7 @@
           "placeholder": "搜索语言"
         },
         "rag": {
+          "notSupported": "向量模型不可用",
           "enabled": "知识库检索（开启）",
           "disabled": "知识库检索（关闭）"
         }

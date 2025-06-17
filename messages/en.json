@@ -529,6 +529,7 @@
           "placeholder": "Search language"
         },
         "rag": {
+          "notSupported": "Vector model is not supported",
           "enabled": "Knowledge Base Search (Enabled)",
           "disabled": "Knowledge Base Search (Disabled)"
         }
