@@ -67,8 +67,8 @@ export function AppFootbar() {
   }
 
   return (
-    <div className="w-full border-t bg-background pb-safe">
-      <div className="flex items-center justify-around h-16">
+    <div className="w-full border-t bg-background h-14">
+      <div className="flex h-full items-center justify-around">
         {items.map((item, index) => (
           <button
             key={index}

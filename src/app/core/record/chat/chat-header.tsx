@@ -11,15 +11,14 @@ export function ChatHeader() {
   const { aiTitle, model } = useSettingStore()
 
   return (
-    <header className="h-12 w-full grid grid-cols-[auto_1fr_auto] items-center border-b px-4 text-sm">
-
+    <header className="h-12 w-full grid grid-cols-[auto_1fr_auto] items-center border-b px-4 text-sm gap-4">
       <div className="flex items-center gap-1">
         <Drama className="size-4" />
         {currentPrompt?.title}
       </div>
       <div className="flex items-center justify-center gap-1">
-        <BotMessageSquare className="size-4" />
-        <span>{model}</span>
+        <BotMessageSquare className="!size-4" />
+        <span className="line-clamp-1 flex-1">{model}</span>
         <span className="hidden lg:inline">({aiTitle})</span>
       </div>
       <div className="flex items-center gap-1">

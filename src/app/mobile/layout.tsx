@@ -1,7 +1,6 @@
 'use client'
 
 import { ThemeProvider } from "@/components/theme-provider"
-import './mobile-styles.css'
 import useSettingStore from "@/stores/setting"
 import { useEffect } from "react";
 import { initAllDatabases } from "@/db"
@@ -12,6 +11,7 @@ import { useI18n } from "@/hooks/useI18n"
 import useVectorStore from "@/stores/vector"
 import { AppFootbar } from "@/components/app-footbar"
 import { TooltipProvider } from "@/components/ui/tooltip";
+import './mobile-styles.scss'
 
 export default function RootLayout({
   children,
@@ -53,7 +53,7 @@ export default function RootLayout({
       disableTransitionOnChange
     >
       <TooltipProvider>
-        <div className="flex flex-col h-screen pt-save">
+        <div className="flex flex-col h-full">
           <main className="flex flex-1 w-full overflow-hidden">
             {children}
           </main>

@@ -6,7 +6,7 @@ import { ModeToggle } from "@/components/mode-toggle"
 import Updater from "@/app/core/setting/about/updater"
 
 export default function Setting() {
-  return <div className="flex w-full h-[calc(100vh-168px)] flex-col">
+  return <div className="flex w-full h-full overflow-y-auto flex-col">
     <div className="h-16 flex items-center justify-end p-2 border-b overflow-hidden">
       <LanguageSwitch />
       <ModeToggle />
