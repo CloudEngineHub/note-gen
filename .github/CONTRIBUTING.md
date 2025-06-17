@@ -8,7 +8,7 @@ Hi! 非常感谢你参与 NoteGen 的贡献！在此之前，请花一些时间�
 
 ## 如何贡献
 
-不论是贡献代码还是提交问题，都应该先创建 Issue。
+不论是贡献代码还是提交问题，都应该先创建 Issue，如果想接管某条 Issue，可以在此 Issue 下留言，“我想开发这个功能/修复这个 bug”，请关注 **Assignees** 是否未指定任何开发者，我们会尽快指定你。
 
 ### Issues
 
@@ -71,7 +71,7 @@ pnpm tauri dev
       - `record`： 记录。
       - `search`：搜索。
       - `setting`：设置。
-    - `screenshot`：截图窗口。
+    - `mobile`：移动端目录。
   - `components`：组件目录，shadcn 和通用组件。
   - `lib`：常用工具库，例如 ai、github 请求等。
   - `db`：SQLite 数据库。
