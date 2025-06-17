@@ -13,7 +13,7 @@ import xml from 'highlight.js/lib/languages/xml';
 import css from 'highlight.js/lib/languages/css';
 import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/github-dark.css';
-import 'github-markdown-css/github-markdown.css';
+import 'github-markdown-css';
 import './chat.scss';
 
 type ThemeType = 'light' | 'dark' | 'system';

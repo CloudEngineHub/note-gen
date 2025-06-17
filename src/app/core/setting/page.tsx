@@ -10,6 +10,10 @@ export default function Page() {
   useEffect(() => {
     // 重定向到最后访问的设置页面，如果没有则使用第一个设置项
     const targetPage = lastSettingPage || baseConfig[0].anchor
+    const hasPage = baseConfig.some(item => item.anchor === targetPage)
+    if (!hasPage) {
+      redirect(`/core/setting/${baseConfig[0].anchor}`)
+    }
     redirect(`/core/setting/${targetPage}`)
   }, [])
   

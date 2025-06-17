@@ -1,4 +1,4 @@
-import { BotMessageSquare, LayoutTemplate, FileUp, Palette, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package } from "lucide-react"
+import { BotMessageSquare, LayoutTemplate, FileUp, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package } from "lucide-react"
 
 const baseConfig = [
   {
@@ -32,10 +32,6 @@ const baseConfig = [
   {
     icon: <ScanText />,
     anchor: 'ocr',
-  },
-  {
-    icon: <Palette />,
-    anchor: 'theme',
   },
   {
     icon: <UserRoundCog />,
