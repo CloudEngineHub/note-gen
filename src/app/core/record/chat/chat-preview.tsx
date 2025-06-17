@@ -18,7 +18,7 @@ import './chat.scss';
 
 type ThemeType = 'light' | 'dark' | 'system';
 
-export default function ChatPreview({text}: {text: string}) {
+export default function ChatPreview({text}: {text: string, themeReverse?: boolean}) {
   useEffect(() => {
     hljs.registerLanguage('javascript', javascript);
     hljs.registerLanguage('typescript', typescript);

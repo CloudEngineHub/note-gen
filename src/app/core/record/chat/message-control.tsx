@@ -94,11 +94,11 @@ export default function MessageControl({chat, children}: {chat: Chat, children: 
           <Separator orientation="vertical" className="h-4" />
           {
             count ? <>
-              <Button className="hidden lg:block" variant={"ghost"} size="sm" disabled>
+              <Button className="hidden lg:flex" variant={"ghost"} size="sm" disabled>
                 <TypeIcon className="size-4" />
                 { count } {t('record.chat.messageControl.words')}
               </Button>
-              <Separator orientation="vertical" className="h-4 hidden lg:block" /> 
+              <Separator orientation="vertical" className="h-4 hidden lg:inline" /> 
             </> : null
           }
           

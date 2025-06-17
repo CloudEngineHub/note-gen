@@ -70,25 +70,11 @@ function MessageWrapper({ chat, children }: { chat: Chat, children: React.ReactN
   }
 
   const index = chats.findIndex(item => item.id === chat.id)
-  if (chat.role === 'system') {
-    return <div className="flex w-full lg:gap-4">
-      <div className='hidden lg:flex'>
-        {loading && index === chats.length - 1 && chat.type === 'chat' ?
-          <LoaderPinwheel className="animate-spin" /> :
-          chat.type === 'clipboard' ? <ClipboardCheck /> : <BotMessageSquare />
-        }
-      </div>
-      <div className='text-sm leading-6 flex-1 lg:max-w-[calc(100vw-460px)] break-words'>
-        {children}
-      </div>
-    </div>
-  } else {
-    return <div className="flex group items-center lg:gap-4">
-      <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg lg:max-w-[calc(100vw-600px)]">
-        {chat.content}
-      </div>
+  return <div className="flex w-full lg:gap-4">
+    {
+      chat.role === 'user' ?  
       <div className="relative">
-        <Avatar className='rounded size-9 items-center justify-center hidden lg:flex'>
+        <Avatar className='rounded size-6 items-center justify-center hidden lg:flex'>
           {
             userInfo?.avatar_url ?
             <AvatarImage src={userInfo?.avatar_url} /> : <UserRound />
@@ -97,9 +83,18 @@ function MessageWrapper({ chat, children }: { chat: Chat, children: React.ReactN
         <Button onClick={revertChat} size="icon" className="absolute top-0 right-0 hidden group-hover:flex">
           <Undo2 />
         </Button>
+      </div> :
+      <div className='hidden lg:flex'>
+        {loading && index === chats.length - 1 && chat.type === 'chat' ?
+          <LoaderPinwheel className="animate-spin" /> :
+          chat.type === 'clipboard' ? <ClipboardCheck /> : <BotMessageSquare />
+        }
       </div>
+    }
+    <div className='text-sm leading-6 flex-1 break-words'>
+      {children}
     </div>
-  }
+  </div>
 }
 
 function Message({ chat }: { chat: Chat }) {
