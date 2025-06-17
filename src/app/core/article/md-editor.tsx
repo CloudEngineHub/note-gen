@@ -250,6 +250,7 @@ export function MdEditor() {
   const setContent = (content: string) => {
     if (!editor) return
     editor.setValue(content)
+    editor.renderPreview(content)
     
     // 如果有匹配位置，滚动到对应位置
     if (matchPosition !== null) {
