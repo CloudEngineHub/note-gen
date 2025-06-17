@@ -253,8 +253,6 @@ export async function getFileCommits({ path, repo }: { path: string, repo: RepoN
       const data = await response.json();
       return data;
     }
-    
-    throw new Error('获取提交记录失败');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return false

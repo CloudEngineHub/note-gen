@@ -47,11 +47,7 @@ export default function History({editor}: {editor?: Vditor}) {
     if (backupMethod === 'github') {
       res = await getGithubFileCommits({ path: activeFilePath, repo: RepoNames.sync });
     } else {
-      res = (await getGiteeFileCommits({ path: activeFilePath, repo: RepoNames.sync }))?.data;
-      // 确保返回结果是数组
-      if (res && !Array.isArray(res)) {
-        res = [];
-      }
+      res = await getGiteeFileCommits({ path: activeFilePath, repo: RepoNames.sync });
     }
 
     setCommits(res || [])
@@ -93,10 +89,9 @@ export default function History({editor}: {editor?: Vditor}) {
   }
 
   useEffect(() => {
-    fetchCommits()
-  }, [activeFilePath])
-
-  useEffect(() => {
+    if (activeFilePath) {
+      fetchCommits()
+    }
     emitter.on('sync-success', async () => {
       await loadFileTree()
       await fetchCommits()

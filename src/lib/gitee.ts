@@ -325,20 +325,11 @@ export async function getFileCommits({ path, repo }: { path: string, repo: RepoN
     const response = await fetch(url, requestOptions);
     if (response.status >= 200 && response.status < 300) {
       const data = await response.json();
-      return { data } as GiteeResponse<any>;
+      return data
     }
-    
-    const errorData = await response.json();
-    throw {
-      status: response.status,
-      message: errorData.message || '获取提交历史失败'
-    };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
-    toast({
-      title: '获取提交历史失败',
-      description: (error as GiteeError).message,
-      variant: 'destructive',
-    })
+    return false
   }
 }
 
