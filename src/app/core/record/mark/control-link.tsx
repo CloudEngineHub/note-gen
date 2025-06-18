@@ -171,7 +171,7 @@ export function ControlLink() {
       <DialogTrigger asChild>
         <TooltipButton icon={<Link />} tooltipText={t('record.mark.type.link') || '链接'} />
       </DialogTrigger>
-      <DialogContent className="min-w-[500px]">
+      <DialogContent className="min-w-full lg:min-w-[500px]">
         <DialogHeader>
           <DialogTitle>{t('record.mark.link.title') || '链接记录'}</DialogTitle>
           <DialogDescription>

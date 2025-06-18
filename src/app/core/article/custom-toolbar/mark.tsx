@@ -71,7 +71,7 @@ export default function MarkInsert({editor}: {editor?: Vditor}) {
           <TooltipButton tooltipText={t('tooltip')} icon={<Highlighter />} disabled={loading} />
         </div>
       </SheetTrigger>
-      <SheetContent className="p-0 min-w-[500px]">
+      <SheetContent className="p-0 min-w-full lg:min-w-[500px]">
         <SheetHeader className="p-4 border-b">
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('description')}</SheetDescription>
