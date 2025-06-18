@@ -10,7 +10,11 @@ export default function Home() {
     const store = await Store.load('store.json')
     const currentPage = await store.get<string>('currentPage')
     if (isMobileDevice()) {
-      router.push(currentPage || '/mobile/chat')
+      if (currentPage?.includes('/mobile')) {
+        router.push(currentPage || '/mobile/chat')
+      } else {
+        router.push('/mobile/chat')
+      }
     } else {
       router.push(currentPage || '/core/record')
     }

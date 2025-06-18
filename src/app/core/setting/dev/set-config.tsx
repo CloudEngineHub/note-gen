@@ -3,8 +3,8 @@ import { SettingRow } from "../components/setting-base";
 import { HardDriveDownload, HardDriveUpload } from "lucide-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { BaseDirectory, copyFile } from "@tauri-apps/plugin-fs";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { BaseDirectory, copyFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { Store } from "@tauri-apps/plugin-store";
 
 export default function SetConfig() {
     const { toast } = useToast()
@@ -13,9 +13,13 @@ export default function SetConfig() {
         title: '导入配置文件',
       })
       if (file) {
-        await copyFile(file, 'store.json', { toPathBaseDir: BaseDirectory.AppData })
+        const content = await readTextFile(file, { baseDir: BaseDirectory.AppData })
+        const jsonContent = JSON.parse(content)
+        const store = await Store.load('store.json');
+        Object.keys(jsonContent).forEach((key: string) => {
+          store.set(key, jsonContent[key])
+        })
         toast({ title: '导入成功' })
-        relaunch()
       }
     }
     async function handleExport() {
