@@ -5,6 +5,8 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BaseDirectory, copyFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
+import { isMobileDevice } from "@/lib/check";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 export default function SetConfig() {
     const { toast } = useToast()
@@ -19,7 +21,13 @@ export default function SetConfig() {
         Object.keys(jsonContent).forEach((key: string) => {
           store.set(key, jsonContent[key])
         })
-        toast({ title: '导入成功' })
+        if (isMobileDevice()) {
+          toast({
+            description: '配置下载成功，请手动重启应用',
+          })
+        } else {
+          relaunch()
+        }
       }
     }
     async function handleExport() {

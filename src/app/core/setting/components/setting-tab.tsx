@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import baseConfig from '../config'
 import { useTranslations } from 'next-intl'
 import useSettingStore from "@/stores/setting"
+import UploadStore from "./upload-store";
 
 export function SettingTab() {
   const [currentPage, setCurrentPage] = useState('about')
@@ -37,8 +38,8 @@ export function SettingTab() {
   }, [pathname, setLastSettingPage])
 
   return (
-    <div className="w-56 border-r h-full min-h-screen bg-sidebar p-4">
-      <ul>
+    <div className="flex flex-col w-56 justify-between h-full min-h-screen bg-sidebar">
+      <ul className="w-full border-r p-4 flex flex-col justify-between">
         {
           config.map(item => {
             return (
@@ -54,6 +55,7 @@ export function SettingTab() {
           })
         }
       </ul>
+      <UploadStore />
     </div>
   )
 }
