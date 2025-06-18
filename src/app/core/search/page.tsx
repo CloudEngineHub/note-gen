@@ -56,7 +56,6 @@ export default function Page() {
       return {...item, searchType: 'article', title}
     })
     searchList.push(...articles)
-    console.log('searchList', searchList)
   }
 
   useEffect(() => {

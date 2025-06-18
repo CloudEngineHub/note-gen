@@ -14,6 +14,8 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/github";
+import { RepoNames } from "@/lib/github.types";
 
 dayjs.extend(relativeTime)
 
@@ -41,6 +43,50 @@ export function GithubSync() {
     setSyncRepoInfo
   } = useSyncStore()
 
+  // 检查 GitHub 仓库状态
+  async function checkGithubRepos() {
+    try {
+      setImageRepoState(SyncStateEnum.checking)
+      setSyncRepoState(SyncStateEnum.checking)
+      await getUserInfo();
+      // 检查图床仓库状态
+      const imageRepo = await checkSyncRepoState(RepoNames.image)
+      if (imageRepo) {
+        setImageRepoInfo(imageRepo)
+        setImageRepoState(SyncStateEnum.success)
+      } else {
+        setImageRepoState(SyncStateEnum.creating)
+        const info = await createSyncRepo(RepoNames.image)
+        if (info) {
+          setImageRepoInfo(info)
+          setImageRepoState(SyncStateEnum.success)
+        } else {
+          setImageRepoState(SyncStateEnum.fail)
+        }
+      }
+      
+      // 检查同步仓库状态
+      const syncRepo = await checkSyncRepoState(RepoNames.sync)
+      if (syncRepo) {
+        setSyncRepoInfo(syncRepo)
+        setSyncRepoState(SyncStateEnum.success)
+      } else {
+        setSyncRepoState(SyncStateEnum.creating)
+        const info = await createSyncRepo(RepoNames.sync, true)
+        if (info) {
+          setSyncRepoInfo(info)
+          setSyncRepoState(SyncStateEnum.success)
+        } else {
+          setSyncRepoState(SyncStateEnum.fail)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to check GitHub repos:', err)
+      setImageRepoState(SyncStateEnum.fail)
+      setSyncRepoState(SyncStateEnum.fail)
+    }
+  }
+
   async function tokenChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     if (value === '') {
@@ -52,6 +98,9 @@ export function GithubSync() {
     setAccessToken(value)
     const store = await Store.load('store.json');
     await store.set('accessToken', value)
+    if (value) {
+      checkGithubRepos()
+    }
   }
 
   useEffect(() => {
@@ -65,6 +114,9 @@ export function GithubSync() {
       }
     }
     init()
+    if (accessToken) {
+      checkGithubRepos()
+    }
   }, [])
 
   return (
