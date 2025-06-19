@@ -1,5 +1,5 @@
 'use client'
-import { MarkToolbar } from '@/app/core/record/mark/mark-toolbar'
+import { MarkHeader } from '@/app/core/record/mark/mark-header'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { TagManage } from '@/app/core/record/tag'
@@ -16,7 +16,7 @@ export default function Record() {
   }
   return (
     <div className="flex flex-col h-full w-full">
-      <MarkToolbar />
+      <MarkHeader />
       {
         trashState? 
         <div className="flex pb-2 pl-2 relative border-b h-6 items-center justify-between">

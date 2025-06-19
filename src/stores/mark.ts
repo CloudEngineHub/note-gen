@@ -1,4 +1,7 @@
-import { getAllMarks, getMarks, Mark, updateMark } from '@/db/marks'
+import { deleteAllMarks, getAllMarks, getMarks, insertMarks, Mark, updateMark } from '@/db/marks'
+import { uploadFile as uploadGithubFile, getFiles as githubGetFiles, decodeBase64ToString } from '@/lib/github';
+import { uploadFile as uploadGiteeFile, getFiles as giteeGetFiles } from '@/lib/gitee';
+import { RepoNames } from '@/lib/github.types';
 import { Store } from '@tauri-apps/plugin-store';
 import { create } from 'zustand'
 
@@ -26,6 +29,14 @@ interface MarkState {
   addQueue: (mark: MarkQueue) => void
   setQueue: (queueId: string, mark: Partial<MarkQueue>) => void
   removeQueue: (queueId: string) => void
+
+  // 同步
+  syncState: boolean
+  setSyncState: (syncState: boolean) => void
+  lastSyncTime: string
+  setLastSyncTime: (lastSyncTime: string) => void
+  uploadMarks: () => Promise<boolean>
+  downloadMarks: () => Promise<Mark[]>
 }
 
 const useMarkStore = create<MarkState>((set) => ({
@@ -121,7 +132,81 @@ const useMarkStore = create<MarkState>((set) => ({
         queues: state.queues.filter(item => item.queueId !== queueId)
       }
     })
-  }
+  },
+  // 同步
+  syncState: false,
+  setSyncState: (syncState) => {
+    set({ syncState })
+  },
+  lastSyncTime: '',
+  setLastSyncTime: (lastSyncTime) => {
+    set({ lastSyncTime })
+  },
+  uploadMarks: async () => {
+    set({ syncState: true })
+    const path = '.data'
+    const filename = 'marks.json'
+    const marks = await getAllMarks()
+    const store = await Store.load('store.json');
+    const jsonToBase64 = (data: Mark[]) => {
+      return Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+    }
+    const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github';
+    let result = false
+    if (primaryBackupMethod === 'github') {
+      const files = await githubGetFiles({ path: `${path}/${filename}`, repo: RepoNames.sync })
+      const res = await uploadGithubFile({
+        ext: 'json',
+        file: jsonToBase64(marks),
+        repo: RepoNames.sync,
+        path,
+        filename,
+        sha: files?.sha,
+      })
+      if (res) {
+        result = true
+      }
+    } else if (primaryBackupMethod === 'gitee') {
+      const files = await giteeGetFiles({ path: `${path}/${filename}`, repo: RepoNames.sync })
+      const res = await uploadGiteeFile({
+        ext: 'json',
+        file: jsonToBase64(marks),
+        repo: RepoNames.sync,
+        path,
+        filename,
+        sha: files?.sha,
+      })
+      if (res) {
+        result = true
+      }
+    }
+    set({ syncState: false })
+    return result
+  },
+  downloadMarks: async () => {
+    const path = '.data'
+    const filename = 'marks.json'
+    const store = await Store.load('store.json');
+    const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github';
+    let result = []
+    if (primaryBackupMethod === 'github') {
+      const file = await githubGetFiles({ path: `${path}/${filename}`, repo: RepoNames.sync })
+      if (file) {
+        const configJson = decodeBase64ToString(file.content)
+        result = JSON.parse(configJson)
+      }
+    } else if (primaryBackupMethod === 'gitee') {
+      const file = await giteeGetFiles({ path: `${path}/${filename}`, repo: RepoNames.sync })
+      if (file) {
+        const configJson = decodeBase64ToString(file.content)
+        result = JSON.parse(configJson)
+      }
+    }
+    await deleteAllMarks()
+    await insertMarks(result)
+    set({ syncState: false })
+    return result
+  },
 }))
 
 export default useMarkStore

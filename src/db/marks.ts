@@ -86,6 +86,26 @@ export async function delMark(id: number) {
   )
 }
 
+export async function deleteAllMarks() {
+  const db = await getDb();
+  return await db.execute("delete from marks")
+}
+
+export async function insertMarks(marks: Partial<Mark>[]) {
+  const db = await getDb();
+  try {
+    for (const mark of marks) {
+      await db.execute(
+        "insert into marks (tagId, type, content, url, desc, createdAt, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
+        [mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted]
+      );
+    }
+  } catch (error) {
+    console.error('Error inserting marks:', error);
+    throw error;
+  }
+}
+
 export async function delMarkForever(id: number) {
   const db = await getDb();
   return await db.execute("delete from marks where id = $1", [id])

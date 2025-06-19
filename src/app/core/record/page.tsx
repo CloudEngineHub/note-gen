@@ -1,4 +1,4 @@
-import { NoteSidebar } from "./note-sidebar"
+import { NoteSidebar } from "./mark"
 import Chat from './chat'
 
 export default function Page() {

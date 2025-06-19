@@ -263,7 +263,8 @@
       "title": "Empty Trash",
       "confirm": "Are you sure to empty the trash?",
       "records": "{count} records can be restored",
-      "empty": "Empty"
+      "empty": "Empty",
+      "close": "Close Trash"
     },
     "queue": {
       "ocr": "OCR recognition",
@@ -285,8 +286,12 @@
         "screenshot": "Screenshot",
         "text": "Text",
         "file": "File",
-        "link": "Link"
+        "link": "Link",
+        "upload": "Upload Record",
+        "download": "Download Record"
       },
+      "uploadSuccess": "Record upload success",
+      "downloadSuccess": "Record download success",
       "desc": "Description",
       "content": "Content",
       "progress": {

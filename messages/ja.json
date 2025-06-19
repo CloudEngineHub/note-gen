@@ -256,7 +256,8 @@
       "title": "ゴミ箱を空にする",
       "confirm": "本当にデータをクリアしますか？",
       "records": "{count}件の記録が復元可能です",
-      "empty": "空にする"
+      "empty": "空にする",
+      "close": "ゴミ箱を閉じる"
     },
     "queue": {
       "ocr": "OCR 認識",
@@ -277,8 +278,12 @@
         "screenshot": "スクリーンショット",
         "text": "テキスト",
         "file": "ファイル",
-        "link": "リンク"
+        "link": "リンク",
+        "upload": "アップロード",
+        "download": "ダウンロード"
       },
+      "uploadSuccess": "記録アップロード成功",
+      "downloadSuccess": "記録ダウンロード成功",
       "desc": "説明",
       "content": "内容",
       "createdAt": "作成日時",
