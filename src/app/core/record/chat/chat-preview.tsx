@@ -131,7 +131,7 @@ export default function ChatPreview({text}: {text: string, themeReverse?: boolea
   };
 
   return (
-    <div className="flex-1">
+    <div className="flex-1 max-w-[calc(100vw-30px)] lg:max-w-[calc(100vw-440px)]">
       <div 
         ref={previewRef}
         className={getThemeClass()}
