@@ -27,7 +27,7 @@ NoteGen 是一款跨平台的 `Markdown` 笔记应用，致力于使用 AI 建�
 ## 为什么选择 NoteGen？
 
 - **轻量**：[安装包](https://github.com/codexu/note-gen/releases)**仅20MB**，免费且无任何广告或捆绑软件。
-- **跨平台**：支持 Mac、Windows、Linux，得益于 `Tauri2` 的跨平台能力，即将支持 iOS 和 Android。
+- **跨平台**：得益于 `Tauri2` 的跨平台能力，支持 Windows、MacOS、Linux、iOS 和 Android，支持免费多设备数据同步。
 - 支持`截图`、`文本`、`插图`、`文件`、`链接`等多种记录方式，满足各类场景的碎片化记录需求。
 - **原生 `Markdown(.md)` 作为存储格式**，拒绝魔改，方便迁移。
 - **原生离线使用**，支持实时同步到 `GitHub、Gitee 私有仓库`，支持历史回滚和 WebDAV 同步。

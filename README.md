@@ -27,7 +27,7 @@ NoteGen is a cross-platform `Markdown` note-taking application dedicated to usin
 ## Why Choose NoteGen?
 
 - Lightweight: [Installation package](https://github.com/codexu/note-gen/releases) is **only 20MB**, free with no ads or bundled software.
-- Cross-platform: Supports Mac, Windows, Linux, and thanks to `Tauri2`'s cross-platform capabilities, will support iOS and Android in the future.
+- Cross-platform capabilities of `Tauri2`, it supports Windows, MacOS, Linux, iOS, and Android, and it supports free multi-device data synchronization.
 - Supports multiple recording methods including `screenshots`, `text`, `illustrations`, `files`, `links`, etc., meeting fragmented recording needs across various scenarios.
 - Native `Markdown(.md)` as storage format, no modifications, easy to migrate.
 - Native offline usage, supporting real-time synchronization to `GitHub, Gitee private repositories` with history rollback, and WebDAV synchronization.
