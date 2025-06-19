@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import baseConfig from '@/app/core/setting/config'
 import { useTranslations } from 'next-intl'
+import { ChevronRight } from "lucide-react";
 
 export function SettingTab() {
   const router = useRouter()
@@ -24,12 +25,15 @@ export function SettingTab() {
         config.map(item => {
           return (
             <li
-              className="flex items-center gap-2 p-4 border-b last:border-b-0 w-full"
+              className="flex items-center gap-2 p-4 border-b last:border-b-0 w-full justify-between"
               key={item.anchor}
               onClick={() => handleNavigation(item.anchor)}
             >
-              {item.icon}
-              <span>{item.title}</span>
+              <div className="flex items-center gap-4">
+                {item.icon}
+                <span className="text-sm">{item.title}</span>
+              </div>
+              <ChevronRight className="size-4" />
             </li>
           )
         })

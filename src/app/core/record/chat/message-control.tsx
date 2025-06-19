@@ -88,17 +88,17 @@ export default function MessageControl({chat, children}: {chat: Chat, children: 
       <>
         <div className='flex items-center gap-1 -translate-x-3'>
           <Button variant={"ghost"} size="sm" disabled>
-            <Clock className="size-4" />
+            <Clock className="size-4 hidden lg:inline" />
             { dayjs(chat.createdAt).fromNow() }
           </Button>
           <Separator orientation="vertical" className="h-4" />
           {
             count ? <>
-              <Button className="hidden lg:flex" variant={"ghost"} size="sm" disabled>
-                <TypeIcon className="size-4" />
-                { count } {t('record.chat.messageControl.words')}
+              <Button variant={"ghost"} size="sm" disabled>
+                <TypeIcon className="size-4 hidden lg:inline" />
+                <span>{ count } {t('record.chat.messageControl.words')}</span>
               </Button>
-              <Separator orientation="vertical" className="h-4 hidden lg:inline" /> 
+              <Separator orientation="vertical" className="h-4" /> 
             </> : null
           }
           
@@ -114,11 +114,14 @@ export default function MessageControl({chat, children}: {chat: Chat, children: 
                     disabled={isTranslating}
                   >
                     <GlobeIcon className="size-4 mr-1" />
-                    {
-                      isTranslating ? 
-                      translateT('translating') : 
-                      (selectedLanguage ? `${translateT('alreadyTranslated')} ${languageOptions
-                        .find(l => l === selectedLanguage)}` : translateT('tooltip'))}
+                    <span className="hidden lg:inline">
+                      {
+                        isTranslating ? 
+                        translateT('translating') : 
+                        (selectedLanguage ? `${translateT('alreadyTranslated')} ${languageOptions
+                          .find(l => l === selectedLanguage)}` : translateT('tooltip'))
+                      }
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
@@ -143,15 +146,10 @@ export default function MessageControl({chat, children}: {chat: Chat, children: 
           )}
           
           {children}
-          {
-            chat.type !== "chat" && 
-            <>
-              <Separator orientation="vertical" className="h-4" />
-              <Button variant={"ghost"} size={"icon"} onClick={deleteHandler}>
-                <XIcon className='size-4' />
-              </Button>
-            </>
-          }
+          <Separator orientation="vertical" className="h-4" />
+          <Button variant={"ghost"} size={"icon"} onClick={deleteHandler}>
+            <XIcon className='size-4' />
+          </Button>
         </div>
         
         {/* 显示翻译结果 */}

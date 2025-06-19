@@ -2,39 +2,39 @@ import { BotMessageSquare, LayoutTemplate, FileUp, ScanText, Store, UserRoundCog
 
 const baseConfig = [
   {
-    icon: <Store />,
+    icon: <Store className="size-4 lg:size-6" />,
     anchor: 'about',
   },
   {
-    icon: <FileUp />,
+    icon: <FileUp className="size-4 lg:size-6" />,
     anchor: 'sync',
   },
   {
-    icon: <BotMessageSquare />,
+    icon: <BotMessageSquare className="size-4 lg:size-6" />,
     anchor: 'ai',
   },
   {
-    icon: <Package />,
+    icon: <Package className="size-4 lg:size-6" />,
     anchor: 'defaultModel',
   },
   {
-    icon: <Drama />,
+    icon: <Drama className="size-4 lg:size-6" />,
     anchor: 'prompt',
   },
   {
-    icon: <LayoutTemplate />,
+    icon: <LayoutTemplate className="size-4 lg:size-6" />,
     anchor: 'template',
   },
   {
-    icon: <FolderOpen />,
+    icon: <FolderOpen className="size-4 lg:size-6" />,
     anchor: 'file',
   },
   {
-    icon: <ScanText />,
+    icon: <ScanText className="size-4 lg:size-6" />,
     anchor: 'ocr',
   },
   {
-    icon: <UserRoundCog />,
+    icon: <UserRoundCog className="size-4 lg:size-6" />,
     anchor: 'dev',
   }
 ]

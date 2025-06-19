@@ -33,11 +33,11 @@ ${chat.content}
     chat.inserted ? 
       <Button variant={"ghost"} size="sm" disabled>
         <CheckCircle className="size-4" />
-        {t('mark.recorded')}
+        <span className="hidden lg:inline">{t('mark.recorded')}</span>
       </Button> :
       <Button variant={"ghost"} size="sm" onClick={handleSuccess}>
         <Highlighter className="size-4" />
-        {t('mark.record')}
+        <span className="hidden lg:inline">{t('mark.record')}</span>
       </Button>
   )
 }
