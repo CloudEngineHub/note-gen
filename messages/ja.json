@@ -23,6 +23,14 @@
     "error": "失敗"
   },
   "settings": {
+    "uploadStore": {
+      "uploadConfirm": "同期リポジトリをプライベートに設定してください。",
+      "downloadConfirm": "ダウンロード配置をローカル配置に上書きし、再起動して有効になります。",
+      "uploadSuccess": "配置を成功しました",
+      "downloadSuccess": "配置を成功しました",
+      "upload": "配置をアップロード",
+      "download": "配置をダウンロード"
+    },
     "prompt": {
       "title": "マスク",
       "promptTitle": "マスク名称",

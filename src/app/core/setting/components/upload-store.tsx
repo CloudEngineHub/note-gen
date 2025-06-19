@@ -11,13 +11,15 @@ import { useState } from "react";
 import { isMobileDevice } from "@/lib/check";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { useTranslations } from "next-intl";
 
 export default function UploadStore() {
   const [upLoading, setUploading] = useState(false)
   const [downLoading, setDownLoading] = useState(false)
+  const t = useTranslations('settings.uploadStore')
 
   async function upload() {
-    const res = await confirm('上传配置请确保同步仓库为私有，否则数据将会泄露！')
+    const res = await confirm(t('uploadConfirm'))
     if (!res) return
     setUploading(true)
     const path = '.settings'
@@ -37,8 +39,7 @@ export default function UploadStore() {
       })
       if (res) {
         toast({
-          title: '上传成功',
-          description: '配置已成功上传',
+          description: t('uploadSuccess'),
         })
       }
     } else if (primaryBackupMethod === 'gitee') {
@@ -53,8 +54,7 @@ export default function UploadStore() {
       })
       if (res) {
         toast({
-          title: '上传成功',
-          description: '配置已成功上传',
+          description: t('uploadSuccess'),
         })
       }
     }
@@ -62,7 +62,7 @@ export default function UploadStore() {
   }
 
   async function download() {
-    const res = await confirm('下载配置将会覆盖本地配置，并且重启生效！')
+    const res = await confirm(t('downloadConfirm'))
     if (!res) return
     setDownLoading(true)
     const path = '.settings'
@@ -83,7 +83,7 @@ export default function UploadStore() {
       })
       if (isMobileDevice()) {
         toast({
-          description: '配置下载成功，请手动重启应用',
+          description: t('downloadSuccess'),
         })
       } else {
         relaunch()
@@ -93,15 +93,15 @@ export default function UploadStore() {
   }
 
   return (
-    <div className="flex gap-1 flex-col border-t justify-center items-center">
+    <div className="flex gap-1 flex-col lg:border-t justify-center items-center">
       <div className="flex gap-2">
         <Button variant={'ghost'} size={'sm'} onClick={upload} disabled={upLoading}>
           {upLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud />}
-          <span>上传配置</span>
+          <span className="hidden lg:inline">{t('upload')}</span>
         </Button>
         <Button variant={'ghost'} size={'sm'} onClick={download} disabled={downLoading}>
           {downLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud />}
-          <span>下载配置</span>
+          <span className="hidden lg:inline">{t('download')}</span>
         </Button>
       </div>
     </div>

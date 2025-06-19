@@ -25,6 +25,14 @@
     "error": "Failed"
   },
   "settings": {
+    "uploadStore": {
+      "uploadConfirm": "Upload configuration please ensure the sync repository is private, otherwise the data will be leaked!",
+      "downloadConfirm": "Download configuration will cover local configuration and restart to take effect!",
+      "uploadSuccess": "Upload success",
+      "downloadSuccess": "Download success",
+      "upload": "Upload configuration",
+      "download": "Download configuration"
+    },
     "about": {
       "title": "About",
       "desc": "A note-taking assistant focused on record and writing.",

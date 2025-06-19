@@ -23,6 +23,14 @@
     "error": "失败"
   },
   "settings": {
+    "uploadStore": {
+      "uploadConfirm": "上传配置请确保同步仓库为私有，否则数据将会泄露！",
+      "downloadConfirm": "下载配置将会覆盖本地配置，并且重启生效！",
+      "uploadSuccess": "上传成功",
+      "downloadSuccess": "下载成功",
+      "upload": "上传配置",
+      "download": "下载配置"
+    },
     "prompt": {
       "title": "Prompt",
       "promptTitle": "Prompt 名称",
