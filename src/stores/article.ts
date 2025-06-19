@@ -343,6 +343,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
       
       if (files) {
         files.forEach((file: GithubContent | GiteeFile) => {
+          // 过滤以"."开头的文件和文件夹
+          if (file.name.startsWith('.')) {
+            return;
+          }
+          
           const itemPath = file.path;
           let currentFolder: DirTree | undefined
           if (file.type === 'dir') {
@@ -409,6 +414,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
     
     if (files && currentFolder) {
       files.forEach((file: GithubContent | GiteeFile) => {
+        // 过滤以"."开头的文件和文件夹
+        if (file.name.startsWith('.')) {
+          return;
+        }
+        
         const index = currentFolder.children?.findIndex(item => item.name === file.name)
         if (index !== undefined && index !== -1 && currentFolder.children) {
           currentFolder.children[index].sha = file.sha

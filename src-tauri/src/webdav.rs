@@ -287,6 +287,15 @@ async fn get_webdav_markdown_files(
 
                 // 只处理Markdown文件
                 if path_str.ends_with(".md") {
+                    // 解码URL并提取文件名
+                    let decoded_path = percent_decode_str(&path_str).decode_utf8_lossy();
+                    let file_name = decoded_path.split('/').last().unwrap_or("");
+                    
+                    // 过滤以"."开头的文件
+                    if file_name.starts_with(".") {
+                        continue;
+                    }
+                    
                     // 计算相对路径，去除WebDAV基础路径
                     let relative_path = if path_str.starts_with(webdav_path) {
                         path_str[webdav_path.len()..].trim_start_matches('/')
@@ -306,6 +315,16 @@ async fn get_webdav_markdown_files(
             // 从 Folder 对象中提取 href
             if let Some(href) = folder.get("href").and_then(|v| v.as_str()) {
                 let folder_path = href.to_string();
+                
+                // 解码URL并提取文件夹名称
+                let decoded_path = percent_decode_str(&folder_path).decode_utf8_lossy();
+                let folder_name = decoded_path.split('/').last().unwrap_or("");
+                
+                // 过滤以"."开头的文件夹
+                if folder_name.starts_with(".") {
+                    continue;
+                }
+                
                 // 去除 WebDAV 基础路径 extract_prefix
                 let prefix = extract_prefix(&folder_path, webdav_path);
                 let path_for_request = folder_path.trim_start_matches(&prefix);

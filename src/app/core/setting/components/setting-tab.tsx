@@ -38,8 +38,8 @@ export function SettingTab() {
   }, [pathname, setLastSettingPage])
 
   return (
-    <div className="flex flex-col w-56 justify-between h-full min-h-screen bg-sidebar">
-      <ul className="w-full border-r p-4 flex flex-col justify-between">
+    <div className="flex flex-col w-56 justify-between h-full min-h-screen bg-sidebar border-r">
+      <ul className="w-full p-4 flex flex-col justify-between">
         {
           config.map(item => {
             return (

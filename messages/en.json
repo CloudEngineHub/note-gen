@@ -170,7 +170,7 @@
       "proxyPlaceholder": "Enter proxy address"
     },
     "ai": {
-      "title": "AI",
+      "title": "Model Management",
       "desc": "Here, you can add and manage various custom model services. After configuration, you will unlock AI-related features, such as organization and conversation functions.",
       "modelTitle": "Custom Name",
       "custom": "Custom",

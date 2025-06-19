@@ -6,6 +6,10 @@ const baseConfig = [
     anchor: 'about',
   },
   {
+    icon: <FileUp />,
+    anchor: 'sync',
+  },
+  {
     icon: <BotMessageSquare />,
     anchor: 'ai',
   },
@@ -20,10 +24,6 @@ const baseConfig = [
   {
     icon: <LayoutTemplate />,
     anchor: 'template',
-  },
-  {
-    icon: <FileUp />,
-    anchor: 'sync',
   },
   {
     icon: <FolderOpen />,
