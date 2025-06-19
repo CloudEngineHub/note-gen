@@ -196,15 +196,15 @@ ${ragContext}
     const request_content = `
       请你扮演一个笔记软件的智能助手的 placeholder，可以参考以下内容笔记的记录，
       以下是通过截图后，使用OCR识别出的文字片段：
-      ${scanMarks.map((item, index) => `${index + 1}. ${item.content}`).join(';\n\n')}。
+      ${scanMarks.map((item, index) => `${index + 1}. ${item.desc?.slice(0, 30)}`).join(';\n\n')}。
       以下是通过文本复制记录的片段：
-      ${textMarks.map((item, index) => `${index + 1}. ${item.content}`).join(';\n\n')}。
+      ${textMarks.map((item, index) => `${index + 1}. ${item.content?.slice(0, 30)}`).join(';\n\n')}。
       以下是插图记录的片段描述：
-      ${imageMarks.map((item, index) => `${index + 1}. ${item.content}`).join(';\n\n')}。
+      ${imageMarks.map((item, index) => `${index + 1}. ${item.desc?.slice(0, 30)}`).join(';\n\n')}。
       以下是文件记录的片段描述：
-      ${fileMarks.map((item, index) => `${index + 1}. ${item.content}`).join(';\n\n')}。
+      ${fileMarks.map((item, index) => `${index + 1}. ${item.desc?.slice(0, 30)}`).join(';\n\n')}。
       以下是链接记录的片段描述：
-      ${linkMarks.map((item, index) => `${index + 1}. ${item.content}`).join(';\n\n')}。
+      ${linkMarks.map((item, index) => `${index + 1}. ${item.desc?.slice(0, 30)}`).join(';\n\n')}。
       以下聊天记录：
       ${chatsAfterClear
         .filter((item) => item.tagId === currentTagId && item.type === "chat")
