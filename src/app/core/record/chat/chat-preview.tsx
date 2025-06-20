@@ -1,8 +1,6 @@
 import useSettingStore from "@/stores/setting";
 import React, { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes'
-import useChatStore from '@/stores/chat';
-import { debounce } from 'lodash-es'
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -31,7 +29,6 @@ export default function ChatPreview({text}: {text: string, themeReverse?: boolea
   const { theme } = useTheme()
   const [mdTheme, setMdTheme] = useState<ThemeType>('light')
   const { codeTheme } = useSettingStore()
-  const { chats } = useChatStore()
   const [htmlContent, setHtmlContent] = useState<string>('');
 
   const md = useRef<MarkdownIt | null>(null);
@@ -57,6 +54,13 @@ export default function ChatPreview({text}: {text: string, themeReverse?: boolea
              '</code></pre>';
     }
     });
+
+    md.current.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+      tokens[idx].attrSet('target', '_blank');
+      tokens[idx].attrSet('rel', 'noopener noreferrer');
+      return self.renderToken(tokens, idx, options);
+    }
+    
     
     // Re-render content when instance is updated
     if (text) {
@@ -72,24 +76,6 @@ export default function ChatPreview({text}: {text: string, themeReverse?: boolea
       setHtmlContent('');
     }
   }, [text]);
-
-  function bindPreviewLink() {
-    setTimeout(() => {
-      const previewContent = previewRef.current;
-      if (!previewContent) return;
-      
-      previewContent.querySelectorAll('a').forEach(item => {
-        item.setAttribute('target', '_blank')
-        item.setAttribute('rel', 'noopener noreferrer')
-      });
-    }, 100);
-  }
-
-  const bindPreviewLinkDebounce = debounce(bindPreviewLink, 1000)
-
-  useEffect(() => {
-    bindPreviewLinkDebounce()
-  }, [chats, htmlContent])
 
   useEffect(() => {
     if (theme === 'system') {
