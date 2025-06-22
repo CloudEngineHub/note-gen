@@ -78,9 +78,9 @@ export default function UploadStore() {
     if (file) {
       const configJson = decodeBase64ToString(file.content)
       const store = await Store.load('store.json');
-      Object.keys(JSON.parse(configJson)).forEach(key => {
-        store.set(key, JSON.parse(configJson)[key])
-      })
+      const keys = Object.keys(JSON.parse(configJson))
+      await Promise.allSettled(keys.map(async key => await store.set(key, JSON.parse(configJson)[key])))
+      await store.save()
       if (isMobileDevice()) {
         toast({
           description: t('downloadSuccess'),
