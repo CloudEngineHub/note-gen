@@ -193,7 +193,7 @@ export function MdEditor() {
               const fileName = `${uuid()}.${files[i].name.split('.')[files[i].name.split('.').length - 1]}`
               let imagesDir = ''
               if (!workspace.isCustom) {
-                imagesDir = `${appDataDirPath}/article/${assetsPath}`
+                imagesDir = `${appDataDirPath}/article/${articlePath}/${assetsPath}`
               } else {
                 imagesDir = `${workspace.path}/${articlePath}/${assetsPath}`
               }

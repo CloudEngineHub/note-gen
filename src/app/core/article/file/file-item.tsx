@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, readTextFile, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { appDataDir } from '@tauri-apps/api/path';
-import { Cloud, CloudDownload, File } from "lucide-react"
+import { Cloud, CloudDownload, File, ImageIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { ask } from '@tauri-apps/plugin-dialog';
 import { Store } from '@tauri-apps/plugin-store';
@@ -408,12 +408,19 @@ export function FileItem({ item }: { item: DirTree }) {
                 }}
               />
             </div> :
-            <span draggable onDragStart={handleDragStart}
+            <span
+              draggable
+              onDragStart={handleDragStart}
+              title={item.name}
               className={`${item.isLocale ? '' : 'opacity-50'} flex justify-between flex-1 select-none items-center gap-1 dark:hover:text-white`}>
               <div className="flex flex-1 gap-1 select-none relative">
                 <span className={item.parent ? 'size-0' : 'size-4 ml-1'}></span>
                 <div className="relative">
-                  { item.isLocale ? <File className="size-4" /> : <CloudDownload className="size-4" /> }
+                  { item.isLocale ? (
+                    item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) ? 
+                    <ImageIcon className="size-4" /> : 
+                    <File className="size-4" />
+                  ) : <CloudDownload className="size-4" /> }
                   { item.sha && item.isLocale && <Cloud className="size-2.5 absolute left-0 bottom-0 z-10 bg-primary-foreground" /> }
                 </div>
                 <span className="text-xs flex-1 line-clamp-1">{item.name}</span>

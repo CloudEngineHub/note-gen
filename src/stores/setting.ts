@@ -317,6 +317,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ assetsPath: path })
     const store = await Store.load('store.json');
     await store.set('assetsPath', path)
+    await store.save()
   },
 }))
 
