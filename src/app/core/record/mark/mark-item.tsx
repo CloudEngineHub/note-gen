@@ -20,48 +20,20 @@ import { LocalImage } from "@/components/local-image";
 import { fetchAiDesc } from "@/lib/ai";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { appDataDir } from "@tauri-apps/api/path";
-// import { invoke } from "@tauri-apps/api/core";
 import { ImageUp } from "lucide-react";
-import { PhotoProvider, PhotoView } from "react-photo-view";
-import { convertImage } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { open } from "@tauri-apps/plugin-shell";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageViewer } from "@/components/image-viewer";
 
 dayjs.extend(relativeTime)
-
-function ImageViewer({mark, path}: {mark: Mark, path?: string}) {
-  const [src, setSrc] = useState('')
-
-  async function init() {
-    const res = mark.url.includes('http') ? mark.url : await convertImage(`/${path}/${mark.url}`)
-    setSrc(res)
-  }
-
-  useEffect(() => {
-    init()
-  }, [])
-
-  return (
-    <PhotoProvider>
-      <PhotoView src={src}>
-        <div>
-          <LocalImage
-            src={mark.url.includes('http') ? mark.url : `/${path}/${mark.url}`}
-            alt=""
-            className="w-14 h-14 object-cover cursor-pointer"
-          />
-        </div>
-      </PhotoView>
-    </PhotoProvider>
-  )
-}
 
 function DetailViewer({mark, content, path}: {mark: Mark, content: string, path?: string}) {
   const [value, setValue] = useState('')
   const { updateMark } = useMarkStore()
   const t = useTranslations('record.mark.type');
   const markT = useTranslations('record.mark');
+
   async function textMarkChangeHandler(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setValue(e.target.value)
     await updateMark({ ...mark, desc: e.target.value, content: e.target.value })
@@ -127,7 +99,7 @@ export function MarkWrapper({mark}: {mark: Mark}) {
           <DetailViewer mark={mark} content={mark.desc || ''} path="screenshot" />
         </div>
         <div className="bg-zinc-900 flex items-center justify-center">
-          <ImageViewer mark={mark} path="screenshot" />
+          <ImageViewer url={mark.url} path="screenshot" />
         </div>
       </div>
     )
@@ -145,7 +117,7 @@ export function MarkWrapper({mark}: {mark: Mark}) {
           <DetailViewer mark={mark} content={mark.desc || ''} path="image" />
         </div>
         <div className="bg-zinc-900 flex items-center justify-center">
-          <ImageViewer mark={mark} path="image" />
+          <ImageViewer url={mark.url} path="image" />
         </div>
       </div>
     )
