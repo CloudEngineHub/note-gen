@@ -243,7 +243,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
     if (workspace.isCustom) {
       // 自定义工作区
       dirs = (await readDir(workspace.path))
-        .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md'))).map(file => ({
+        .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i))).map(file => ({
           ...file,
           isEditing: false,
           isLocale: true,
@@ -255,7 +255,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
     } else {
       // 默认工作区
       dirs = (await readDir('article', { baseDir: BaseDirectory.AppData }))
-        .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md'))).map(file => ({
+        .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i))).map(file => ({
           ...file,
           isEditing: false,
           isLocale: true,
@@ -277,7 +277,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
           
           if (workspace.isCustom) {
             children = (await readDir(dir))
-              .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md')))
+              .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)))
               .map(file => ({
                 ...file,
                 parent: entry,
@@ -289,7 +289,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
             const dirRelative = await toWorkspaceRelativePath(dir)
             const pathOptions = await getFilePathOptions(dirRelative)
             children = (await readDir(pathOptions.path, { baseDir: pathOptions.baseDir }))
-              .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md')))
+              .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.endsWith('.md') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)))
               .map(file => ({
                 ...file,
                 parent: entry,

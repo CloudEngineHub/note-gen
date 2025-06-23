@@ -248,6 +248,11 @@
         "errorDesc": "无法选择工作区目录，请重试",
         "resetError": "重置工作区失败",
         "resetErrorDesc": "无法重置为默认工作区，请重试"
+      },
+      "assets": {
+        "title": "写作资源路径",
+        "desc": "设置写作资源的保存路径，例如图片、视频、文件等，与当前编辑的 markdown 文件同级。",
+        "select": "请设置写作资源路径，例如：assets"
       }
     }
   },

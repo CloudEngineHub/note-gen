@@ -2,8 +2,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { Input } from "@/components/ui/input";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, readTextFile, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
-import { appDataDir } from '@tauri-apps/api/path';
-import { Cloud, CloudDownload, File } from "lucide-react"
+import { Cloud, CloudDownload, File, ImageIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { ask } from '@tauri-apps/plugin-dialog';
 import { Store } from '@tauri-apps/plugin-store';
@@ -14,6 +13,9 @@ import { computedParentPath, getCurrentFolder } from "@/lib/path";
 import { toast } from "@/hooks/use-toast";
 import { useTranslations } from "next-intl";
 import useClipboardStore from "@/stores/clipboard";
+import { PhotoProvider, PhotoView } from "react-photo-view";
+import { convertImageByWorkspace } from "@/lib/utils";
+import { appDataDir } from '@tauri-apps/api/path';
 
 export function FileItem({ item }: { item: DirTree }) {
   const [isEditing, setIsEditing] = useState(item.isEditing)
@@ -22,6 +24,7 @@ export function FileItem({ item }: { item: DirTree }) {
   const { activeFilePath, setActiveFilePath, readArticle, setCurrentArticle, fileTree, setFileTree, loadFileTree } = useArticleStore()
   const { setClipboardItem, clipboardItem, clipboardOperation } = useClipboardStore()
   const t = useTranslations('article.file')
+  const [imageUrl, setImageUrl] = useState('')
   
   const path = computedParentPath(item)
   const isRoot = path.split('/').length === 1
@@ -29,9 +32,20 @@ export function FileItem({ item }: { item: DirTree }) {
   const cacheTree = cloneDeep(fileTree)
   const currentFolder = getCurrentFolder(folderPath, cacheTree)
 
-  function handleSelectFile() {
-    setActiveFilePath(computedParentPath(item))
-    readArticle(computedParentPath(item), item.sha, item.isLocale)
+  async function handleSelectFile() {
+    if (item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) {
+      let path = ''
+      if (item.isLocale) {
+        path = computedParentPath(item)
+      } else {
+        path = activeFilePath
+      }
+      const url = await convertImageByWorkspace(path)
+      setImageUrl(url)
+    } else {
+      setActiveFilePath(computedParentPath(item))
+      readArticle(computedParentPath(item), item.sha, item.isLocale)
+    }
   }
 
   async function handleDeleteFile() {
@@ -381,72 +395,96 @@ export function FileItem({ item }: { item: DirTree }) {
   }, [item])
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        <div
-          className={`${path === activeFilePath ? 'file-manange-item active' : 'file-manange-item'} ${!isRoot && 'translate-x-5 !w-[calc(100%-22px)]'}`}
-          onClick={handleSelectFile}
-          onContextMenu={handleSelectFile}
-        >
-          {
-            isEditing ? 
-            <div className="flex gap-1 items-center w-full select-none">
-              <span className={item.parent ? 'size-0' : 'size-4 ml-1'} />
-              <File className="size-4" />
-              <Input
-                ref={inputRef}
-                className="h-5 rounded-sm text-xs px-1 font-normal flex-1 mr-1"
-                value={name}
-                onBlur={handleRename}
-                onChange={(e) => { setName(e.target.value) }}
-                onKeyDown={(e) => {
-                  if (e.code === 'Enter' && !e.nativeEvent.isComposing) {
-                    handleRename()
-                  } else if (e.code === 'Escape') {
-                    handleEditEnd()
-                  }
-                }}
-              />
-            </div> :
-            <span draggable onDragStart={handleDragStart}
-              className={`${item.isLocale ? '' : 'opacity-50'} flex justify-between flex-1 select-none items-center gap-1 dark:hover:text-white`}>
-              <div className="flex flex-1 gap-1 select-none relative">
-                <span className={item.parent ? 'size-0' : 'size-4 ml-1'}></span>
-                <div className="relative">
-                  { item.isLocale ? <File className="size-4" /> : <CloudDownload className="size-4" /> }
-                  { item.sha && item.isLocale && <Cloud className="size-2.5 absolute left-0 bottom-0 z-10 bg-primary-foreground" /> }
-                </div>
-                <span className="text-xs flex-1 line-clamp-1">{item.name}</span>
-              </div> 
-            </span>
-          }
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem inset onClick={handleShowFileManager}>
-          {t('context.viewDirectory')}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem inset disabled={!item.isLocale} onClick={handleCutFile}>
-          {t('context.cut')}
-        </ContextMenuItem>
-        <ContextMenuItem inset onClick={handleCopyFile}>
-          {t('context.copy')}
-        </ContextMenuItem>
-        <ContextMenuItem inset disabled={!clipboardItem} onClick={handlePasteFile}>
-          {t('context.paste')}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={!item.isLocale} inset onClick={handleStartRename}>
-          {t('context.rename')}
-        </ContextMenuItem>
-        <ContextMenuItem disabled={!item.sha} inset className="text-red-900" onClick={handleDeleteSyncFile}>
-          {t('context.deleteSyncFile')}
-        </ContextMenuItem>
-        <ContextMenuItem disabled={!item.isLocale} inset className="text-red-900" onClick={handleDeleteFile}>
-          {t('context.deleteLocalFile')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger>
+          <div
+            className={`${path === activeFilePath ? 'file-manange-item active' : 'file-manange-item'} ${!isRoot && 'translate-x-5 !w-[calc(100%-22px)]'}`}
+            onClick={handleSelectFile}
+            onContextMenu={handleSelectFile}
+          >
+            {
+              isEditing ? 
+              <div className="flex gap-1 items-center w-full select-none">
+                <span className={item.parent ? 'size-0' : 'size-4 ml-1'} />
+                <File className="size-4" />
+                <Input
+                  ref={inputRef}
+                  className="h-5 rounded-sm text-xs px-1 font-normal flex-1 mr-1"
+                  value={name}
+                  onBlur={handleRename}
+                  onChange={(e) => { setName(e.target.value) }}
+                  onKeyDown={(e) => {
+                    if (e.code === 'Enter' && !e.nativeEvent.isComposing) {
+                      handleRename()
+                    } else if (e.code === 'Escape') {
+                      handleEditEnd()
+                    }
+                  }}
+                />
+              </div> :
+              item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) ? 
+              <PhotoProvider>
+                <PhotoView src={imageUrl}>
+                  <span
+                    draggable
+                    onDragStart={handleDragStart}
+                    title={item.name}
+                    className={`${item.isLocale ? '' : 'opacity-50'} flex justify-between flex-1 select-none items-center gap-1 dark:hover:text-white`}>
+                    <div className="flex flex-1 gap-1 select-none relative">
+                      <span className={item.parent ? 'size-0' : 'size-4 ml-1'}></span>
+                      <div className="relative">
+                        <ImageIcon className="size-4" />
+                        { item.sha && item.isLocale && <Cloud className="size-2.5 absolute left-0 bottom-0 z-10 bg-primary-foreground" /> }
+                      </div>
+                      <span className="text-xs flex-1 line-clamp-1">{item.name}</span>
+                    </div> 
+                  </span>
+                </PhotoView>
+              </PhotoProvider> :
+              <span
+                draggable
+                onDragStart={handleDragStart}
+                title={item.name}
+                className={`${item.isLocale ? '' : 'opacity-50'} flex justify-between flex-1 select-none items-center gap-1 dark:hover:text-white`}>
+                <div className="flex flex-1 gap-1 select-none relative">
+                  <span className={item.parent ? 'size-0' : 'size-4 ml-1'}></span>
+                  <div className="relative">
+                    { item.isLocale ? <File className="size-4" /> : <CloudDownload className="size-4" /> }
+                    { item.sha && item.isLocale && <Cloud className="size-2.5 absolute left-0 bottom-0 z-10 bg-primary-foreground" /> }
+                  </div>
+                  <span className="text-xs flex-1 line-clamp-1">{item.name}</span>
+                </div> 
+              </span>
+            }
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem inset onClick={handleShowFileManager}>
+            {t('context.viewDirectory')}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem inset disabled={!item.isLocale} onClick={handleCutFile}>
+            {t('context.cut')}
+          </ContextMenuItem>
+          <ContextMenuItem inset onClick={handleCopyFile}>
+            {t('context.copy')}
+          </ContextMenuItem>
+          <ContextMenuItem inset disabled={!clipboardItem} onClick={handlePasteFile}>
+            {t('context.paste')}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={!item.isLocale} inset onClick={handleStartRename}>
+            {t('context.rename')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={!item.sha} inset className="text-red-900" onClick={handleDeleteSyncFile}>
+            {t('context.deleteSyncFile')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={!item.isLocale} inset className="text-red-900" onClick={handleDeleteFile}>
+            {t('context.deleteLocalFile')}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    </>
   )
 }

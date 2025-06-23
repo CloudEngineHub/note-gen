@@ -255,6 +255,11 @@
         "errorDesc": "Unable to select workspace directory, please try again",
         "resetError": "Workspace Reset Failed",
         "resetErrorDesc": "Unable to reset to default workspace, please try again"
+      },
+      "assets": {
+        "title": "Assets Path",
+        "desc": "Set the path where resources (e.g. images, videos, files etc.) used in writing will be saved. Resources will be saved at the same level as the currently edited markdown file.",
+        "select": "Set the path where resources used in writing will be saved"
       }
     }
   },

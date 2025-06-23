@@ -22,10 +22,14 @@ import CustomFooter from './custom-footer'
 import { useLocalStorage } from 'react-use'
 import { open } from '@tauri-apps/plugin-shell'
 import { isMobileDevice } from '@/lib/check'
+import { getWorkspacePath } from '@/lib/workspace'
+import { convertFileSrc } from "@tauri-apps/api/core";
+import useSettingStore from '@/stores/setting'
 
 export function MdEditor() {
   const [editor, setEditor] = useState<Vditor>();
   const { currentArticle, saveCurrentArticle, loading, activeFilePath, matchPosition, setMatchPosition } = useArticleStore()
+  const { assetsPath } = useSettingStore()
   const { theme } = useTheme()
   const t = useTranslations('article.editor')
   const { currentLocale } = useI18n()
@@ -159,11 +163,11 @@ export function MdEditor() {
         if (activeFilePath === '') {
           vditor.setValue('', true)
         }
-        
       },
       input: (value) => {
         saveCurrentArticle(value)
         emitter.emit('editor-input')
+        handleLocalImage(vditor)
       },
       mode: localMode,
       upload: {
@@ -180,19 +184,25 @@ export function MdEditor() {
             }
             return filesUrls.join('\n')
           } else {
-            // 保存到本地 images/ 目录下
+            // 保存到 activeFilePath/image 目录下
+            const workspace = await getWorkspacePath()
+            const articlePath = activeFilePath.split('/').slice(0, -1).join('/')
             const appDataDirPath = await appDataDir()
-            const imagesDir = `${appDataDirPath}/image`
-            if (!await exists(imagesDir)) {
-              await mkdir(imagesDir)
-            }
             for (let i = 0; i < files.length; i++) {
               const uint8Array = new Uint8Array(await files[i].arrayBuffer())
               const fileName = `${uuid()}.${files[i].name.split('.')[files[i].name.split('.').length - 1]}`
+              let imagesDir = ''
+              if (!workspace.isCustom) {
+                imagesDir = `${appDataDirPath}/article/${articlePath}/${assetsPath}`
+              } else {
+                imagesDir = `${workspace.path}/${articlePath}/${assetsPath}`
+              }
+              if (!await exists(imagesDir)) {
+                await mkdir(imagesDir)
+              }
               const path = `${imagesDir}/${fileName}`
               await writeFile(path, uint8Array)
-              const imageSrc = await convertImage(`/image/${fileName}`)
-              vditor.insertValue(`![${files[i].name}](${imageSrc})`)
+              vditor.insertValue(`![${files[i].name}](/${assetsPath}/${fileName})`)
             }
             return '图片已保存到本地'
           }
@@ -204,6 +214,36 @@ export function MdEditor() {
           emitter.emit('toolbar-text-number', length)
         }
       }
+    })
+  }
+
+  // 处理本地相对路径图片
+  async function handleLocalImage(vditor: Vditor) {
+    const workspace = await getWorkspacePath()
+    const previews = [vditor.vditor.ir?.element, vditor.vditor.sv?.element, vditor.vditor.wysiwyg?.element]
+    previews.forEach(element => {
+      element?.querySelectorAll('img').forEach(async (img) => {
+        let src = img.getAttribute('src')
+        if (!src) return
+        if (!src.startsWith('http') && !src.startsWith('asset://')) {
+          const articlePath = activeFilePath.split('/').slice(0, -1).join('/')
+          if (src.startsWith('./')) {
+            src = src.slice(2)
+          }
+          if (!src.startsWith('/')) {
+            src = `/${src}`
+          }
+          if (!workspace.isCustom) {
+            const relativePath = `/${workspace.path}/${articlePath}${src}`
+            const tauriSrc = await convertImage(relativePath)
+            img.setAttribute('src', tauriSrc)
+          } else {
+            const relativePath = `${workspace.path}/${articlePath}${src}`
+            const tauriSrc = convertFileSrc(relativePath)
+            img.setAttribute('src', tauriSrc)
+          }
+        }
+      })
     })
   }
 
@@ -436,7 +476,9 @@ export function MdEditor() {
 
   useEffect(() => {
     setContent(currentArticle)
-  }, [currentArticle])
+    if (!editor) return
+    handleLocalImage(editor)
+  }, [currentArticle, editor])
 
   return <div className='flex-1 w-full h-full lg:h-screen flex flex-col overflow-hidden dark:bg-zinc-950'>
     <CustomToolbar editor={editor} />

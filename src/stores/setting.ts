@@ -109,6 +109,9 @@ interface SettingState {
 
   workspacePath: string
   setWorkspacePath: (path: string) => Promise<void>
+
+  assetsPath: string
+  setAssetsPath: (path: string) => Promise<void>
 }
 
 
@@ -307,7 +310,15 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ primaryBackupMethod: method })
     const store = await Store.load('store.json');
     await store.set('primaryBackupMethod', method)
-  }
+  },
+
+  assetsPath: 'assets',
+  setAssetsPath: async (path: string) => {
+    set({ assetsPath: path })
+    const store = await Store.load('store.json');
+    await store.set('assetsPath', path)
+    await store.save()
+  },
 }))
 
 export default useSettingStore

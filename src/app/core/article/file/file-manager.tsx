@@ -10,7 +10,7 @@ import {
 import React, { useEffect, useState } from "react"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import useArticleStore, { DirTree } from "@/stores/article"
-import { BaseDirectory, rename, writeTextFile } from "@tauri-apps/plugin-fs"
+import { BaseDirectory, rename, writeTextFile, writeFile } from "@tauri-apps/plugin-fs"
 import { FileItem } from './file-item'
 import { FolderItem } from "./folder-item"
 import { computedParentPath } from "@/lib/path"
@@ -86,9 +86,23 @@ export function FileManager() {
       const files = e.dataTransfer.files
       for (let i = 0; i < files.length; i += 1) {
         const file = files[i]
+        // 接受 markdown 和图片文件
         if (file.name.endsWith('.md')) {
           const text = await file.text()
           await writeTextFile(`article/${file.name}`, text, { baseDir: BaseDirectory.AppData })
+          addFile({
+            name: file.name,
+            isEditing: false,
+            isLocale: true,
+            isDirectory: false,
+            isFile: true,
+            isSymlink: false
+          })
+        } else if (file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) {
+          // 处理图片文件
+          const arrayBuffer = await file.arrayBuffer()
+          const uint8Array = new Uint8Array(arrayBuffer)
+          await writeFile(`article/${file.name}`, uint8Array, { baseDir: BaseDirectory.AppData })
           addFile({
             name: file.name,
             isEditing: false,

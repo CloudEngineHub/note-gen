@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, mkdir, readDir, readTextFile, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { appDataDir } from '@tauri-apps/api/path';
-import { ChevronRight, Cloud, Folder, FolderDown } from "lucide-react"
+import { ChevronRight, Cloud, Folder, FolderDot, FolderDown, FolderOpen, FolderOpenDot } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { computedParentPath, getCurrentFolder } from "@/lib/path";
 import { useTranslations } from "next-intl";
 import useClipboardStore from "@/stores/clipboard";
 import { ask } from '@tauri-apps/plugin-dialog';
+import useSettingStore from '@/stores/setting'
 
 export function FolderItem({ item }: { item: DirTree }) {
   const [isEditing, setIsEditing] = useState(item.isEditing)
@@ -21,6 +22,7 @@ export function FolderItem({ item }: { item: DirTree }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const t = useTranslations('article.file')
   const { setClipboardItem, clipboardItem, clipboardOperation } = useClipboardStore()
+  const { assetsPath } = useSettingStore()
 
   const { 
     activeFilePath,
@@ -442,7 +444,10 @@ export function FolderItem({ item }: { item: DirTree }) {
                 >
                   <div className="flex flex-1 gap-1 select-none relative">
                     <div className="relative">
-                      {item.isLocale ? <Folder className="size-4" /> : <FolderDown className="size-4" /> }
+                      {collapsibleList.includes(path) ? 
+                        (assetsPath === item.name ? <FolderOpenDot className="size-4" /> : <FolderOpen className="size-4" />) :
+                        (assetsPath === item.name ? <FolderDot className="size-4" /> : <Folder className="size-4" />)
+                      }
                       {item.sha && item.isLocale && <Cloud className="size-2.5 absolute left-0 bottom-0 z-10 bg-primary-foreground" />}
                     </div>
                     <span className="text-xs line-clamp-1">{item.name}</span>
