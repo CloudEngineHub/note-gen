@@ -24,10 +24,12 @@ import { open } from '@tauri-apps/plugin-shell'
 import { isMobileDevice } from '@/lib/check'
 import { getWorkspacePath } from '@/lib/workspace'
 import { convertFileSrc } from "@tauri-apps/api/core";
+import useSettingStore from '@/stores/setting'
 
 export function MdEditor() {
   const [editor, setEditor] = useState<Vditor>();
   const { currentArticle, saveCurrentArticle, loading, activeFilePath, matchPosition, setMatchPosition } = useArticleStore()
+  const { assetsPath } = useSettingStore()
   const { theme } = useTheme()
   const t = useTranslations('article.editor')
   const { currentLocale } = useI18n()
@@ -191,16 +193,16 @@ export function MdEditor() {
               const fileName = `${uuid()}.${files[i].name.split('.')[files[i].name.split('.').length - 1]}`
               let imagesDir = ''
               if (!workspace.isCustom) {
-                imagesDir = `${appDataDirPath}/article/assets`
+                imagesDir = `${appDataDirPath}/article/${assetsPath}`
               } else {
-                imagesDir = `${workspace.path}/${articlePath}/assets`
+                imagesDir = `${workspace.path}/${articlePath}/${assetsPath}`
               }
               if (!await exists(imagesDir)) {
                 await mkdir(imagesDir)
               }
               const path = `${imagesDir}/${fileName}`
               await writeFile(path, uint8Array)
-              vditor.insertValue(`![${files[i].name}](/assets/${fileName})`)
+              vditor.insertValue(`![${files[i].name}](/${assetsPath}/${fileName})`)
             }
             return '图片已保存到本地'
           }
