@@ -3,9 +3,9 @@ import { Store } from '@tauri-apps/plugin-store'
 import { invoke } from '@tauri-apps/api/core'
 
 export enum WebDAVConnectionState {
-  checking = '检测中',
-  success = '可用',
-  fail = '不可用',
+  checking = 'checking',
+  success = 'success',
+  fail = 'failed',
 }
 
 interface WebDAVState {

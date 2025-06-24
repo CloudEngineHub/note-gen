@@ -1,14 +1,20 @@
-import { BotMessageSquare, LayoutTemplate, FileUp, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package } from "lucide-react"
+import { BotMessageSquare, LayoutTemplate, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package, Database, DatabaseBackup } from "lucide-react"
 
 const baseConfig = [
   {
     icon: <Store className="size-4 lg:size-6" />,
     anchor: 'about',
   },
+  '-',
   {
-    icon: <FileUp className="size-4 lg:size-6" />,
+    icon: <DatabaseBackup className="size-4 lg:size-6" />,
     anchor: 'sync',
   },
+  {
+    icon: <Database className="size-4 lg:size-6" />,
+    anchor: 'backupSync',
+  },
+  '-',
   {
     icon: <BotMessageSquare className="size-4 lg:size-6" />,
     anchor: 'ai',
@@ -25,6 +31,7 @@ const baseConfig = [
     icon: <LayoutTemplate className="size-4 lg:size-6" />,
     anchor: 'template',
   },
+  '-',
   {
     icon: <FolderOpen className="size-4 lg:size-6" />,
     anchor: 'file',
@@ -33,6 +40,7 @@ const baseConfig = [
     icon: <ScanText className="size-4 lg:size-6" />,
     anchor: 'ocr',
   },
+  '-',
   {
     icon: <UserRoundCog className="size-4 lg:size-6" />,
     anchor: 'dev',

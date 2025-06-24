@@ -28,8 +28,8 @@
       "downloadConfirm": "ダウンロード配置をローカル配置に上書きし、再起動して有効になります。",
       "uploadSuccess": "配置を成功しました",
       "downloadSuccess": "配置を成功しました",
-      "upload": "配置をアップロード",
-      "download": "配置をダウンロード"
+      "upload": "Upload",
+      "download": "Download"
     },
     "prompt": {
       "title": "マスク",
@@ -138,6 +138,36 @@
         "1m": "1 分",
         "5m": "5 分",
         "30m": "30 分"
+      }
+    },
+    "backupSync": {
+      "title": "データバックアップ",
+      "desc": "ここでは、他の方法でデータをバックアップすることができます。定期的にバックアップを取ることで、データの安全を確保できます。",
+      "webdav": {
+        "connectionState": {
+          "success": "接続済み",
+          "checking": "接続中",
+          "failed": "未接続"
+        },
+        "description": "WebDAVはバックアップソリューションとしてのみ使用され、自動同期や履歴ロールバックなどの機能はサポートしていません。",
+        "backupTo": "WebDAVにバックアップ",
+        "syncFrom": "WebDAVから同期",
+        "serverUrl": "WebDAVサーバーURL",
+        "serverUrlDesc": "WebDAVサーバーのURLを入力してください、例：https://dav.example.com",
+        "serverUrlPlaceholder": "https://dav.example.com",
+        "username": "ユーザー名",
+        "usernameDesc": "WebDAVサーバーのユーザー名",
+        "usernamePlaceholder": "ユーザー名",
+        "password": "パスワード",
+        "passwordDesc": "WebDAVサーバーのパスワード",
+        "passwordPlaceholder": "パスワード",
+        "backupPath": "バックアップパス",
+        "backupPathDesc": "WebDAVサーバー上のバックアップパス、例：/backup/notes",
+        "backupPathPlaceholder": "/backup/notes",
+        "backupSuccess": "バックアップ成功",
+        "backupSuccessDesc": "{count} 個のファイルをWebDAVにバックアップしました。",
+        "syncSuccess": "同期成功",
+        "syncSuccessDesc": "WebDAVからローカルに {count} 個のファイルを同期しました。"
       }
     },
     "template": {

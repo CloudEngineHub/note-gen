@@ -7,8 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Upload, Download, LoaderCircle } from "lucide-react";
 import useWebDAVStore, { WebDAVConnectionState } from "@/stores/webdav";
 import { toast } from "@/hooks/use-toast";
+import { useTranslations } from "next-intl";
 
 export default function WebdavSync() {
+  const t = useTranslations('settings.backupSync.webdav');
   const { 
     url, setUrl,
     username, setUsername,
@@ -45,16 +47,16 @@ export default function WebdavSync() {
   const handleBackupToWebDAV = async () => {
     const res = await backupToWebDAV();
     toast({
-      title: "备份成功",
-      description: `已备份 ${res} 个文件至 WebDAV。`,
+      title: t('backupSuccess'),
+      description: t('backupSuccessDesc', { count: res }),
     });
   };
 
   const handleSyncFromWebDAV = async () => {
     const res = await syncFromWebDAV();
     toast({
-      title: "同步成功",
-      description: `已从 WebDAV 同步至本地 ${res} 个文件。`,
+      title: t('syncSuccess'),
+      description: t('syncSuccessDesc', { count: res }),
     });
   };
 
@@ -76,10 +78,10 @@ export default function WebdavSync() {
                           : 'bg-red-800'
                     }`}
                   >
-                    {connectionState}
+                    {t(`connectionState.${connectionState}`)}
                   </Badge>
                 </CardTitle>
-                <CardDescription>WebDAV 仅作为备用备份方案，不支持自动同步、历史回滚等功能。</CardDescription>
+                <CardDescription>{t('description')}</CardDescription>
               </CardHeader>
               <CardContent className="flex gap-4">
                 <Button 
@@ -95,7 +97,7 @@ export default function WebdavSync() {
                       <Upload />
                     )
                   }
-                  备份至 WebDAV
+                  {t('backupTo')}
                 </Button>
                 <Button 
                   onClick={handleSyncFromWebDAV} 
@@ -110,7 +112,7 @@ export default function WebdavSync() {
                       <Download />
                     )
                   }
-                  从 WebDAV 同步
+                  {t('syncFrom')}
                 </Button>
               </CardContent>
             </Card>
@@ -118,42 +120,42 @@ export default function WebdavSync() {
         </FormItem>
       </SettingRow>
       <SettingRow>
-        <FormItem title="WebDAV 服务器地址" desc="输入WebDAV服务器的URL，例如：https://dav.example.com">
+        <FormItem title={t('serverUrl')} desc={t('serverUrlDesc')}>
           <Input 
             value={url} 
             onChange={handleUrlChange} 
-            placeholder="https://dav.example.com"
+            placeholder={t('serverUrlPlaceholder')}
           />
         </FormItem>
       </SettingRow>
 
       <SettingRow>
-        <FormItem title="用户名" desc="WebDAV服务器的用户名">
+        <FormItem title={t('username')} desc={t('usernameDesc')}>
           <Input 
             value={username} 
             onChange={handleUsernameChange} 
-            placeholder="用户名"
+            placeholder={t('usernamePlaceholder')}
           />
         </FormItem>
       </SettingRow>
 
       <SettingRow>
-        <FormItem title="密码" desc="WebDAV服务器的密码">
+        <FormItem title={t('password')} desc={t('passwordDesc')}>
           <Input 
             value={password} 
             onChange={handlePasswordChange} 
             type="password" 
-            placeholder="密码"
+            placeholder={t('passwordPlaceholder')}
           />
         </FormItem>
       </SettingRow>
 
       <SettingRow>
-        <FormItem title="备份路径" desc="WebDAV服务器上的备份路径，例如：/backup/notes">
+        <FormItem title={t('backupPath')} desc={t('backupPathDesc')}>
           <Input 
             value={path} 
             onChange={handlePathChange} 
-            placeholder="/backup/notes"
+            placeholder={t('backupPathPlaceholder')}
           />
         </FormItem>
       </SettingRow>

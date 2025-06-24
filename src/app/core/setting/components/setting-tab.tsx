@@ -6,6 +6,7 @@ import baseConfig from '../config'
 import { useTranslations } from 'next-intl'
 import useSettingStore from "@/stores/setting"
 import UploadStore from "./upload-store";
+import { Separator } from "@/components/ui/separator";
 
 export function SettingTab() {
   const [currentPage, setCurrentPage] = useState('about')
@@ -15,10 +16,13 @@ export function SettingTab() {
   const { setLastSettingPage } = useSettingStore()
   
   // Add translations to the config
-  const config = baseConfig.map(item => ({
-    ...item,
-    title: t(`${item.anchor}.title`)
-  }))
+  const config = baseConfig.map(item => {
+    if (typeof item === 'string') return item
+    return {
+      ...item,
+      title: t(`${item.anchor}.title`)
+    }
+  })
 
   function handleNavigation(anchor: string) {
     setCurrentPage(anchor)
@@ -41,7 +45,10 @@ export function SettingTab() {
     <div className="flex flex-col w-56 justify-between h-full min-h-screen bg-sidebar border-r">
       <ul className="w-full p-4 flex flex-col justify-between">
         {
-          config.map(item => {
+          config.map((item, index) => {
+            if (typeof item === 'string') return (
+              <Separator key={index} className="my-2" />
+            )
             return (
               <li
                 key={item.anchor}

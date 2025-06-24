@@ -30,8 +30,8 @@
       "downloadConfirm": "Download configuration will cover local configuration and restart to take effect!",
       "uploadSuccess": "Upload success",
       "downloadSuccess": "Download success",
-      "upload": "Upload configuration",
-      "download": "Download configuration"
+      "upload": "Upload",
+      "download": "Download"
     },
     "about": {
       "title": "About",
@@ -140,6 +140,36 @@
         "1m": "1 minute",
         "5m": "5 minutes",
         "30m": "30 minutes"
+      }
+    },
+    "backupSync": {
+      "title": "Backup Data",
+      "desc": "Here, you can use other methods to backup your data, you can regularly backup to ensure data security.",
+      "webdav": {
+        "connectionState": {
+          "success": "Connected",
+          "checking": "Connecting",
+          "failed": "Not Connected"
+        },
+        "description": "WebDAV is only used as a backup solution and does not support auto-sync, history rollback, and other features.",
+        "backupTo": "Backup to WebDAV",
+        "syncFrom": "Sync from WebDAV",
+        "serverUrl": "WebDAV Server URL",
+        "serverUrlDesc": "Enter the URL of the WebDAV server, e.g: https://dav.example.com",
+        "serverUrlPlaceholder": "https://dav.example.com",
+        "username": "Username",
+        "usernameDesc": "WebDAV server username",
+        "usernamePlaceholder": "Username",
+        "password": "Password",
+        "passwordDesc": "WebDAV server password",
+        "passwordPlaceholder": "Password",
+        "backupPath": "Backup Path",
+        "backupPathDesc": "Backup path on the WebDAV server, e.g: /backup/notes",
+        "backupPathPlaceholder": "/backup/notes",
+        "backupSuccess": "Backup Successful",
+        "backupSuccessDesc": "Backed up {count} files to WebDAV.",
+        "syncSuccess": "Sync Successful",
+        "syncSuccessDesc": "Synced {count} files from WebDAV to local."
       }
     },
     "template": {
