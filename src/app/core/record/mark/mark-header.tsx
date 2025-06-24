@@ -18,28 +18,39 @@ import { Button } from "@/components/ui/button"
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { DownloadCloud, LoaderCircle, Menu, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import useTagStore from '@/stores/tag'
+import { useState } from 'react'
 
 export function MarkHeader() {
+  const [syncState, setSyncState] = useState(false)
   const t = useTranslations('record.mark');
-  const { trashState, setTrashState, fetchAllTrashMarks, fetchMarks, uploadMarks, downloadMarks, syncState } = useMarkStore()
+  const { trashState, setTrashState, fetchAllTrashMarks, fetchMarks, uploadMarks, downloadMarks } = useMarkStore()
+  const { uploadTags, downloadTags, fetchTags } = useTagStore()
 
   async function upload() {
-    const res = await uploadMarks()
-    if (res) {
+    setSyncState(true)
+    const tagRes = await uploadTags()
+    const markRes = await uploadMarks()
+    if (tagRes && markRes) {
       toast({
         description: t('uploadSuccess'),
       })
     }
+    setSyncState(false)
   }
 
   async function download() {
-    const res = await downloadMarks()
-    fetchMarks()
-    if (res) {
+    setSyncState(true)
+    const tagRes = await downloadTags()
+    const markRes = await downloadMarks()
+    if (tagRes && markRes) {
+      fetchTags()
+      fetchMarks()
       toast({
         description: t('downloadSuccess'),
       })
     }
+    setSyncState(false)
   }
 
   React.useEffect(() => {

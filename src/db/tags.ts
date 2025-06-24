@@ -67,3 +67,28 @@ export async function delTag(id: number) {
   const db = await getDb();
   return await db.execute("delete from tags where id = $1", [id])
 }
+
+export async function deleteAllTags() {
+  const db = await getDb();
+  return await db.execute("delete from tags where isLocked = false")
+}
+
+export async function insertTags(tags: Tag[]) {
+  const db = await getDb();
+  for (const tag of tags) {
+    if (tag.isLocked) continue;
+    const exists = await db.select<Tag[]>("select * from tags where id = $1", [tag.id])
+    if (exists.length > 0) {
+      await db.execute(
+        "update tags set name = $1, isLocked = $2, isPin = $3 where id = $4",
+        [tag.name, tag.isLocked, tag.isPin, tag.id]
+      )
+    } else {
+      await db.execute(
+        "insert into tags (id, name, isLocked, isPin) values ($1, $2, $3, $4)",
+        [tag.id, tag.name, tag.isLocked, tag.isPin]
+      )
+    }
+  }
+  return true;
+}
