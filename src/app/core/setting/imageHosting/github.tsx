@@ -17,13 +17,14 @@ import { FileImage } from "lucide-react";
 import useImageStore from "@/stores/imageHosting";
 import { createImageRepo, checkImageRepoState } from "@/lib/imageHosting/github";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 dayjs.extend(relativeTime)
 
 export function GithubImageHosting() {
 
   const t = useTranslations();
-  const { setImageRepoUserInfo } = useImageStore()
+  const { setImageRepoUserInfo, mainImageHosting, setMainImageHosting } = useImageStore()
 
   const {
     githubImageAccessToken,
@@ -154,6 +155,21 @@ export function GithubImageHosting() {
               disabled={!githubImageAccessToken || imageRepoState !== SyncStateEnum.success || !useImageRepo}
             />
           </SettingPanel>
+          <SettingRow className="mb-4">
+            {mainImageHosting === 'github' ? (
+              <Button disabled variant="outline">
+                {t('settings.imageHosting.isPrimaryBackup', { type: 'Github' })}
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                onClick={() => setMainImageHosting('github')}
+                disabled={!githubImageAccessToken || imageRepoState !== SyncStateEnum.success}
+              >
+                {t('settings.imageHosting.setPrimaryBackup')}
+              </Button>
+            )}
+          </SettingRow>
         </>
       }
     </div>

@@ -4,6 +4,7 @@ import { Store } from '@tauri-apps/plugin-store';
 import { create } from 'zustand'
 
 interface MarkState {
+  initMainHosting: () => Promise<void>
   path: string
   setPath: (path: string) => void
 
@@ -12,6 +13,10 @@ interface MarkState {
   deleteImage: (name: string) => void
   getImages: () => Promise<void>
 
+  // 主要图床
+  mainImageHosting: string
+  setMainImageHosting: (mainImageHosting: string) => Promise<void>
+  
   // 图床 Github 仓库
   imageRepoUserInfo?: OctokitResponse<UserInfo>
   setImageRepoUserInfo: (imageRepoUserInfo?: OctokitResponse<UserInfo>) => Promise<void>
@@ -22,6 +27,10 @@ interface MarkState {
 }
 
 const useImageStore = create<MarkState>((set, get) => ({
+  initMainHosting: async () => {
+    const store = await Store.load('store.json');
+    await store.set('mainImageHosting', get().mainImageHosting)
+  },
   path: '',
   setPath: (path) => set({ path }),
 
@@ -41,6 +50,15 @@ const useImageStore = create<MarkState>((set, get) => ({
     set({ images: [] })
     const images = await getFiles({ path: get().path, repo: RepoNames.image })
     set({ images: images || [] })
+  },
+
+  // 主要图床
+  mainImageHosting: 'github',
+  setMainImageHosting: async (mainImageHosting) => {
+    set({ mainImageHosting })
+    const store = await Store.load('store.json');
+    await store.set('mainImageHosting', mainImageHosting)
+    await store.save()
   },
 
   imageRepoUserInfo: undefined,

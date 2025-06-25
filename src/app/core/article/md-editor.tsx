@@ -8,13 +8,10 @@ import CustomToolbar from './custom-toolbar'
 import './style.scss'
 import { useTheme } from 'next-themes'
 import { toast } from '@/hooks/use-toast'
-import { fileToBase64, uploadFile } from '@/lib/github'
-import { RepoNames } from '@/lib/github.types'
 import { Store } from '@tauri-apps/plugin-store'
 import { useTranslations } from 'next-intl'
 import { useI18n } from '@/hooks/useI18n'
 import emitter from '@/lib/emitter'
-import dayjs from 'dayjs'
 import { appDataDir } from '@tauri-apps/api/path'
 import { v4 as uuid } from 'uuid'
 import { convertImage } from '@/lib/utils'
@@ -25,6 +22,7 @@ import { isMobileDevice } from '@/lib/check'
 import { getWorkspacePath } from '@/lib/workspace'
 import { convertFileSrc } from "@tauri-apps/api/core";
 import useSettingStore from '@/stores/setting'
+import { uploadImage } from '@/lib/imageHosting'
 
 export function MdEditor() {
   const [editor, setEditor] = useState<Vditor>();
@@ -173,7 +171,7 @@ export function MdEditor() {
       upload: {
         async handler(files: File[]) {
           const store = await Store.load('store.json');
-          const accessToken = await store.get('accessToken')
+          const accessToken = await store.get('githubImageAccessToken')
           const useImageRepo = await store.get('useImageRepo')
           if (accessToken && useImageRepo) {
             const filesUrls = await uploadImages(files)
@@ -257,23 +255,7 @@ export function MdEditor() {
             description: file.name,
             duration: 600000,
           })
-          const path = dayjs().format('YYYY-MM')
-          const fileBase64 = await fileToBase64(file)
-          const ext = file.name.split('.')[file.name.split('.').length - 1]
-          await uploadFile({
-            ext,
-            file: fileBase64,
-            repo: RepoNames.image,
-            path
-          }).then(async res => {
-            const store = await Store.load('store.json');
-            const jsdelivr = await store.get('jsdelivr')
-            let url = res?.data.content.download_url
-            if (jsdelivr) {
-              const githubUsername = await store.get('githubUsername')
-              await fetch(`https://purge.jsdelivr.net/gh/${githubUsername}/${RepoNames.image}@main/${path}/${res?.data.content.name}`)
-              url = `https://cdn.jsdelivr.net/gh/${githubUsername}/${RepoNames.image}@main/${path}/${res?.data.content.name}`
-            }
+          await uploadImage(file).then(async url => {
             resolve(url)
           }).catch(err => {
             reject(err)

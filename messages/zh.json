@@ -142,7 +142,9 @@
     },
     "imageHosting": {
       "title": "图床",
-      "desc": "在这里，你可以配置图床，将图片上传到图床。"
+      "desc": "在这里，你可以配置图床，将图片上传到图床。",
+      "isPrimaryBackup": "当前 {type} 为主要图床",
+      "setPrimaryBackup": "设为主要图床"
     },
     "backupSync": {
       "title": "备用方案",

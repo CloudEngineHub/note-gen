@@ -1,5 +1,5 @@
 'use client';
-import { ImageUp } from "lucide-react"
+import { ImageUp, SquareCheckBig } from "lucide-react"
 import { useTranslations } from 'next-intl';
 import { SettingType } from '../components/setting-base';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,12 +10,15 @@ export default function ImageHostingPage() {
   
   return (
     <SettingType id="imageHosting" icon={<ImageUp />} title={t('settings.imageHosting.title')} desc={t('settings.imageHosting.desc')}>
-      <Tabs defaultValue="Github">
+      <Tabs defaultValue="github">
         <TabsList className="grid grid-cols-2 w-full mb-8">
-          <TabsTrigger value="Github">Github</TabsTrigger>
+          <TabsTrigger value="github" className="flex items-center gap-2">
+            Github
+            <SquareCheckBig className="size-4" />
+          </TabsTrigger>
           <TabsTrigger disabled value="SM.MS">Under development...</TabsTrigger>
         </TabsList>
-        <TabsContent value="Github">
+        <TabsContent value="github">
           <GithubImageHosting />
         </TabsContent>
         <TabsContent value="SM.MS">

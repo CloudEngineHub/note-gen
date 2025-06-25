@@ -12,6 +12,7 @@ import useVectorStore from "@/stores/vector"
 import { AppFootbar } from "@/components/app-footbar"
 import { TooltipProvider } from "@/components/ui/tooltip";
 import './mobile-styles.scss'
+import useImageStore from "@/stores/imageHosting";
 
 export default function RootLayout({
   children,
@@ -19,9 +20,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { initSettingData } = useSettingStore()
+  const { initMainHosting } = useImageStore()
   const { currentLocale } = useI18n()
   useEffect(() => {
     initSettingData()
+    initMainHosting()
     initAllDatabases()
   }, [])
 

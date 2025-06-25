@@ -144,7 +144,9 @@
     },
     "imageHosting": {
       "title": "Image Hosting",
-      "desc": "Here, you can configure image hosting, uploading images to the image hosting service."
+      "desc": "Here, you can configure image hosting, uploading images to the image hosting service.",
+      "isPrimaryBackup": "Current {type} primary image hosting method",
+      "setPrimaryBackup": "Set as Primary Image Hosting"
     },
     "backupSync": {
       "title": "Backup Data",

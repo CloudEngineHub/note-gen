@@ -142,7 +142,9 @@
     },
     "imageHosting": {
       "title": "画像ホスティング",
-      "desc": "ここでは、画像ホスティングを設定できます。"
+      "desc": "ここでは、画像ホスティングを設定できます。",
+      "isPrimaryBackup": "現在の {type} 主要バックアップ方法",
+      "setPrimaryBackup": "主要バックアップ方法として設定"
     },
     "backupSync": {
       "title": "備用方案",
