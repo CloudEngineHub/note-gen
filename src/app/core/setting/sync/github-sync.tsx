@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/github";
 import { RepoNames, SyncStateEnum } from "@/lib/github.types";
 import { DatabaseBackup } from "lucide-react";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 
 dayjs.extend(relativeTime)
 
@@ -114,14 +115,19 @@ export function GithubSync() {
             </CardHeader>
             {
               syncRepoInfo &&
-              <CardContent>
-                <h3 className="text-xl font-bold mt-4 mb-2">
-                  <OpenBroswer title={syncRepoInfo?.full_name || ''} url={syncRepoInfo?.html_url || ''} />
-                </h3>
-                <CardDescription className="flex">
-                  <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(syncRepoInfo?.created_at).fromNow() })}，</p>
-                  <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(syncRepoInfo?.updated_at).fromNow() })}。</p>
-                </CardDescription>
+              <CardContent className="flex items-center gap-4 mt-4">
+                <Avatar className="size-12"  >
+                  <AvatarImage src={syncRepoInfo?.owner.avatar_url || ''} />
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">
+                    <OpenBroswer title={syncRepoInfo?.full_name || ''} url={syncRepoInfo?.html_url || ''} />
+                  </h3>
+                  <CardDescription className="flex">
+                    <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(syncRepoInfo?.created_at).fromNow() })}，</p>
+                    <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(syncRepoInfo?.updated_at).fromNow() })}。</p>
+                  </CardDescription>
+                </div>
               </CardContent>
             }
           </Card>

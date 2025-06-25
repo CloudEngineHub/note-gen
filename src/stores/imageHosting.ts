@@ -1,5 +1,6 @@
 import { getFiles, GithubFile } from '@/lib/github';
-import { GithubRepoInfo, RepoNames, SyncStateEnum } from '@/lib/github.types';
+import { GithubRepoInfo, OctokitResponse, RepoNames, SyncStateEnum, UserInfo } from '@/lib/github.types';
+import { Store } from '@tauri-apps/plugin-store';
 import { create } from 'zustand'
 
 interface MarkState {
@@ -12,6 +13,8 @@ interface MarkState {
   getImages: () => Promise<void>
 
   // 图床 Github 仓库
+  imageRepoUserInfo?: OctokitResponse<UserInfo>
+  setImageRepoUserInfo: (imageRepoUserInfo?: OctokitResponse<UserInfo>) => Promise<void>
   imageRepoState: SyncStateEnum
   setImageRepoState: (imageRepoState: SyncStateEnum) => void
   imageRepoInfo?: GithubRepoInfo
@@ -40,14 +43,22 @@ const useImageStore = create<MarkState>((set, get) => ({
     set({ images: images || [] })
   },
 
+  imageRepoUserInfo: undefined,
+  setImageRepoUserInfo: async (imageRepoUserInfo) => {
+    set({ imageRepoUserInfo })
+    if (!imageRepoUserInfo) return
+    const store = await Store.load('store.json');
+    await store.set('githubImageUsername', imageRepoUserInfo?.data?.login)
+    await store.save()
+  },
   imageRepoState: SyncStateEnum.fail,
-    setImageRepoState: (imageRepoState) => {
-      set({ imageRepoState })
-    },
-    imageRepoInfo: undefined,
-    setImageRepoInfo: (imageRepoInfo) => {
-      set({ imageRepoInfo })
-    },
+  setImageRepoState: (imageRepoState) => {
+    set({ imageRepoState })
+  },
+  imageRepoInfo: undefined,
+  setImageRepoInfo: (imageRepoInfo) => {
+    set({ imageRepoInfo })
+  },
 }))
 
 export default useImageStore

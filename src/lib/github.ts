@@ -1,15 +1,8 @@
 import { toast } from '@/hooks/use-toast';
 import { Store } from '@tauri-apps/plugin-store';
 import { v4 as uuid } from 'uuid';
-import { GithubError, GithubRepoInfo, RepoNames } from './github.types';
+import { GithubError, GithubRepoInfo, OctokitResponse, RepoNames } from './github.types';
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
-
-// 自定义类型，代替 OctokitResponse
-type OctokitResponse<T> = {
-  data: T;
-  status?: number;
-  headers?: Record<string, string>;
-}
 
 export function uint8ArrayToBase64(data: Uint8Array) {
   return Buffer.from(data).toString('base64');
@@ -260,9 +253,9 @@ export async function getFileCommits({ path, repo }: { path: string, repo: RepoN
 }
 
 // 获取 Github 用户信息
-export async function getUserInfo() {
+export async function getUserInfo(token?: string) {
   const store = await Store.load('store.json');
-  const accessToken = await store.get('accessToken')
+  const accessToken = token || await store.get('accessToken')
   if (!accessToken) return;
   
   // 获取代理设置

@@ -11,18 +11,23 @@ import { OpenBroswer } from "@/components/open-broswer";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Switch } from "@/components/ui/switch";
-import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/github";
+import { getUserInfo } from "@/lib/github";
 import { RepoNames, SyncStateEnum } from "@/lib/github.types";
 import { FileImage } from "lucide-react";
 import useImageStore from "@/stores/imageHosting";
+import { createImageRepo, checkImageRepoState } from "@/lib/imageHosting/github";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 
 dayjs.extend(relativeTime)
 
 export function GithubImageHosting() {
+
   const t = useTranslations();
+  const { setImageRepoUserInfo } = useImageStore()
+
   const {
-    accessToken,
-    setAccessToken,
+    githubImageAccessToken,
+    setGithubImageAccessToken,
     useImageRepo,
     setUseImageRepo,
     jsdelivr,
@@ -39,15 +44,19 @@ export function GithubImageHosting() {
   async function checkGithubRepos() {
     try {
       setImageRepoState(SyncStateEnum.checking)
-      await getUserInfo();
+      const store = await Store.load('store.json');
+      const accessToken = await store.get<string>('githubImageAccessToken')
+      const userInfo = await getUserInfo(accessToken);
+      if (!userInfo) return;
+      setImageRepoUserInfo(userInfo)
       // 检查图床仓库状态
-      const imageRepo = await checkSyncRepoState(RepoNames.image)
+      const imageRepo = await checkImageRepoState(RepoNames.image)
       if (imageRepo) {
         setImageRepoInfo(imageRepo)
         setImageRepoState(SyncStateEnum.success)
       } else {
         setImageRepoState(SyncStateEnum.creating)
-        const info = await createSyncRepo(RepoNames.image)
+        const info = await createImageRepo(RepoNames.image)
         if (info) {
           setImageRepoInfo(info)
           setImageRepoState(SyncStateEnum.success)
@@ -67,9 +76,7 @@ export function GithubImageHosting() {
       setImageRepoState(SyncStateEnum.fail)
       setImageRepoInfo(undefined)
     }
-    setAccessToken(value)
-    const store = await Store.load('store.json');
-    await store.set('accessToken', value)
+    await setGithubImageAccessToken(value)
     if (value) {
       checkGithubRepos()
     }
@@ -78,12 +85,12 @@ export function GithubImageHosting() {
   useEffect(() => {
     async function init() {
       const store = await Store.load('store.json');
-      const token = await store.get<string>('accessToken')
+      const token = await store.get<string>('githubImageAccessToken')
       if (token) {
-        setAccessToken(token)
+        await setGithubImageAccessToken(token)
         checkGithubRepos()
       } else {
-        setAccessToken('')
+        await setGithubImageAccessToken('')
       }
     }
     init()
@@ -94,7 +101,7 @@ export function GithubImageHosting() {
       <SettingRow>
         <FormItem title="Github Access Token" desc={t('settings.sync.newTokenDesc')}>
           <OpenBroswer url="https://github.com/settings/tokens/new" title={t('settings.sync.newToken')} className="mb-2" />
-          <Input value={accessToken} onChange={tokenChangeHandler} />
+          <Input value={githubImageAccessToken} onChange={tokenChangeHandler} />
         </FormItem>
       </SettingRow>
       <SettingRow>
@@ -112,14 +119,19 @@ export function GithubImageHosting() {
             </CardHeader>
             {
               imageRepoInfo &&
-              <CardContent>
-                <h3 className="text-xl font-bold mt-4 mb-2">
-                  <OpenBroswer title={imageRepoInfo?.full_name || ''} url={imageRepoInfo?.html_url || ''} />
-                </h3>
-                <CardDescription className="flex">
-                  <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(imageRepoInfo?.created_at).fromNow() })}，</p>
-                  <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(imageRepoInfo?.updated_at).fromNow() })}。</p>
-                </CardDescription>
+              <CardContent className="flex items-center gap-4 mt-4">
+                <Avatar className="size-12"  >
+                  <AvatarImage src={imageRepoInfo?.owner.avatar_url || ''} />
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2 mb-1">
+                    <OpenBroswer title={imageRepoInfo?.full_name || ''} url={imageRepoInfo?.html_url || ''} />
+                  </h3>
+                  <CardDescription className="flex">
+                    <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(imageRepoInfo?.created_at).fromNow() })}，</p>
+                    <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(imageRepoInfo?.updated_at).fromNow() })}。</p>
+                  </CardDescription>
+                </div>
               </CardContent>
             }
           </Card>
@@ -132,14 +144,14 @@ export function GithubImageHosting() {
             <Switch 
               checked={useImageRepo} 
               onCheckedChange={(checked) => setUseImageRepo(checked)} 
-              disabled={!accessToken || imageRepoState !== SyncStateEnum.success}
+              disabled={!githubImageAccessToken || imageRepoState !== SyncStateEnum.success}
             />
           </SettingPanel>
           <SettingPanel title={t('settings.sync.jsdelivrSetting')} desc={t('settings.sync.jsdelivrSettingDesc')}>
             <Switch 
               checked={jsdelivr} 
               onCheckedChange={(checked) => setJsdelivr(checked)} 
-              disabled={!accessToken || imageRepoState !== SyncStateEnum.success || !useImageRepo}
+              disabled={!githubImageAccessToken || imageRepoState !== SyncStateEnum.success || !useImageRepo}
             />
           </SettingPanel>
         </>

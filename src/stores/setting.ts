@@ -112,6 +112,10 @@ interface SettingState {
 
   assetsPath: string
   setAssetsPath: (path: string) => Promise<void>
+
+  // 图床设置
+  githubImageAccessToken: string
+  setGithubImageAccessToken: (githubImageAccessToken: string) => Promise<void>
 }
 
 
@@ -317,6 +321,15 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ assetsPath: path })
     const store = await Store.load('store.json');
     await store.set('assetsPath', path)
+    await store.save()
+  },
+
+  // 图床设置
+  githubImageAccessToken: '',
+  setGithubImageAccessToken: async (githubImageAccessToken: string) => {
+    set({ githubImageAccessToken })
+    const store = await Store.load('store.json');
+    await store.set('githubImageAccessToken', githubImageAccessToken)
     await store.save()
   },
 }))

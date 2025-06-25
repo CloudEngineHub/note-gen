@@ -267,3 +267,10 @@ export enum SyncStateEnum {
   creating = '创建中',
   fail = '不可用',
 }
+
+// 自定义类型，代替 OctokitResponse
+export type OctokitResponse<T> = {
+  data: T;
+  status?: number;
+  headers?: Record<string, string>;
+}
