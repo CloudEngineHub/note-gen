@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import useSettingStore from "@/stores/setting";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { CircleUserRound } from "lucide-react";
-import { UserInfo } from "@/lib/github.types";
+import { SyncStateEnum, UserInfo } from "@/lib/github.types";
 import { RepoNames } from "@/lib/github.types";
-import useSyncStore, { SyncStateEnum } from "@/stores/sync";
+import useSyncStore from "@/stores/sync";
 import { open } from '@tauri-apps/plugin-shell'
 
 export default function AppStatus() {
@@ -16,8 +16,6 @@ export default function AppStatus() {
     giteeUserInfo, 
     setUserInfo, 
     setGiteeUserInfo,
-    setImageRepoState,
-    setImageRepoInfo,
     syncRepoState,
     setSyncRepoState,
     setSyncRepoInfo,
@@ -30,10 +28,7 @@ export default function AppStatus() {
   async function handleGetUserInfo() {
     try {
       if (accessToken) {
-        // 获取 GitHub 用户信息
-        setImageRepoInfo(undefined)
         setSyncRepoInfo(undefined)
-        setImageRepoState(SyncStateEnum.checking)
         setSyncRepoState(SyncStateEnum.checking)
         const res = await getUserInfo()
         if (res) {
@@ -66,22 +61,6 @@ export default function AppStatus() {
   // 检查 GitHub 仓库状态
   async function checkGithubRepos() {
     try {
-      // 检查图床仓库状态
-      const imageRepo = await checkSyncRepoState(RepoNames.image)
-      if (imageRepo) {
-        setImageRepoInfo(imageRepo)
-        setImageRepoState(SyncStateEnum.success)
-      } else {
-        setImageRepoState(SyncStateEnum.creating)
-        const info = await createSyncRepo(RepoNames.image)
-        if (info) {
-          setImageRepoInfo(info)
-          setImageRepoState(SyncStateEnum.success)
-        } else {
-          setImageRepoState(SyncStateEnum.fail)
-        }
-      }
-      
       // 检查同步仓库状态
       const syncRepo = await checkSyncRepoState(RepoNames.sync)
       if (syncRepo) {
@@ -99,7 +78,6 @@ export default function AppStatus() {
       }
     } catch (err) {
       console.error('Failed to check GitHub repos:', err)
-      setImageRepoState(SyncStateEnum.fail)
       setSyncRepoState(SyncStateEnum.fail)
     }
   }

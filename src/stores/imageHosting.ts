@@ -1,5 +1,5 @@
 import { getFiles, GithubFile } from '@/lib/github';
-import { RepoNames } from '@/lib/github.types';
+import { GithubRepoInfo, RepoNames, SyncStateEnum } from '@/lib/github.types';
 import { create } from 'zustand'
 
 interface MarkState {
@@ -10,6 +10,12 @@ interface MarkState {
   pushImage: (image: GithubFile) => void
   deleteImage: (name: string) => void
   getImages: () => Promise<void>
+
+  // 图床 Github 仓库
+  imageRepoState: SyncStateEnum
+  setImageRepoState: (imageRepoState: SyncStateEnum) => void
+  imageRepoInfo?: GithubRepoInfo
+  setImageRepoInfo: (imageRepoInfo?: GithubRepoInfo) => void
 }
 
 const useImageStore = create<MarkState>((set, get) => ({
@@ -33,6 +39,15 @@ const useImageStore = create<MarkState>((set, get) => ({
     const images = await getFiles({ path: get().path, repo: RepoNames.image })
     set({ images: images || [] })
   },
+
+  imageRepoState: SyncStateEnum.fail,
+    setImageRepoState: (imageRepoState) => {
+      set({ imageRepoState })
+    },
+    imageRepoInfo: undefined,
+    setImageRepoInfo: (imageRepoInfo) => {
+      set({ imageRepoInfo })
+    },
 }))
 
 export default useImageStore

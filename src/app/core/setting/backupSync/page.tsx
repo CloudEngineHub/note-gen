@@ -11,7 +11,7 @@ export default function SyncPage() {
   return (
     <SettingType id="sync" icon={<FileUp />} title={t('title')} desc={t('desc')}>
       <Tabs defaultValue="Webdav">
-        <TabsList className="grid grid-cols-2 w-full lg:w-[600px] mb-8">
+        <TabsList className="grid grid-cols-2 w-full mb-4">
           <TabsTrigger value="Webdav">Webdav</TabsTrigger>
           <TabsTrigger disabled value="Others">Under development...</TabsTrigger>
         </TabsList>

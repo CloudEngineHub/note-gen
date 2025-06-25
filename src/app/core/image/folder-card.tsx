@@ -3,7 +3,7 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { GithubFile } from "@/lib/github"
-import useImageStore from "@/stores/image"
+import useImageStore from "@/stores/imageHosting"
 import { Folder } from 'lucide-react'
 
 export function FolderCard({file}: {file: GithubFile}) {

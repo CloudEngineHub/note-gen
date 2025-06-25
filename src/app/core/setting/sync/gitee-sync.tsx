@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useSettingStore from "@/stores/setting";
 import { Store } from "@tauri-apps/plugin-store";
-import useSyncStore, { SyncStateEnum } from "@/stores/sync";
+import useSyncStore from "@/stores/sync";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenBroswer } from "@/components/open-broswer";
@@ -15,7 +15,8 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { checkSyncRepoState, getUserInfo } from "@/lib/gitee";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { RepoNames } from "@/lib/github.types";
+import { RepoNames, SyncStateEnum } from "@/lib/github.types";
+import { DatabaseBackup } from "lucide-react";
 
 dayjs.extend(relativeTime)
 
@@ -101,7 +102,7 @@ export function GiteeSync() {
   }, [])
 
   return (
-    <>
+    <div className="mt-4">
       <SettingRow>
         <FormItem title="Gitee 私人令牌" desc={t('settings.sync.giteeTokenDesc')}>
           <OpenBroswer url="https://gitee.com/profile/personal_access_tokens/new" title={t('settings.sync.newToken')} className="mb-2" />
@@ -110,30 +111,30 @@ export function GiteeSync() {
       </SettingRow>
       <SettingRow>
         <FormItem title={t('settings.sync.repoStatus')}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className={`${giteeSyncRepoInfo ? 'border-b' : ''}`}>
-                <CardTitle className="flex justify-between items-center">
-                  <span>{t('settings.sync.syncRepo')}（{ giteeSyncRepoInfo?.private ? t('settings.sync.private') : t('settings.sync.public') }）</span>
-                  <Badge className={`${giteeSyncRepoState === SyncStateEnum.success ? 'bg-green-800' : 'bg-red-800'}`}>{giteeSyncRepoState}</Badge>
-                </CardTitle>
-                <CardDescription>{t('settings.sync.syncRepoDesc')}</CardDescription>
-              </CardHeader>
-              {
-                giteeSyncRepoInfo &&
-                <CardContent>
-                  <h3 className="text-xl font-bold mt-4 mb-2">
-                    <OpenBroswer title={giteeSyncRepoInfo?.full_name || ''} url={giteeSyncRepoInfo?.html_url || ''} />
-                  </h3>
-                  <CardDescription className="flex">
-                    <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(giteeSyncRepoInfo?.created_at).fromNow() })}，</p>
-                    <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(giteeSyncRepoInfo?.updated_at).fromNow() })}。</p>
-                  </CardDescription>
-                </CardContent>
-              }
-            </Card>
-
-          </div>
+          <Card>
+            <CardHeader className={`${giteeSyncRepoInfo ? 'border-b' : ''}`}>
+              <CardTitle className="flex justify-between items-center">
+                <div className="flex gap-2 items-center">
+                  <DatabaseBackup className="size-4" />
+                  {t('settings.sync.syncRepo')}（{ giteeSyncRepoInfo?.private ? t('settings.sync.private') : t('settings.sync.public') }）
+                </div>
+                <Badge className={`${giteeSyncRepoState === SyncStateEnum.success ? 'bg-green-800' : 'bg-red-800'}`}>{giteeSyncRepoState}</Badge>
+              </CardTitle>
+              <CardDescription>{t('settings.sync.syncRepoDesc')}</CardDescription>
+            </CardHeader>
+            {
+              giteeSyncRepoInfo &&
+              <CardContent>
+                <h3 className="text-xl font-bold mt-4 mb-2">
+                  <OpenBroswer title={giteeSyncRepoInfo?.full_name || ''} url={giteeSyncRepoInfo?.html_url || ''} />
+                </h3>
+                <CardDescription className="flex">
+                  <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(giteeSyncRepoInfo?.created_at).fromNow() })}，</p>
+                  <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(giteeSyncRepoInfo?.updated_at).fromNow() })}。</p>
+                </CardDescription>
+              </CardContent>
+            }
+          </Card>
         </FormItem>
       </SettingRow>
       {
@@ -175,6 +176,6 @@ export function GiteeSync() {
           </Button>
         )}
       </SettingRow>
-    </>
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-import { BotMessageSquare, LayoutTemplate, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package, Database, DatabaseBackup } from "lucide-react"
+import { BotMessageSquare, LayoutTemplate, ScanText, Store, UserRoundCog, Drama, FolderOpen, Package, Database, DatabaseBackup, ImageUp } from "lucide-react"
 
 const baseConfig = [
   {
@@ -9,6 +9,10 @@ const baseConfig = [
   {
     icon: <DatabaseBackup className="size-4 lg:size-6" />,
     anchor: 'sync',
+  },
+  {
+    icon: <ImageUp className="size-4 lg:size-6" />,
+    anchor: 'imageHosting',
   },
   {
     icon: <Database className="size-4 lg:size-6" />,

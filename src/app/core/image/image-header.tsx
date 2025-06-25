@@ -3,7 +3,7 @@ import {TooltipButton} from "@/components/tooltip-button"
 import {TooltipProvider} from "@/components/ui/tooltip"
 import {RefreshCcw} from "lucide-react"
 import * as React from "react"
-import useImageStore from "@/stores/image"
+import useImageStore from "@/stores/imageHosting"
 import {Separator} from "@/components/ui/separator"
 import {convertBytesToSize} from "@/lib/utils"
 import {open} from '@tauri-apps/plugin-shell';

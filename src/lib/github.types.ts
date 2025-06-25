@@ -260,3 +260,10 @@ interface Owner {
   user_view_type: string;
   site_admin: boolean;
 }
+
+export enum SyncStateEnum {
+  checking = '检测中',
+  success = '可用',
+  creating = '创建中',
+  fail = '不可用',
+}
