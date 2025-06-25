@@ -7,7 +7,7 @@ import { GithubFile } from "@/lib/github"
 import { convertBytesToSize } from '@/lib/utils'
 import { deleteFile } from "@/lib/github"
 import { toast } from "@/hooks/use-toast"
-import useImageStore from "@/stores/image"
+import useImageStore from "@/stores/imageHosting"
 import { RepoNames } from "@/lib/github.types"
 import { PhotoProvider, PhotoView } from 'react-photo-view';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@/components/ui/context-menu"

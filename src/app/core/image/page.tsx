@@ -2,7 +2,7 @@
 import { fileToBase64, GithubFile, uploadFile } from '@/lib/github'
 import { useEffect, useState } from 'react'
 import { ImageCard } from './image-card'
-import useImageStore from '@/stores/image'
+import useImageStore from '@/stores/imageHosting'
 import useMarkStore from '@/stores/mark'
 import { ImageHeader } from './image-header'
 import useSettingStore from '@/stores/setting'

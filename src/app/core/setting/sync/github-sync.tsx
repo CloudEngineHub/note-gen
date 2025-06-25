@@ -6,16 +6,17 @@ import { useTranslations } from 'next-intl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import useSettingStore from "@/stores/setting";
 import { Store } from "@tauri-apps/plugin-store";
-import useSyncStore, { SyncStateEnum } from "@/stores/sync";
+import useSyncStore from "@/stores/sync";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenBroswer } from "@/components/open-broswer";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/github";
-import { RepoNames } from "@/lib/github.types";
+import { RepoNames, SyncStateEnum } from "@/lib/github.types";
+import { DatabaseBackup } from "lucide-react";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 
 dayjs.extend(relativeTime)
 
@@ -23,48 +24,23 @@ export function GithubSync() {
   const t = useTranslations();
   const { accessToken,
     setAccessToken,
-    useImageRepo,
-    setUseImageRepo,
-    jsdelivr,
-    setJsdelivr,
     autoSync,
     setAutoSync,
     primaryBackupMethod,
     setPrimaryBackupMethod
   } = useSettingStore()
   const {
-    imageRepoState,
-    setImageRepoState,
     syncRepoState,
     setSyncRepoState,
-    imageRepoInfo,
     syncRepoInfo,
-    setImageRepoInfo,
     setSyncRepoInfo
   } = useSyncStore()
 
   // 检查 GitHub 仓库状态
   async function checkGithubRepos() {
     try {
-      setImageRepoState(SyncStateEnum.checking)
       setSyncRepoState(SyncStateEnum.checking)
       await getUserInfo();
-      // 检查图床仓库状态
-      const imageRepo = await checkSyncRepoState(RepoNames.image)
-      if (imageRepo) {
-        setImageRepoInfo(imageRepo)
-        setImageRepoState(SyncStateEnum.success)
-      } else {
-        setImageRepoState(SyncStateEnum.creating)
-        const info = await createSyncRepo(RepoNames.image)
-        if (info) {
-          setImageRepoInfo(info)
-          setImageRepoState(SyncStateEnum.success)
-        } else {
-          setImageRepoState(SyncStateEnum.fail)
-        }
-      }
-      
       // 检查同步仓库状态
       const syncRepo = await checkSyncRepoState(RepoNames.sync)
       if (syncRepo) {
@@ -82,7 +58,6 @@ export function GithubSync() {
       }
     } catch (err) {
       console.error('Failed to check GitHub repos:', err)
-      setImageRepoState(SyncStateEnum.fail)
       setSyncRepoState(SyncStateEnum.fail)
     }
   }
@@ -90,9 +65,7 @@ export function GithubSync() {
   async function tokenChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     if (value === '') {
-      setImageRepoState(SyncStateEnum.fail)
       setSyncRepoState(SyncStateEnum.fail)
-      setImageRepoInfo(undefined)
       setSyncRepoInfo(undefined)
     }
     setAccessToken(value)
@@ -120,7 +93,7 @@ export function GithubSync() {
   }, [])
 
   return (
-    <>
+    <div className="mt-4">
       <SettingRow>
         <FormItem title="Github Access Token" desc={t('settings.sync.newTokenDesc')}>
           <OpenBroswer url="https://github.com/settings/tokens/new" title={t('settings.sync.newToken')} className="mb-2" />
@@ -129,50 +102,35 @@ export function GithubSync() {
       </SettingRow>
       <SettingRow>
         <FormItem title={t('settings.sync.repoStatus')}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className={`${syncRepoInfo ? 'border-b' : ''}`}>
-                <CardTitle className="flex justify-between items-center">
-                  <span>{t('settings.sync.syncRepo')}（{ syncRepoInfo?.private ? t('settings.sync.private') : t('settings.sync.public') }）</span>
-                  <Badge className={`${syncRepoState === SyncStateEnum.success ? 'bg-green-800' : 'bg-red-800'}`}>{syncRepoState}</Badge>
-                </CardTitle>
-                <CardDescription>{t('settings.sync.syncRepoDesc')}</CardDescription>
-              </CardHeader>
-              {
-                syncRepoInfo &&
-                <CardContent>
-                  <h3 className="text-xl font-bold mt-4 mb-2">
+          <Card>
+            <CardHeader className={`${syncRepoInfo ? 'border-b' : ''}`}>
+              <CardTitle className="flex justify-between items-center">
+                <div className="flex gap-2 items-center">
+                  <DatabaseBackup className="size-4" />
+                  {t('settings.sync.syncRepo')}（{ syncRepoInfo?.private === false ? t('settings.sync.public') : t('settings.sync.private') }）
+                </div>
+                <Badge className={`${syncRepoState === SyncStateEnum.success ? 'bg-green-800' : 'bg-red-800'}`}>{syncRepoState}</Badge>
+              </CardTitle>
+              <CardDescription>{t('settings.sync.syncRepoDesc')}</CardDescription>
+            </CardHeader>
+            {
+              syncRepoInfo &&
+              <CardContent className="flex items-center gap-4 mt-4">
+                <Avatar className="size-12"  >
+                  <AvatarImage src={syncRepoInfo?.owner.avatar_url || ''} />
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-bold mb-1">
                     <OpenBroswer title={syncRepoInfo?.full_name || ''} url={syncRepoInfo?.html_url || ''} />
                   </h3>
                   <CardDescription className="flex">
                     <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(syncRepoInfo?.created_at).fromNow() })}，</p>
                     <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(syncRepoInfo?.updated_at).fromNow() })}。</p>
                   </CardDescription>
-                </CardContent>
-              }
-            </Card>
-            <Card>
-              <CardHeader className={`${imageRepoInfo ? 'border-b' : ''}`}>
-                <CardTitle className="flex justify-between items-center">
-                  <span>{t('settings.sync.imageRepo')} （{ imageRepoInfo?.private ? t('settings.sync.private') : t('settings.sync.public') }）</span>
-                  <Badge className={`${imageRepoState === SyncStateEnum.success ? 'bg-green-800' : 'bg-red-800'}`}>{imageRepoState}</Badge>
-                </CardTitle>
-                <CardDescription>{t('settings.sync.imageRepoDesc')}</CardDescription>
-              </CardHeader>
-              {
-                imageRepoInfo &&
-                <CardContent>
-                  <h3 className="text-xl font-bold mt-4 mb-2">
-                    <OpenBroswer title={imageRepoInfo?.full_name || ''} url={imageRepoInfo?.html_url || ''} />
-                  </h3>
-                  <CardDescription className="flex">
-                    <p className="text-zinc-500 leading-6">{t('settings.sync.createdAt', { time: dayjs(imageRepoInfo?.created_at).fromNow() })}，</p>
-                    <p className="text-zinc-500 leading-6">{t('settings.sync.updatedAt', { time: dayjs(imageRepoInfo?.updated_at).fromNow() })}。</p>
-                  </CardDescription>
-                </CardContent>
-              }
-            </Card>
-          </div>
+                </div>
+              </CardContent>
+            }
+          </Card>
         </FormItem>
       </SettingRow>
       {
@@ -199,25 +157,6 @@ export function GithubSync() {
           </SettingPanel>
         </>
       }
-      {
-        imageRepoInfo &&
-        <>
-          <SettingPanel title={t('settings.sync.imageRepoSetting')} desc={t('settings.sync.imageRepoSettingDesc')}>
-            <Switch 
-              checked={useImageRepo} 
-              onCheckedChange={(checked) => setUseImageRepo(checked)} 
-              disabled={!accessToken || imageRepoState !== SyncStateEnum.success}
-            />
-          </SettingPanel>
-          <SettingPanel title={t('settings.sync.jsdelivrSetting')} desc={t('settings.sync.jsdelivrSettingDesc')}>
-            <Switch 
-              checked={jsdelivr} 
-              onCheckedChange={(checked) => setJsdelivr(checked)} 
-              disabled={!accessToken || imageRepoState !== SyncStateEnum.success || !useImageRepo}
-            />
-          </SettingPanel>
-        </>
-      }
       <SettingRow className="mb-4">
         {primaryBackupMethod === 'github' ? (
           <Button disabled variant="outline">
@@ -233,6 +172,6 @@ export function GithubSync() {
           </Button>
         )}
       </SettingRow>
-    </>
+    </div>
   )
 }

@@ -109,7 +109,7 @@
     },
     "sync": {
       "title": "Sync",
-      "desc": "Here, you can add and manage repositories, helping you sync your notes and images.",
+      "desc": "Here, you can configure the synchronization repository, which can help you synchronize records, markdown files, system configurations and other information.",
       "repoStatus": "Repository Status",
       "syncRepo": "Sync Repository",
       "syncRepoDesc": "Sync markdown files in writing",
@@ -141,6 +141,12 @@
         "5m": "5 minutes",
         "30m": "30 minutes"
       }
+    },
+    "imageHosting": {
+      "title": "Image Hosting",
+      "desc": "Here, you can configure image hosting, uploading images to the image hosting service.",
+      "isPrimaryBackup": "Current {type} primary image hosting method",
+      "setPrimaryBackup": "Set as Primary Image Hosting"
     },
     "backupSync": {
       "title": "Backup Data",

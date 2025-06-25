@@ -11,6 +11,7 @@ import zh from "dayjs/locale/zh-cn";
 import en from "dayjs/locale/en";
 import { useI18n } from "@/hooks/useI18n"
 import useVectorStore from "@/stores/vector"
+import useImageStore from "@/stores/imageHosting"
 
 export default function RootLayout({
   children,
@@ -18,9 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { initSettingData } = useSettingStore()
+  const { initMainHosting } = useImageStore()
   const { currentLocale } = useI18n()
   useEffect(() => {
     initSettingData()
+    initMainHosting()
     initAllDatabases()
   }, [])
 

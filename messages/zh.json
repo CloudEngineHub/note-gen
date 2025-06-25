@@ -107,10 +107,10 @@
     },
     "sync": {
       "title": "同步配置",
-      "desc": "在这里，你可以配置同步仓库，将写作中的文件同步到仓库，并支持图床。",
+      "desc": "在这里，你可以配置同步仓库，它可以帮助你同步记录、markdown 文件、系统配置等信息。",
       "repoStatus": "仓库状态",
       "syncRepo": "同步仓库",
-      "syncRepoDesc": "同步写作中的 markdown 文件",
+      "syncRepoDesc": "同步写作中的 markdown 文件。",
       "imageRepo": "图床仓库",
       "imageRepoDesc": "同步你的图片到图床仓库。",
       "private": "私有",
@@ -140,8 +140,14 @@
         "30m": "30 分钟"
       }
     },
+    "imageHosting": {
+      "title": "图床",
+      "desc": "在这里，你可以配置图床，将图片上传到图床。",
+      "isPrimaryBackup": "当前 {type} 为主要图床",
+      "setPrimaryBackup": "设为主要图床"
+    },
     "backupSync": {
-      "title": "数据备份",
+      "title": "备用方案",
       "desc": "在这里，你可以使用其他方案来备份你的数据，你可以定期进行备份，以确保数据的安全。",
       "webdav": {
         "connectionState": {
