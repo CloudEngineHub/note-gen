@@ -21,7 +21,7 @@ import useSettingStore from "@/stores/setting";
 
 export default function CreateConfig() {
   const t = useTranslations('settings.ai');
-  const { setCurrentAi, setAiConfig } = useSettingStore()
+  const { setCurrentAi, setAiModelList } = useSettingStore()
 
   const [open, setOpen] = useState(false)
 
@@ -48,7 +48,7 @@ export default function CreateConfig() {
       modelType: 'chat'
     }
     const updatedList = [...aiModelList, newModel]
-    setAiConfig(updatedList)
+    setAiModelList(updatedList)
     setCurrentAi(id)
     await store.set('aiModelList', updatedList)
     await store.save()

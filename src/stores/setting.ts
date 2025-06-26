@@ -36,8 +36,8 @@ interface SettingState {
   currentAi: string
   setCurrentAi: (currentAi: string) => void
 
-  aiConfig: AiConfig[]
-  setAiConfig: (aiConfig: AiConfig[]) => void
+  aiModelList: AiConfig[]
+  setAiModelList: (aiModelList: AiConfig[]) => void
 
   primaryModel: string
   setPrimaryModel: (primaryModel: string) => void
@@ -152,8 +152,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
   currentAi: '',
   setCurrentAi: (currentAi) => set({ currentAi }),
 
-  aiConfig: [],
-  setAiConfig: (aiConfig) => set({ aiConfig }),
+  aiModelList: [],
+  setAiModelList: (aiModelList) => set({ aiModelList }),
 
   primaryModel: 'chatgpt',
   setPrimaryModel: (primaryModel) => set({ primaryModel }),

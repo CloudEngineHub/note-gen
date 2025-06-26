@@ -34,12 +34,12 @@ async function getAISettings() {
   const primaryModel = await store.get<string>('primaryModel') || 'openai'
   const chatLanguage = await store.get<string>('chatLanguage')
   const proxyUrl = await store.get<string>('proxyUrl')
-  const aiConfig = await store.get<AiConfig[]>('aiConfig')
-  const model = aiConfig?.find(item => item.key === primaryModel)?.model || ''
-  const baseURL = aiConfig?.find(item => item.key === primaryModel)?.baseURL || ''
-  const apiKey = aiConfig?.find(item => item.key === primaryModel)?.apiKey || ''
-  const temperature = aiConfig?.find(item => item.key === primaryModel)?.temperature || 0.7
-  const topP = aiConfig?.find(item => item.key === primaryModel)?.topP || 1
+  const aiModelList = await store.get<AiConfig[]>('aiModelList')
+  const model = aiModelList?.find(item => item.key === primaryModel)?.model || ''
+  const baseURL = aiModelList?.find(item => item.key === primaryModel)?.baseURL || ''
+  const apiKey = aiModelList?.find(item => item.key === primaryModel)?.apiKey || ''
+  const temperature = aiModelList?.find(item => item.key === primaryModel)?.temperature || 0.7
+  const topP = aiModelList?.find(item => item.key === primaryModel)?.topP || 1
   
   return {
     baseURL,

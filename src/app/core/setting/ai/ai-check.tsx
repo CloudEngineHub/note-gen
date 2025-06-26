@@ -7,11 +7,10 @@ import { useCallback, useEffect, useState } from "react"
 
 // 检测当前 AI 的可用性
 export function AiCheck() {
-  const [state, setState] = useState<'ok' | 'error' | 'checking'>('checking')
-  const { primaryModel, embeddingModel, rerankingModel } = useSettingStore()
+  const [state, setState] = useState<'ok' | 'error' | 'checking' | 'init'>('init')
+  const { currentAi, aiModelList } = useSettingStore()
 
   async function check() {
-    console.log('check');
     setState('checking')
     setTimeout(async() => {
       const aiStatus = await checkAiStatus()
@@ -26,14 +25,18 @@ export function AiCheck() {
   const debouncedCheck = useCallback(debounce(check, 500), [])
 
   useEffect(() => {
+    const model = aiModelList.find(item => item.key === currentAi)
+    if (!model?.model) return
     debouncedCheck()
-  }, [primaryModel, embeddingModel, rerankingModel])
+  }, [currentAi, aiModelList])
 
   if (state === 'ok') {
     return <CircleCheck className="text-green-500 size-4" />
   } else if (state === 'error') {
     return <CircleX className="text-red-500 size-4" />
-  } else {  
+  } else if (state === 'checking') {  
     return <LoaderCircle className="animate-spin size-4" />
+  } else {
+    return null
   }
 }
