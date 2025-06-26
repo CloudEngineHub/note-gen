@@ -58,13 +58,13 @@ export type ModelType = 'chat' | 'image' | 'video' | 'audio' | 'embedding' | 're
 export interface AiConfig {
   key: string
   title: string
-  type: 'built-in' | 'custom'
-  temperature: number
-  topP: number
+  temperature?: number
+  topP?: number
   apiKey?: string
   model?: string
   baseURL?: string
   modelType?: ModelType
+  icon?: string
 }
 
 export interface Model {
@@ -79,74 +79,56 @@ const baseAiConfig: AiConfig[] = [
   {
     key: 'chatgpt',
     title: 'ChatGPT',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://api.openai.com/v1',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/cVMf586WTBYAju4.png',
   },
   {
     key: 'gemini',
     title: 'Gemini',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://generativelanguage.googleapis.com/v1beta',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/JU2jVxLFsW4lB6S.png',
   },
   {
     key: 'grok',
     title: 'Grok',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://api.x.ai/v1',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/JBZMluaobKq43QE.png',
   },
   {
     key: 'ollama',
     title: 'Ollama',
-    type: 'built-in',
     baseURL: 'http://localhost:11434/v1',
-    temperature: 0.7,
-    topP: 1.0,
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/legkEpHACDBQ5Xz.png',
   },
   {
     key: 'lmstudio',
     title: 'LM Studio',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'http://localhost:1234/v1',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/IifFV4HTQ9dpGZE.png',
   },
   {
     key: 'deepseek',
     title: 'DeepSeek',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://api.deepseek.com',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/n39WmsCDbVLQzjr.png',
+  },
+  {
+    key: '302',
+    title: '302.AI',
+    baseURL: 'https://api.302.ai/v1',
+    icon: 'https://s2.loli.net/2025/06/26/4CJOQ2U9ibvoGpR.png'
   },
   {
     key: 'openrouter',
     title: 'OpenRouter',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://openrouter.ai/api/v1',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/CTjSDHLl4XdvxM5.png'
   },
   {
     key: 'siliconflow',
     title: 'SiliconFlow',
-    type: 'built-in',
-    temperature: 0.7,
-    topP: 1.0,
     baseURL: 'https://api.siliconflow.cn/v1',
-    modelType: 'chat',
+    icon: 'https://s2.loli.net/2025/06/25/pPAmrXclsMUZV9o.png'
   },
 ]
 

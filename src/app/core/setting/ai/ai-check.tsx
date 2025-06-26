@@ -1,11 +1,11 @@
-// 检测当前 AI 的可用性
-
+'use client'
 import { checkAiStatus } from "@/lib/ai"
 import useSettingStore from "@/stores/setting"
 import { debounce } from "lodash-es"
 import { CircleCheck, CircleX, LoaderCircle } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 
+// 检测当前 AI 的可用性
 export function AiCheck() {
   const [state, setState] = useState<'ok' | 'error' | 'checking'>('checking')
   const { aiType, apiKey, model, baseURL, embeddingModel, rerankingModel } = useSettingStore()

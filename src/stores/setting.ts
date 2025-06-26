@@ -1,6 +1,7 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
 import { getVersion } from '@tauri-apps/api/app'
+import { AiConfig } from '@/app/core/setting/config'
 
 export enum GenTemplateRange {
   All = '全部',
@@ -30,6 +31,13 @@ interface SettingState {
 
   language: string
   setLanguage: (language: string) => void
+
+  // setting - ai - 当前选择的模型 key
+  currentAi: string
+  setCurrentAi: (currentAi: string) => void
+
+  aiConfig: AiConfig[]
+  setAiConfig: (aiConfig: AiConfig[]) => void
 
   aiType: string
   setAiType: (aiType: string) => void
@@ -153,6 +161,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
   language: '简体中文',
   setLanguage: (language) => set({ language }),
+
+  currentAi: '',
+  setCurrentAi: (currentAi) => set({ currentAi }),
+
+  aiConfig: [],
+  setAiConfig: (aiConfig) => set({ aiConfig }),
 
   aiType: 'chatgpt',
   setAiType: (aiType) => set({ aiType }),
