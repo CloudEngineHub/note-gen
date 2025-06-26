@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import useSettingStore from "@/stores/setting";
-import { AiConfig } from "../config";
 import { Input } from "@/components/ui/input";
-import { Store } from "@tauri-apps/plugin-store";
-import { getModels } from "@/lib/ai";
+import { createOpenAIClient } from "@/lib/ai";
 import OpenAI from "openai";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,12 +15,15 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { AiConfig } from "../config";
+import { Store } from "@tauri-apps/plugin-store";
 
 export default function ModelSelect(
   { model, setModel }:
   { model: string, setModel: (model: string) => void }
 ) {
-  const { primaryModel } = useSettingStore()
+  const [loading, setLoading] = useState(false)
+  const { currentAi } = useSettingStore()
   const [list, setList] = useState<OpenAI.Models.Model[]>([])
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState<string>("") 
@@ -33,28 +34,43 @@ export default function ModelSelect(
   }
 
   async function initModelList() {
-    const models = await getModels()
+    const store = await Store.load('store.json')
+    const aiModelList = await store.get<AiConfig[]>('aiModelList')
+    const model = aiModelList?.find(item => item.key === currentAi)
+    if (!model) return
+    const models = await getModels(model)
     if (!models) return
     setList(models)
-    const store = await Store.load('store.json');
-    const aiModelList = await store.get<AiConfig[]>('aiModelList')
-    if (!aiModelList) return
-    const modelConfig = aiModelList.find(item => item.key === primaryModel)
+    
+    const modelConfig = aiModelList?.find(item => item.key === currentAi)
     if (!modelConfig) return
     setModel(modelConfig.model || '')
   }
 
+  // 获取模型列表
+  async function getModels(model: AiConfig) {
+    try {
+      setLoading(true)
+      const openai = await createOpenAIClient(model)
+      const models = await openai.models.list()
+      const uniqueModels = models.data.filter((model, index) => models.data.findIndex(m => m.id === model.id) === index)
+      return uniqueModels
+    } catch {
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function syncModelList(value: string) {
     setModel(value)
-    const store = await Store.load('store.json');
-    await store.set('model', value)
-
+    const store = await Store.load('store.json')
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    const modelConfig = aiModelList.find(item => item.key === primaryModel)
+    const modelConfig = aiModelList.find(item => item.key === currentAi)
     if (!modelConfig) return
     modelConfig.model = value
-    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = modelConfig
+    aiModelList[aiModelList.findIndex(item => item.key === currentAi)] = modelConfig
     await store.set('aiModelList', aiModelList)
   }
 
@@ -91,12 +107,12 @@ export default function ModelSelect(
   }, [model])
 
   useEffect(() => {
+    setList([])
     initModelList()
-  }, [primaryModel])
+  }, [currentAi])
   
-  return (
-    <div className="flex flex-col">
-      {list.length ? (
+  return (<>
+    {list.length ? (
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -156,14 +172,22 @@ export default function ModelSelect(
             </Command>
           </PopoverContent>
         </Popover>
-      ) : (
-        <Input 
-          value={model} 
-          onChange={(e) => syncModelList(e.target.value)} 
-          className="w-full mt-2" 
-          placeholder="Input model name" 
-        />
-      )}
-    </div>
+      ) :
+        <div className="flex gap-2 items-center">
+          <Input 
+            value={model} 
+            onChange={(e) => syncModelList(e.target.value)} 
+            className="w-full mt-2 lg:w-[360px]" 
+            placeholder="Input model name" 
+          />
+          {loading && 
+            <div className="flex gap-2 items-center text-xs text-muted-foreground mt-2">
+              <Loader2 className="size-4 animate-spin" />
+              Loading models...
+            </div>
+          }
+        </div>
+      }
+    </>
   )
 }

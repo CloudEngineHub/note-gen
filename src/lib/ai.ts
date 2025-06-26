@@ -839,17 +839,3 @@ export async function checkAiStatus() {
     return false
   }
 }
-
-export async function getModels() {
-  try {
-    // 获取AI设置
-    const { baseURL, primaryModel } = await getAISettings()
-    if (!baseURL || !primaryModel) return []
-    const openai = await createOpenAIClient()
-    const models = await openai.models.list()
-    const uniqueModels = models.data.filter((model, index) => models.data.findIndex(m => m.id === model.id) === index)
-    return uniqueModels
-  } catch {
-    return []
-  }
-}

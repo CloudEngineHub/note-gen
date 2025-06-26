@@ -4,6 +4,7 @@ import useSettingStore from "@/stores/setting"
 import { CircleCheck, CircleX, LoaderCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { AiConfig } from "../config"
+import { toast } from "@/hooks/use-toast"
 
 // 检测当前 AI 的可用性
 export function AiCheck() {
@@ -13,7 +14,6 @@ export function AiCheck() {
   async function check() {
     setState('checking')
     const model = aiModelList.find(item => item.key === currentAi)
-    console.log(model);
     if (!model) {
       setState('init')
       return
@@ -28,7 +28,6 @@ export function AiCheck() {
 
   async function checkAiStatus(model: AiConfig) {
     try {
-      console.log(model);
       if (!model) return false
       switch (model.modelType) {
         // 重排序模型测试
@@ -79,16 +78,21 @@ export function AiCheck() {
       }
       return true
     } catch (error) {
-      // 捕获错误但不处理
-      console.error('AI 状态检查失败:', error);
+      toast({
+        description: error instanceof Error ? error.message : 'Error',
+        variant: 'destructive'
+      })
       return false
     }
   }
 
   useEffect(() => {
     const model = aiModelList.find(item => item.key === currentAi)
-    if (!model?.model) return
-    check()
+    if (model?.model) {
+      check()
+    } else {
+      setState('init')
+    }
   }, [currentAi, aiModelList])
 
   if (state === 'ok') {

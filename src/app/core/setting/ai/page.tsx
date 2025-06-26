@@ -14,7 +14,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider"
@@ -25,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import CreateConfig from "./create";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AiPage() {
   const t = useTranslations('settings.ai');
@@ -52,7 +52,7 @@ export default function AiPage() {
   async function modelConfigSelectChange(key: string) {
     const store = await Store.load('store.json');
     const models = await store.get<AiConfig[]>('aiModelList')
-    console.log(models);
+    await store.set('currentAi', key)
     if (!models?.length) return
     const model = models.find(item => item.key === key)
     if (!model) return
@@ -149,50 +149,62 @@ export default function AiPage() {
     async function init() {
       const store = await Store.load('store.json');
       const aiModelList = await store.get<AiConfig[]>('aiModelList')
-      const firstKey = aiModelList?.[0]?.key
-      if (!firstKey) return
-      setCurrentAi(firstKey)
-      modelConfigSelectChange(firstKey)
+      const currentAi = await store.get<string>('currentAi')
+      if (currentAi) {
+        setCurrentAi(currentAi)
+        modelConfigSelectChange(currentAi)
+      } else {
+        const firstKey = aiModelList?.[0]?.key
+        if (!firstKey) return
+        setCurrentAi(firstKey)
+        modelConfigSelectChange(firstKey)
+      }
     }
     init()
   }, [])
 
   return (
     <SettingType id="ai" icon={<BotMessageSquare />} title={t('title')} desc={t('desc')}>
-      <SettingRow>
-        <FormItem title={t('modelConfigTitle')} desc={t('modelConfigDesc')}>
-          <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
-            <Select value={currentAi} onValueChange={modelConfigSelectChange}>
-              <SelectTrigger className="w-full flex">
-                <div className="flex items-center gap-2">
-                  <AiCheck />
-                  <SelectValue />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {
-                  aiModelList.map((item) => (
-                    <SelectItem value={item.key} key={item.key}>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {item.modelType}
-                        </Badge>
-                        {item.title}
-                        { item.model && <span>({item.model})</span>}
-                      </div>
-                    </SelectItem>
-                  ))
-                }
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2">
-              <CreateConfig />
-              <Button disabled={!aiModelList.length} onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
-              <Button disabled={!aiModelList.length} variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
-            </div>
-          </div>
-        </FormItem>
-      </SettingRow>
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>
+            {t('modelConfigTitle')}
+            <span className="ml-2 text-xs text-muted-foreground">({aiModelList.length})</span>
+          </CardTitle>
+          <CardDescription>{t('modelConfigDesc')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Select value={currentAi} onValueChange={modelConfigSelectChange}>
+            <SelectTrigger className="w-full flex">
+              <div className="flex items-center gap-2">
+                <AiCheck />
+                { aiModelList.find(item => item.key === currentAi)?.title}
+                { aiModelList.find(item => item.key === currentAi)?.model && <span>({aiModelList.find(item => item.key === currentAi)?.model})</span>}
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {
+                aiModelList.map((item) => (
+                  <SelectItem value={item.key} key={item.key}>
+                    <div className="flex items-center gap-2">
+                      <Badge>
+                        {t(`modelType.${item.modelType}`)}
+                      </Badge>
+                      {item.title}
+                      { item.model && <span>({item.model})</span>}
+                    </div>
+                  </SelectItem>
+                ))
+              }
+            </SelectContent>
+          </Select>
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <CreateConfig />
+          <Button disabled={!aiModelList.length} variant={'outline'} onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
+          <Button disabled={!aiModelList.length} variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
+        </CardFooter>
+      </Card>
       <SettingRow>
         <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
           <Input value={aiTitle} onChange={(e) => valueChangeHandler('title', e.target.value)} />

@@ -59,7 +59,7 @@ export default function CreateConfig() {
     <Dialog open={open} onOpenChange={setOpen}>
       <form>
         <DialogTrigger asChild>
-          <Button variant="outline">
+          <Button>
             <Plus />{t('create')}
           </Button>
         </DialogTrigger>
