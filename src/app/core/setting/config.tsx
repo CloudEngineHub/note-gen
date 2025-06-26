@@ -87,7 +87,7 @@ const baseAiConfig: AiConfig[] = [
   {
     key: 'gemini',
     title: 'Gemini',
-    baseURL: 'https://generativelanguage.googleapis.com/v1beta',
+    baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai',
     icon: 'https://s2.loli.net/2025/06/25/JU2jVxLFsW4lB6S.png',
     apiKeyUrl: 'https://aistudio.google.com/app/apikey'
   },
