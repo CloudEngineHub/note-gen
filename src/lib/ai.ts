@@ -360,7 +360,7 @@ async function prepareMessages(text: string, primaryModel: string, includeLangua
 /**
  * 创建OpenAI客户端，适用于所有AI类型
  */
-async function createOpenAIClient(AiConfig?: AiConfig) {
+export async function createOpenAIClient(AiConfig?: AiConfig) {
   const store = await Store.load('store.json')
   let baseURL
   let apiKey

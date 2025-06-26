@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import useSettingStore from "@/stores/setting";
 import { Store } from "@tauri-apps/plugin-store";
 import { BotMessageSquare, Copy, X } from "lucide-react";
-import ModelSelect from "./model-select";
+import ModelSelect from "./modelSelect";
 import { AiConfig, ModelType } from "../config";
 import * as React from "react"
 import {
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider"
 import { v4 } from 'uuid';
 import { confirm } from '@tauri-apps/plugin-dialog';
-import { AiCheck } from "./ai-check";
+import { AiCheck } from "./check";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import CreateConfig from "./create";
