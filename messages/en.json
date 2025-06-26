@@ -229,6 +229,7 @@
       "copyConfig": "Copy",
       "builtin": "Built-in",
       "modelSupport": "Only supports AI models with OpenAI protocol",
+      "apiKeyUrl": "Create API Key",
       "modelType": {
         "title": "Model Type",
         "desc": "Select the type of AI model based on its capability",

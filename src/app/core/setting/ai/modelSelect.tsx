@@ -114,7 +114,7 @@ export default function ModelSelect(
   return (<>
     {list.length ? (
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
+          <PopoverTrigger className="w-full" asChild>
             <Button
               variant="outline"
               role="combobox"
@@ -173,17 +173,17 @@ export default function ModelSelect(
           </PopoverContent>
         </Popover>
       ) :
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 flex-col">
           <Input 
             value={model} 
             onChange={(e) => syncModelList(e.target.value)} 
-            className="w-full mt-2 lg:w-[360px]" 
+            className="w-full mt-2" 
             placeholder="Input model name" 
           />
           {loading && 
-            <div className="flex gap-2 items-center text-xs text-muted-foreground mt-2">
+            <div className="flex gap-2 items-center text-xs text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              Loading models...
+              <p className="line-clamp-1 flex-1">Loading models...</p>
             </div>
           }
         </div>

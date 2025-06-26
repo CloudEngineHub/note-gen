@@ -227,6 +227,7 @@
       "copyConfig": "コピー",
       "builtin": "内蔵",
       "modelSupport": "OpenAIプロトコル対応のAIモデルのみサポート",
+      "apiKeyUrl": "Create API Key",
       "modelType": {
         "title": "モデルタイプ",
         "desc": "能力に基づいてAIモデルのタイプを選択します",

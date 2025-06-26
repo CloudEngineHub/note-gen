@@ -24,7 +24,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import CreateConfig from "./create";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { OpenBroswer } from "@/components/open-broswer";
+import { baseAiConfig } from "../config";
 
 export default function AiPage() {
   const t = useTranslations('settings.ai');
@@ -163,136 +164,153 @@ export default function AiPage() {
     init()
   }, [])
 
+  useEffect(() => {
+    modelConfigSelectChange(currentAi)
+  }, [currentAi])
+
   return (
     <SettingType id="ai" icon={<BotMessageSquare />} title={t('title')} desc={t('desc')}>
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>
-            {t('modelConfigTitle')}
-            <span className="ml-2 text-xs text-muted-foreground">({aiModelList.length})</span>
-          </CardTitle>
-          <CardDescription>{t('modelConfigDesc')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Select value={currentAi} onValueChange={modelConfigSelectChange}>
-            <SelectTrigger className="w-full flex">
-              <div className="flex items-center gap-2">
-                <AiCheck />
-                { aiModelList.find(item => item.key === currentAi)?.title}
-                { aiModelList.find(item => item.key === currentAi)?.model && <span>({aiModelList.find(item => item.key === currentAi)?.model})</span>}
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {
-                aiModelList.map((item) => (
-                  <SelectItem value={item.key} key={item.key}>
-                    <div className="flex items-center gap-2">
-                      <Badge>
-                        {t(`modelType.${item.modelType}`)}
-                      </Badge>
-                      {item.title}
-                      { item.model && <span>({item.model})</span>}
-                    </div>
-                  </SelectItem>
-                ))
-              }
-            </SelectContent>
-          </Select>
-        </CardContent>
-        <CardFooter className="flex gap-2">
-          <CreateConfig />
-          <Button disabled={!aiModelList.length} variant={'outline'} onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
-          <Button disabled={!aiModelList.length} variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
-        </CardFooter>
-      </Card>
-      <SettingRow>
-        <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
-          <Input value={aiTitle} onChange={(e) => valueChangeHandler('title', e.target.value)} />
-        </FormItem>
-      </SettingRow>
-      <SettingRow>
-        <FormItem title="BaseURL" desc={t('modelBaseUrlDesc')}>
-          <Input value={baseURL} onChange={(e) => valueChangeHandler('baseURL', e.target.value)} />
-        </FormItem>
-      </SettingRow>
-      <SettingRow>
-        <FormItem title="API Key">
-          <Input value={apiKey} onChange={(e) => valueChangeHandler('apiKey', e.target.value)} />
-        </FormItem>
-      </SettingRow>
-      <SettingRow>
-        <FormItem title="Model" desc={t('modelDesc')}>
-          <ModelSelect model={model} setModel={(model) => valueChangeHandler('model', model)} />
-        </FormItem>
-      </SettingRow>
-      <SettingRow>
-        <FormItem title={t('modelType.title')} desc={t('modelType.desc')}>
-          <RadioGroup
-            value={modelType}
-            onValueChange={(value) => valueChangeHandler('modelType', value as ModelType)}
-            className="flex flex-wrap gap-6 m-2"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="chat" id="chat" />
-              <Label htmlFor="chat">{t('modelType.chat')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="image" id="image" disabled />
-              <Label htmlFor="image" className="text-muted-foreground">{t('modelType.image')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="video" id="video" disabled />
-              <Label htmlFor="video" className="text-muted-foreground">{t('modelType.video')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="audio" id="audio" disabled />
-              <Label htmlFor="audio" className="text-muted-foreground">{t('modelType.audio')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="embedding" id="embedding" />
-              <Label htmlFor="embedding">{t('modelType.embedding')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="rerank" id="rerank" />
-              <Label htmlFor="rerank">{t('modelType.rerank')}</Label>
-            </div>
-          </RadioGroup>
-        </FormItem>
-      </SettingRow>
+      <CreateConfig />
       {
-        modelType === 'chat' && (
-          <>
+        aiModelList.length > 0 && <>
+        {/* 模型配置选择 */}
+        <SettingRow>
+          <FormItem title={t('modelConfigTitle')} desc={t('modelConfigDesc')}>
+            <div className="flex items-center gap-2">
+              <Select value={currentAi} onValueChange={modelConfigSelectChange}>
+                <SelectTrigger className="w-full flex">
+                  <div className="flex items-center gap-2">
+                    <AiCheck />
+                    { aiModelList.find(item => item.key === currentAi)?.title}
+                    { aiModelList.find(item => item.key === currentAi)?.model && <span>({aiModelList.find(item => item.key === currentAi)?.model})</span>}
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {
+                    aiModelList.map((item) => (
+                      <SelectItem value={item.key} key={item.key}>
+                        <div className="flex items-center gap-2">
+                          <Badge>
+                            {t(`modelType.${item.modelType}`)}
+                          </Badge>
+                          {item.title}
+                          { item.model && <span>({item.model})</span>}
+                        </div>
+                      </SelectItem>
+                    ))
+                  }
+                </SelectContent>
+              </Select>
+              <Button disabled={!aiModelList.length} variant={'outline'} onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
+              <Button disabled={!aiModelList.length} variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
+            </div>
+          </FormItem>
+        </SettingRow>
+        {/* 模型名称 */}
+        <SettingRow>
+          <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
+            <Input value={aiTitle} onChange={(e) => valueChangeHandler('title', e.target.value)} />
+          </FormItem>
+        </SettingRow>
+        {/* BaseURL */}
+        <SettingRow>
+          <FormItem title="BaseURL" desc={t('modelBaseUrlDesc')}>
+            <Input value={baseURL} onChange={(e) => valueChangeHandler('baseURL', e.target.value)} />
+          </FormItem>
+        </SettingRow>
+        {/* API Key */}
+        <SettingRow>
+          <FormItem title="API Key">
+            <div className="flex gap-2">
+              <Input value={apiKey} onChange={(e) => valueChangeHandler('apiKey', e.target.value)} />
+              {
+                baseAiConfig.find(item => item.baseURL === baseURL)?.apiKeyUrl &&
+                <OpenBroswer
+                  type="button"
+                  url={baseAiConfig.find(item => item.baseURL === baseURL)?.apiKeyUrl || ''}
+                  title={t('apiKeyUrl')}
+                />
+              }
+            </div>
+          </FormItem>
+        </SettingRow>
+        {/* 模型 */}
+        <SettingRow>
+          <FormItem title="Model" desc={t('modelDesc')}>
+            <ModelSelect model={model} setModel={(model) => valueChangeHandler('model', model)} />
+          </FormItem>
+        </SettingRow>
+        {/* 模型类型 */}
+        <SettingRow>
+          <FormItem title={t('modelType.title')} desc={t('modelType.desc')}>
+            <RadioGroup
+              value={modelType}
+              onValueChange={(value) => valueChangeHandler('modelType', value as ModelType)}
+              className="flex flex-wrap gap-6 m-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="chat" id="chat" />
+                <Label htmlFor="chat">{t('modelType.chat')}</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="image" id="image" disabled />
+                <Label htmlFor="image" className="text-muted-foreground">{t('modelType.image')}</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="video" id="video" disabled />
+                <Label htmlFor="video" className="text-muted-foreground">{t('modelType.video')}</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="audio" id="audio" disabled />
+                <Label htmlFor="audio" className="text-muted-foreground">{t('modelType.audio')}</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="embedding" id="embedding" />
+                <Label htmlFor="embedding">{t('modelType.embedding')}</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="rerank" id="rerank" />
+                <Label htmlFor="rerank">{t('modelType.rerank')}</Label>
+              </div>
+            </RadioGroup>
+          </FormItem>
+        </SettingRow>
+        {
+          modelType === 'chat' && (
+            <>
+              <SettingRow>
+                <FormItem title="Temperature" desc={t('temperatureDesc')}>
+                  <div className="flex gap-2 py-2">
+                    <Slider
+                      className="w-64"
+                      value={[temperature]}
+                    max={2}
+                    step={0.01}
+                    onValueChange={(value) => valueChangeHandler('temperature', value[0])}
+                    />
+                    <span className="text-zinc-500">{temperature}</span>
+                  </div>
+                </FormItem>
+            </SettingRow>
             <SettingRow>
-              <FormItem title="Temperature" desc={t('temperatureDesc')}>
+              <FormItem title="Top P" desc={t('topPDesc')}>
                 <div className="flex gap-2 py-2">
                   <Slider
                     className="w-64"
-                    value={[temperature]}
-                  max={2}
-                  step={0.01}
-                  onValueChange={(value) => valueChangeHandler('temperature', value[0])}
+                    value={[topP]}
+                    max={1}
+                    min={0}
+                    step={0.01}
+                    onValueChange={(value) => valueChangeHandler('topP', value[0])}
                   />
-                  <span className="text-zinc-500">{temperature}</span>
+                  <span className="text-zinc-500">{topP}</span>
                 </div>
               </FormItem>
-          </SettingRow>
-          <SettingRow>
-            <FormItem title="Top P" desc={t('topPDesc')}>
-              <div className="flex gap-2 py-2">
-                <Slider
-                  className="w-64"
-                  value={[topP]}
-                  max={1}
-                  min={0}
-                  step={0.01}
-                  onValueChange={(value) => valueChangeHandler('topP', value[0])}
-                />
-                <span className="text-zinc-500">{topP}</span>
-              </div>
-            </FormItem>
-          </SettingRow>
-        </>)
-      }
+            </SettingRow>
+          </>)
+        }
+      </>
+    }
     </SettingType>
   )
 }

@@ -92,7 +92,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className="w-full lg:w-[480px] justify-between"
+              className="w-full lg:w-[520px] justify-between"
             >
               {model
                 ? `${list.find((item) => item.key === model)?.model}(${list.find((item) => item.key === model)?.title})`

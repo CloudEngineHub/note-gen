@@ -65,6 +65,7 @@ export interface AiConfig {
   baseURL?: string
   modelType?: ModelType
   icon?: string
+  apiKeyUrl?: string
 }
 
 export interface Model {
@@ -81,18 +82,21 @@ const baseAiConfig: AiConfig[] = [
     title: 'ChatGPT',
     baseURL: 'https://api.openai.com/v1',
     icon: 'https://s2.loli.net/2025/06/25/cVMf586WTBYAju4.png',
+    apiKeyUrl: 'https://platform.openai.com/api-keys'
   },
   {
     key: 'gemini',
     title: 'Gemini',
     baseURL: 'https://generativelanguage.googleapis.com/v1beta',
     icon: 'https://s2.loli.net/2025/06/25/JU2jVxLFsW4lB6S.png',
+    apiKeyUrl: 'https://aistudio.google.com/app/apikey'
   },
   {
     key: 'grok',
     title: 'Grok',
     baseURL: 'https://api.x.ai/v1',
     icon: 'https://s2.loli.net/2025/06/25/JBZMluaobKq43QE.png',
+    apiKeyUrl: 'https://console.x.ai/'
   },
   {
     key: 'ollama',
@@ -111,24 +115,28 @@ const baseAiConfig: AiConfig[] = [
     title: 'DeepSeek',
     baseURL: 'https://api.deepseek.com',
     icon: 'https://s2.loli.net/2025/06/25/n39WmsCDbVLQzjr.png',
+    apiKeyUrl: 'https://platform.deepseek.com/api_keys'
   },
   {
     key: '302',
     title: '302.AI',
     baseURL: 'https://api.302.ai/v1',
-    icon: 'https://s2.loli.net/2025/06/26/4CJOQ2U9ibvoGpR.png'
+    icon: 'https://s2.loli.net/2025/06/26/4CJOQ2U9ibvoGpR.png',
+    apiKeyUrl: 'https://share.302.ai/jfFrIP'
   },
   {
     key: 'openrouter',
     title: 'OpenRouter',
     baseURL: 'https://openrouter.ai/api/v1',
-    icon: 'https://s2.loli.net/2025/06/25/CTjSDHLl4XdvxM5.png'
+    icon: 'https://s2.loli.net/2025/06/25/CTjSDHLl4XdvxM5.png',
+    apiKeyUrl: 'https://openrouter.ai/api-keys'
   },
   {
     key: 'siliconflow',
     title: 'SiliconFlow',
     baseURL: 'https://api.siliconflow.cn/v1',
-    icon: 'https://s2.loli.net/2025/06/25/pPAmrXclsMUZV9o.png'
+    icon: 'https://s2.loli.net/2025/06/25/pPAmrXclsMUZV9o.png',
+    apiKeyUrl: 'https://cloud.siliconflow.cn/i/O2ciJeZw'
   },
 ]
 
