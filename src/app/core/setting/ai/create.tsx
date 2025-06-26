@@ -21,7 +21,7 @@ import useSettingStore from "@/stores/setting";
 
 export default function CreateConfig() {
   const t = useTranslations('settings.ai');
-  const { setAiConfig, setCurrentAi } = useSettingStore()
+  const { setCurrentAi, setAiConfig } = useSettingStore()
 
   const [open, setOpen] = useState(false)
 

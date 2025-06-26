@@ -5,7 +5,7 @@ import useSettingStore from "@/stores/setting";
 
 export function Setting({id, icon}: {id: string, icon?: React.ReactNode}) {
   const t = useTranslations('settings.defaultModel');
-  const { model, aiType } = useSettingStore()
+  const { model, primaryModel, aiConfig } = useSettingStore()
 
   const options = [
     {
@@ -39,7 +39,7 @@ export function Setting({id, icon}: {id: string, icon?: React.ReactNode}) {
     <SettingType id={id} icon={icon} title={t('title')} desc={t('desc')}>
       <SettingRow>
         <FormItem title={t('mainModel')}>
-          <p>{`${model}(${aiType})`}</p>
+          <p>{`${model}(${aiConfig.find(item => item.key === primaryModel)?.title})`}</p>
         </FormItem>
       </SettingRow>
       {options.map((option) => (

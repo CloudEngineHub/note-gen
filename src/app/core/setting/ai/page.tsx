@@ -24,24 +24,22 @@ import { AiCheck } from "./ai-check";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import CreateConfig from "./create";
+import { Badge } from "@/components/ui/badge";
 
 export default function AiPage() {
   const t = useTranslations('settings.ai');
   const {
     currentAi,
     setCurrentAi,
-    aiType,
-    setAiType,
-    apiKey,
-    setApiKey,
-    baseURL,
-    setBaseURL,
-    setModel,
-    setAiTitle,
+    primaryModel,
+    setPrimaryModel,
     aiConfig,
     setAiConfig
   } = useSettingStore()
-  const [title, setTitle] = useState<string>('')
+  const [apiKey, setApiKey] = useState<string>('')
+  const [baseURL, setBaseURL] = useState<string>('')
+  const [model, setModel] = useState<string>('')
+  const [aiTitle, setAiTitle] = useState<string>('')
   const [temperature, setTemperature] = useState<number>(0.7)
   const [topP, setTopP] = useState<number>(1.0)
   const [modelType, setModelType] = useState<ModelType>('chat')
@@ -51,7 +49,7 @@ export default function AiPage() {
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    setAiType(key)
+    setPrimaryModel(key)
     const model = aiModelList.find(item => item.key === key)
     if (model?.modelType) {
       setModelType(model.modelType)
@@ -76,9 +74,9 @@ export default function AiPage() {
       default:
         break;
     }
-    await store.set('aiType', key)
+    await store.set('primaryModel', key)
     setCurrentAi(aiConfig.find(item => item.key === key)?.key || '')
-    setAiType(key)
+    setPrimaryModel(key)
     if (!model) return
     setBaseURL(model.baseURL || '')
     store.set('baseURL', model.baseURL || '')
@@ -94,14 +92,14 @@ export default function AiPage() {
 
   // 自定义名称
   async function titleChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
-    setTitle(e.target.value)
-    const model = await getModelByStore(aiType)
+    setAiTitle(e.target.value)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     model.title = e.target.value
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = model
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = model
     setAiConfig(aiModelList)
     await store.set('aiModelList', aiModelList)
     await store.set('aiTitle', model.title || '')
@@ -112,14 +110,14 @@ export default function AiPage() {
   async function baseURLChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     setBaseURL(value)
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     model.baseURL = value
     const store = await Store.load('store.json');
     store.set('baseURL', value)
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = model
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = model
     await store.set('aiModelList', aiModelList)
   }
 
@@ -127,14 +125,14 @@ export default function AiPage() {
   async function apiKeyChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value
     setApiKey(value)
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     model.apiKey = value
     const store = await Store.load('store.json');
     store.set('apiKey', value)
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = model
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = model
     await store.set('aiModelList', aiModelList)
   }
 
@@ -142,31 +140,31 @@ export default function AiPage() {
   async function deleteCustomModelHandler() {
     const res = await confirm(t('deleteCustomModelConfirm'))
     if (!res) return
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList.splice(aiModelList.findIndex(item => item.key === aiType), 1)
+    aiModelList.splice(aiModelList.findIndex(item => item.key === primaryModel), 1)
     await store.set('aiModelList', aiModelList)
     setAiConfig(aiModelList)
     const first = aiModelList[0]
     if (!first) return
     selectChangeHandler(first.key)
     setCurrentAi(first.key)
-    setAiType(first.key)
+    setPrimaryModel(first.key)
   }
 
   // temperature 变更处理
   async function temperatureChangeHandler(value: number[]) {
     setTemperature(value[0])
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     model.temperature = value[0]
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = model
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = model
     await store.set('aiModelList', aiModelList)
     await store.set('temperature', value[0])
   }
@@ -174,13 +172,13 @@ export default function AiPage() {
   // topP 变更处理
   async function topPChangeHandler(value: number[]) {
     setTopP(value[0])
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
     model.topP = value[0]
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = model
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = model
     await store.set('aiModelList', aiModelList)
     await store.set('topP', value[0] || 0.1)
   }
@@ -191,10 +189,10 @@ export default function AiPage() {
     const store = await Store.load('store.json');
     switch (value) {
       case 'embedding':
-        store.set('embeddingModel', aiType)
+        store.set('embeddingModel', primaryModel)
         break;
       case 'rerank':
-        store.set('rerankingModel', aiType)
+        store.set('rerankingModel', primaryModel)
         break;
       default:
         break;
@@ -202,7 +200,7 @@ export default function AiPage() {
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
 
-    const modelIndex = aiModelList.findIndex(item => item.key === aiType);
+    const modelIndex = aiModelList.findIndex(item => item.key === primaryModel);
     if (modelIndex === -1) return;
 
     const model = aiModelList[modelIndex];
@@ -223,7 +221,7 @@ export default function AiPage() {
 
   // 复制当前配置
   async function copyConfig() {
-    const model = await getModelByStore(aiType)
+    const model = await getModelByStore(primaryModel)
     if (!model) return
 
     const id = v4()
@@ -249,12 +247,12 @@ export default function AiPage() {
   useEffect(() => {
     async function init() {
       const store = await Store.load('store.json');
-      const aiType = await store.get<string>('aiType')
-      if (!aiType) return
-      setAiType(aiType)
+      const primaryModel = await store.get<string>('primaryModel')
+      if (!primaryModel) return
+      setPrimaryModel(primaryModel)
       const aiModelList = await store.get<AiConfig[]>('aiModelList') || []
       setAiConfig(aiModelList)
-      const model = await getModelByStore(aiType)
+      const model = await getModelByStore(primaryModel)
       if (!model) return
       switch (model.modelType) {
         case 'embedding':
@@ -266,8 +264,9 @@ export default function AiPage() {
         default:
           break;
       }
-      await store.set('aiType', aiType)
+      await store.set('primaryModel', primaryModel)
       setCurrentAi(model.key)
+      setAiTitle(model.title || '')
       setBaseURL(model.baseURL || '')
       setApiKey(model.apiKey || '')
       setModel(model.model || '')
@@ -281,10 +280,10 @@ export default function AiPage() {
   return (
     <SettingType id="ai" icon={<BotMessageSquare />} title={t('title')} desc={t('desc')}>
       <SettingRow>
-        <FormItem title="Model Provider" desc={t('modelProviderDesc')}>
+        <FormItem title={t('modelConfigTitle')} desc={t('modelConfigDesc')}>
           <div className="flex flex-col lg:flex-row gap-2 lg:items-center">
             <Select value={currentAi} onValueChange={selectChangeHandler}>
-              <SelectTrigger className="w-full lg:w-[240px] flex">
+              <SelectTrigger className="w-full flex">
                 <div className="flex items-center gap-2">
                   <AiCheck />
                   <SelectValue />
@@ -293,25 +292,29 @@ export default function AiPage() {
               <SelectContent>
                 {
                   aiConfig.map((item) => (
-                    <SelectItem value={item.key} key={item.key}>{item.title}</SelectItem>
+                    <SelectItem value={item.key} key={item.key}>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">
+                          {item.modelType}
+                        </Badge>
+                        {item.title}
+                        { item.model && <span>({item.model})</span>}
+                      </div>
+                    </SelectItem>
                   ))
                 }
               </SelectContent>
             </Select>
-            <CreateConfig />
-            {
-              aiConfig.length > 0 && (
-                <div className="flex gap-2">
-                  <Button onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
-                  <Button variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
-                </div>
-              )
-            }
+            <div className="flex gap-2">
+              <CreateConfig />
+              <Button disabled={!aiConfig.length} onClick={copyConfig}><Copy />{t('copyConfig')}</Button>
+              <Button disabled={!aiConfig.length} variant={'destructive'} onClick={deleteCustomModelHandler}><X />{t('deleteCustomModel')}</Button>
+            </div>
           </div>
         </FormItem>
       </SettingRow>
       {
-        aiType === 'custom' && (
+        primaryModel === 'custom' && (
           <SettingRow>
             <span className="my-2 flex items-center gap-2"><InfoIcon className="size-4" />{t('modelSupport')}</span>
           </SettingRow>
@@ -321,7 +324,7 @@ export default function AiPage() {
         currentAi && (
           <SettingRow>
             <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
-              <Input value={title} onChange={titleChangeHandler} />
+              <Input value={aiTitle} onChange={titleChangeHandler} />
             </FormItem>
           </SettingRow>
         )
@@ -338,7 +341,7 @@ export default function AiPage() {
       </SettingRow>
       <SettingRow>
         <FormItem title="Model" desc={t('modelDesc')}>
-          <ModelSelect />
+          <ModelSelect model={model} setModel={setModel} />
         </FormItem>
       </SettingRow>
       <SettingRow>

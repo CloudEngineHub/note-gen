@@ -31,20 +31,21 @@ async function getPromptContent(): Promise<string> {
  */
 async function getAISettings() {
   const store = await Store.load('store.json')
-  const baseURL = await store.get<string>('baseURL')
-  const apiKey = await store.get<string>('apiKey')
-  const model = await store.get<string>('model') || 'gpt-3.5-turbo'
-  const aiType = await store.get<string>('aiType') || 'openai'
-  const temperature = await store.get<number>('temperature') || 0.7
-  const topP = await store.get<number>('topP') || 1
-  const chatLanguage = await store.get<string>('chatLanguage') || 'en'
-  const proxyUrl = await store.get<string>('proxy')
+  const primaryModel = await store.get<string>('primaryModel') || 'openai'
+  const chatLanguage = await store.get<string>('chatLanguage')
+  const proxyUrl = await store.get<string>('proxyUrl')
+  const aiConfig = await store.get<AiConfig[]>('aiConfig')
+  const model = aiConfig?.find(item => item.key === primaryModel)?.model || ''
+  const baseURL = aiConfig?.find(item => item.key === primaryModel)?.baseURL || ''
+  const apiKey = aiConfig?.find(item => item.key === primaryModel)?.apiKey || ''
+  const temperature = aiConfig?.find(item => item.key === primaryModel)?.temperature || 0.7
+  const topP = aiConfig?.find(item => item.key === primaryModel)?.topP || 1
   
   return {
     baseURL,
     apiKey,
     model,
-    aiType,
+    primaryModel,
     temperature,
     topP,
     chatLanguage,
@@ -312,7 +313,7 @@ export async function rerankDocuments(
 /**
  * 为不同AI类型准备消息
  */
-async function prepareMessages(text: string, aiType: string, includeLanguage = false): Promise<{
+async function prepareMessages(text: string, primaryModel: string, includeLanguage = false): Promise<{
   messages: OpenAI.Chat.ChatCompletionMessageParam[],
   geminiText?: string
 }> {
@@ -330,7 +331,7 @@ async function prepareMessages(text: string, aiType: string, includeLanguage = f
   let geminiText: string | undefined
   
   // 根据不同AI类型构建请求
-  if (aiType === 'gemini') {
+  if (primaryModel === 'gemini') {
     // 对于Gemini，我们将使用@google/genai库
     const finalText = promptContent ? `${promptContent}\n\n${text}` : text
     messages = [{
@@ -421,16 +422,16 @@ async function getModelInfo(name: string) {
 export async function fetchAi(text: string): Promise<string> {
   try {
     // 获取AI设置
-    const { baseURL, model, aiType, temperature, topP } = await getAISettings()
+    const { baseURL, model, primaryModel, temperature, topP } = await getAISettings()
     
     // 验证AI服务
     if (validateAIService(baseURL) === null) return ''
     
     // 准备消息
-    const { messages, geminiText } = await prepareMessages(text, aiType)
+    const { messages, geminiText } = await prepareMessages(text, primaryModel)
     
     // 根据不同AI类型构建请求
-    if (aiType === 'gemini') {
+    if (primaryModel === 'gemini') {
       // 创建Gemini客户端
       const genAI = await createGeminiClient()
       
@@ -471,16 +472,16 @@ export async function fetchAi(text: string): Promise<string> {
 export async function fetchAiStream(text: string, onUpdate: (content: string) => void, abortSignal?: AbortSignal): Promise<string> {
   try {
     // 获取AI设置
-    const { baseURL, model, aiType, temperature, topP } = await getAISettings()
+    const { baseURL, model, primaryModel, temperature, topP } = await getAISettings()
     
     // 验证AI服务
     if (await validateAIService(baseURL) === null) return ''
     
     // 准备消息
-    const { messages, geminiText } = await prepareMessages(text, aiType, true)
+    const { messages, geminiText } = await prepareMessages(text, primaryModel, true)
 
     // 根据不同AI类型进行流式请求
-    if (aiType === 'gemini') {
+    if (primaryModel === 'gemini') {
       // Gemini API流式请求使用@google/genai
       const genAI = await createGeminiClient()
       
@@ -551,16 +552,16 @@ export async function fetchAiStream(text: string, onUpdate: (content: string) =>
 export async function fetchAiStreamToken(text: string, onUpdate: (content: string) => void): Promise<string> {
   try {
     // 获取AI设置
-    const { baseURL, model, aiType, temperature, topP } = await getAISettings()
+    const { baseURL, model, primaryModel, temperature, topP } = await getAISettings()
     
     // 验证AI服务
     if (await validateAIService(baseURL) === null) return ''
     
     // 准备消息
-    const { messages, geminiText } = await prepareMessages(text, aiType, true)
+    const { messages, geminiText } = await prepareMessages(text, primaryModel, true)
     
     // 根据不同AI类型进行流式请求
-    if (aiType === 'gemini') {
+    if (primaryModel === 'gemini') {
       // Gemini API流式请求使用@google/genai
       const genAI = await createGeminiClient()
       
@@ -757,16 +758,16 @@ export async function fetchAiTranslate(text: string, targetLanguage: string): Pr
 export async function checkAiStatus() {
   try {
     // 获取AI设置
-    const { baseURL, model, aiType } = await getAISettings()
+    const { baseURL, model, primaryModel } = await getAISettings()
     
-    if (!baseURL || !aiType) return false
+    if (!baseURL || !primaryModel) return false
     
     // 获取模型配置信息
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList');
     if (!aiModelList) return false;
     
-    const modelConfig = aiModelList.find(item => item.key === aiType);
+    const modelConfig = aiModelList.find(item => item.key === primaryModel);
     if (!modelConfig) return false;
     // 根据模型类型选择测试方法
     if (modelConfig.modelType === 'rerank') {
@@ -808,7 +809,7 @@ export async function checkAiStatus() {
       }
     } else {
       // 对话模型测试 (!modelConfig.modelType || modelConfig.modelType === 'chat')
-      if (aiType === 'gemini') {
+      if (primaryModel === 'gemini') {
         // Gemini - 使用@google/genai
         const genAI = await createGeminiClient()
         
@@ -842,19 +843,12 @@ export async function checkAiStatus() {
 export async function getModels() {
   try {
     // 获取AI设置
-    const { baseURL, aiType } = await getAISettings()
-    
-    if (!baseURL || !aiType) return []
-    
-    if (aiType === 'gemini') {
-      return []
-    } else {
-      // OpenAI/Ollama模型列表
-      const openai = await createOpenAIClient()
-      const models = await openai.models.list()
-      const uniqueModels = models.data.filter((model, index) => models.data.findIndex(m => m.id === model.id) === index)
-      return uniqueModels
-    }
+    const { baseURL, primaryModel } = await getAISettings()
+    if (!baseURL || !primaryModel) return []
+    const openai = await createOpenAIClient()
+    const models = await openai.models.list()
+    const uniqueModels = models.data.filter((model, index) => models.data.findIndex(m => m.id === model.id) === index)
+    return uniqueModels
   } catch {
     return []
   }

@@ -32,23 +32,23 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('settings.defaultModel')
 
-  function setAiType(aiType: string) {
-    setModel(aiType)
+  function setPrimaryModel(primaryModel: string) {
+    setModel(primaryModel)
     switch (modelKey) {
       case 'placeholder':
-        setPlaceholderModel(aiType)
+        setPlaceholderModel(primaryModel)
         break;
       case 'translate':
-        setTranslateModel(aiType)
+        setTranslateModel(primaryModel)
         break;
       case 'markDesc':
-        setMarkDescModel(aiType)
+        setMarkDescModel(primaryModel)
         break;
       case 'embedding':
-        setEmbeddingModel(aiType)
+        setEmbeddingModel(primaryModel)
         break;
       case 'reranking':
-        setRerankingModel(aiType)
+        setRerankingModel(primaryModel)
         break;
       default:
         break;
@@ -63,13 +63,13 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
       return item.apiKey && item.model && item.baseURL
     })
     setList(filteredModels)
-    const aiType = await store.get<string>(`${modelKey}AiType`)
-    if (!aiType) return
-    setAiType(aiType)
+    const primaryModel = await store.get<string>(`${modelKey}AiType`)
+    if (!primaryModel) return
+    setPrimaryModel(primaryModel)
   }
 
   async function modelSelectChangeHandler(e: string) {
-    setAiType(e)
+    setPrimaryModel(e)
     const store = await Store.load('store.json');
     store.set(`${modelKey}AiType`, e)
   }
@@ -77,7 +77,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
   async function resetDefaultModel() {
     const store = await Store.load('store.json');
     store.set(`${modelKey}AiType`, '')
-    setAiType('')
+    setPrimaryModel('')
   }
 
   useEffect(() => {

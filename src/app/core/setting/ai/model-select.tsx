@@ -18,8 +18,11 @@ import {
   CommandList,
 } from "@/components/ui/command";
 
-export default function ModelSelect() {
-  const { aiType, apiKey, model, setModel } = useSettingStore()
+export default function ModelSelect(
+  { model, setModel }:
+  { model: string, setModel: (model: string) => void }
+) {
+  const { primaryModel } = useSettingStore()
   const [list, setList] = useState<OpenAI.Models.Model[]>([])
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState<string>("") 
@@ -31,11 +34,12 @@ export default function ModelSelect() {
 
   async function initModelList() {
     const models = await getModels()
+    if (!models) return
     setList(models)
     const store = await Store.load('store.json');
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    const modelConfig = aiModelList.find(item => item.key === aiType)
+    const modelConfig = aiModelList.find(item => item.key === primaryModel)
     if (!modelConfig) return
     setModel(modelConfig.model || '')
   }
@@ -47,10 +51,10 @@ export default function ModelSelect() {
 
     const aiModelList = await store.get<AiConfig[]>('aiModelList')
     if (!aiModelList) return
-    const modelConfig = aiModelList.find(item => item.key === aiType)
+    const modelConfig = aiModelList.find(item => item.key === primaryModel)
     if (!modelConfig) return
     modelConfig.model = value
-    aiModelList[aiModelList.findIndex(item => item.key === aiType)] = modelConfig
+    aiModelList[aiModelList.findIndex(item => item.key === primaryModel)] = modelConfig
     await store.set('aiModelList', aiModelList)
   }
 
@@ -88,7 +92,7 @@ export default function ModelSelect() {
 
   useEffect(() => {
     initModelList()
-  }, [apiKey, aiType])
+  }, [primaryModel])
   
   return (
     <div className="flex flex-col">

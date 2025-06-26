@@ -39,21 +39,8 @@ interface SettingState {
   aiConfig: AiConfig[]
   setAiConfig: (aiConfig: AiConfig[]) => void
 
-  aiType: string
-  setAiType: (aiType: string) => void
-
-  // Ai title 与设置中Model Provider的下拉名称保持一致
-  aiTitle: string
-  setAiTitle: (aiTitle: string) => void
-
-  baseURL: string
-  setBaseURL: (baseURL: string) => void
-
-  apiKey: string
-  setApiKey: (apiKey: string) => void
-
-  model: string
-  setModel: (language: string) => void
+  primaryModel: string
+  setPrimaryModel: (primaryModel: string) => void
 
   placeholderModel: string
   setPlaceholderModel: (placeholderModel: string) => Promise<void>
@@ -168,20 +155,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
   aiConfig: [],
   setAiConfig: (aiConfig) => set({ aiConfig }),
 
-  aiType: 'chatgpt',
-  setAiType: (aiType) => set({ aiType }),
-
-  baseURL: '',
-  setBaseURL: (baseURL) => set({ baseURL }),
-
-  apiKey: '',
-  setApiKey: (apiKey) => set({ apiKey }),
-
-  aiTitle: '',
-  setAiTitle: (aiTitle) => set({ aiTitle }),
-
-  model: '',
-  setModel: (model) => set({ model }),
+  primaryModel: 'chatgpt',
+  setPrimaryModel: (primaryModel) => set({ primaryModel }),
 
   placeholderModel: '',
   setPlaceholderModel: async (placeholderModel) => {

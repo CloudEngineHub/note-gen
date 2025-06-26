@@ -8,9 +8,10 @@ import { useCallback, useEffect, useState } from "react"
 // 检测当前 AI 的可用性
 export function AiCheck() {
   const [state, setState] = useState<'ok' | 'error' | 'checking'>('checking')
-  const { aiType, apiKey, model, baseURL, embeddingModel, rerankingModel } = useSettingStore()
+  const { primaryModel, embeddingModel, rerankingModel } = useSettingStore()
 
   async function check() {
+    console.log('check');
     setState('checking')
     setTimeout(async() => {
       const aiStatus = await checkAiStatus()
@@ -26,7 +27,7 @@ export function AiCheck() {
 
   useEffect(() => {
     debouncedCheck()
-  }, [aiType, apiKey, model, baseURL, embeddingModel, rerankingModel])
+  }, [primaryModel, embeddingModel, rerankingModel])
 
   if (state === 'ok') {
     return <CircleCheck className="text-green-500 size-4" />

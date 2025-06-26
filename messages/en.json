@@ -217,6 +217,8 @@
       "title": "Model Management",
       "desc": "Here, you can add and manage various custom model services. After configuration, you will unlock AI-related features, such as organization and conversation functions.",
       "modelTitle": "Custom Name",
+      "modelConfigTitle": "Model Config",
+      "modelConfigDesc": "Every configuration corresponds to an AI model, you can create new configurations through templates or custom.",
       "create": "Create",
       "createDesc": "Select an empty configuration or create a new configuration using the supplier template.",
       "config": "Config",
