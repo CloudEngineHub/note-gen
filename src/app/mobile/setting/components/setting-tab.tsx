@@ -10,7 +10,7 @@ export function SettingTab() {
   const t = useTranslations('settings')
   
   // Add translations to the config
-  const config = baseConfig.map(item => ({
+  const config = baseConfig.filter(item => typeof item !== 'string').map(item => ({
     ...item,
     title: t(`${item.anchor}.title`)
   })).filter(item => item.anchor !== 'about')
