@@ -381,7 +381,7 @@ export async function fetchAi(text: string): Promise<string> {
     // 准备消息
     const { messages } = await prepareMessages(text)
 
-    const openai = await createOpenAIClient()
+    const openai = await createOpenAIClient(aiConfig)
     
     const completion = await openai.chat.completions.create({
       model: aiConfig?.model || '',
@@ -464,7 +464,7 @@ export async function fetchAiStreamToken(text: string, onUpdate: (content: strin
     // 准备消息
     const { messages } = await prepareMessages(text, true)
   
-    const openai = await createOpenAIClient()
+    const openai = await createOpenAIClient(aiConfig)
     const stream = await openai.chat.completions.create({
       model: aiConfig?.model || '',
       messages: messages,
@@ -491,7 +491,6 @@ export async function fetchAiDesc(text: string) {
   try {
     // 获取AI设置
     const aiConfig = await getAISettings('markDescPrimaryModel')
-    console.log(aiConfig);
     
     const descContent = `根据截图的内容：${text}，返回一条描述，不要超过50字，不要包含特殊字符。`
     

@@ -31,7 +31,6 @@ export function ModelSelect() {
   const t = useTranslations('record.chat.input.modelSelect')
 
   async function initModelList() {
-    console.log('initModelList');
     const store = await Store.load('store.json');
     const models = await store.get<AiConfig[]>('aiModelList')
     if (!models) return
