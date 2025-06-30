@@ -194,7 +194,7 @@ export default function AiPage() {
                       <SelectItem value={item.key} key={item.key}>
                         <div className="flex items-center gap-2">
                           <Badge>
-                            {t(`modelType.${item.modelType}`)}
+                            {t(`modelType.${item.modelType || 'chat'}`)}
                           </Badge>
                           {item.title}
                           { item.model && <span>({item.model})</span>}
