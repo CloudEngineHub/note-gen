@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/command";
 import { AiConfig } from "../config";
 import { Store } from "@tauri-apps/plugin-store";
+import emitter from "@/lib/emitter";
 
 export default function ModelSelect(
   { model, setModel }:
@@ -98,6 +99,17 @@ export default function ModelSelect(
       }, 0)
     }
   }
+
+  useEffect(() => {
+    emitter.on('getSettingModelList', () => {
+      setTimeout(() => {
+        initModelList()
+      }, 500)
+    })
+    return () => {
+      emitter.off('getSettingModelList')
+    }
+  }, [])
 
   // 只在初始化和模型变化时设置输入值
   useEffect(() => {

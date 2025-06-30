@@ -26,6 +26,7 @@ import CreateConfig from "./create";
 import { Badge } from "@/components/ui/badge";
 import { OpenBroswer } from "@/components/open-broswer";
 import { baseAiConfig } from "../config";
+import emitter from "@/lib/emitter";
 
 export default function AiPage() {
   const t = useTranslations('settings.ai');
@@ -74,9 +75,11 @@ export default function AiPage() {
         setAiTitle(value as string)
         break;
       case 'baseURL':
+        emitter.emit('getSettingModelList')
         setBaseURL(value as string)
         break;
       case 'apiKey':
+        emitter.emit('getSettingModelList')
         setApiKey(value as string)
         break;
       case 'model':
