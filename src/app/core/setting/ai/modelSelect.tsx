@@ -120,6 +120,7 @@ export default function ModelSelect(
 
   useEffect(() => {
     setList([])
+    setInputValue('')
     initModelList()
   }, [currentAi])
   

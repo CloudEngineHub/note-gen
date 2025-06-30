@@ -8,9 +8,7 @@ export default function Continue({editor}: {editor?: Vditor}) {
   const t = useTranslations('article.editor.toolbar.continue')
 
   async function handler() {
-    console.log(editor);
-    const button = editor?.vditor.toolbar?.elements?.continue
-    console.log(button);
+    const button = editor?.vditor.toolbar?.elements?.continue?.childNodes[0] as HTMLButtonElement
     if (button) {
       button.classList.add('vditor-menu--disabled')
     }
