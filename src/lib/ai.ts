@@ -28,14 +28,16 @@ async function getPromptContent(): Promise<string> {
 /**
  * 获取AI设置
  */
-async function getAISettings(modelType?: string) {
+async function getAISettings(modelType?: string): Promise<AiConfig | undefined> {
   const store = await Store.load('store.json')
-    const primaryModel = await store.get<string>(modelType || 'primaryModel')
-    
-    // 获取AI设置
-    const aiConfigs = await store.get<AiConfig[]>('aiModelList')
-    const aiConfig = aiConfigs?.find(item => item.key === primaryModel)
-    return aiConfig
+  const aiConfigs = await store.get<AiConfig[]>('aiModelList')
+  const modelKey = await store.get(modelType || 'primaryModel')
+  if (!modelKey) {
+    const primaryModel = await store.get<string>('primaryModel')
+    return aiConfigs?.find(item => item.key === primaryModel)
+  } else {
+    return aiConfigs?.find(item => item.key === modelKey)
+  }
 }
 
 /**
@@ -365,16 +367,6 @@ export async function createOpenAIClient(AiConfig?: AiConfig) {
   })
 }
 
-// 根据名称获取模型信息
-async function getModelInfo(name: string) {
-  const store = await Store.load('store.json')
-  const aiModelList = await store.get<AiConfig[]>('aiModelList')
-  if (!aiModelList) return
-  const modelConfig = aiModelList.find(item => item.key === name)
-  if (!modelConfig) return
-  return modelConfig
-}
-
 /**
  * 非流式方式获取AI结果
  */
@@ -498,20 +490,14 @@ export async function fetchAiStreamToken(text: string, onUpdate: (content: strin
 export async function fetchAiDesc(text: string) {
   try {
     // 获取AI设置
-    const aiConfig = await getAISettings('markDescModel')
+    const aiConfig = await getAISettings('markDescPrimaryModel')
+    console.log(aiConfig);
     
-    const descContent = `
-      根据截图的内容：${text}，返回一条描述，不要超过50字，不要包含特殊字符。
-    `
+    const descContent = `根据截图的内容：${text}，返回一条描述，不要超过50字，不要包含特殊字符。`
     
-    const store = await Store.load('store.json');
-    const markDescModel = await store.get<string>('markDescModelPrimaryModel')
-
-    const modelInfo = await getModelInfo(markDescModel || '')
-
-    const openai = await createOpenAIClient(modelInfo)
+    const openai = await createOpenAIClient(aiConfig)
     const completion = await openai.chat.completions.create({
-      model: modelInfo?.model || aiConfig?.model || '',
+      model: aiConfig?.model || '',
       messages: [{
         role: 'user' as const,
         content: descContent
@@ -522,7 +508,7 @@ export async function fetchAiDesc(text: string) {
     
     return completion.choices[0].message.content || ''
   } catch (error) {
-    await handleAIError(error, false)
+    handleAIError(error, false)
     return null
   }
 }
@@ -532,22 +518,17 @@ export async function fetchAiPlaceholder(text: string): Promise<string> {
   try {
     // 获取AI设置
     const aiConfig = await getAISettings('placeholderPrimaryModel')
-    
+
     // 构建 placeholder 提示词
     const placeholderPrompt = `Generate a placeholder for the following text: ${text}`
-    
-    const store = await Store.load('store.json');
-    const placeholderModel = await store.get<string>('placeholderModel')
-
-    const modelInfo = await getModelInfo(placeholderModel || '')
 
     // 准备消息
     const { messages } = await prepareMessages(`${placeholderPrompt}\n\n${text}`, false)
     
-    const openai = await createOpenAIClient(modelInfo)
+    const openai = await createOpenAIClient(aiConfig)
       
     const completion = await openai.chat.completions.create({
-      model: modelInfo?.model || aiConfig?.model || '',
+      model: aiConfig?.model || '',
       messages: messages,
       temperature: aiConfig?.temperature || 1,
       top_p: aiConfig?.topP || 1,
@@ -568,17 +549,12 @@ export async function fetchAiTranslate(text: string, targetLanguage: string): Pr
     // 构建翻译提示词
     const translationPrompt = `Translate the following text to ${targetLanguage}. Maintain the original formatting, markdown syntax, and structure:`
     
-    const store = await Store.load('store.json');
-    const translateModel = await store.get<string>('translateModel')
-
-    const modelInfo = await getModelInfo(translateModel || '')
-
     // 准备消息
     const { messages } = await prepareMessages(`${translationPrompt}\n\n${text}`, false)
-    const openai = await createOpenAIClient(modelInfo)
+    const openai = await createOpenAIClient(aiConfig)
     
     const completion = await openai.chat.completions.create({
-      model: modelInfo?.model || aiConfig?.model || '',
+      model: aiConfig?.model || '',
       messages: messages,
       temperature: aiConfig?.temperature || 1,
       top_p: aiConfig?.topP || 1,
