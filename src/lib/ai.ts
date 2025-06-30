@@ -533,8 +533,10 @@ export async function fetchAiPlaceholder(text: string): Promise<string> {
       temperature: aiConfig?.temperature || 1,
       top_p: aiConfig?.topP || 1,
     })
-    
-    return completion.choices[0]?.message?.content || ''
+
+    const result = completion.choices[0]?.message?.content || ''
+    // 去掉所有换行符和各种特殊符号
+    return result.replace(/\n/g, '').replace(/\s/g, '')
   } catch (error) {
     return handleAIError(error) || ''
   }
