@@ -251,18 +251,6 @@
         }
       },
       "selectModel": "Please select a model",
-      "providers": {
-        "chatgpt": "ChatGPT",
-        "gemini": "Gemini",
-        "chatanywhere": "ChatAnyWhere",
-        "ollama": "Ollama",
-        "lmstudio": "LM Studio",
-        "volcengine": "VolcEngine",
-        "aliyun": "TongYi QianWen",
-        "moonshot": "Kimi",
-        "deepseek": "DeepSeek",
-        "tongyi": "Tongyi Qianwen"
-      },
       "modelProviderDesc": "Custom models only support AI models with OpenAI protocol.",
       "modelTitleDesc": "Custom name, used to identify AI models, please do not repeat.",
       "modelBaseUrlDesc": "You only need to configure the version number, for example: https://api.openai.com/v1, the suffix will be automatically added.",

@@ -249,13 +249,6 @@
         }
       },
       "selectModel": "モデルを選択してください",
-      "providers": {
-        "chatgpt": "ChatGPT",
-        "gemini": "Gemini",
-        "ollama": "Ollama",
-        "lmstudio": "LM Studio",
-        "deepseek": "DeepSeek"
-      },
       "modelProviderDesc": "自定義モデルOpenAIプロトコル対応のAIモデルのみサポート。",
       "modelTitleDesc": "カスタム名、用于标识 AI 模型，请勿重复。",
       "modelBaseUrlDesc": "バージョン番号まで設定すればOKです（例：https://api.openai.com/v1）。サフィックスは自動で追加されます。",

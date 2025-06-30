@@ -249,13 +249,6 @@
         }
       },
       "selectModel": "请选择模型",
-      "providers": {
-        "chatgpt": "ChatGPT",
-        "gemini": "Gemini",
-        "ollama": "Ollama",
-        "lmstudio": "LM Studio",
-        "deepseek": "DeepSeek"
-      },
       "modelProviderDesc": "自定义模型仅支持 openai 协议的 AI 模型。",
       "modelTitleDesc": "自定义名称，用于标识 AI 模型，请勿重复。",
       "modelBaseUrlDesc": "你只需要配置到版本号即可，例如：https://api.openai.com/v1，后缀会自动添加。",

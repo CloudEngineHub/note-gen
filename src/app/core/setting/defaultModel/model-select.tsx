@@ -105,7 +105,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
             >
               {model
                 ? `${list.find((item) => item.key === model)?.model}(${list.find((item) => item.key === model)?.title})`
-                : chatModelTypes.includes(modelKey) ? t('tooltip') : t('noModel')}
+                : modelKey === 'primaryModel' ? t('noModel') : chatModelTypes.includes(modelKey) ? t('tooltip') : t('noModel')}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </div>

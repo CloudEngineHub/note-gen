@@ -34,11 +34,16 @@ export function ChatHeader() {
         {currentPrompt?.title}
       </div>
       <div className="flex items-center justify-center gap-1">
-        <BotMessageSquare className="!size-4" />
-        <span className="line-clamp-1 flex-1 lg:flex-none">
-          {models.find(model => model.key === primaryModel)?.model}
-          ({models.find(model => model.key === primaryModel)?.title})
-        </span>
+        {
+          primaryModel &&
+          <>
+            <BotMessageSquare className="!size-4" />
+            <span className="line-clamp-1 flex-1 lg:flex-none">
+              {models.find(model => model.key === primaryModel)?.model}
+              ({models.find(model => model.key === primaryModel)?.title})
+            </span>
+          </>
+        }
       </div>
       <div className="flex items-center gap-1">
         <NewChat />

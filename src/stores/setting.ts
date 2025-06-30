@@ -155,7 +155,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
   aiModelList: [],
   setAiModelList: (aiModelList) => set({ aiModelList }),
 
-  primaryModel: 'chatgpt',
+  primaryModel: '',
   setPrimaryModel: (primaryModel) => set({ primaryModel }),
 
   placeholderModel: '',
