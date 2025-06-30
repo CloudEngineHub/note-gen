@@ -525,7 +525,8 @@
           "default": "你可以提问或将记录整理为文章...",
           "noApiKey": "未配置 API Key，无法使用 AI 对话功能...",
           "on": "AI 建议 (开启)",
-          "off": "AI 建议 (关闭)"
+          "off": "AI 建议 (关闭)",
+          "noPrimaryModel": "未配置主模型，无法使用 AI 对话功能..."
         },
         "translate": {
           "tooltip": "翻译",

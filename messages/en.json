@@ -558,7 +558,8 @@
           "default": "Type a message...",
           "noApiKey": "No API Key configured, can't use AI chat...",
           "on": "AI suggestions on",
-          "off": "AI suggestions off"
+          "off": "AI suggestions off",
+          "noPrimaryModel": "No primary model configured, can't use AI chat..."
         },
         "translate": {
           "tooltip": "Translate",

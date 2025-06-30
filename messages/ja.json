@@ -523,7 +523,8 @@
           "default": "メッセージを入力...",
           "noApiKey": "無 API KEY 設定、AI 話題できません...",
           "on": "AIサジェスト有効",
-          "off": "AIサジェスト無効"
+          "off": "AIサジェスト無効",
+          "noPrimaryModel": "無主模型設定、AI 話題できません..."
         },
         "translate": {
           "tooltip": "翻訳",

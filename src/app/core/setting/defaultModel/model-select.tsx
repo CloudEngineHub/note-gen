@@ -65,7 +65,6 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
     })
     setList(filteredModels)
     const primaryModel = await store.get<string>(modelKey === 'primaryModel' ? 'primaryModel' : `${modelKey}PrimaryModel`)
-    console.log(modelKey, primaryModel);
     if (!primaryModel) return
     setPrimaryModel(primaryModel)
   }
