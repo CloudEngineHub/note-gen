@@ -27,15 +27,18 @@ import { TooltipButton } from "@/components/tooltip-button"
 
 export function ModelSelect({modelKey}: {modelKey: string}) {
   const [list, setList] = useState<AiConfig[]>([])
-  const { setPlaceholderModel, setTranslateModel, setMarkDescModel, setEmbeddingModel, setRerankingModel } = useSettingStore()
+  const { setPlaceholderModel, setTranslateModel, setMarkDescModel, setEmbeddingModel, setRerankingModel, setPrimaryModel } = useSettingStore()
   const [model, setModel] = useState<string>('')
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('settings.defaultModel')
   const chatModelTypes = ['primaryModel', 'markDesc', 'placeholder', 'translate']
 
-  function setPrimaryModel(primaryModel: string) {
+  function setPrimaryModelHandler(primaryModel: string) {
     setModel(primaryModel)
     switch (modelKey) {
+      case 'primaryModel':
+        setPrimaryModel(primaryModel)
+        break;
       case 'placeholder':
         setPlaceholderModel(primaryModel)
         break;
@@ -66,11 +69,11 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
     setList(filteredModels)
     const primaryModel = await store.get<string>(modelKey === 'primaryModel' ? 'primaryModel' : `${modelKey}PrimaryModel`)
     if (!primaryModel) return
-    setPrimaryModel(primaryModel)
+    setPrimaryModelHandler(primaryModel)
   }
 
   async function modelSelectChangeHandler(e: string) {
-    setPrimaryModel(e)
+    setPrimaryModelHandler(e)
     const store = await Store.load('store.json');
     if (modelKey === 'primaryModel') {
       store.set('primaryModel', e)
@@ -86,7 +89,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
     } else {
       store.set(`${modelKey}PrimaryModel`, '')
     }
-    setPrimaryModel('')
+    setPrimaryModelHandler('')
   }
 
   useEffect(() => {

@@ -31,6 +31,7 @@ export function ModelSelect() {
   const t = useTranslations('record.chat.input.modelSelect')
 
   async function initModelList() {
+    console.log('initModelList');
     const store = await Store.load('store.json');
     const models = await store.get<AiConfig[]>('aiModelList')
     if (!models) return
@@ -40,15 +41,16 @@ export function ModelSelect() {
     setList(filteredModels)
   }
 
-  async function modelSelectChangeHandler(e: string) {
-    setPrimaryModel(e)
+  async function modelSelectChangeHandler(key: string) {
+    setPrimaryModel(key)
     const store = await Store.load('store.json');
-    store.set('primaryModel', e)
+    store.set('primaryModel', key)
   }
 
   useEffect(() => {
     initModelList()
   }, [])
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
