@@ -72,6 +72,10 @@
       "placeholder": "Please select or search for models",
       "main": "Main model",
       "options" : {
+        "primaryModel": {
+          "title": "Main model",
+          "desc": "As the main model for all scenarios, this model is used if other dialogue models do not select the default model."
+        },
         "markDesc": {
           "title": "Record Description",
           "desc": "Used to process records after OCR recognition, generating record descriptions."

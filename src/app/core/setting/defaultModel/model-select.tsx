@@ -31,6 +31,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
   const [model, setModel] = useState<string>('')
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('settings.defaultModel')
+  const chatModelTypes = ['primaryModel', 'markDesc', 'placeholder', 'translate']
 
   function setPrimaryModel(primaryModel: string) {
     setModel(primaryModel)
@@ -63,7 +64,8 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
       return item.apiKey && item.model && item.baseURL
     })
     setList(filteredModels)
-    const primaryModel = await store.get<string>(`${modelKey}AiType`)
+    const primaryModel = await store.get<string>(modelKey === 'primaryModel' ? 'primaryModel' : `${modelKey}PrimaryModel`)
+    console.log(modelKey, primaryModel);
     if (!primaryModel) return
     setPrimaryModel(primaryModel)
   }
@@ -71,12 +73,20 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
   async function modelSelectChangeHandler(e: string) {
     setPrimaryModel(e)
     const store = await Store.load('store.json');
-    store.set(`${modelKey}AiType`, e)
+    if (modelKey === 'primaryModel') {
+      store.set('primaryModel', e)
+    } else {
+      store.set(`${modelKey}PrimaryModel`, e)
+    }
   }
 
   async function resetDefaultModel() {
     const store = await Store.load('store.json');
-    store.set(`${modelKey}AiType`, '')
+    if (modelKey === 'primaryModel') {
+      store.set('primaryModel', '')
+    } else {
+      store.set(`${modelKey}PrimaryModel`, '')
+    }
     setPrimaryModel('')
   }
 
@@ -96,13 +106,13 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
             >
               {model
                 ? `${list.find((item) => item.key === model)?.model}(${list.find((item) => item.key === model)?.title})`
-                : modelKey === 'markDesc' || modelKey === 'placeholder' || modelKey === 'translate' ? t('tooltip') : t('noModel')}
+                : chatModelTypes.includes(modelKey) ? t('tooltip') : t('noModel')}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </div>
         </PopoverTrigger>
         {
-          (modelKey === 'markDesc' || modelKey === 'placeholder' || modelKey === 'translate') && model && (
+          chatModelTypes.includes(modelKey) && model && (
             <TooltipButton
               icon={<X className="h-4 w-4" />}
               onClick={resetDefaultModel}
@@ -128,7 +138,7 @@ export function ModelSelect({modelKey}: {modelKey: string}) {
           <CommandList>
             <CommandEmpty>No model found.</CommandEmpty>
             <CommandGroup>
-              {(modelKey === 'markDesc' || modelKey === 'placeholder' || modelKey === 'translate') && list.filter(item => item.modelType === 'chat' || !item.modelType).map((item) => (
+              {chatModelTypes.includes(modelKey) && list.filter(item => item.modelType === 'chat' || !item.modelType).map((item) => (
                 <CommandItem
                   key={item.key}
                   value={item.key}

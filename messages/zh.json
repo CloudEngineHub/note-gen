@@ -52,6 +52,10 @@
       "placeholder": "请选择或搜索模型",
       "mainModel": "主要模型",
       "options" : {
+        "primaryModel": {
+          "title": "主要模型",
+          "desc": "作为所有场景的主要模型，如果其他对话模型未选择默认模型，则使用此模型。"
+        },
         "markDesc": {
           "title": "记录描述",
           "desc": "用于处理 OCR 识别后的记录，生成记录描述。"
