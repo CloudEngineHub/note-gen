@@ -1,10 +1,11 @@
 'use client'
-import { createOpenAIClient, fetchEmbedding } from "@/lib/ai"
+import { createOpenAIClient } from "@/lib/ai"
 import useSettingStore from "@/stores/setting"
 import { CircleCheck, CircleX, LoaderCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { AiConfig } from "../config"
 import { toast } from "@/hooks/use-toast"
+import { fetch } from "@tauri-apps/plugin-http"
 
 // 检测当前 AI 的可用性
 export function AiCheck() {
@@ -29,14 +30,12 @@ export function AiCheck() {
   async function checkAiStatus(model: AiConfig) {
     try {
       if (!model) return false
+
       switch (model.modelType) {
         // 重排序模型测试
         case 'rerank':
-          const testQuery = '测试查询';
-          const testDocuments = [
-            '这是一个测试文档', 
-            '这是另一个测试文档'
-          ];
+          const query = 'Apple';
+          const documents = ["apple","banana","fruit","vegetable"];
           // 发送重排序测试请求
           const response = await fetch(model.baseURL + '/rerank', {
             method: 'POST',
@@ -45,27 +44,47 @@ export function AiCheck() {
               'Authorization': `Bearer ${model.apiKey}`
             },
             body: JSON.stringify({
-              model: model,
-              query: testQuery,
-              documents: testDocuments
+              model: model.model,
+              query,
+              documents
             })
           });
-          
           if (!response.ok) {
             throw new Error(`重排序请求失败: ${response.status} ${response.statusText}`);
           }
           
-          const data = await response.json();
-          if (!data || !data.results) {
+          const rerankData = await response.json();
+          if (!rerankData || !rerankData.results) {
             throw new Error('重排序结果格式不正确');
           }
+          return true
         // 嵌入模型测试
         case 'embedding':
           const testText = '测试文本';
-          const embedding = await fetchEmbedding(testText);
-          if (!embedding) {
+          const embeddingData = await fetch(model.baseURL + '/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${model.apiKey}`
+            },
+            body: JSON.stringify({
+              model: model.model,
+              input: testText,
+              encoding_format: 'float'
+            })
+          });
+          if (!embeddingData.ok) {
+            throw new Error(`嵌入请求失败: ${embeddingData.status} ${embeddingData.statusText}`);
+          }
+          
+          const embeddingDataJson = await embeddingData.json();
+          if (!embeddingDataJson || !embeddingDataJson.data || !embeddingDataJson.data[0] || !embeddingDataJson.data[0].embedding) {
+            throw new Error('嵌入结果格式不正确');
+          }
+          if (!embeddingDataJson.data[0].embedding) {
             throw new Error('嵌入模型测试失败');
           }
+          return true
         default:
           const openai = await createOpenAIClient(model)
           await openai.chat.completions.create({
@@ -75,8 +94,8 @@ export function AiCheck() {
               content: 'Hello'
             }],
           })
+          return true
       }
-      return true
     } catch (error) {
       toast({
         description: error instanceof Error ? error.message : 'Error',

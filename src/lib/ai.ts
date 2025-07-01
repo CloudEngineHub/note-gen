@@ -92,7 +92,7 @@ interface EmbeddingResponse {
  */
 async function getEmbeddingModelInfo() {
   const store = await Store.load('store.json');
-  const embeddingModel = await store.get<string>('embeddingModel');
+  const embeddingModel = await store.get<string>('embeddingPrimaryModel');
   if (!embeddingModel) return null;
   
   const aiModelList = await store.get<AiConfig[]>('aiModelList');
@@ -110,7 +110,7 @@ async function getEmbeddingModelInfo() {
  */
 export async function getRerankModelInfo() {
   const store = await Store.load('store.json');
-  const rerankModel = await store.get<string>('rerankingModel');
+  const rerankModel = await store.get<string>('rerankPrimaryModel');
   if (!rerankModel) return null;
   
   const aiModelList = await store.get<AiConfig[]>('aiModelList');
@@ -564,76 +564,5 @@ export async function fetchAiTranslate(text: string, targetLanguage: string): Pr
     return completion.choices[0]?.message?.content || ''
   } catch (error) {
     return handleAIError(error) || ''
-  }
-}
-
-export async function checkAiStatus() {
-  try {
-    // 获取AI设置
-    const aiConfig = await getAISettings()
-    
-    if (!aiConfig?.baseURL || !aiConfig?.model) return false
-    
-    // 获取模型配置信息
-    const store = await Store.load('store.json');
-    const aiModelList = await store.get<AiConfig[]>('aiModelList');
-    if (!aiModelList) return false;
-    
-    const modelConfig = aiModelList.find(item => item.key === aiConfig?.model);
-    if (!modelConfig) return false;
-    // 根据模型类型选择测试方法
-    if (modelConfig.modelType === 'rerank') {
-      // 重排序模型测试
-      const testQuery = '测试查询';
-      const testDocuments = [
-        '这是一个测试文档', 
-        '这是另一个测试文档'
-      ];
-      
-      // 发送重排序测试请求
-      const response = await fetch(aiConfig?.baseURL + '/rerank', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${modelConfig.apiKey}`
-        },
-        body: JSON.stringify({
-          model: aiConfig?.model,
-          query: testQuery,
-          documents: testDocuments
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`重排序请求失败: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      if (!data || !data.results) {
-        throw new Error('重排序结果格式不正确');
-      }
-    } else if (modelConfig.modelType === 'embedding') {
-      // 嵌入模型测试
-      const testText = '测试文本';
-      const embedding = await fetchEmbedding(testText);
-      if (!embedding) {
-        throw new Error('嵌入模型测试失败');
-      }
-    } else {
-      const openai = await createOpenAIClient()
-      await openai.chat.completions.create({
-        model: aiConfig?.model,
-        messages: [{
-          role: 'user' as const,
-          content: 'Hello'
-        }],
-      })
-    }
-    
-    return true
-  } catch (error) {
-    // 捕获错误但不处理
-    console.error('AI 状态检查失败:', error);
-    return false
   }
 }
