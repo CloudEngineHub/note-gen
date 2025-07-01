@@ -69,7 +69,7 @@ export default function Updater() {
     }
 
     function openRelease() {
-      open('https://github.com/NoteGen/NoteGen/releases');
+      open('https://github.com/codexu/note-gen/releases');
     }
 
     useEffect(() => {
