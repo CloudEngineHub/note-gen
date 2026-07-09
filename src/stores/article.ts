@@ -751,7 +751,23 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const store = await getStore();
     const tabs = await store.get<OpenTabInfo[]>('openTabs')
     const activeTabId = await store.get<string>('activeTabId')
-    set({ openTabs: tabs || [], activeTabId: activeTabId || '' })
+    const nextTabs = tabs || []
+    const nextActiveTabId = activeTabId || ''
+    const activeTab = nextTabs.find(tab => tab.id === nextActiveTabId)
+    const nextActiveFilePath = getActiveFilePathForTab(activeTab)
+
+    set({
+      openTabs: nextTabs,
+      activeTabId: nextActiveTabId,
+      activeFilePath: nextActiveFilePath,
+      currentArticle: '',
+    })
+
+    await store.set('activeFilePath', nextActiveFilePath)
+
+    if (nextActiveFilePath && isLikelyFilePath(nextActiveFilePath)) {
+      get().readArticle(nextActiveFilePath)
+    }
   },
   setShowCloudFiles: async (show: boolean) => {
     set({ showCloudFiles: show })
