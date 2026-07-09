@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useState } from "react"
 import dayjs from "dayjs"
 import {
   CheckCircle2,
@@ -57,7 +57,6 @@ import {
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Textarea } from "@/components/ui/textarea"
 import { cn, isHttpUrl } from "@/lib/utils"
 import { fetchAiDesc } from "@/lib/ai/description"
 import useMarkStore from "@/stores/mark"
@@ -75,6 +74,7 @@ import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
 import { canOpenMarkSource, getMarkOpenAction } from "./mark-open-path"
 import { createRecordTab, getRecordTabPath } from "./mark-record-tab"
 import { getMarkTypeListBadgeClasses } from "./mark-type-meta"
+import { TipTapEditor } from "@/app/core/main/editor/markdown/tiptap-editor"
 
 const getMarkTitle = (mark: Mark, fallback: string) => {
   const title = mark.desc?.trim() || mark.content?.trim() || mark.url?.trim()
@@ -195,27 +195,20 @@ interface TodoData {
   priority: Priority
 }
 
-function resizeTextareaToContent(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) {
-    return
-  }
-
-  textarea.style.height = 'auto'
-  textarea.style.height = `${textarea.scrollHeight}px`
-}
-
 function SectionBlock({
   title,
   description,
   actions,
   children,
   className,
+  contentClassName,
 }: {
   title?: React.ReactNode
   description?: React.ReactNode
   actions?: React.ReactNode
   children: React.ReactNode
   className?: string
+  contentClassName?: string
 }) {
   return (
     <section className={cn("flex min-w-0 flex-col gap-3 px-5 py-4", className)}>
@@ -240,7 +233,7 @@ function SectionBlock({
           ) : null}
         </div>
       ) : null}
-      <div className="min-w-0 max-w-full overflow-hidden text-sm">
+      <div className={cn("min-w-0 max-w-full overflow-hidden text-sm", contentClassName)}>
         {children}
       </div>
     </section>
@@ -775,15 +768,10 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
   const { updateMark } = useMarkStore()
   const { fetchTags, getCurrentTag } = useTagStore()
   const [todoData, setTodoData] = useState<TodoData>(() => parseTodoMarkContent(mark))
-  const todoDescriptionRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     setTodoData(parseTodoMarkContent(mark))
   }, [mark])
-
-  useEffect(() => {
-    resizeTextareaToContent(todoDescriptionRef.current)
-  }, [todoData.description])
 
   const persistTodoData = useCallback(async (nextTodoData: TodoData) => {
     setTodoData(nextTodoData)
@@ -796,6 +784,10 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
     getCurrentTag()
   }, [fetchTags, getCurrentTag, mark, updateMark])
 
+  const handleDescriptionChange = useCallback((description: string) => {
+    void persistTodoData({ ...todoData, description })
+  }, [persistTodoData, todoData])
+
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col overflow-hidden divide-y">
       <SectionBlock title="标题">
@@ -807,18 +799,21 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
           className="w-full min-w-0 max-w-full"
         />
       </SectionBlock>
-      <SectionBlock title="内容">
-        <Textarea
-          ref={todoDescriptionRef}
+      <SectionBlock title="内容" contentClassName="overflow-visible">
+        <div
           id="record-detail-todo-description"
-          className="min-h-32 w-full min-w-0 max-w-full resize-none overflow-hidden"
-          value={todoData.description}
-          onChange={(event) => {
-            resizeTextareaToContent(event.target)
-            void persistTodoData({ ...todoData, description: event.target.value })
-          }}
-          placeholder={t('record.mark.todo.descriptionPlaceholder')}
-        />
+          className="record-detail-markdown-editor min-h-32 w-full min-w-0 max-w-full overflow-visible bg-background"
+        >
+          <TipTapEditor
+            initialContent={todoData.description}
+            onChange={handleDescriptionChange}
+            activeFilePath={getRecordTabPath(mark.id)}
+            placeholder={t('record.mark.todo.descriptionPlaceholder')}
+            editable={mark.deleted !== 1}
+            showFooterBar={false}
+            scrollable={false}
+          />
+        </div>
       </SectionBlock>
     </div>
   )
@@ -828,12 +823,11 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
   const t = useTranslations()
   const markT = useTranslations('record.mark')
   const { updateMark } = useMarkStore()
-  const { recordTextSize, primaryModel } = useSettingStore()
+  const { primaryModel } = useSettingStore()
   const [value, setValue] = useState('')
   const [isRecognizingImage, setIsRecognizingImage] = useState(false)
   const [recognizingStage, setRecognizingStage] = useState<ImageRecognitionStage | null>(null)
   const [detailImagePreviewSrc, setDetailImagePreviewSrc] = useState('')
-  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const imageSrc = getImageSrc(mark)
 
   useEffect(() => {
@@ -841,16 +835,10 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
   }, [mark])
 
   useEffect(() => {
-    resizeTextareaToContent(contentTextareaRef.current)
-  }, [value])
-
-  useEffect(() => {
     setDetailImagePreviewSrc(isHttpUrl(mark.url) ? mark.url : '')
   }, [mark.url])
 
-  const textMarkChangeHandler = useCallback(async (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const nextContent = event.target.value
-    resizeTextareaToContent(event.target)
+  const handleContentChange = useCallback(async (nextContent: string) => {
     setValue(nextContent)
     await updateMark({
       ...mark,
@@ -912,9 +900,9 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
     return <TodoDetailEditor mark={mark} />
   }
 
-  const contentTitle = imageSrc ? t('record.capture.screenshotOcrContent') : markT('content')
   const contentPlaceholder = imageSrc ? t('record.capture.screenshotOcrContent') : markT('content')
-  const contentMinHeight = mark.type === 'text' ? 'min-h-[520px]' : 'min-h-[320px]'
+  const editorHeightClass = mark.type === 'text' ? 'min-h-[520px]' : 'min-h-[320px]'
+  const recordEditorPath = getRecordTabPath(mark.id)
 
   return (
     <div className="flex w-full min-w-0 max-w-full flex-col overflow-hidden divide-y">
@@ -971,15 +959,21 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
           </a>
         </SectionBlock>
       ) : null}
-      <SectionBlock title={contentTitle}>
-        <Textarea
-          ref={contentTextareaRef}
+      <SectionBlock className="px-0 py-0" contentClassName="overflow-visible">
+        <div
           id="record-detail-content"
-          value={value}
-          onChange={textMarkChangeHandler}
-          placeholder={contentPlaceholder}
-          className={cn(contentMinHeight, "w-full min-w-0 max-w-full resize-none overflow-hidden leading-relaxed", `text-${recordTextSize}`)}
-        />
+          className={cn(editorHeightClass, "record-detail-markdown-editor w-full min-w-0 max-w-full overflow-visible bg-background")}
+        >
+          <TipTapEditor
+            initialContent={value}
+            onChange={handleContentChange}
+            activeFilePath={recordEditorPath}
+            placeholder={contentPlaceholder}
+            editable={mark.deleted !== 1}
+            showFooterBar={false}
+            scrollable={false}
+          />
+        </div>
       </SectionBlock>
     </div>
   )

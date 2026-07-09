@@ -28,6 +28,10 @@ function getScrollContainer(editor: Editor) {
   return root?.querySelector('.overflow-y-auto') as HTMLElement | null
 }
 
+function getEditorRoot(editor: Editor) {
+  return editor.view.dom.closest('.tiptap-editor') as HTMLElement | null
+}
+
 function calculateFloatingPosition(
   editor: Editor,
   anchorPosition: { top: number; left: number; right: number; bottom: number },
@@ -37,7 +41,22 @@ function calculateFloatingPosition(
   const scrollContainer = getScrollContainer(editor)
 
   if (!scrollContainer) {
-    return { top: anchorPosition.bottom + 12, left: Math.max(12, anchorPosition.left - panelWidth / 2) }
+    const editorRoot = getEditorRoot(editor)
+
+    if (!editorRoot) {
+      return { top: anchorPosition.bottom + 12, left: Math.max(12, anchorPosition.left - panelWidth / 2) }
+    }
+
+    const rootBounds = editorRoot.getBoundingClientRect()
+    const centeredLeft = (rootBounds.width - panelWidth) / 2
+    const minLeft = 12
+    const maxLeft = rootBounds.width - panelWidth - 12
+    const preferredTop = anchorPosition.bottom - rootBounds.top + 12
+
+    return {
+      top: Math.max(preferredTop, 12),
+      left: Math.min(Math.max(centeredLeft, minLeft), Math.max(minLeft, maxLeft)),
+    }
   }
 
   const containerBounds = scrollContainer.getBoundingClientRect()
@@ -114,16 +133,12 @@ export function AISuggestionFloating({ editor }: AISuggestionFloatingProps) {
 
     updatePosition()
     const scrollContainer = getScrollContainer(editor)
-    if (!scrollContainer) {
-      return
-    }
-
     const handleLayoutChange = () => updatePosition()
-    scrollContainer.addEventListener('scroll', handleLayoutChange)
+    scrollContainer?.addEventListener('scroll', handleLayoutChange)
     window.addEventListener('resize', handleLayoutChange)
 
     return () => {
-      scrollContainer.removeEventListener('scroll', handleLayoutChange)
+      scrollContainer?.removeEventListener('scroll', handleLayoutChange)
       window.removeEventListener('resize', handleLayoutChange)
     }
   }, [editor, isVisible, updatePosition])

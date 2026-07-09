@@ -3,7 +3,12 @@ export function getEditorContentContainerClass(options: {
   isMobile: boolean
   outlineOpen?: boolean
   outlinePosition?: 'left' | 'right'
+  contentInset?: boolean
 }) {
+  if (options.contentInset === false) {
+    return ''
+  }
+
   if (options.isMobile) {
     return ''
   }

@@ -281,6 +281,21 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
   const itemContent = useMemo(() => getMarkListItemContent(mark), [mark])
   const listTitleClassName = `block max-w-full truncate text-${recordTextSize} font-semibold ${interactive ? 'hover:underline' : ''}`
   const listPreviewClassName = `max-w-full ${lineHeight} text-${recordTextSize} text-muted-foreground break-words [overflow-wrap:anywhere]`
+  const fileDescription = useMemo(() => {
+    if (mark.type !== 'file') {
+      return ''
+    }
+
+    const content = compactRecordText(mark.content)
+    const title = compactRecordText(itemContent.title)
+    const path = compactRecordText(mark.url)
+
+    if (!content || content === title || content === path) {
+      return ''
+    }
+
+    return content
+  }, [itemContent.title, mark.content, mark.type, mark.url])
   const cardPreviewClampLines = 6
   const cardPreviewClampStyle: React.CSSProperties = {
     display: '-webkit-box',
@@ -488,7 +503,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
               interactive={interactive}
             />
           )}
-          {!isImageCard && itemContent.preview ? mark.type === 'todo' ? (
+          {!isImageCard && itemContent.preview && mark.type !== 'file' ? mark.type === 'todo' ? (
             interactive ? (
               <div
                 className="w-full min-w-0 max-w-full overflow-hidden"
@@ -517,6 +532,15 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
               content={itemContent.preview}
               className={`max-w-full break-words text-${recordTextSize} ${lineHeight} text-muted-foreground [overflow-wrap:anywhere]`}
               clampLines={cardPreviewClampLines}
+              interactive={interactive}
+            />
+          ) : null}
+          {!isImageCard && mark.type === 'file' && fileDescription ? (
+            <MarkDetailTrigger
+              mark={mark}
+              content={fileDescription}
+              className={`max-w-full break-words text-${recordTextSize} ${lineHeight} text-muted-foreground [overflow-wrap:anywhere]`}
+              clampLines={3}
               interactive={interactive}
             />
           ) : null}
@@ -664,14 +688,18 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
               </span>
               <span className={`ml-auto shrink-0 text-${recordTextSize}`}>{dayjs(mark.createdAt).fromNow()}</span>
             </div>
-            {renderListTextBlock(itemContent.title || t(mark.type), itemContent.preview || mark.desc)}
-            {mark.url && (
-              <div className="mt-1 min-w-0 max-w-full overflow-hidden">
-                <span className={`block max-w-full break-words text-${recordTextSize} [overflow-wrap:anywhere]`}>
-                  {mark.desc}
-                </span>
+            {renderListTextBlock(itemContent.title || t(mark.type))}
+            {fileDescription ? (
+              <div className="mt-2 min-w-0 max-w-full overflow-hidden">
+                <MarkDetailTrigger
+                  mark={mark}
+                  content={fileDescription}
+                  className={`max-w-full break-words text-${recordTextSize} ${lineHeight} text-muted-foreground [overflow-wrap:anywhere]`}
+                  clampLines={3}
+                  interactive={interactive}
+                />
               </div>
-            )}
+            ) : null}
           </div>
       )
     case 'todo':

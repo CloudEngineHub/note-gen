@@ -19,6 +19,23 @@
   color: hsl(var(--foreground));
 }
 
+.tiptap-editor.tiptap-editor-no-inset .ProseMirror {
+  padding: 0;
+}
+
+.record-detail-markdown-editor .ProseMirror,
+.record-detail-markdown-editor .ProseMirror a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.record-detail-markdown-editor .tiptap-editor,
+.record-detail-markdown-editor .tiptap-editor > div,
+.record-detail-markdown-editor .tiptap,
+.record-detail-markdown-editor .ProseMirror {
+  min-height: inherit;
+}
+
 .tiptap-editor .ProseMirror p.is-empty::before {
   content: attr(data-placeholder);
   float: left;
@@ -803,27 +820,33 @@
 
 .tiptap-drag-handle {
   z-index: 40;
-  width: 22px;
-  height: 28px;
+  width: 20px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: hsl(var(--muted-foreground) / 0.6);
   background: hsl(var(--background) / 0.92);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: grab;
-  opacity: 0.82;
+  opacity: 0;
+  pointer-events: none;
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
 .tiptap-drag-handle::before {
   content: '';
-  width: 10px;
-  height: 16px;
-  background-image: radial-gradient(currentColor 1.35px, transparent 1.35px);
+  width: 9px;
+  height: 13.5px;
+  background-image: radial-gradient(currentColor 1.5px, transparent 1.5px);
   background-position: 0 0;
-  background-size: 5px 5px;
+  background-size: 4.5px 4.5px;
+}
+
+.tiptap-editor:hover .tiptap-drag-handle {
+  opacity: 0.72;
+  pointer-events: auto;
 }
 
 .tiptap-drag-handle:hover,
@@ -832,6 +855,7 @@
   background: hsl(var(--muted));
   border-color: hsl(var(--border));
   opacity: 1;
+  pointer-events: auto;
 }
 
 .tiptap-drag-handle[data-dragging="true"] {

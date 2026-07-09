@@ -852,6 +852,9 @@ interface TipTapEditorProps {
   onToggleOutline?: () => void
   autoScroll?: boolean
   showOverlay?: boolean
+  showFooterBar?: boolean
+  contentInset?: boolean
+  scrollable?: boolean
   onTerminate?: () => void
 }
 
@@ -897,6 +900,9 @@ export function TipTapEditor({
   onToggleOutline,
   autoScroll = false,
   showOverlay = false,
+  showFooterBar = true,
+  contentInset = true,
+  scrollable = true,
   onTerminate,
 }: TipTapEditorProps) {
   const t = useTranslations('editor')
@@ -4004,7 +4010,15 @@ export function TipTapEditor({
   }
 
   return (
-    <div ref={editorContainerRef} id="aritcle-md-editor" className="tiptap-editor relative flex flex-col h-full">
+    <div
+      ref={editorContainerRef}
+      id="aritcle-md-editor"
+      className={cn(
+        "tiptap-editor relative flex flex-col",
+        scrollable ? "h-full" : "h-auto min-h-full",
+        !contentInset && "tiptap-editor-no-inset"
+      )}
+    >
       {isMobile && mobileContext && (
         <MobileEditorContextBar
           mode={mobileContext.mode}
@@ -4018,7 +4032,8 @@ export function TipTapEditor({
       <div
         ref={scrollContainerRef}
         className={cn(
-          "flex-1 overflow-x-hidden overflow-y-auto relative",
+          "relative overflow-x-hidden",
+          scrollable ? "flex-1 overflow-y-auto" : "overflow-y-visible",
           isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
           isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
         )}
@@ -4032,6 +4047,7 @@ export function TipTapEditor({
             isMobile,
             outlineOpen: !!outlineOpen,
             outlinePosition,
+            contentInset,
           })}
           style={
             !isMobile && outlineOpen
@@ -4041,7 +4057,7 @@ export function TipTapEditor({
               : undefined
           }
         >
-        <EditorContent editor={editor} className="h-full relative">
+        <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
           {!isMobile && <ImageBubbleMenu editor={editor} />}
 
           <AISuggestionFloating editor={editor} />
@@ -4118,12 +4134,13 @@ export function TipTapEditor({
         </div>
       )}
 
-      {/* Bottom toolbar - always visible */}
-      <FooterBar
-        editor={editor}
-        outlineOpen={effectiveOutlineOpen}
-        onToggleOutline={handleOutlineToggle}
-      />
+      {showFooterBar ? (
+        <FooterBar
+          editor={editor}
+          outlineOpen={effectiveOutlineOpen}
+          onToggleOutline={handleOutlineToggle}
+        />
+      ) : null}
 
       <SlashCommandPortal />
 
