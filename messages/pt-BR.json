@@ -483,6 +483,10 @@
           "title": "Atualizações de versão",
           "desc": "Abra as notas da versão mais recente e o histórico de atualizações."
         },
+        "donation": {
+          "title": "Doação",
+          "desc": "Se o NoteGen ajuda você, apoie a manutenção contínua com uma doação."
+        },
         "docs": {
           "title": "Documentos e configuração",
           "desc": "Aprenda sobre sincronização, backup e armazenamento de dados."
@@ -502,6 +506,16 @@
           "title": "Guia de sincronização",
           "buttonName": "Abrir",
           "desc": "Configure sync com Git, S3 e WebDAV."
+        },
+        "donate": {
+          "title": "Apoiar o NoteGen",
+          "buttonName": "Doar",
+          "desc": "Abra a página de doação para apoiar o projeto."
+        },
+        "business": {
+          "title": "Negócios",
+          "buttonName": "Contato",
+          "desc": "Explore parcerias, promoção e oportunidades relacionadas à marca."
         },
         "github": {
           "title": "GitHub",

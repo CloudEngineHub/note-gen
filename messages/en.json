@@ -537,6 +537,10 @@
           "title": "Version updates",
           "desc": "Open the latest release notes and update history."
         },
+        "donation": {
+          "title": "Donate",
+          "desc": "If NoteGen helps you, you can support ongoing maintenance with a donation."
+        },
         "docs": {
           "title": "Docs and configuration",
           "desc": "Learn about sync, backup, and data storage from the website and docs."
@@ -556,6 +560,16 @@
           "title": "Sync configuration guide",
           "buttonName": "Open",
           "desc": "Set up Git, S3, and WebDAV sync."
+        },
+        "donate": {
+          "title": "Support NoteGen",
+          "buttonName": "Donate",
+          "desc": "Open the donation page to support the project."
+        },
+        "business": {
+          "title": "Business",
+          "buttonName": "Contact",
+          "desc": "Explore partnerships, promotion, and brand-related opportunities."
         },
         "github": {
           "title": "GitHub",

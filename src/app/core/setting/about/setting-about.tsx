@@ -2,9 +2,9 @@
 import { SettingType } from "../components/setting-base";
 import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import Updater from "./updater";
-import { Bug, ExternalLink, Github, HomeIcon, MessageSquare, SettingsIcon } from "lucide-react";
+import { BriefcaseBusiness, Bug, ExternalLink, Github, HandHeart, HomeIcon, MessageSquare } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
@@ -27,12 +27,8 @@ interface AboutResourceSection {
 
 export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
   const t = useTranslations('settings.about');
-  const locale = useLocale();
-  const docsBaseUrl = locale.startsWith('zh')
-    ? 'https://notegen.top/cn/docs'
-    : 'https://notegen.top/en/docs';
 
-  const docItems: AboutResource[] = [
+  const communityItems: AboutResource[] = [
     {
       url: "https://notegen.top/",
       title: t('items.home.title'),
@@ -40,16 +36,6 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
       icon: <HomeIcon />,
       buttonName: t('items.home.buttonName')
     },
-    {
-      url: `${docsBaseUrl}/settings/sync`,
-      title: t('items.guide.title'),
-      desc: t('items.guide.desc'),
-      icon: <SettingsIcon />,
-      buttonName: t('items.guide.buttonName')
-    }
-  ]
-
-  const communityItems: AboutResource[] = [
     {
       url: "https://github.com/codexu/note-gen",
       title: t('items.github.title'),
@@ -73,12 +59,29 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
     }
   ]
 
+  const donationItems: AboutResource[] = [
+    {
+      url: "https://notegen.top/donate",
+      title: t('items.donate.title'),
+      desc: t('items.donate.desc'),
+      icon: <HandHeart />,
+      buttonName: t('items.donate.buttonName')
+    },
+    {
+      url: "https://notegen.top/business",
+      title: t('items.business.title'),
+      desc: t('items.business.desc'),
+      icon: <BriefcaseBusiness />,
+      buttonName: t('items.business.buttonName')
+    }
+  ]
+
   const sections: AboutResourceSection[] = [
     {
-      id: 'docs',
-      title: t('sections.docs.title'),
-      desc: t('sections.docs.desc'),
-      items: docItems
+      id: 'donation',
+      title: t('sections.donation.title'),
+      desc: t('sections.donation.desc'),
+      items: donationItems
     },
     {
       id: 'community',

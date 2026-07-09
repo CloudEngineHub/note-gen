@@ -624,6 +624,10 @@
           "title": "バージョン更新",
           "desc": "最新リリースノートと更新履歴を確認します。"
         },
+        "donation": {
+          "title": "寄付",
+          "desc": "NoteGen が役立っている場合は、寄付で継続的なメンテナンスを支援できます。"
+        },
         "docs": {
           "title": "ドキュメントと設定",
           "desc": "同期、バックアップ、データ保存について確認します。"
@@ -643,6 +647,16 @@
           "title": "同期設定ガイド",
           "buttonName": "表示",
           "desc": "Git、S3、WebDAV同期を設定します。"
+        },
+        "donate": {
+          "title": "NoteGen を支援",
+          "buttonName": "寄付",
+          "desc": "寄付ページを開いてプロジェクトを支援します。"
+        },
+        "business": {
+          "title": "ビジネス提携",
+          "buttonName": "連絡",
+          "desc": "提携、プロモーション、ブランド関連の機会について確認します。"
         },
         "github": {
           "title": "GitHub",

@@ -624,6 +624,10 @@
           "title": "版本更新",
           "desc": "查看最新版本、發布說明和歷史更新。"
         },
+        "donation": {
+          "title": "捐贈支持",
+          "desc": "如果 NoteGen 對你有幫助，可以透過捐贈支持專案持續維護。"
+        },
         "docs": {
           "title": "文件與配置",
           "desc": "從官網和文件了解同步、備份與資料儲存。"
@@ -643,6 +647,16 @@
           "title": "同步配置指南",
           "buttonName": "打開",
           "desc": "配置 Git、S3 和 WebDAV 同步。"
+        },
+        "donate": {
+          "title": "支持 NoteGen",
+          "buttonName": "捐贈",
+          "desc": "前往捐贈頁面支持專案。"
+        },
+        "business": {
+          "title": "商務合作",
+          "buttonName": "聯繫",
+          "desc": "了解合作、推廣與品牌相關事宜。"
         },
         "github": {
           "title": "GitHub",
