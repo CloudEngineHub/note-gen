@@ -2,6 +2,8 @@ import { Tool, ToolResult } from '../types'
 import emitter from '@/lib/emitter'
 import useArticleStore from '@/stores/article'
 import { replaceLinesInRange } from '@/lib/agent/react-diff-helpers'
+import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { getFilePathOptions } from '@/lib/workspace'
 
 const EDITOR_TOOL_RESPONSE_TIMEOUT_MS = 200
 let storeBackedContentVersion = 0
@@ -37,6 +39,34 @@ function getStoreBackedEditorContent() {
   return buildEditorContentPayload(currentArticle || '', storeBackedContentVersion)
 }
 
+async function hydrateStoreBackedEditorContent() {
+  const articleStore = useArticleStore.getState()
+
+  if (articleStore.currentArticle || !articleStore.activeFilePath) {
+    return getStoreBackedEditorContent()
+  }
+
+  try {
+    const pathOptions = await getFilePathOptions(articleStore.activeFilePath)
+    const fileExists = pathOptions.baseDir
+      ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+      : await exists(pathOptions.path)
+
+    if (!fileExists) {
+      return getStoreBackedEditorContent()
+    }
+
+    const content = pathOptions.baseDir
+      ? await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
+      : await readTextFile(pathOptions.path)
+
+    articleStore.setCurrentArticle(content)
+    return buildEditorContentPayload(content, storeBackedContentVersion)
+  } catch {
+    return getStoreBackedEditorContent()
+  }
+}
+
 function replaceNthOccurrence(content: string, searchContent: string, replaceContent: string, occurrence: number) {
   let searchFrom = 0
   let foundIndex = -1
@@ -52,11 +82,55 @@ function replaceNthOccurrence(content: string, searchContent: string, replaceCon
   return `${content.slice(0, foundIndex)}${replaceContent}${content.slice(foundIndex + searchContent.length)}`
 }
 
-function saveStoreBackedEditorContent(markdown: string) {
+async function saveStoreBackedEditorContent(markdown: string) {
   const articleStore = useArticleStore.getState()
   incrementStoreBackedContentVersion()
   articleStore.setCurrentArticle(markdown)
-  void articleStore.saveCurrentArticle(markdown)
+
+  if (!articleStore.activeFilePath) {
+    return
+  }
+
+  try {
+    const pathOptions = await getFilePathOptions(articleStore.activeFilePath)
+    if (pathOptions.baseDir) {
+      await writeTextFile(pathOptions.path, markdown, { baseDir: pathOptions.baseDir })
+    } else {
+      await writeTextFile(pathOptions.path, markdown)
+    }
+  } catch {
+    await articleStore.saveCurrentArticle(markdown)
+  }
+}
+
+async function insertIntoStoreBackedEditor(params: Record<string, any>): Promise<ToolResult> {
+  const storeContent = await hydrateStoreBackedEditorContent()
+  const currentMarkdown = storeContent.markdown
+  const insertContent = (params.content || '') as string
+  const articleStore = useArticleStore.getState()
+  const activeFilePath = articleStore.activeFilePath
+  const savedViewState = activeFilePath
+    ? articleStore.getEditorViewState(activeFilePath)
+    : null
+  const requestedPosition = typeof params.position === 'number'
+    ? params.position
+    : savedViewState
+      ? Math.max(savedViewState.selectionFrom, savedViewState.selectionTo)
+      : currentMarkdown.length
+  const insertPosition = Math.min(Math.max(requestedPosition, 0), currentMarkdown.length)
+  const updatedMarkdown = `${currentMarkdown.slice(0, insertPosition)}${insertContent}${currentMarkdown.slice(insertPosition)}`
+
+  await saveStoreBackedEditorContent(updatedMarkdown)
+
+  return {
+    success: true,
+    data: {
+      success: true,
+      insertedLength: insertContent.length,
+      newCursorPosition: insertPosition + insertContent.length,
+    },
+    message: `成功插入 ${insertContent.length} 个字符`,
+  }
 }
 
 function getEditorSelectionFallbackResult(): ToolResult {
@@ -75,8 +149,8 @@ function getInsertFallbackResult(): ToolResult {
   }
 }
 
-function replaceEditorContentWithStore(params: Record<string, any>): ToolResult {
-  const storeContent = getStoreBackedEditorContent()
+async function replaceEditorContentWithStore(params: Record<string, any>): Promise<ToolResult> {
+  const storeContent = await hydrateStoreBackedEditorContent()
   const currentMarkdown = storeContent.markdown
   const replaceContent = (params.content || params.replaceContent || '') as string
 
@@ -89,14 +163,23 @@ function replaceEditorContentWithStore(params: Record<string, any>): ToolResult 
   }
 
   if (params.startLine !== undefined && params.endLine !== undefined) {
-    const updatedMarkdown = replaceLinesInRange(
-      currentMarkdown,
-      params.startLine,
-      params.endLine,
-      replaceContent.split('\n')
-    )
+    let updatedMarkdown = ''
+    try {
+      updatedMarkdown = replaceLinesInRange(
+        currentMarkdown,
+        params.startLine,
+        params.endLine,
+        replaceContent.split('\n')
+      )
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: error instanceof Error ? error.message : '替换失败',
+      }
+    }
 
-    saveStoreBackedEditorContent(updatedMarkdown)
+    await saveStoreBackedEditorContent(updatedMarkdown)
 
     return {
       success: true,
@@ -106,6 +189,24 @@ function replaceEditorContentWithStore(params: Record<string, any>): ToolResult 
         message: `成功替换第 ${params.startLine}-${params.endLine} 行内容`,
       },
       message: `成功替换第 ${params.startLine}-${params.endLine} 行内容`,
+    }
+  }
+
+  if (params.from !== undefined && params.to !== undefined) {
+    const from = Math.max(0, Math.min(params.from, currentMarkdown.length))
+    const to = Math.max(from, Math.min(params.to, currentMarkdown.length))
+    const updatedMarkdown = `${currentMarkdown.slice(0, from)}${replaceContent}${currentMarkdown.slice(to)}`
+
+    await saveStoreBackedEditorContent(updatedMarkdown)
+
+    return {
+      success: true,
+      data: {
+        success: true,
+        insertedLength: replaceContent.length,
+        message: `成功替换 ${to - from} 个字符`,
+      },
+      message: `成功替换 ${to - from} 个字符`,
     }
   }
 
@@ -125,7 +226,7 @@ function replaceEditorContentWithStore(params: Record<string, any>): ToolResult 
       }
     }
 
-    saveStoreBackedEditorContent(updatedMarkdown)
+    await saveStoreBackedEditorContent(updatedMarkdown)
 
     return {
       success: true,
@@ -240,7 +341,7 @@ export const getEditorContentTool: Tool = {
       }
 
       const timeoutId = setTimeout(() => {
-        finalize(getStoreBackedEditorContent())
+        void hydrateStoreBackedEditorContent().then(finalize)
       }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
       emitter.emit('editor-get-content', {
@@ -302,7 +403,10 @@ export const insertAtCursorTool: Tool = {
       }
 
       const timeoutId = setTimeout(() => {
-        finalize(getInsertFallbackResult())
+        void insertIntoStoreBackedEditor({
+          ...params,
+          position: cursorPosition,
+        }).then(finalize).catch(() => finalize(getInsertFallbackResult()))
       }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
       emitter.emit('editor-insert', {
@@ -449,7 +553,7 @@ When the user quotes content from the editor and exact selection positions are p
       }
 
       const timeoutId = setTimeout(() => {
-        finalize(replaceEditorContentWithStore(params))
+        void replaceEditorContentWithStore(params).then(finalize)
       }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
       emitter.emit('editor-replace', {

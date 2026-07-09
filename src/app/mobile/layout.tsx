@@ -30,6 +30,7 @@ import { ControlLink } from "@/app/core/main/mark/control-link"
 import { ControlFile } from "@/app/core/main/mark/control-file"
 import { ControlTodo } from "@/app/core/main/mark/control-todo"
 import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
+import useArticleStore from "@/stores/article"
 
 export default function RootLayout({
   children,
@@ -39,6 +40,7 @@ export default function RootLayout({
   const pathname = usePathname()
   const { initSettingData, customThemeColors, appFontFamily } = useSettingStore()
   const { initMainHosting } = useImageStore()
+  const { initCollapsibleList } = useArticleStore()
   const { currentLocale } = useI18n()
   useEffect(() => {
     let cancelled = false
@@ -50,6 +52,8 @@ export default function RootLayout({
         initSettingData()
         initMainHosting()
         await initAllDatabases()
+        if (cancelled) return
+        await initCollapsibleList()
         if (cancelled) return
         await initAutoDataSyncRuntime()
         if (cancelled) return
