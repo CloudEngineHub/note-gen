@@ -658,8 +658,16 @@
 
 /* 任务列表 */
 .tiptap-editor .ProseMirror ul[data-type="taskList"] {
+  --task-checkbox-border: hsl(var(--foreground) / 0.58);
+  --task-checkbox-bg: hsl(var(--background));
+  --task-checkbox-hover-bg: hsl(var(--primary) / 0.06);
   list-style: none;
   padding-left: 0;
+}
+
+.dark .tiptap-editor .ProseMirror ul[data-type="taskList"] {
+  --task-checkbox-border: hsl(var(--foreground) / 0.7);
+  --task-checkbox-hover-bg: hsl(var(--primary) / 0.1);
 }
 
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li {
@@ -687,14 +695,15 @@
   width: 16px !important;
   height: 16px !important;
   min-width: 16px !important;
-  border: 1px solid hsl(var(--border)) !important;
+  border: 1.5px solid var(--task-checkbox-border) !important;
   border-radius: 3px !important;
-  background-color: transparent !important;
+  background-color: var(--task-checkbox-bg) !important;
   cursor: pointer !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  transition: all 0.15s ease !important;
+  box-shadow: 0 0 0 1px hsl(var(--background) / 0.35) !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
   margin: 0 !important;
   padding: 0 !important;
 }
@@ -705,7 +714,9 @@
 
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:hover,
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label > span:hover {
+  background-color: var(--task-checkbox-hover-bg) !important;
   border-color: hsl(var(--primary)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.12) !important;
 }
 
 .tiptap-editor .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked,
