@@ -5,6 +5,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, ReactNodeViewProps } from '@tip
 import { useMemo, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import { normalizeLatexForKatex } from '@/lib/latex'
 
 // Inline Math Component
 function InlineMathView({ node, updateAttributes }: ReactNodeViewProps) {
@@ -15,7 +16,7 @@ function InlineMathView({ node, updateAttributes }: ReactNodeViewProps) {
   const renderedHtml = useMemo(() => {
     try {
       setError(null)
-      return katex.renderToString(node.attrs.latex || '', {
+      return katex.renderToString(normalizeLatexForKatex(node.attrs.latex || ''), {
         throwOnError: false,
         displayMode: false,
       })
@@ -81,7 +82,7 @@ function BlockMathView({ node, updateAttributes }: ReactNodeViewProps) {
   const renderedHtml = useMemo(() => {
     try {
       setError(null)
-      return katex.renderToString(node.attrs.latex || '', {
+      return katex.renderToString(normalizeLatexForKatex(node.attrs.latex || ''), {
         throwOnError: false,
         displayMode: true,
       })
@@ -183,6 +184,14 @@ export const InlineMath = Node.create({
           latex: match[0].slice(1, -1),
         }),
       }),
+      nodeInputRule({
+        // Convert `\(...\)` to an inline math node.
+        find: /\\\([^\n]+?\\\)$/,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[0].slice(2, -2),
+        }),
+      }),
     ]
   },
 
@@ -193,17 +202,27 @@ export const InlineMath = Node.create({
   markdownTokenizer: {
     name: 'inline_math',
     level: 'inline',
-    start: (src) => src.indexOf('$'),
+    start: (src) => {
+      const dollarIndex = src.indexOf('$')
+      const bracketIndex = src.indexOf('\\(')
+
+      if (dollarIndex === -1) return bracketIndex
+      if (bracketIndex === -1) return dollarIndex
+
+      return Math.min(dollarIndex, bracketIndex)
+    },
     tokenize: (src, tokens, lexer) => {
       // Match $...$ (non-greedy, single line)
-      const match = /^\$([^\$\n]+?)\$/.exec(src)
+      const match = /^(?:\$([^\$\n]+?)\$|\\\(([^\n]+?)\\\))/.exec(src)
       if (!match) return undefined
+
+      const content = match[1] ?? match[2] ?? ''
 
       return {
         type: 'inline_math',
         raw: match[0],
-        content: match[1],
-        tokens: lexer.inlineTokens(match[1]),
+        content,
+        tokens: lexer.inlineTokens(content),
       }
     },
   },
@@ -267,6 +286,14 @@ export const BlockMath = Node.create({
           latex: match[0].slice(2, -2).trim(),
         }),
       }),
+      nodeInputRule({
+        // Convert `\[...\]` within a paragraph to a block math node immediately.
+        find: /^\\\[[\s\S]+?\\\]$/,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[0].slice(2, -2).trim(),
+        }),
+      }),
     ]
   },
 
@@ -277,17 +304,27 @@ export const BlockMath = Node.create({
   markdownTokenizer: {
     name: 'block_math',
     level: 'block',
-    start: (src) => src.indexOf('$$'),
+    start: (src) => {
+      const dollarIndex = src.indexOf('$$')
+      const bracketIndex = src.indexOf('\\[')
+
+      if (dollarIndex === -1) return bracketIndex
+      if (bracketIndex === -1) return dollarIndex
+
+      return Math.min(dollarIndex, bracketIndex)
+    },
     tokenize: (src, tokens, lexer) => {
       // Match $$...$$ (can span multiple lines)
-      const match = /^\$\$([\s\S]*?)\$\$/.exec(src)
+      const match = /^(?:\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\])/.exec(src)
       if (!match) return undefined
+
+      const content = (match[1] ?? match[2] ?? '').trim()
 
       return {
         type: 'block_math',
         raw: match[0],
-        content: match[1].trim(),
-        tokens: lexer.blockTokens(match[1].trim()),
+        content,
+        tokens: lexer.blockTokens(content),
       }
     },
   },

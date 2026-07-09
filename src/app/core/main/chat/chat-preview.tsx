@@ -16,6 +16,7 @@ import 'highlight.js/styles/github.min.css';
 import './chat.css';
 import { advanceStreamingSmoother } from './streaming-smoother';
 import { cn } from "@/lib/utils";
+import { normalizeLatexForKatex } from "@/lib/latex";
 
 type ThemeType = 'light' | 'dark' | 'system';
 
@@ -82,7 +83,7 @@ export default function ChatPreview({text, streaming = false, containerClassName
     }
 
     if (displayedTextRef.current) {
-      setHtmlContent(md.current.render(displayedTextRef.current));
+      setHtmlContent(md.current.render(normalizeLatexForKatex(displayedTextRef.current)));
     } else {
       setHtmlContent('');
     }
@@ -103,7 +104,7 @@ export default function ChatPreview({text, streaming = false, containerClassName
 
     setDisplayedText(nextText);
     if (md.current) {
-      setHtmlContent(md.current.render(nextText));
+      setHtmlContent(md.current.render(normalizeLatexForKatex(nextText)));
     } else {
       setHtmlContent(nextText);
     }

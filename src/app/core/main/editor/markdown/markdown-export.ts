@@ -21,6 +21,7 @@ import jsPDF from 'jspdf'
 import { checkIsTauri } from '@/lib/check'
 import { getFilePathOptions } from '@/lib/workspace'
 import { convertImageByWorkspace } from '@/lib/utils'
+import { normalizeLatexForKatex } from '@/lib/latex'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 
@@ -616,7 +617,7 @@ ${body}
 }
 
 async function renderMarkdownToHtml(markdown: string, sourcePath?: string, resolveImages = false) {
-  const html = getMarkdownRenderer().render(markdown)
+  const html = getMarkdownRenderer().render(normalizeLatexForKatex(markdown))
   if (!resolveImages) {
     return html
   }
