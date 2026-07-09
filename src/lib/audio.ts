@@ -381,6 +381,19 @@ export async function transcribeRecording(audioBlob: Blob): Promise<string> {
   return fetchAudioTranscription(audioBlob)
 }
 
+function getAudioFileName(audioBlob: Blob): string {
+  const mimeType = audioBlob.type.toLowerCase()
+
+  if (mimeType.includes('wav')) return 'audio.wav'
+  if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'audio.mp3'
+  if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'audio.mp4'
+  if (mimeType.includes('ogg')) return 'audio.ogg'
+  if (mimeType.includes('flac')) return 'audio.flac'
+  if (mimeType.includes('aac')) return 'audio.aac'
+
+  return 'audio.webm'
+}
+
 /**
  * 调用STT模型将音频转换为文本
  */
@@ -399,7 +412,7 @@ export async function fetchAudioTranscription(audioBlob: Blob): Promise<string> 
     // 检查新的 models 数组结构
     if (config.models && config.models.length > 0) {
       const targetModel = config.models.find(model => 
-        model.id === sttModel && model.modelType === 'stt'
+        model.modelType === 'stt' && (model.id === sttModel || `${config.key}-${model.id}` === sttModel)
       )
       if (targetModel) {
         // 返回合并了模型配置的 AiConfig
@@ -441,7 +454,7 @@ export async function fetchAudioTranscription(audioBlob: Blob): Promise<string> 
       },
       file: {
         bytes: await blobToBytes(audioBlob),
-        fileName: 'audio.webm',
+        fileName: getAudioFileName(audioBlob),
         contentType: audioBlob.type || 'audio/webm',
       }
     })

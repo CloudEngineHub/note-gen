@@ -200,20 +200,10 @@ export function ModelSelect({
   }
 
   // 检查模型是否被选中（支持向后兼容）
-  const isModelSelected = (modelId: string): boolean => {
+  const isModelSelected = (item: GroupedModel): boolean => {
     if (!model) return false
     
-    // 首先尝试精确匹配（新格式的组合键）
-    if (model === modelId) return true
-    
-    // 向后兼容匹配（旧格式的单独ID）
-    if (modelId.includes('-')) {
-      const parts = modelId.split('-')
-      const originalId = parts.slice(2).join('-') // 去掉 config.key 部分
-      return originalId === model
-    }
-    
-    return false
+    return model === item.model.id || model === `${item.configKey}-${item.model.id}`
   }
 
   // 查找当前选中的模型显示信息
@@ -221,20 +211,7 @@ export function ModelSelect({
     if (!model || !groupedModels.length) return null
     
     // 首先尝试精确匹配（新格式的组合键）
-    let selectedItem = groupedModels.find(item => item.model.id === model)
-    
-    // 如果没找到，尝试向后兼容匹配（旧格式的单独ID）
-    if (!selectedItem) {
-      selectedItem = groupedModels.find(item => {
-        // 对于新格式的组合键，提取原始ID进行匹配
-        if (item.model.id.includes('-')) {
-          const parts = item.model.id.split('-')
-          const originalId = parts.slice(2).join('-') // 去掉 config.key 部分
-          return originalId === model
-        }
-        return item.model.id === model
-      })
-    }
+    const selectedItem = groupedModels.find(isModelSelected)
     
     if (selectedItem) {
       return `${selectedItem.model.model}(${selectedItem.configTitle})`
@@ -302,7 +279,7 @@ export function ModelSelect({
                     <Check
                       className={cn(
                         "ml-auto",
-                        isModelSelected(item.model.id) ? "opacity-100" : "opacity-0"
+                        isModelSelected(item) ? "opacity-100" : "opacity-0"
                       )}
                     />
                   </CommandItem>

@@ -101,20 +101,24 @@ function mergeNoteGenDefaultModels(config: AiConfig, remoteModels: ModelConfig[]
   }
 
   const remoteModelById = new Map(remoteModels.map((model) => [model.id, model]))
+  const builtinModelIds = new Set(config.models.map((model) => model.id))
 
   return {
     ...config,
-    models: config.models.map((model) => {
-      const remoteModel = remoteModelById.get(model.id)
-      if (!remoteModel) {
-        return model
-      }
+    models: [
+      ...config.models.map((model) => {
+        const remoteModel = remoteModelById.get(model.id)
+        if (!remoteModel) {
+          return model
+        }
 
-      return {
-        ...model,
-        ...remoteModel,
-      }
-    }),
+        return {
+          ...model,
+          ...remoteModel,
+        }
+      }),
+      ...remoteModels.filter((model) => !builtinModelIds.has(model.id)),
+    ],
   }
 }
 

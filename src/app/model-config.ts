@@ -29,9 +29,14 @@ export const noteGenDefaultModels: AiConfig[] = [
         "temperature": 0.7,
         "topP": 1,
         "enableStream": true
+      },
+      {
+        "id": "note-gen-stt",
+        "model": "FunAudioLLM/SenseVoiceSmall",
+        "modelType": "stt"
       }
     ]
   }
 ]
 
-export const noteGenModelKeys = ['note-gen-free', 'note-gen-limited', 'note-gen-chat', 'note-gen-embedding', 'note-gen-vlm']
+export const noteGenModelKeys = ['note-gen-free', 'note-gen-limited', 'note-gen-chat', 'note-gen-embedding', 'note-gen-vlm', 'note-gen-stt']

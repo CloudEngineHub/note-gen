@@ -71,11 +71,6 @@ const useRecordingStore = create<RecordingState>((set, get) => ({
         }
       }
       
-      mediaRecorder.onstop = () => {
-        // 停止所有音频轨道
-        stream.getTracks().forEach(track => track.stop())
-      }
-      
       mediaRecorder.start()
       
       // 启动计时器，保存到 state
@@ -151,7 +146,8 @@ const useRecordingStore = create<RecordingState>((set, get) => ({
     
     return new Promise((resolve) => {
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || audioChunks[0]?.type || 'audio/webm' })
+        mediaRecorder.stream.getTracks().forEach(track => track.stop())
         get().resetState()
         resolve(audioBlob)
       }
