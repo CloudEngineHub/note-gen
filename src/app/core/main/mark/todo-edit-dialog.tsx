@@ -14,12 +14,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect, useCallback, useRef } from "react"
-import { updateMark } from "@/db/marks"
 import useMarkStore from "@/stores/mark"
 import useTagStore from "@/stores/tag"
 import { CheckSquare } from "lucide-react"
-
-type Priority = 'low' | 'medium' | 'high'
+import { parseTodoMarkContent } from "./mark-list-item-content"
+import type { Priority } from "./todo-form"
 
 interface TodoData {
   title: string
@@ -36,53 +35,29 @@ interface TodoEditDialogProps {
 
 export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps) {
   const t = useTranslations()
-  const { fetchMarks } = useMarkStore()
+  const { updateMark } = useMarkStore()
   const { fetchTags, getCurrentTag } = useTagStore()
 
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState<Priority>('medium')
+  const [todoData, setTodoData] = useState<TodoData>(() => parseTodoMarkContent(mark))
   const titleInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (open && mark) {
-      try {
-        const todoData: TodoData = JSON.parse(mark.content || '{}')
-        setTitle(todoData.title || '')
-        setDescription(todoData.description || '')
-        setPriority(todoData.priority || 'medium')
-      } catch {
-        setTitle(mark.desc || '')
-        setDescription('')
-        setPriority('medium')
-      }
+      setTodoData(parseTodoMarkContent(mark))
     }
   }, [open, mark])
 
-  async function handleSave() {
-    if (!title.trim()) {
-      return
-    }
-
-    const todoData: TodoData = {
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      completed: false // 编辑后重置完成状态
-    }
-
+  const persistTodoData = useCallback(async (nextTodoData: TodoData) => {
+    setTodoData(nextTodoData)
     await updateMark({
       ...mark,
-      desc: title.trim(),
-      content: JSON.stringify(todoData)
+      desc: nextTodoData.title.trim(),
+      content: JSON.stringify(nextTodoData)
     })
 
-    await fetchMarks()
     await fetchTags()
     getCurrentTag()
-
-    onOpenChange(false)
-  }
+  }, [fetchTags, getCurrentTag, mark, updateMark])
 
   const handleOpenAutoFocus = useCallback((event: Event) => {
     event.preventDefault()
@@ -117,8 +92,8 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
             <Input
               ref={titleInputRef}
               id="edit-todo-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={todoData.title}
+              onChange={(e) => void persistTodoData({ ...todoData, title: e.target.value })}
               placeholder={t('record.mark.todo.titlePlaceholder')}
               className="mt-1.5"
             />
@@ -129,8 +104,8 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
             <Textarea
               id="edit-todo-description"
               rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              value={todoData.description}
+              onChange={(e) => void persistTodoData({ ...todoData, description: e.target.value })}
               placeholder={t('record.mark.todo.descriptionPlaceholder')}
               className="mt-1.5"
             />
@@ -138,7 +113,7 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
 
           <div>
             <Label htmlFor="edit-todo-priority">{t('record.mark.todo.priority')}</Label>
-            <Tabs value={priority} onValueChange={(value) => setPriority(value as Priority)} className="mt-1.5">
+            <Tabs value={todoData.priority} onValueChange={(value) => void persistTodoData({ ...todoData, priority: value as Priority })} className="mt-1.5">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="low" className="data-[state=active]:bg-green-800 data-[state=active]:text-white">
                   {t('record.mark.todo.priorityLow')}
@@ -156,10 +131,7 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSave} disabled={!title.trim()}>
-            {t('common.save')}
+            {t('common.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -14,6 +14,7 @@ import { S3Config } from '@/types/sync'
 import { normalizeRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { normalizeRecordViewMode } from '@/app/core/main/mark/mark-view-mode.mjs'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
+import useArticleStore from './article'
 
 interface RecordDataDownloadOptions {
   allowMissingRemote?: boolean
@@ -166,6 +167,7 @@ const useMarkStore = create<MarkState>((set, get) => ({
         }),
       }
     })
+    void useArticleStore.getState().updateRecordTab(mark)
     await updateMark(mark)
   },
   setMarks: (marks) => {

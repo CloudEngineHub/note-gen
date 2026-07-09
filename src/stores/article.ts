@@ -27,6 +27,7 @@ import { buildVectorIndexedMap, getVectorDocumentKey } from '@/lib/vector-docume
 import { buildRemotePathsToLoad } from './article-remote-sync'
 import { debugSyncPath } from '@/lib/sync/remote-file'
 import type { Mark } from '@/db/marks'
+import { getRecordTabName } from '@/app/core/main/mark/mark-record-tab'
 
 type SyncPushCompletedEvent = Events['sync-push-completed']
 type SyncPushCompletedListener = (event: SyncPushCompletedEvent) => void
@@ -243,6 +244,7 @@ interface NoteState {
   activeTabId: string
   setActiveTabId: (id: string) => void
   addTab: (tab: OpenTabInfo) => void
+  updateRecordTab: (mark: Mark) => Promise<void>
   removeTab: (id: string) => void
   editorViewStates: Record<string, EditorViewState>
   setEditorViewState: (path: string, state: EditorViewState) => void
@@ -558,6 +560,30 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const store = await getStore();
     await store.set('openTabs', newTabs)
     await store.set('activeTabId', tab.id)
+  },
+  updateRecordTab: async (mark) => {
+    const currentTabs = get().openTabs
+    const newTabs = currentTabs.map((tab) => {
+      const isSameRecord = tab.markId === mark.id || tab.path === `${RECORD_TAB_PATH_PREFIX}${mark.id}`
+
+      if (!isSameRecord) {
+        return tab
+      }
+
+      return {
+        ...tab,
+        name: getRecordTabName(mark, mark.type),
+        markType: mark.type,
+      }
+    })
+
+    if (newTabs === currentTabs || newTabs.every((tab, index) => tab === currentTabs[index])) {
+      return
+    }
+
+    set({ openTabs: newTabs })
+    const store = await getStore()
+    await store.set('openTabs', newTabs)
   },
   removeTab: async (id) => {
     const currentTabs = get().openTabs

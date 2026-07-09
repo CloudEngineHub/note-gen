@@ -2,9 +2,8 @@ import { Mark } from "@/db/marks"
 import { useTranslations } from 'next-intl'
 import dayjs from "dayjs"
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { updateMark } from "@/db/marks"
 import type { CSSProperties } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CheckSquare, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import useMarkStore from "@/stores/mark"
@@ -25,12 +24,16 @@ interface TodoData {
 
 export function TodoItemContent({ mark, interactive = true }: { mark: Mark, interactive?: boolean }) {
   const t = useTranslations()
-  const { fetchMarks } = useMarkStore()
+  const { updateMark } = useMarkStore()
   const { recordTextSize } = useSettingStore()
 
   const [todoData, setTodoData] = useState<TodoData>(() => {
     return parseTodoMarkContent(mark)
   })
+
+  useEffect(() => {
+    setTodoData(parseTodoMarkContent(mark))
+  }, [mark])
 
   // 根据文字大小映射行高
   const getLineHeight = (textSize: string) => {
@@ -79,8 +82,6 @@ export function TodoItemContent({ mark, interactive = true }: { mark: Mark, inte
       ...mark,
       content: JSON.stringify(newData)
     })
-
-    await fetchMarks()
   }
 
   const priorityDotColor = getPriorityColor(todoData.priority)

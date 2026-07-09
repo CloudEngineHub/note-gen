@@ -153,40 +153,23 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
     setTodoData(parseTodoMarkContent(mark))
   }, [mark])
 
-  const handleSave = useCallback(async () => {
-    if (!todoData.title.trim()) {
-      return
-    }
-
-    const nextTodoData: TodoData = {
-      title: todoData.title.trim(),
-      description: todoData.description.trim(),
-      priority: todoData.priority,
-      completed: todoData.completed,
-    }
-
+  const persistTodoData = useCallback(async (nextTodoData: TodoData) => {
+    setTodoData(nextTodoData)
     await updateMark({
       ...mark,
-      desc: nextTodoData.title,
+      desc: nextTodoData.title.trim(),
       content: JSON.stringify(nextTodoData),
     })
     await fetchTags()
     getCurrentTag()
-  }, [fetchTags, getCurrentTag, mark, todoData, updateMark])
+  }, [fetchTags, getCurrentTag, mark, updateMark])
 
   const handleToggleComplete = useCallback(async () => {
-    const nextTodoData = {
+    await persistTodoData({
       ...todoData,
       completed: !todoData.completed,
-    }
-
-    setTodoData(nextTodoData)
-    await updateMark({
-      ...mark,
-      desc: nextTodoData.title,
-      content: JSON.stringify(nextTodoData),
     })
-  }, [mark, todoData, updateMark])
+  }, [persistTodoData, todoData])
 
   return (
     <div className="w-full min-w-0 max-w-full overflow-hidden">
@@ -209,7 +192,7 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
         <Input
           id="record-detail-todo-title"
           value={todoData.title}
-          onChange={(event) => setTodoData({ ...todoData, title: event.target.value })}
+          onChange={(event) => void persistTodoData({ ...todoData, title: event.target.value })}
           placeholder={t('record.mark.todo.titlePlaceholder')}
           className="w-full min-w-0 max-w-full"
         />
@@ -219,7 +202,7 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
           id="record-detail-todo-description"
           className="min-h-32 w-full min-w-0 max-w-full resize-y"
           value={todoData.description}
-          onChange={(event) => setTodoData({ ...todoData, description: event.target.value })}
+          onChange={(event) => void persistTodoData({ ...todoData, description: event.target.value })}
           placeholder={t('record.mark.todo.descriptionPlaceholder')}
         />
       </DetailItem>
@@ -227,7 +210,7 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
         <Tabs
           className="w-full min-w-0 max-w-full"
           value={todoData.priority}
-          onValueChange={(value) => setTodoData({ ...todoData, priority: value as Priority })}
+          onValueChange={(value) => void persistTodoData({ ...todoData, priority: value as Priority })}
         >
           <TabsList className="grid w-full min-w-0 max-w-full grid-cols-3">
             <TabsTrigger value="low" className="min-w-0">
@@ -241,13 +224,6 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-      </DetailItem>
-      <DetailItem title="操作" className="border-b-0">
-        <div className="flex w-full min-w-0 justify-end">
-          <Button onClick={handleSave} disabled={!todoData.title.trim()}>
-            {t('record.mark.todo.saveEdit')}
-          </Button>
-        </div>
       </DetailItem>
     </div>
   )
