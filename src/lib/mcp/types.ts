@@ -30,11 +30,20 @@ export interface MCPServerConfig {
 export interface MCPTool {
   name: string
   description?: string
+  annotations?: MCPToolAnnotations
   inputSchema: {
     type: 'object'
     properties?: Record<string, any>
     required?: string[]
   }
+}
+
+export interface MCPToolAnnotations {
+  title?: string
+  readOnlyHint?: boolean
+  destructiveHint?: boolean
+  idempotentHint?: boolean
+  openWorldHint?: boolean
 }
 
 // MCP 资源定义

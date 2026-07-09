@@ -691,6 +691,7 @@ function buildMcpListToolsTool(): AgentTool {
             name: tool.name,
             description: tool.description || '',
             required: tool.inputSchema?.required || [],
+            annotations: tool.annotations,
           })),
           resourceCount: resources.length,
           resources: resources.map((resource) => ({

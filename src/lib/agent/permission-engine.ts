@@ -1,4 +1,6 @@
 import type { AgentContextSnapshot, AgentTool, AgentToolRisk } from './types'
+import { mcpServerManager } from '@/lib/mcp/server-manager'
+import type { MCPToolAnnotations } from '@/lib/mcp/types'
 
 export interface PermissionDecision {
   allowed: boolean
@@ -17,8 +19,20 @@ const SESSION_APPROVABLE_RISKS = new Set<AgentToolRisk>([
   'medium',
 ])
 
-const SAFE_EXTERNAL_TOOL_PATTERN = /^(get|list|read|search|find|fetch|query|lookup|describe|inspect|show)(_|-|[A-Z]|$)/i
 const RISKY_EXTERNAL_TOOL_PATTERN = /(write|update|create|delete|remove|rename|move|copy|send|post|publish|deploy|execute|run|install|merge|close|open_pr|approve)/i
+const SAFE_EXTERNAL_TOOL_TOKENS = new Set([
+  'get',
+  'list',
+  'read',
+  'search',
+  'find',
+  'fetch',
+  'query',
+  'lookup',
+  'describe',
+  'inspect',
+  'show',
+])
 const READ_ONLY_INTENT_PATTERN = /(不要|别|无需|禁止|不需要).{0,8}(修改|改动|编辑|写入|保存|创建|新建|删除|插入|添加|替换|更新)|只读|仅(总结|解释|分析|回答|查看|读取)|只(总结|解释|分析|回答|查看|读取)|do not (modify|edit|write|save|create|delete|insert|update)|don't (modify|edit|write|save|create|delete|insert|update)|without (modifying|editing|writing|saving)|read[- ]only/i
 const SCOPED_PRESERVE_INTENT_PATTERN = /(不要|别|无需|禁止|不需要).{0,12}(改动|修改|编辑|写入|替换|更新).{0,12}(其他|其它|其余|剩余|选区外|范围外|之外|以外|其他部分|其它部分|其余内容)|不(改动|修改|编辑).{0,12}(其他|其它|其余|剩余|选区外|范围外|之外|以外|其他部分|其它部分|其余内容)|keep .{0,20}(the rest|other parts|outside|unchanged)|do not (modify|edit|change).{0,20}(the rest|other parts|outside)/i
 const CURRENT_MARKDOWN_PRESERVE_PATTERN = /(不要|别|无需|禁止|不需要).{0,12}(修改|改动|编辑|写入|保存|替换|更新).{0,12}(当前|这个|此).{0,8}(Markdown|md|笔记|文件|文档)|do not (modify|edit|write|save|update).{0,24}(current|open).{0,12}(markdown|note|file|document)/i
@@ -29,6 +43,34 @@ function stripPathLiterals(userInput: string) {
   return userInput
     .replace(/(?:^|[\s"'`：:，,（(])(?:[\w.-]+\/)+[\w.-]+(?:\.[\w.-]+)?(?=$|[\s"'`。；;，,）)])/g, ' ')
     .replace(/(?:^|[\s"'`：:，,（(])[\w.-]+\.md(?=$|[\s"'`。；;，,）)])/g, ' ')
+}
+
+function getToolNameTokens(toolName: string) {
+  return toolName
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[^a-zA-Z0-9]+/)
+    .map(token => token.toLowerCase())
+    .filter(Boolean)
+}
+
+function hasSafeExternalToolName(toolName: string) {
+  const tokens = getToolNameTokens(toolName)
+  return tokens.some(token => SAFE_EXTERNAL_TOOL_TOKENS.has(token)) && !RISKY_EXTERNAL_TOOL_PATTERN.test(toolName)
+}
+
+function hasRiskyExternalToolName(toolName: string) {
+  return RISKY_EXTERNAL_TOOL_PATTERN.test(toolName)
+}
+
+function getMcpToolAnnotations(input: Record<string, unknown>): MCPToolAnnotations | undefined {
+  const serverId = typeof input.serverId === 'string' ? input.serverId : ''
+  const toolName = typeof input.toolName === 'string' ? input.toolName : ''
+
+  if (!serverId || !toolName) {
+    return undefined
+  }
+
+  return mcpServerManager.getServerTools(serverId).find(tool => tool.name === toolName)?.annotations
 }
 
 export function hasReadOnlyIntent(userInput: string) {
@@ -91,16 +133,46 @@ export class AgentPermissionEngine {
 
     if (tool.risk === 'external') {
       const externalToolName = typeof input.toolName === 'string' ? input.toolName : ''
-      if (externalToolName && SAFE_EXTERNAL_TOOL_PATTERN.test(externalToolName) && !RISKY_EXTERNAL_TOOL_PATTERN.test(externalToolName)) {
+      const annotations = getMcpToolAnnotations(input)
+
+      if (annotations?.readOnlyHint === true) {
         return {
           allowed: true,
           requiresApproval: false,
         }
       }
 
-      const writeIntentDecision = this.evaluateWriteIntent(context)
-      if (writeIntentDecision) {
-        return writeIntentDecision
+      if (annotations?.destructiveHint === true) {
+        const writeIntentDecision = this.evaluateWriteIntent(context)
+        if (writeIntentDecision) {
+          return writeIntentDecision
+        }
+
+        return {
+          allowed: true,
+          requiresApproval: true,
+          canApproveForSession: false,
+        }
+      }
+
+      if (externalToolName && hasSafeExternalToolName(externalToolName)) {
+        return {
+          allowed: true,
+          requiresApproval: false,
+        }
+      }
+
+      if (externalToolName && hasRiskyExternalToolName(externalToolName)) {
+        const writeIntentDecision = this.evaluateWriteIntent(context)
+        if (writeIntentDecision) {
+          return writeIntentDecision
+        }
+
+        return {
+          allowed: true,
+          requiresApproval: true,
+          canApproveForSession: false,
+        }
       }
 
       return {
