@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { applyAppFontFamily } from "@/lib/font-settings"
@@ -31,6 +31,7 @@ import { ControlFile } from "@/app/core/main/mark/control-file"
 import { ControlTodo } from "@/app/core/main/mark/control-todo"
 import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
 import useArticleStore from "@/stores/article"
+import { WritingScreen } from "./writing/writing-screen"
 
 export default function RootLayout({
   children,
@@ -38,10 +39,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname()
+  const isWritingRoute = pathname === '/mobile/writing'
+  const [hasWritingCache, setHasWritingCache] = useState(isWritingRoute)
   const { initSettingData, customThemeColors, appFontFamily } = useSettingStore()
   const { initMainHosting } = useImageStore()
   const { initCollapsibleList } = useArticleStore()
   const { currentLocale } = useI18n()
+  useEffect(() => {
+    if (isWritingRoute) {
+      setHasWritingCache(true)
+    }
+  }, [isWritingRoute])
+
+  useEffect(() => {
+    if (isWritingRoute) {
+      return
+    }
+
+    const writingRoot = document.getElementById('mobile-writing')
+    const activeElement = document.activeElement
+    if (writingRoot && activeElement instanceof HTMLElement && writingRoot.contains(activeElement)) {
+      activeElement.blur()
+    }
+  }, [isWritingRoute])
+
   useEffect(() => {
     let cancelled = false
 
@@ -115,7 +136,15 @@ export default function RootLayout({
         <TooltipProvider>
           <div className="mobile-app-shell flex flex-col">
             <main className="mobile-app-main flex flex-1 w-full overflow-hidden">
-              {children}
+              {hasWritingCache ? (
+                <div
+                  className={isWritingRoute ? "h-full w-full min-w-0" : "hidden"}
+                  aria-hidden={!isWritingRoute}
+                >
+                  <WritingScreen />
+                </div>
+              ) : null}
+              {!isWritingRoute ? children : null}
             </main>
             {!hideFootbar ? (
               <div className="mobile-footbar">

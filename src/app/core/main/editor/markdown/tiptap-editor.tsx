@@ -910,6 +910,7 @@ export function TipTapEditor({
 
   const placeholderText = placeholder || t('placeholder')
   const isMobile = isMobileDevice()
+  const [isRestoringMobileView, setIsRestoringMobileView] = useState(isMobile)
 
   // Use ref for autoScroll to avoid infinite re-render loop
   const autoScrollRef = useRef(autoScroll)
@@ -1011,8 +1012,9 @@ export function TipTapEditor({
       initializedForPathRef.current = activeFilePath
       pendingSyncUpdateRef.current = null
       restoredViewPathRef.current = null
+      setIsRestoringMobileView(isMobile)
     }
-  }, [activeFilePath])
+  }, [activeFilePath, isMobile])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -1552,12 +1554,24 @@ export function TipTapEditor({
     const savedViewState = getEditorViewState(path)
 
     if (!savedViewState) {
+      const initialScrollTop = isMobile ? 0 : scrollContainerRef.current.scrollTop
+
+      if (isMobile) {
+        scrollContainerRef.current.scrollTop = initialScrollTop
+        requestAnimationFrame(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = initialScrollTop
+          }
+        })
+        setIsRestoringMobileView(false)
+      }
+
       restoredViewPathRef.current = path
       lastViewStateRef.current = {
         path,
         selectionFrom: editor.state.selection.from,
         selectionTo: editor.state.selection.to,
-        scrollTop: scrollContainerRef.current.scrollTop,
+        scrollTop: initialScrollTop,
       }
       return
     }
@@ -1603,6 +1617,19 @@ export function TipTapEditor({
         }
 
         scrollContainerRef.current.scrollTop = savedViewState.scrollTop
+        setIsRestoringMobileView(false)
+        if (isMobile) {
+          window.setTimeout(() => {
+            if (scrollContainerRef.current && restoredViewPathRef.current === path) {
+              scrollContainerRef.current.scrollTop = savedViewState.scrollTop
+            }
+          }, 0)
+          window.setTimeout(() => {
+            if (scrollContainerRef.current && restoredViewPathRef.current === path) {
+              scrollContainerRef.current.scrollTop = savedViewState.scrollTop
+            }
+          }, 50)
+        }
         restoredViewPathRef.current = path
         lastViewStateRef.current = {
           path,
@@ -1619,7 +1646,7 @@ export function TipTapEditor({
         }
       })
     })
-  }, [editor, getEditorViewState, setEditorViewState])
+  }, [editor, getEditorViewState, isMobile, setEditorViewState])
 
   const scrollMobileSelectionIntoView = useCallback(() => {
     if (!isMobile || !editor || editor.isDestroyed || !scrollContainerRef.current) {
@@ -3992,7 +4019,8 @@ export function TipTapEditor({
         ref={scrollContainerRef}
         className={cn(
           "flex-1 overflow-x-hidden overflow-y-auto relative",
-          isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll"
+          isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
+          isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
         )}
         onMouseDownCapture={handleEditorMouseDownCapture}
         onDragOver={(e) => e.preventDefault()}
