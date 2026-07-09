@@ -34,6 +34,7 @@ import { platform } from '@tauri-apps/plugin-os'
 import useSettingStore from '@/stores/setting'
 import type { Mark } from '@/db/marks'
 import { isRecordTabPath } from '../mark/mark-record-tab'
+import { getMarkTypeListBadgeClasses } from '../mark/mark-type-meta'
 
 export interface TabInfo {
   id: string
@@ -147,8 +148,8 @@ function SortableTabWithMenu({
         >
           {isRecordTab ? (
             <span className={cn(
-              'shrink-0 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground',
-              isActive && 'border-primary/30 bg-primary/10 text-primary'
+              getMarkTypeListBadgeClasses(tab.markType || 'text'),
+              'shrink-0 text-[10px]'
             )}>
               {recordTypeLabel}
             </span>
