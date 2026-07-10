@@ -1723,6 +1723,14 @@
       "empty": "Nenhum registro ainda",
       "loading": "Carregando...",
       "createdAt": "Criado em",
+      "detail": {
+        "notFound": "Este registro não existe ou foi excluído",
+        "moreActions": "Mais ações",
+        "tag": "Etiqueta",
+        "discardTitle": "Descartar alterações não salvas?",
+        "discardDescription": "Suas alterações não serão mantidas ao sair desta página.",
+        "discard": "Descartar alterações"
+      },
       "type": {
         "scan": "Digitalização",
         "image": "Imagem",

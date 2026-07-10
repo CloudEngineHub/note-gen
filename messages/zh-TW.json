@@ -1729,6 +1729,14 @@
     "mark": {
       "empty": "暫無記錄",
       "loading": "載入中...",
+      "detail": {
+        "notFound": "記錄不存在或已被刪除",
+        "moreActions": "更多操作",
+        "tag": "所屬標籤",
+        "discardTitle": "放棄未保存的修改？",
+        "discardDescription": "返回後，本次修改將不會保留。",
+        "discard": "放棄修改"
+      },
       "type": {
         "scan": "截圖",
         "image": "插圖",

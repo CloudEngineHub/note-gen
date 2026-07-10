@@ -7,12 +7,16 @@ interface SwipeBackProps {
   children: React.ReactNode
   edgeWidth?: number // 左侧边缘触发区域宽度（百分比）
   threshold?: number // 触发返回的滑动距离阈值（像素）
+  enabled?: boolean
+  onBack?: () => void
 }
 
 export function SwipeBack({
   children,
   edgeWidth = 15,
-  threshold = 80
+  threshold = 80,
+  enabled = true,
+  onBack,
 }: SwipeBackProps) {
   const router = useRouter()
   const [canGoBack, setCanGoBack] = useState(false)
@@ -24,9 +28,9 @@ export function SwipeBack({
   // 检查是否可以返回
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setCanGoBack(window.history.length > 1)
+      setCanGoBack(Boolean(onBack) || window.history.length > 1)
     }
-  }, [])
+  }, [onBack])
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     const touch = e.touches[0]
@@ -67,16 +71,20 @@ export function SwipeBack({
 
     // 如果向右滑动超过阈值，且水平位移大于垂直位移
     if (deltaX > threshold && deltaX > deltaY) {
-      router.back()
+      if (onBack) {
+        onBack()
+      } else {
+        router.back()
+      }
     }
 
     touchStartX.current = null
     touchStartY.current = null
     isDragging.current = false
-  }, [router, threshold])
+  }, [onBack, router, threshold])
 
   useEffect(() => {
-    if (!canGoBack) return
+    if (!enabled || !canGoBack) return
 
     const container = document.body
 
@@ -89,7 +97,7 @@ export function SwipeBack({
       container.removeEventListener('touchmove', handleTouchMove)
       container.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [canGoBack, handleTouchStart, handleTouchMove, handleTouchEnd])
+  }, [canGoBack, enabled, handleTouchStart, handleTouchMove, handleTouchEnd])
 
   if (!canGoBack) {
     return <>{children}</>

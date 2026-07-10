@@ -121,7 +121,7 @@ export default function RootLayout({
     applyAppFontFamily(appFontFamily)
   }, [appFontFamily])
 
-  const hideFootbar = pathname.startsWith('/mobile/setting/pages')
+  const hideFootbar = pathname.startsWith('/mobile/setting/pages') || pathname === '/mobile/record/detail'
 
   return (
     <ThemeProvider

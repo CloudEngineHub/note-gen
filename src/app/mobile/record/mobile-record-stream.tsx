@@ -3,19 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Textarea } from '@/components/ui/textarea'
 import { LocalImage } from '@/components/local-image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
-import { getMarkTypeChipClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
+import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
 import useMarkStore, { RecordTimePreset } from '@/stores/mark'
 import useTagStore from '@/stores/tag'
 import { clearTrash, delMark, deleteMarks, delMarkForever, initMarksDb, Mark, restoreMark, restoreMarks, updateMark as updateMarkDb } from '@/db/marks'
@@ -46,6 +45,7 @@ function getMarkImageSrc(mark: Mark) {
 
 export function MobileRecordStream() {
   const t = useTranslations()
+  const router = useRouter()
   const {
     trashState,
     setTrashState,
@@ -72,12 +72,7 @@ export function MobileRecordStream() {
   const [createTagOpen, setCreateTagOpen] = useState(false)
   const [typeFilterOpen, setTypeFilterOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
-  const [activeMark, setActiveMark] = useState<Mark | null>(null)
   const [moveTargetMark, setMoveTargetMark] = useState<Mark | null>(null)
-  const [editDesc, setEditDesc] = useState('')
-  const [editContent, setEditContent] = useState('')
-  const [editUrl, setEditUrl] = useState('')
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const touchStartXRef = useRef(0)
   const touchStartYRef = useRef(0)
   const isSwipingRef = useRef(false)
@@ -114,45 +109,6 @@ export function MobileRecordStream() {
       setSelectedIds(new Set())
     }
   }, [multiMode])
-
-  useEffect(() => {
-    if (!activeMark) return
-    setEditDesc(activeMark.type === 'text' ? (activeMark.content || '') : (activeMark.desc || ''))
-    setEditContent(activeMark.content || '')
-    setEditUrl(activeMark.url || '')
-  }, [activeMark])
-
-  useEffect(() => {
-    if (!activeMark) return
-    const hasChanges =
-      (activeMark.desc || '') !== editDesc ||
-      (activeMark.content || '') !== editContent ||
-      (activeMark.url || '') !== editUrl
-
-    if (!hasChanges) return
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current)
-    }
-
-    autoSaveTimerRef.current = setTimeout(async () => {
-      const updatedMark: Mark = {
-        ...activeMark,
-        desc: activeMark.type === 'text' ? editContent : editDesc,
-        content: editContent,
-        url: editUrl,
-      }
-      await updateMarkDb(updatedMark)
-      setActiveMark(updatedMark)
-      await refreshRecords()
-    }, 300)
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current)
-      }
-    }
-  }, [activeMark, editDesc, editContent, editUrl])
 
   const records = marks
   const tagMap = useMemo(() => new Map(tags.map((tag) => [tag.id, tag.name])), [tags])
@@ -517,9 +473,9 @@ export function MobileRecordStream() {
             {queues.map((queue) => (
               <div key={queue.queueId} className="rounded-xl border border-dashed bg-muted/40 px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px]">
+                  <span className={cn(getMarkTypeListBadgeClasses(queue.type), 'shrink-0 text-[10px]')}>
                     {t(`record.mark.type.${queue.type}`)}
-                  </Badge>
+                  </span>
                   <span className="text-xs text-muted-foreground">{t('common.loading')}</span>
                   <span className="ml-auto text-xs text-muted-foreground">{queue.progress}</span>
                 </div>
@@ -657,17 +613,14 @@ export function MobileRecordStream() {
                                 setSwipedMarkId(null)
                                 return
                               }
-                              setActiveMark(mark)
+                              router.push(`/mobile/record/detail?id=${mark.id}`)
                             }}
                           >
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[10px]">
+                              <span className={cn(getMarkTypeListBadgeClasses(mark.type), 'shrink-0 text-[10px]')}>
                                 {t(`record.mark.type.${mark.type}`)}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">{dayjs(mark.createdAt).format('HH:mm')}</span>
-                              {!trashState && (
-                                <span className="ml-auto text-xs text-muted-foreground">{tagMap.get(mark.tagId) || '-'}</span>
-                              )}
+                              </span>
+                              <span className="ml-auto text-xs text-muted-foreground">{dayjs(mark.createdAt).format('HH:mm')}</span>
                             </div>
                             {(mark.type === 'image' || mark.type === 'scan') && mark.url ? (
                               <div className="mt-2 flex items-center gap-2">
@@ -692,62 +645,6 @@ export function MobileRecordStream() {
           ))
         )}
       </div>
-
-      <Sheet open={Boolean(activeMark)} onOpenChange={(open) => !open && setActiveMark(null)}>
-        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
-          {activeMark && (
-            <>
-              <SheetHeader>
-                <SheetTitle>{t(`record.mark.type.${activeMark.type}`)}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-3 space-y-3 text-sm">
-                <div className="text-xs text-muted-foreground">{dayjs(activeMark.createdAt).format('YYYY-MM-DD HH:mm:ss')}</div>
-                {(activeMark.type === 'image' || activeMark.type === 'scan') && activeMark.url && (
-                  <div className="overflow-hidden rounded-lg border bg-muted/20 p-2">
-                    <LocalImage
-                      src={getMarkImageSrc(activeMark)}
-                      alt=""
-                      className="h-48 w-full rounded-md object-contain"
-                    />
-                  </div>
-                )}
-                {activeMark.type !== 'text' && (
-                  <div>
-                    <div className="mb-1 text-xs text-muted-foreground">{t('record.mark.desc')}</div>
-                    <Textarea
-                      value={editDesc}
-                      onChange={(e) => setEditDesc(e.target.value)}
-                      rows={3}
-                      className="min-h-20"
-                    />
-                  </div>
-                )}
-                <div>
-                  <div className="mb-1 text-xs text-muted-foreground">{t('record.mark.content')}</div>
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => {
-                      const next = e.target.value
-                      setEditContent(next)
-                      if (activeMark.type === 'text') {
-                        setEditDesc(next)
-                      }
-                    }}
-                    rows={8}
-                    className="min-h-28"
-                  />
-                </div>
-                {activeMark.type === 'link' && (
-                  <div>
-                    <div className="mb-1 text-xs text-muted-foreground">URL</div>
-                    <Input value={editUrl} onChange={(e) => setEditUrl(e.target.value)} />
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
 
       <Sheet open={createTagOpen} onOpenChange={setCreateTagOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl">

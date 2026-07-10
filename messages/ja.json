@@ -1729,6 +1729,14 @@
     "mark": {
       "empty": "記録はまだありません",
       "loading": "読み込み中...",
+      "detail": {
+        "notFound": "記録が存在しないか、削除されています",
+        "moreActions": "その他の操作",
+        "tag": "タグ",
+        "discardTitle": "未保存の変更を破棄しますか？",
+        "discardDescription": "このページを離れると、変更内容は保存されません。",
+        "discard": "変更を破棄"
+      },
       "type": {
         "scan": "スキャン",
         "image": "イラスト",

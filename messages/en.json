@@ -1730,6 +1730,14 @@
       "empty": "No records yet",
       "loading": "Loading...",
       "createdAt": "Created At",
+      "detail": {
+        "notFound": "This record does not exist or has been deleted",
+        "moreActions": "More actions",
+        "tag": "Tag",
+        "discardTitle": "Discard unsaved changes?",
+        "discardDescription": "Your changes will not be kept after leaving this page.",
+        "discard": "Discard changes"
+      },
       "type": {
         "scan": "Scan",
         "image": "Image",
