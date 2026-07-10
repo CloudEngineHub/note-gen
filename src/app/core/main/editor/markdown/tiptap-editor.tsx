@@ -23,7 +23,8 @@ import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
 import UniqueId from '@tiptap/extension-unique-id'
 import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
-import { AllSelection, NodeSelection, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
+import { AllSelection, EditorState, NodeSelection, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
+import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { dropPoint } from '@tiptap/pm/transform'
 import 'katex/dist/katex.min.css'
@@ -31,7 +32,7 @@ import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useRef, useCallback, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, useCallback, useMemo, useState, type MouseEvent as ReactMouseEvent, type UIEvent as ReactUIEvent } from 'react'
 import { Store } from '@tauri-apps/plugin-store'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -71,7 +72,7 @@ import { StableCodeBlockLowlight } from './code-block-extension'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 import useSettingStore from '@/stores/setting'
 import useChatStore, { type PendingQuote } from '@/stores/chat'
-import { Loader2, X } from 'lucide-react'
+import { ArrowUp, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { buildMobileSelectionContext, isMobileSelectionContextStale } from './mobile-selection-context'
 import { MobileEditorContextBar } from './mobile-editor-context-bar'
@@ -107,6 +108,7 @@ const IMAGE_RESIZE_DIRECTIONS: ResizableNodeViewDirection[] = [
 ]
 
 const AI_GENERATION_LOADING_TEXT = '···'
+const MOBILE_SCROLL_TOP_THRESHOLD = 160
 
 function createDragHandleElement(): HTMLElement {
   const element = document.createElement('div')
@@ -856,6 +858,7 @@ interface TipTapEditorProps {
   showFooterBar?: boolean
   contentInset?: boolean
   scrollable?: boolean
+  mobileMode?: boolean
   onTerminate?: () => void
 }
 
@@ -908,6 +911,40 @@ function clampSelectionPosition(value: number, docSize: number): number {
   return Math.max(0, Math.min(value, docSize))
 }
 
+function getEditorUndoRedoState(editor: CoreEditor): { undo: boolean; redo: boolean } {
+  return {
+    undo: undoDepth(editor.state) > 0,
+    redo: redoDepth(editor.state) > 0,
+  }
+}
+
+function emitEditorUndoRedoState(editor: CoreEditor): void {
+  emitter.emit('editor-undo-redo-changed', getEditorUndoRedoState(editor))
+}
+
+function resetEditorHistory(editor: CoreEditor): void {
+  const { state } = editor
+  const nextState = EditorState.create({
+    doc: state.doc,
+    selection: state.selection,
+    storedMarks: state.storedMarks,
+    plugins: state.plugins,
+  })
+
+  editor.view.updateState(nextState)
+}
+
+function setEditorContentWithoutUndo(editor: CoreEditor, content: string): void {
+  editor
+    .chain()
+    .setMeta('addToHistory', false)
+    .setContent(content, { contentType: 'markdown' })
+    .run()
+
+  resetEditorHistory(editor)
+  emitEditorUndoRedoState(editor)
+}
+
 export function TipTapEditor({
   initialContent,
   onChange,
@@ -925,6 +962,7 @@ export function TipTapEditor({
   showFooterBar = true,
   contentInset = true,
   scrollable = true,
+  mobileMode,
   onTerminate,
 }: TipTapEditorProps) {
   const t = useTranslations('editor')
@@ -937,7 +975,7 @@ export function TipTapEditor({
   const getEditorViewState = useArticleStore((state) => state.getEditorViewState)
 
   const placeholderText = placeholder || t('placeholder')
-  const isMobile = isMobileDevice()
+  const isMobile = mobileMode ?? isMobileDevice()
   const [isRestoringMobileView, setIsRestoringMobileView] = useState(isMobile)
 
   // Use ref for autoScroll to avoid infinite re-render loop
@@ -963,6 +1001,7 @@ export function TipTapEditor({
   const [mobileContext, setMobileContext] = useState<MobileSelectionContext>(null)
   const [mobileSheetMode, setMobileSheetMode] = useState<MobileSheetMode>(null)
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false)
+  const [showMobileScrollTop, setShowMobileScrollTop] = useState(false)
   const [imageSrcDraft, setImageSrcDraft] = useState('')
   const [imageAltDraft, setImageAltDraft] = useState('')
   const [customAiInstruction, setCustomAiInstruction] = useState('')
@@ -986,7 +1025,7 @@ export function TipTapEditor({
   useEffect(() => {
     async function loadCenteredContent() {
       // 移动端强制关闭居中内容
-      if (isMobileDevice()) {
+      if (isMobile) {
         setCenteredContent(false)
         return
       }
@@ -995,7 +1034,7 @@ export function TipTapEditor({
       setCenteredContent(centered)
     }
     loadCenteredContent()
-  }, [])
+  }, [isMobile])
   // Bug fix: Track when editor is ready (has caught up with content)
   const isReadyRef = useRef(false)
   // Bug fix: Track if this is the first onUpdate after initialization
@@ -1533,6 +1572,61 @@ export function TipTapEditor({
       scrollTop: nextState.scrollTop,
     })
   }, [activeFilePath, editor, setEditorViewState])
+
+  const handleEditorScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
+    persistEditorViewState()
+
+    if (!isMobile) {
+      return
+    }
+
+    setShowMobileScrollTop(event.currentTarget.scrollTop > MOBILE_SCROLL_TOP_THRESHOLD)
+  }, [isMobile, persistEditorViewState])
+
+  useEffect(() => {
+    if (!isMobile || !editor) {
+      setShowMobileScrollTop(false)
+      return
+    }
+
+    const scrollContainer = scrollContainerRef.current
+    const proseMirror = editor.view.dom
+    const scrollTargets = [scrollContainer, proseMirror].filter((target): target is HTMLElement => !!target)
+
+    if (!scrollTargets.length) {
+      setShowMobileScrollTop(false)
+      return
+    }
+
+    let animationFrame: number | null = null
+
+    const updateScrollTopVisibility = () => {
+      animationFrame = null
+      const scrollTop = Math.max(...scrollTargets.map((target) => target.scrollTop))
+      setShowMobileScrollTop(scrollTop > MOBILE_SCROLL_TOP_THRESHOLD)
+    }
+
+    const scheduleUpdate = () => {
+      if (animationFrame !== null) {
+        return
+      }
+      animationFrame = window.requestAnimationFrame(updateScrollTopVisibility)
+    }
+
+    updateScrollTopVisibility()
+    scrollTargets.forEach((target) => {
+      target.addEventListener('scroll', scheduleUpdate, { passive: true })
+    })
+
+    return () => {
+      scrollTargets.forEach((target) => {
+        target.removeEventListener('scroll', scheduleUpdate)
+      })
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame)
+      }
+    }
+  }, [isMobile, editor, activeFilePath])
 
   useEffect(() => {
     if (!editor || !activeFilePath) {
@@ -3148,9 +3242,7 @@ export function TipTapEditor({
         // Check if the file path is still the same (handle race condition)
         if (activeFilePath !== currentPath) return
 
-        if (initialContent) {
-          editor.commands.setContent(initialContent || '', { contentType: 'markdown' })
-        }
+        setEditorContentWithoutUndo(editor, initialContent || '')
         // Mark as initialized to allow subsequent content updates
         isInitializedRef.current = true
         // Bug fix: Mark editor as ready AFTER content is set
@@ -3233,10 +3325,7 @@ export function TipTapEditor({
     let frameId: number | null = null
 
     const emitUndoRedoState = () => {
-      emitter.emit('editor-undo-redo-changed', {
-        undo: editor.can().undo(),
-        redo: editor.can().redo()
-      })
+      emitEditorUndoRedoState(editor)
     }
 
     emitUndoRedoState()
@@ -4175,10 +4264,7 @@ export function TipTapEditor({
         resolve({ undo: false, redo: false })
         return
       }
-      resolve({
-        undo: editor.can().undo(),
-        redo: editor.can().redo()
-      })
+      resolve(getEditorUndoRedoState(editor))
     }
 
     // Defer emitter and document listener registration to avoid flushSync conflict during React render
@@ -4244,6 +4330,17 @@ export function TipTapEditor({
     onToggleOutline?.()
   }
 
+  const handleMobileScrollTop = () => {
+    scrollContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+    editor.view.dom.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+  }
+
   return (
     <div
       ref={editorContainerRef}
@@ -4273,6 +4370,7 @@ export function TipTapEditor({
           isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
         )}
         onMouseDownCapture={handleEditorMouseDownCapture}
+        onScroll={handleEditorScroll}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleEditorDrop}
       >
@@ -4320,6 +4418,20 @@ export function TipTapEditor({
         />
         </div>
       </div>
+
+      {isMobile && showMobileScrollTop && (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="返回顶部"
+          className="mobile-scroll-top-button absolute right-4 size-11 rounded-full border-border/70 bg-background/90 text-foreground shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/75"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={handleMobileScrollTop}
+        >
+          <ArrowUp className="size-5" />
+        </Button>
+      )}
 
       {isMobile && !mobileContext && (
         <MobileWritingToolbar
