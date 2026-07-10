@@ -2559,6 +2559,26 @@
         "pullingRemote": "Buscando conteúdo mais recente do servidor remoto...",
         "pullComplete": "Pull Concluído"
       },
+      "mobile": {
+        "cancel": "Cancelar",
+        "create": "Criar",
+        "save": "Salvar",
+        "emptyDir": "Esta pasta está vazia",
+        "root": "Raiz",
+        "openFiles": "Abrir arquivos",
+        "remote": "Arquivo remoto",
+        "remoteFileNotPulled": "Somente nuvem · Toque para baixar",
+        "remoteFolderOnly": "Pasta somente na nuvem",
+        "file": "Arquivo",
+        "folder": "Pasta",
+        "folderChildren": "{files} arquivos · {folders} pastas",
+        "filePlaceholder": "example.md",
+        "folderPlaceholder": "example-folder",
+        "dragToParent": "Solte aqui para mover um nível acima",
+        "dragReleaseToMove": "Solte para mover aqui",
+        "moveInvalidTarget": "Não é possível mover para esta pasta",
+        "moveFailed": "Falha ao mover"
+      },
       "context": {
         "viewDirectory": "Ver Diretório",
         "cut": "Recortar",

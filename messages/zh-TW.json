@@ -2566,6 +2566,26 @@
         "pullingRemote": "正在從遠端伺服器取得最新內容...",
         "pullComplete": "拉取完成"
       },
+      "mobile": {
+        "cancel": "取消",
+        "create": "創建",
+        "save": "保存",
+        "emptyDir": "該目錄為空",
+        "root": "根目錄",
+        "openFiles": "打開文件",
+        "remote": "遠端文件",
+        "remoteFileNotPulled": "僅雲端 · 點擊後拉取",
+        "remoteFolderOnly": "僅雲端目錄",
+        "file": "文件",
+        "folder": "文件夾",
+        "folderChildren": "{files} 個文件 · {folders} 個文件夾",
+        "filePlaceholder": "示例.md",
+        "folderPlaceholder": "示例文件夾",
+        "dragToParent": "拖到這裡移動到上一級",
+        "dragReleaseToMove": "鬆手移動到此處",
+        "moveInvalidTarget": "不能移動到該文件夾",
+        "moveFailed": "移動失敗"
+      },
       "context": {
         "viewDirectory": "查看目錄",
         "cut": "剪切",

@@ -2576,6 +2576,26 @@
         "pullingRemote": "リモートサーバーから最新コンテンツを取得中...",
         "pullComplete": "プル完了"
       },
+      "mobile": {
+        "cancel": "キャンセル",
+        "create": "作成",
+        "save": "保存",
+        "emptyDir": "このディレクトリは空です",
+        "root": "ルート",
+        "openFiles": "ファイルを開く",
+        "remote": "リモートファイル",
+        "remoteFileNotPulled": "クラウドのみ · タップして取得",
+        "remoteFolderOnly": "クラウドのみのフォルダ",
+        "file": "ファイル",
+        "folder": "フォルダ",
+        "folderChildren": "{files} 個のファイル · {folders} 個のフォルダ",
+        "filePlaceholder": "example.md",
+        "folderPlaceholder": "example-folder",
+        "dragToParent": "ここにドロップして1つ上の階層へ移動",
+        "dragReleaseToMove": "離すとここへ移動",
+        "moveInvalidTarget": "このフォルダには移動できません",
+        "moveFailed": "移動に失敗しました"
+      },
       "context": {
         "viewDirectory": "ディレクトリを表示",
         "cut": "切り取り",

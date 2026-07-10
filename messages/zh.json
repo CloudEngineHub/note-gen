@@ -2755,7 +2755,11 @@
         "folder": "文件夹",
         "folderChildren": "{files} 个文件 · {folders} 个文件夹",
         "filePlaceholder": "示例.md",
-        "folderPlaceholder": "示例文件夹"
+        "folderPlaceholder": "示例文件夹",
+        "dragToParent": "拖到这里移动到上一级",
+        "dragReleaseToMove": "松手移动到此处",
+        "moveInvalidTarget": "不能移动到该文件夹",
+        "moveFailed": "移动失败"
       },
       "deleteConfirm": "确认删除此文件吗？"
     },

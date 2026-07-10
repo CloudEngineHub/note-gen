@@ -5,7 +5,7 @@ import { BaseDirectory, exists, mkdir, remove, rename as fsRename, stat, writeTe
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useTranslations } from 'next-intl'
 import type { Editor } from '@tiptap/react'
-import { ChevronLeft, FilePlus, Folder, FolderPlus, List, Pencil, Redo2, RefreshCw, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
+import { ChevronLeft, FilePlus, Folder, FolderInput, FolderPlus, List, Pencil, Redo2, RefreshCw, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -33,6 +33,8 @@ import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { RepoNames } from '@/lib/sync/github.types'
 import { Store } from '@tauri-apps/plugin-store'
 import { S3Config, WebDAVConfig } from '@/types/sync'
+import { buildMoveTargetPath, getPathAfterMove, isInvalidFolderMoveTarget, moveFileManagerEntry } from '@/app/core/main/file/file-dnd'
+import { cn } from '@/lib/utils'
 
 interface WritingHeaderProps {
   editor: Editor | null
@@ -40,6 +42,11 @@ interface WritingHeaderProps {
 
 function shouldLoadRemoteOnTreeRefresh(options?: { isCreateFlow?: boolean }) {
   return options?.isCreateFlow !== true
+}
+
+type DragPoint = {
+  x: number
+  y: number
 }
 
 export function WritingHeader({ editor }: WritingHeaderProps) {
@@ -59,6 +66,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     loadCollapsibleFiles,
     loadFolderRemoteFiles,
     setCollapsibleList,
+    moveLocalEntry,
+    syncOpenTabsForPathChange,
   } = useArticleStore()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -77,6 +86,12 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const [renameName, setRenameName] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [undoRedoState, setUndoRedoState] = useState({ undo: false, redo: false })
+  const [dragEntry, setDragEntry] = useState<BrowserEntry | null>(null)
+  const [dragStartPoint, setDragStartPoint] = useState<DragPoint | null>(null)
+  const [dragPoint, setDragPoint] = useState<DragPoint | null>(null)
+  const [dragTargetPath, setDragTargetPath] = useState<string | null>(null)
+  const folderDropTargetRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const parentDropTargetRef = useRef<HTMLElement | null>(null)
 
   const normalizedActivePath = normalizePath(activeFilePath)
 
@@ -258,6 +273,55 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
   const isBrowserLoading = fileTreeLoading || folderLoading || isRefreshing || !!currentFolderNode?.loading
 
+  const getValidDropTargetPath = useCallback((entry: BrowserEntry, point: DragPoint) => {
+    if (!entry.isLocale) return null
+
+    if (currentDir && parentDropTargetRef.current) {
+      const rect = parentDropTargetRef.current.getBoundingClientRect()
+      if (
+        point.x >= rect.left &&
+        point.x <= rect.right &&
+        point.y >= rect.top &&
+        point.y <= rect.bottom
+      ) {
+        const targetPath = parentPath(currentDir)
+        return isInvalidFolderMoveTarget(entry.relativePath, targetPath) ? null : targetPath
+      }
+    }
+
+    for (const [targetPath, node] of folderDropTargetRefs.current.entries()) {
+      if (targetPath === entry.relativePath) continue
+      if (isInvalidFolderMoveTarget(entry.relativePath, targetPath)) continue
+
+      const rect = node.getBoundingClientRect()
+      if (
+        point.x >= rect.left &&
+        point.x <= rect.right &&
+        point.y >= rect.top &&
+        point.y <= rect.bottom
+      ) {
+        return targetPath
+      }
+    }
+
+    return null
+  }, [currentDir])
+
+  const updateDragTarget = useCallback((entry: BrowserEntry, point: DragPoint) => {
+    setDragTargetPath(getValidDropTargetPath(entry, point))
+  }, [getValidDropTargetPath])
+
+  const registerFolderDropTarget = useCallback((entry: BrowserEntry, node: HTMLDivElement | null) => {
+    if (entry.type !== 'folder' || !entry.isLocale) return
+
+    if (node) {
+      folderDropTargetRefs.current.set(entry.relativePath, node)
+      return
+    }
+
+    folderDropTargetRefs.current.delete(entry.relativePath)
+  }, [])
+
   const refreshTree = useCallback(async (
     dir: string,
     options: { includeRemote?: boolean } = {}
@@ -292,9 +356,97 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     }
   }, [loadFileTree, loadRemoteSyncFiles, loadCollapsibleFiles, loadFolderRemoteFiles, setCollapsibleList])
 
+  const handleDragStart = useCallback((entry: BrowserEntry, point: DragPoint) => {
+    if (!entry.isLocale) {
+      toast({ title: tFile('clipboard.notSupported') })
+      return
+    }
+
+    setDragEntry(entry)
+    setDragStartPoint(point)
+    setDragPoint(point)
+    updateDragTarget(entry, point)
+  }, [tFile, updateDragTarget])
+
+  const handleDragMove = useCallback((point: DragPoint) => {
+    setDragPoint(point)
+    setDragEntry((entry) => {
+      if (entry) {
+        updateDragTarget(entry, point)
+      }
+      return entry
+    })
+  }, [updateDragTarget])
+
+  const resetDragState = useCallback(() => {
+    setDragEntry(null)
+    setDragStartPoint(null)
+    setDragPoint(null)
+    setDragTargetPath(null)
+  }, [])
+
+  const handleDragEnd = useCallback(async (point: DragPoint) => {
+    const entry = dragEntry
+    const targetDirectoryPath = entry ? getValidDropTargetPath(entry, point) : null
+
+    resetDragState()
+
+    if (!entry || targetDirectoryPath === null) return
+
+    const { targetPath } = buildMoveTargetPath(entry.relativePath, targetDirectoryPath)
+    const targetPathOptions = await getFilePathOptions(targetPath)
+    const targetExists = targetPathOptions.baseDir
+      ? await exists(targetPathOptions.path, { baseDir: targetPathOptions.baseDir })
+      : await exists(targetPathOptions.path)
+
+    if (targetExists) {
+      toast({ title: tFile('error.fileExists') })
+      return
+    }
+
+    try {
+      const result = await moveFileManagerEntry(entry.relativePath, targetDirectoryPath)
+      if (!result.moved) {
+        if (result.reason === 'invalid-target') {
+          toast({ title: tMobile('moveInvalidTarget') })
+        }
+        return
+      }
+
+      moveLocalEntry(result.sourcePath, result.targetPath)
+      await syncOpenTabsForPathChange(result.sourcePath, result.targetPath)
+
+      const nextActivePath = getPathAfterMove(normalizedActivePath, result.sourcePath, result.targetPath)
+      if (nextActivePath !== normalizedActivePath) {
+        await setActiveFilePath(nextActivePath)
+      }
+
+      await refreshTree(currentDir, { includeRemote: false })
+    } catch (error) {
+      console.error('Mobile file move failed:', error)
+      toast({
+        title: tMobile('moveFailed'),
+        variant: 'destructive',
+      })
+    }
+  }, [
+    currentDir,
+    dragEntry,
+    getValidDropTargetPath,
+    moveLocalEntry,
+    normalizedActivePath,
+    refreshTree,
+    resetDragState,
+    setActiveFilePath,
+    syncOpenTabsForPathChange,
+    tFile,
+    tMobile,
+  ])
+
   useEffect(() => {
     if (!drawerOpen) {
       hasInitializedDrawerRef.current = false
+      resetDragState()
       return
     }
 
@@ -316,7 +468,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     }
 
     init()
-  }, [drawerOpen, normalizedActivePath, loadFileTree, loadCollapsibleFiles, setCollapsibleList, fileTree.length])
+  }, [drawerOpen, normalizedActivePath, loadFileTree, loadCollapsibleFiles, resetDragState, setCollapsibleList, fileTree.length])
 
   const ensureLocalFolder = useCallback(async (dir: string) => {
     if (!dir) return
@@ -648,7 +800,12 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           <List className="size-4" />
         </Button>
 
-        <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <Drawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          handleOnly={!!dragEntry}
+          dismissible={!dragEntry}
+        >
           <DrawerTrigger asChild>
             <Button variant="ghost" size="icon" className="size-9 rounded-full">
               <Folder className="size-4" />
@@ -656,17 +813,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
             </Button>
           </DrawerTrigger>
           <DrawerContent className="h-[85%]">
-            <DrawerHeader>
-              <div className="flex items-center gap-2 min-w-0">
-                {currentDir !== '' ? (
-                  <Button variant="ghost" size="icon" onClick={() => setCurrentDir(parentPath(currentDir))}>
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                ) : (
-                  <div className="size-9" />
-                )}
-              <DrawerTitle className="truncate">{currentDirLabel}</DrawerTitle>
-              </div>
+            <DrawerHeader className="gap-2">
+              <DrawerTitle className="sr-only">{currentDirLabel}</DrawerTitle>
             </DrawerHeader>
             <div className="px-4 pb-4 h-full flex flex-col overflow-hidden">
               <div className="flex items-center gap-2 mb-3">
@@ -717,8 +865,40 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                   <FolderPlus className="size-4" />
                 </Button>
               </div>
+              {currentDir !== '' && (
+                <button
+                  ref={(node) => {
+                    parentDropTargetRef.current = node
+                  }}
+                  type="button"
+                  data-vaul-no-drag
+                  onClick={() => {
+                    if (dragEntry) return
+                    setCurrentDir(parentPath(currentDir))
+                  }}
+                  className={cn(
+                    "mb-3 flex min-h-12 w-full items-center gap-2 rounded-md border border-dashed bg-background px-3 py-3 text-left text-sm shadow-sm",
+                    dragTargetPath === parentPath(currentDir) && "border-primary bg-primary/5 text-primary"
+                  )}
+                >
+                  {dragEntry ? (
+                    <FolderInput className="size-4 shrink-0" />
+                  ) : (
+                    <ChevronLeft className="size-4 shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">
+                    {dragEntry ? tMobile('dragToParent') : currentDirLabel}
+                  </span>
+                </button>
+              )}
 
-              <div className="flex-1 overflow-y-auto">
+              <div
+                className={cn(
+                  "relative flex-1",
+                  dragEntry ? "overflow-visible" : "overflow-y-auto overflow-x-hidden"
+                )}
+                data-vaul-no-drag
+              >
                 {isBrowserLoading ? (
                   <div className="text-sm text-muted-foreground py-8 text-center">{t('loading')}</div>
                 ) : visibleEntries.length === 0 ? (
@@ -726,7 +906,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                     {searchQuery.trim() ? t('noFiles') : tFile('mobile.emptyDir')}
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     {visibleEntries.map((entry) => (
                       <EntryListItem
                         key={entry.relativePath}
@@ -735,6 +915,22 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                         onOpen={openEntry}
                         remoteLabel={tMobile('remote')}
                         subtitle={getEntrySubtitle(entry)}
+                        dragDisabled={!entry.isLocale}
+                        isDragging={dragEntry?.relativePath === entry.relativePath}
+                        dragOffset={
+                          dragEntry?.relativePath === entry.relativePath && dragStartPoint && dragPoint
+                            ? {
+                                x: dragPoint.x - dragStartPoint.x,
+                                y: dragPoint.y - dragStartPoint.y,
+                              }
+                            : undefined
+                        }
+                        isDropTarget={dragTargetPath === entry.relativePath}
+                        dropTargetRef={(node) => registerFolderDropTarget(entry, node)}
+                        onDragStart={handleDragStart}
+                        onDragMove={handleDragMove}
+                        onDragEnd={handleDragEnd}
+                        onDragCancel={resetDragState}
                         actions={[
                           {
                             key: 'rename',

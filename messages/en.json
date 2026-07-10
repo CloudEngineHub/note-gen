@@ -2755,7 +2755,11 @@
         "folder": "Folder",
         "folderChildren": "{files} files · {folders} folders",
         "filePlaceholder": "example.md",
-        "folderPlaceholder": "example-folder"
+        "folderPlaceholder": "example-folder",
+        "dragToParent": "Drop here to move up one level",
+        "dragReleaseToMove": "Release to move here",
+        "moveInvalidTarget": "Cannot move to this folder",
+        "moveFailed": "Move failed"
       },
       "deleteConfirm": "Are you sure you want to delete this file?"
     },
