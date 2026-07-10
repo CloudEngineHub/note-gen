@@ -31,7 +31,7 @@ import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useRef, useCallback, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useRef, useCallback, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { Store } from '@tauri-apps/plugin-store'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -76,6 +76,7 @@ import { Button } from '@/components/ui/button'
 import { buildMobileSelectionContext, isMobileSelectionContextStale } from './mobile-selection-context'
 import { MobileEditorContextBar } from './mobile-editor-context-bar'
 import { MobileEditorMoreSheet } from './mobile-editor-more-sheet'
+import { MobileWritingToolbar } from './mobile-writing-toolbar'
 import { shouldRestorePendingQuote } from './quote-session'
 import { getEditorContentContainerClass } from '@/lib/editor-layout-styles'
 import { getResultIndexToFocus } from './search-navigation'
@@ -880,7 +881,28 @@ type MobileSelectionContext =
     }
   | null
 
-type MobileSheetMode = 'ai' | 'image-src' | 'image-alt' | 'table-align' | 'table-more' | null
+type MobileSheetMode =
+  | 'insert'
+  | 'format'
+  | 'ai'
+  | 'ai-write'
+  | 'ai-custom'
+  | 'mobile-more'
+  | 'image-src'
+  | 'image-alt'
+  | 'table-align'
+  | 'table-more'
+  | null
+
+function blurActiveEditableElement() {
+  const activeElement = document.activeElement
+  if (
+    activeElement instanceof HTMLElement
+    && activeElement.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+  ) {
+    activeElement.blur()
+  }
+}
 
 function clampSelectionPosition(value: number, docSize: number): number {
   return Math.max(0, Math.min(value, docSize))
@@ -943,6 +965,7 @@ export function TipTapEditor({
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false)
   const [imageSrcDraft, setImageSrcDraft] = useState('')
   const [imageAltDraft, setImageAltDraft] = useState('')
+  const [customAiInstruction, setCustomAiInstruction] = useState('')
   const aiActionHandlersRef = useRef({
     polish: async () => {},
     concise: async () => {},
@@ -1885,8 +1908,191 @@ export function TipTapEditor({
     setMobileSheetMode(null)
   }, [editor, isMobile])
 
+  const runMobileWritingAction = useCallback((action: string) => {
+    if (!editor) return
+
+    const closeSheet = () => setMobileSheetMode(null)
+    const openSheet = (mode: Exclude<MobileSheetMode, null>) => {
+      window.setTimeout(() => {
+        setMobileSheetMode(mode)
+      }, 0)
+    }
+    const runCommand = (command: () => boolean) => {
+      command()
+      closeSheet()
+      updateMobileContext()
+    }
+
+    switch (action) {
+      case 'open-insert':
+        openSheet('insert')
+        return
+      case 'open-ai-write':
+        openSheet('ai-write')
+        return
+      case 'open-ai-custom':
+        openSheet('ai-custom')
+        return
+      case 'open-mobile-more':
+        openSheet('mobile-more')
+        return
+      case 'open-format-sheet':
+        openSheet('format')
+        return
+      case 'toggle-heading-2':
+      case 'insert-heading-2':
+      case 'format-heading-2':
+        runCommand(() => editor.chain().focus().toggleHeading({ level: 2 }).run())
+        return
+      case 'format-heading-1':
+        runCommand(() => editor.chain().focus().toggleHeading({ level: 1 }).run())
+        return
+      case 'format-heading-3':
+        runCommand(() => editor.chain().focus().toggleHeading({ level: 3 }).run())
+        return
+      case 'format-paragraph':
+        runCommand(() => editor.chain().focus().setParagraph().run())
+        return
+      case 'toggle-task-list':
+      case 'insert-task-list':
+        runCommand(() => editor.chain().focus().toggleTaskList().run())
+        return
+      case 'toggle-blockquote':
+      case 'insert-blockquote':
+        runCommand(() => editor.chain().focus().toggleBlockquote().run())
+        return
+      case 'insert-bullet-list':
+        runCommand(() => editor.chain().focus().toggleBulletList().run())
+        return
+      case 'insert-ordered-list':
+        runCommand(() => editor.chain().focus().toggleOrderedList().run())
+        return
+      case 'insert-code-block':
+        runCommand(() => editor.chain().focus().toggleCodeBlock().run())
+        return
+      case 'insert-horizontal-rule':
+        runCommand(() => editor.chain().focus().setHorizontalRule().run())
+        return
+      case 'insert-table':
+        runCommand(() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run())
+        return
+      case 'insert-image':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-image'))
+        return
+      case 'format-bold':
+        runCommand(() => editor.chain().focus().toggleBold().run())
+        return
+      case 'format-italic':
+        runCommand(() => editor.chain().focus().toggleItalic().run())
+        return
+      case 'format-highlight':
+        runCommand(() => editor.chain().focus().toggleHighlight().run())
+        return
+      case 'ai-continue':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-ai-continue', { detail: { suppressKeyboard: true } }))
+        return
+      case 'ai-generate-section':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-ai-generate', { detail: { action: 'section', suppressKeyboard: true } }))
+        return
+      case 'ai-generate-summary':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-ai-generate', { detail: { action: 'summary', suppressKeyboard: true } }))
+        return
+      case 'ai-generate-custom':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-ai-generate', {
+          detail: { action: 'custom', instruction: customAiInstruction, suppressKeyboard: true },
+        }))
+        return
+      case 'open-search-replace':
+        closeSheet()
+        setSearchReplaceOpen(true)
+        return
+      case 'toggle-outline':
+        closeSheet()
+        setMobileOutlineOpen((prev) => !prev)
+        return
+      case 'insert-inline-math':
+        closeSheet()
+        setMathType('inline')
+        setMathDialogOpen(true)
+        return
+      case 'insert-block-math':
+        closeSheet()
+        setMathType('block')
+        setMathDialogOpen(true)
+        return
+      case 'insert-mermaid':
+      case 'insert-mermaid-flowchart':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'flowchart' } }))
+        return
+      case 'insert-mermaid-sequence':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'sequence' } }))
+        return
+      case 'insert-mermaid-gantt':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'gantt' } }))
+        return
+      case 'insert-mermaid-class':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'classDiagram' } }))
+        return
+      case 'insert-mermaid-state':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'stateDiagram' } }))
+        return
+      case 'insert-mermaid-pie':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'pie' } }))
+        return
+      case 'insert-mermaid-er':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'er' } }))
+        return
+      case 'insert-mermaid-journey':
+        closeSheet()
+        document.dispatchEvent(new CustomEvent('tiptap-insert-mermaid', { detail: { type: 'journey' } }))
+        return
+      default:
+        return
+    }
+  }, [
+    customAiInstruction,
+    editor,
+    updateMobileContext,
+  ])
+
+  const submitMobileCustomAiInstruction = useCallback(() => {
+    runMobileWritingAction('ai-generate-custom')
+  }, [runMobileWritingAction])
+
+  const mobileWritingActiveActions = useMemo(() => {
+    if (!editor) {
+      return []
+    }
+
+    const actions: string[] = []
+    if (editor.isActive('heading', { level: 2 })) actions.push('toggle-heading-2')
+    if (editor.isActive('taskList')) actions.push('toggle-task-list')
+    if (editor.isActive('blockquote')) actions.push('toggle-blockquote')
+    if (editor.isActive('bulletList')) actions.push('insert-bullet-list')
+    if (editor.isActive('orderedList')) actions.push('insert-ordered-list')
+    if (editor.isActive('codeBlock')) actions.push('insert-code-block')
+    return actions
+  }, [editor, mobileContext, mobileSheetMode])
+
   const runMobileEditorAction = useCallback((action: string) => {
-    if (!editor || !mobileContext) return
+    if (!editor) return
+
+    if (!mobileContext) {
+      runMobileWritingAction(action)
+      return
+    }
 
     switch (action) {
       case 'bold':
@@ -2008,11 +2214,13 @@ export function TipTapEditor({
         if (restoreMobileContextSelection()) editor.chain().focus().deleteTable().run()
         return
       default:
+        runMobileWritingAction(action)
         return
     }
   }, [
     editor,
     mobileContext,
+    runMobileWritingAction,
     restoreMobileContextSelection,
     updateMobileContext,
   ])
@@ -2775,6 +2983,17 @@ export function TipTapEditor({
   }, [activeFilePath, editor, tImage])
 
   useEffect(() => {
+    const handleInsertImage = () => {
+      void insertImageAtSelection()
+    }
+
+    document.addEventListener('tiptap-insert-image', handleInsertImage)
+    return () => {
+      document.removeEventListener('tiptap-insert-image', handleInsertImage)
+    }
+  }, [insertImageAtSelection])
+
+  useEffect(() => {
     editorShortcutHandlersRef.current = {
       undo: (targetEditor) => targetEditor.chain().focus().undo().run(),
       redo: (targetEditor) => targetEditor.chain().focus().redo().run(),
@@ -3244,8 +3463,16 @@ export function TipTapEditor({
   useEffect(() => {
     let abortController: AbortController | null = null
 
-    const handleAIContinue = async () => {
+    const handleAIContinue = async (event: Event) => {
       if (!editor) return
+
+      const shouldSuppressKeyboard = isMobile && (event as CustomEvent<{ suppressKeyboard?: boolean }>).detail?.suppressKeyboard === true
+      const editorChain = () => shouldSuppressKeyboard ? editor.chain() : editor.chain().focus()
+      const blurEditor = () => {
+        if (shouldSuppressKeyboard) {
+          blurActiveEditableElement()
+        }
+      }
 
       // Get content before cursor as context
       const { from } = editor.state.selection
@@ -3274,8 +3501,7 @@ export function TipTapEditor({
         if (!loadingVisible) {
           return
         }
-        editor.chain()
-          .focus()
+        editorChain()
           .deleteRange({
             from: startPosition,
             to: startPosition + AI_GENERATION_LOADING_TEXT.length,
@@ -3284,7 +3510,8 @@ export function TipTapEditor({
         loadingVisible = false
       }
 
-      editor.chain().focus().insertContent(AI_GENERATION_LOADING_TEXT).run()
+      editorChain().insertContent(AI_GENERATION_LOADING_TEXT).run()
+      blurEditor()
 
       try {
         await fetchCompletionStream(
@@ -3293,10 +3520,10 @@ export function TipTapEditor({
             if (isFirst) {
               removeLoadingIndicator()
             }
-            editor.chain()
-              .focus()
+            editorChain()
               .insertContentAt(startPosition + accumulatedResult.length, chunk)
               .run()
+            blurEditor()
             accumulatedResult += chunk
           },
           abortController.signal
@@ -3307,16 +3534,15 @@ export function TipTapEditor({
           return
         }
 
-        editor.chain()
-          .focus()
+        editorChain()
           .deleteRange({ from: startPosition, to: startPosition + accumulatedResult.length })
           .run()
 
         const docSizeBeforeInsert = editor.state.doc.content.size
-        editor.chain()
-          .focus()
+        editorChain()
           .insertContentAt(startPosition, accumulatedResult, { contentType: 'markdown' })
           .run()
+        blurEditor()
 
         const insertedSize = Math.max(0, editor.state.doc.content.size - docSizeBeforeInsert)
         const generatedRange = {
@@ -3335,6 +3561,7 @@ export function TipTapEditor({
         })
       } catch (error) {
         removeLoadingIndicator()
+        blurEditor()
 
         // Show error toast (but not for aborted requests)
         if (error instanceof Error && error.message !== 'Request was aborted.') {
@@ -3352,7 +3579,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-continue', handleAIContinue)
       abortController?.abort()
     }
-  }, [editor])
+  }, [editor, isMobile])
 
   // Handle slash-command AI generation actions that operate without selected text.
   useEffect(() => {
@@ -3370,6 +3597,7 @@ export function TipTapEditor({
       const detail = (event as CustomEvent<{
         action?: unknown
         instruction?: string
+        suppressKeyboard?: boolean
       }>).detail
 
       if (!isEditorAiGenerationAction(detail?.action)) {
@@ -3378,6 +3606,13 @@ export function TipTapEditor({
 
       const action = detail.action
       const instruction = detail.instruction?.trim()
+      const shouldSuppressKeyboard = isMobile && detail.suppressKeyboard === true
+      const editorChain = () => shouldSuppressKeyboard ? editor.chain() : editor.chain().focus()
+      const blurEditor = () => {
+        if (shouldSuppressKeyboard) {
+          blurActiveEditableElement()
+        }
+      }
 
       if (action === 'custom' && !instruction) {
         toast({
@@ -3414,8 +3649,7 @@ export function TipTapEditor({
         if (!loadingVisible) {
           return
         }
-        editor.chain()
-          .focus()
+        editorChain()
           .deleteRange({
             from: startPosition,
             to: startPosition + AI_GENERATION_LOADING_TEXT.length,
@@ -3424,7 +3658,8 @@ export function TipTapEditor({
         loadingVisible = false
       }
 
-      editor.chain().focus().insertContent(AI_GENERATION_LOADING_TEXT).run()
+      editorChain().insertContent(AI_GENERATION_LOADING_TEXT).run()
+      blurEditor()
 
       try {
         await fetchEditorAiGenerationStream(
@@ -3439,10 +3674,10 @@ export function TipTapEditor({
             if (isFirst) {
               removeLoadingIndicator()
             }
-            editor.chain()
-              .focus()
+            editorChain()
               .insertContentAt(startPosition + accumulatedResult.length, chunk)
               .run()
+            blurEditor()
             accumulatedResult += chunk
           },
           abortController.signal
@@ -3454,8 +3689,7 @@ export function TipTapEditor({
         }
 
         const sanitizedResult = sanitizeEditorAiGenerationOutput(accumulatedResult)
-        editor.chain()
-          .focus()
+        editorChain()
           .deleteRange({
             from: startPosition,
             to: startPosition + accumulatedResult.length,
@@ -3467,10 +3701,10 @@ export function TipTapEditor({
         }
 
         const docSizeBeforeInsert = editor.state.doc.content.size
-        editor.chain()
-          .focus()
+        editorChain()
           .insertContentAt(startPosition, sanitizedResult, { contentType: 'markdown' })
           .run()
+        blurEditor()
 
         const insertedSize = Math.max(0, editor.state.doc.content.size - docSizeBeforeInsert)
         const generatedRange = {
@@ -3489,6 +3723,7 @@ export function TipTapEditor({
         })
       } catch (error) {
         removeLoadingIndicator()
+        blurEditor()
 
         if (error instanceof Error && error.message !== 'Request was aborted.') {
           toast({
@@ -3505,7 +3740,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-generate', handleAIGenerate)
       abortController?.abort()
     }
-  }, [editor])
+  }, [editor, isMobile])
 
   // Handle drag and drop from marks
   const handleEditorDrop = useCallback((e: React.DragEvent) => {
@@ -4086,12 +4321,20 @@ export function TipTapEditor({
         </div>
       </div>
 
+      {isMobile && !mobileContext && (
+        <MobileWritingToolbar
+          activeActions={mobileWritingActiveActions}
+          onAction={runMobileWritingAction}
+        />
+      )}
+
       {isMobile && (
         <MobileEditorMoreSheet
           open={mobileSheetMode !== null}
           mode={mobileSheetMode}
           imageSrc={imageSrcDraft}
           imageAlt={imageAltDraft}
+          customAiInstruction={customAiInstruction}
           onOpenChange={(open) => {
             if (!open) {
               setMobileSheetMode(null)
@@ -4099,8 +4342,10 @@ export function TipTapEditor({
           }}
           onImageSrcChange={setImageSrcDraft}
           onImageAltChange={setImageAltDraft}
+          onCustomAiInstructionChange={setCustomAiInstruction}
           onSubmitImageSrc={submitMobileImageSrc}
           onSubmitImageAlt={submitMobileImageAlt}
+          onSubmitCustomAiInstruction={submitMobileCustomAiInstruction}
           onAction={runMobileEditorAction}
         />
       )}

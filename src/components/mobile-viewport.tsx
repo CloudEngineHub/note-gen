@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 
 const KEYBOARD_OPEN_THRESHOLD = 80
 const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
+const KEYBOARD_KEEPALIVE_SELECTOR = '.mobile-writing-toolbar'
 const KEYBOARD_VIEWPORT_CHECK_DELAYS = [0, 80, 160, 320, 600, 900]
 const EDITABLE_POINTER_WINDOW = 700
 const STABLE_VIEWPORT_FALLBACK_WINDOW = 1200
@@ -14,6 +15,10 @@ function isEditableElement(target: EventTarget | null): target is HTMLElement {
 
 function hasEditableTarget(target: EventTarget | null) {
   return target instanceof HTMLElement && Boolean(target.closest(EDITABLE_SELECTOR))
+}
+
+function hasKeyboardKeepAliveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest(`${EDITABLE_SELECTOR}, ${KEYBOARD_KEEPALIVE_SELECTOR}`))
 }
 
 export function MobileViewport() {
@@ -85,12 +90,14 @@ export function MobileViewport() {
     }
 
     const handleEditablePointerStart = (event: Event) => {
-      if (!hasEditableTarget(event.target)) {
+      if (!hasKeyboardKeepAliveTarget(event.target)) {
         stableViewportFallbackUntil = 0
         return
       }
 
-      recentEditablePointerAt = Date.now()
+      if (hasEditableTarget(event.target)) {
+        recentEditablePointerAt = Date.now()
+      }
       armStableViewportFallback()
       scheduleViewportUpdates()
     }

@@ -1099,6 +1099,15 @@
     z-index: 35;
   }
 
+  #mobile-writing .mobile-writing-toolbar {
+    display: none;
+  }
+
+  #mobile-writing .mobile-writing-toolbar-track {
+    animation: mobile-writing-toolbar-menu-in 160ms ease-out;
+    will-change: opacity, transform;
+  }
+
   /* 确保移动端写作页面的编辑器容器不会阻止滑动 */
   #mobile-writing .tiptap-editor .ProseMirror {
     padding-bottom: calc(24px + var(--mobile-footbar-reserved-space));
@@ -1106,8 +1115,17 @@
     -webkit-overflow-scrolling: touch !important;
   }
 
+  .mobile-keyboard-open #mobile-writing .mobile-writing-toolbar {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    z-index: 45;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    flex-shrink: 0;
+  }
+
   .mobile-keyboard-open #mobile-writing .tiptap-editor .ProseMirror {
-    padding-bottom: 0;
+    padding-bottom: 24px;
   }
 
   .mobile-keyboard-open #mobile-writing .mobile-writing-editor-scroll {
@@ -1121,6 +1139,23 @@
 
   #mobile-writing .tiptap-editor .ProseMirror ::selection {
     background-color: hsl(var(--primary) / 0.34);
+  }
+
+  @keyframes mobile-writing-toolbar-menu-in {
+    from {
+      opacity: 0;
+      transform: translateX(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #mobile-writing .mobile-writing-toolbar-track {
+      animation: none;
+    }
   }
 
   /* 移动端优化 FooterBar */
