@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from '@/hooks/use-toast'
 import { useTranslations } from 'next-intl'
 import { Separator } from '@/components/ui/separator'
+import useRecordingStore from '@/stores/recording'
 
 interface MobileRecordToolsProps {
   onClose?: () => void
@@ -19,6 +20,7 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
   const router = useRouter()
   const t = useTranslations()
   const { loadFileTree, setActiveFilePath } = useArticleStore()
+  const { isRecording } = useRecordingStore()
 
   const recordTools = [
     { id: 'text' },
@@ -116,6 +118,8 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
             key={tool.id}
             toolId={tool.id}
             onToolClick={handleToolClick}
+            active={tool.id === 'recording' && isRecording}
+            label={tool.id === 'recording' && isRecording ? t('recording.recording') : undefined}
           />
         ))}
       </div>

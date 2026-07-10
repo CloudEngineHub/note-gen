@@ -46,10 +46,10 @@ export function ControlRecording() {
   // 监听快捷键
   useEffect(() => {
     const handleToggleRecording = () => {
-      if (isRecording) {
-        handleStop()
+      if (useRecordingStore.getState().isRecording) {
+        void handleStop()
       } else {
-        handleStart()
+        void handleStart()
       }
     }
     
@@ -57,7 +57,7 @@ export function ControlRecording() {
     return () => {
       emitter.off('toolbar-shortcut-recording', handleToggleRecording)
     }
-  }, [isRecording])
+  })
 
   // 格式化录音时长
   const formatDuration = (seconds: number) => {
@@ -70,9 +70,6 @@ export function ControlRecording() {
   const handleStart = async () => {
     try {
       await startRecording()
-      
-      // 记录完成后的导航处理（桌面端切换tab，移动端跳转页面）
-      handleRecordComplete(router)
     } catch (error) {
       cancelRecording()
       toast({
@@ -105,6 +102,8 @@ export function ControlRecording() {
         progress: t('recording.processing'),
         startTime: Date.now()
       })
+
+      handleRecordComplete(router)
       
       // 后台异步识别（使用转换后的 WAV）
       processTranscription(wavBlob, queueId)

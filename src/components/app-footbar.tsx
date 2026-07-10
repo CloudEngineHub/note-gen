@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageSquare, Highlighter, SquarePen, Settings, User, Plus } from "lucide-react"
+import { MessageSquare, Highlighter, SquarePen, Settings, User, Plus, Square } from "lucide-react"
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from "@/lib/utils"
 import { Store } from "@tauri-apps/plugin-store"
@@ -27,6 +27,8 @@ import {
   subscribeAutoDataSyncState,
   type AutoDataSyncState,
 } from '@/lib/sync/auto-data-sync-queue'
+import useRecordingStore from "@/stores/recording"
+import emitter from "@/lib/emitter"
 
 type MobileSyncIndicator = 'none' | 'syncing' | 'warning' | 'attention'
 
@@ -78,6 +80,20 @@ function ProfileAvatarIcon({ avatarUrl }: { avatarUrl: string }) {
   )
 }
 
+function RecordingDockIcon() {
+  return (
+    <span className="inline-flex size-5 items-center justify-center text-red-500">
+      <Square className="size-4 animate-pulse fill-current" />
+    </span>
+  )
+}
+
+function formatRecordingDuration(seconds: number) {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
 function getMobileSyncIndicator(
   autoDataSyncEnabled: boolean,
   autoDataSyncState: AutoDataSyncState
@@ -112,6 +128,7 @@ export function AppFootbar() {
   const [quickRecordOpen, setQuickRecordOpen] = useState(false)
   const [autoDataSyncState, setAutoDataSyncState] = useState<AutoDataSyncState>(getAutoDataSyncState())
   const organizeRef = useRef<{ openOrganize: () => void }>(null)
+  const { isRecording, recordingDuration } = useRecordingStore()
   const { 
     githubUsername,
     accessToken,
@@ -248,9 +265,10 @@ export function AppFootbar() {
     },
     {
       id: 'quick-record',
-      label: t('navigation.mobileDock.quickRecord'),
+      label: isRecording ? formatRecordingDuration(recordingDuration) : t('navigation.mobileDock.quickRecord'),
       url: "#quick-record",
       icon: Plus,
+      iconElement: isRecording ? <RecordingDockIcon /> : undefined,
       isQuickRecord: true,
     },
     {
@@ -272,11 +290,17 @@ export function AppFootbar() {
   const routeActiveIndex = items.findIndex(item => pathname === item.url)
   const quickRecordIndex = items.findIndex(item => item.isQuickRecord)
   const activeIndex =
-    quickRecordOpen && quickRecordIndex >= 0 ? quickRecordIndex : Math.max(routeActiveIndex, 0)
+    (isRecording || quickRecordOpen) && quickRecordIndex >= 0 ? quickRecordIndex : Math.max(routeActiveIndex, 0)
 
   // 处理导航点击事件
   async function menuHandler(item: FootbarItem) {
     if (item.isQuickRecord) {
+      if (isRecording) {
+        setQuickRecordOpen(false)
+        emitter.emit('toolbar-shortcut-recording')
+        return
+      }
+
       // 快捷记录按钮：打开浮动弹窗
       setQuickRecordOpen(open => !open)
       return
@@ -308,6 +332,7 @@ export function AppFootbar() {
       <Popover open={quickRecordOpen} onOpenChange={setQuickRecordOpen}>
         <PopoverAnchor asChild>
           <InteractiveMenu
+            accentColor={isRecording ? "rgb(239 68 68)" : undefined}
             activeIndex={activeIndex}
             aria-label={t('navigation.navigate')}
             className="w-full"
