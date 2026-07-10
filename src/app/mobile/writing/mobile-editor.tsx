@@ -147,6 +147,7 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
         activeFilePath={activeFilePath}
         onReady={handleEditorReady}
         onEditorReady={onEditorReady}
+        mobileMode
       />
     </div>
   )

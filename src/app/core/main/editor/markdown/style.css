@@ -1087,6 +1087,15 @@
   background-color: hsl(var(--background));
 }
 
+#mobile-writing .mobile-scroll-top-button {
+  bottom: calc(var(--mobile-footbar-reserved-space) + 2.25rem);
+  z-index: 38;
+}
+
+.mobile-keyboard-open #mobile-writing .mobile-scroll-top-button {
+  display: none;
+}
+
 /* 移动端工具栏支持左右滑动 */
 @media (max-width: 768px) {
   .tiptap-drag-handle {
