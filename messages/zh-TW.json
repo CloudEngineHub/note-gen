@@ -2059,6 +2059,7 @@
         "chat": "聊天",
         "placeholder": {
           "default": "你可以提問或將記錄整理為文章...",
+          "steering": "追加資訊以引導目前任務...",
           "noApiKey": "未配置 API Key，無法使用 AI 對話功能...",
           "on": "AI 建議 (開啟)",
           "off": "AI 建議 (關閉)",
@@ -2075,6 +2076,7 @@
           "disable": "剪貼簿監聽(關閉)"
         },
         "send": "發送",
+        "steer": "追加引導",
         "stop": "停止",
         "terminate": "終止",
         "tagLink": {

@@ -2132,6 +2132,7 @@
         "chat": "Bate-papo",
         "placeholder": {
           "default": "Digite uma mensagem...",
+          "steering": "Adicione informações para orientar a tarefa atual...",
           "noApiKey": "Nenhuma Chave de API configurada, não é possível usar o chat de IA...",
           "on": "Sugestões de IA ativadas",
           "off": "Sugestões de IA desativadas",
@@ -2148,6 +2149,7 @@
           "disable": "Monitoramento da área de transferência (desligado)"
         },
         "send": "Enviar",
+        "steer": "Orientar tarefa",
         "stop": "Parar",
         "terminate": "Terminar",
         "tagLink": {

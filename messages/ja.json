@@ -2059,6 +2059,7 @@
         "chat": "チャット",
         "placeholder": {
           "default": "メッセージを入力...",
+          "steering": "現在のタスクを調整する情報を追加...",
           "noApiKey": "API Keyが設定されていないため、AIチャットを使用できません...",
           "on": "AIサジェスト有効",
           "off": "AIサジェスト無効",
@@ -2078,6 +2079,7 @@
           "tooltip": "MCP サーバー"
         },
         "send": "送信",
+        "steer": "タスクを調整",
         "stop": "停止",
         "terminate": "終了",
         "tagLink": {

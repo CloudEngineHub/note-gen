@@ -2101,6 +2101,7 @@
         "chat": "聊天",
         "placeholder": {
           "default": "你可以提问或将记录整理为文章...",
+          "steering": "追加信息以引导当前任务...",
           "noApiKey": "未配置 API Key，无法使用 AI 对话功能...",
           "on": "AI 建议 (开启)",
           "off": "AI 建议 (关闭)",
@@ -2117,6 +2118,7 @@
           "disable": "剪贴板监听(关闭)"
         },
         "send": "发送",
+        "steer": "追加引导",
         "stop": "停止",
         "stopped": "对话已终止",
         "terminate": "终止",

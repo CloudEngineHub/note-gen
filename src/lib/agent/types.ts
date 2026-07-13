@@ -112,6 +112,7 @@ export type AgentRunStatus =
   | 'waiting_approval'
   | 'applying_change'
   | 'recovering'
+  | 'steering'
   | 'completed'
   | 'stopped'
   | 'failed'
@@ -125,6 +126,7 @@ export interface AgentTraceEvent {
     | 'tool_call'
     | 'tool_result'
     | 'approval'
+    | 'steering'
     | 'change'
     | 'error'
     | 'final'
@@ -169,6 +171,16 @@ export interface AgentRuntimeInput {
   availableSkills?: AgentSkillSummary[]
 }
 
+export interface AgentSteeringPayload {
+  sequence: number
+  text: string
+  imageUrls?: string[]
+  additionalContext?: string
+  currentQuote?: AgentQuoteSnapshot
+}
+
+export type AgentApprovalDecision = 'approved' | 'denied' | 'steered'
+
 export interface AgentRuntimeCallbacks {
   onStatus?: (status: AgentRunStatus) => void
   onTrace?: (event: AgentTraceEvent) => void
@@ -189,7 +201,7 @@ export interface AgentRuntimeCallbacks {
       from?: number
       to?: number
     }
-  ) => Promise<boolean>
+  ) => Promise<AgentApprovalDecision>
 }
 
 export interface AgentRuntimeResult {
@@ -241,7 +253,7 @@ export interface ToolCall {
 export interface ConfirmationRecord {
   toolName: string
   params: Record<string, any>
-  status: 'pending' | 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'superseded'
   timestamp: number
   scope?: 'once' | 'conversation'
   sessionApprovalType?: 'write' | 'runtime-script-skill'

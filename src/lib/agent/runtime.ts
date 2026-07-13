@@ -15,6 +15,7 @@ import type {
   AgentRuntimeCallbacks,
   AgentRuntimeInput,
   AgentRuntimeResult,
+  AgentSteeringPayload,
   AgentStep,
   AgentTool,
   AgentToolResult,
@@ -688,10 +689,32 @@ export class AgentRuntime {
   private readonly recoveryManager = new AgentRecoveryManager()
   private abortController: AbortController | null = null
   private stopped = false
+  private steeringRequested = false
+  private steeringQueue: AgentSteeringPayload[] = []
+  private steeringReadyResolver: (() => void) | null = null
 
   stop() {
     this.stopped = true
+    this.steeringQueue = []
+    this.steeringRequested = false
+    this.steeringReadyResolver?.()
+    this.steeringReadyResolver = null
     this.abortController?.abort()
+  }
+
+  beginSteering() {
+    if (!this.stopped) {
+      this.steeringRequested = true
+    }
+  }
+
+  steer(payload: AgentSteeringPayload) {
+    if (this.stopped) return
+    this.steeringRequested = true
+    this.steeringQueue.push(payload)
+    this.steeringQueue.sort((a, b) => a.sequence - b.sequence)
+    this.steeringReadyResolver?.()
+    this.steeringReadyResolver = null
   }
 
   async run(input: AgentRuntimeInput, callbacks: AgentRuntimeCallbacks = {}): Promise<AgentRuntimeResult> {
@@ -729,6 +752,7 @@ export class AgentRuntime {
     })
 
     if (
+      !this.steeringRequested &&
       hasEffectiveWriteIntent(context) &&
       requiresSelectedContext(input.userInput) &&
       !input.currentQuote
@@ -759,7 +783,9 @@ export class AgentRuntime {
       }
     }
 
-    const existingActiveCreateTarget = getCreateOnlyExistingActiveFile(context)
+    const existingActiveCreateTarget = this.steeringRequested
+      ? undefined
+      : getCreateOnlyExistingActiveFile(context)
     if (existingActiveCreateTarget) {
       const content = `文件 \`${existingActiveCreateTarget}\` 已经存在，已取消新建操作，未修改现有内容。`
       agentDebugLog('create_target_already_active_final', {
@@ -789,9 +815,9 @@ export class AgentRuntime {
     }
 
     const allTools = agentToolRegistry.listTools()
-    const tools = selectToolsForContext(context, allTools)
+    let tools = selectToolsForContext(context, allTools)
     const customSystemPrompt = await getSystemPromptContent()
-    const systemPrompt = this.promptAssembler.assemble(
+    let systemPrompt = this.promptAssembler.assemble(
       context,
       tools,
       customSystemPrompt
@@ -841,9 +867,9 @@ export class AgentRuntime {
     }
 
     const client = await createOpenAIClient(aiConfig)
-    const openAITools = agentToolRegistry.toOpenAITools(tools)
-    const baseToolChoice = buildToolChoice(context)
-    const documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
+    let openAITools = agentToolRegistry.toOpenAITools(tools)
+    let baseToolChoice = buildToolChoice(context)
+    let documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
     let documentWideSnapshotRead = false
     let finalContent = ''
     let missingWriteToolRepairCount = 0
@@ -864,6 +890,53 @@ export class AgentRuntime {
     let activeModelReasoning = ''
     let activeModelContent = ''
     let activeModelStreamedTokenCount = 0
+
+    const drainSteering = async () => {
+      if (!this.steeringRequested) return false
+      if (this.steeringQueue.length === 0 && !this.stopped) {
+        await new Promise<void>((resolve) => {
+          this.steeringReadyResolver = resolve
+        })
+      }
+      if (this.stopped) return false
+
+      const payloads = this.steeringQueue.splice(0)
+      if (payloads.length === 0) return false
+      this.steeringRequested = false
+      callbacks.onStatus?.('steering')
+
+      for (const payload of payloads) {
+        const text = payload.additionalContext
+          ? `## App Context\n${payload.additionalContext}\n\n## User steering message\n${payload.text}`
+          : payload.text
+        messages.push(await this.contextManager.buildCurrentUserMessage(text, payload.imageUrls))
+      }
+
+      const latest = payloads[payloads.length - 1]
+      context.userInput = latest.text
+      context.currentQuote = latest.currentQuote
+      context.multipleFileCreation = hasMultipleFileCreationIntent(latest.text)
+      context.multipleFileUpdate = hasMultipleFileUpdateIntent(latest.text)
+      context.requestedFileCount = getRequestedFileCount(latest.text)
+      tools = selectToolsForContext(context, allTools)
+      openAITools = agentToolRegistry.toOpenAITools(tools)
+      baseToolChoice = buildToolChoice(context)
+      documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
+      documentWideSnapshotRead = false
+      missingWriteToolRepairCount = 0
+      invalidQuotedWriteRepairCount = 0
+      systemPrompt = this.promptAssembler.assemble(context, tools, customSystemPrompt)
+      messages[0] = { role: 'system', content: systemPrompt }
+
+      const steeringTrace = recorder.add({
+        type: 'steering',
+        title: '已应用追加信息',
+        status: 'success',
+        message: payloads.map((payload) => payload.text).join('\n'),
+      })
+      callbacks.onTrace?.(steeringTrace)
+      return true
+    }
 
     const finalizeInterruptedModelTrace = (status: 'success' | 'error', title: string) => {
       if (!activeModelTraceId) {
@@ -905,6 +978,8 @@ export class AgentRuntime {
             trace: recorder.all(),
           }
         }
+
+        await drainSteering()
 
         callbacks.onStatus?.('thinking')
         await agentEventBus.emit('before-model-call', { runId })
@@ -954,11 +1029,16 @@ export class AgentRuntime {
         let streamedText = ''
         let streamedTokenCount = 0
         let lastModelProgressTraceAt = 0
+        let steeringInterrupted = false
         const streamedToolCalls = new Map<number, StreamingToolCallAccumulator>()
 
         for await (const chunk of stream) {
           if (this.stopped) {
             throw new Error('USER_STOPPED')
+          }
+          if (this.steeringRequested) {
+            steeringInterrupted = true
+            break
           }
 
           const choice = chunk.choices[0]
@@ -1038,8 +1118,17 @@ export class AgentRuntime {
         streamedTokenCount = estimateTokens(streamedText)
         activeModelStreamedTokenCount = streamedTokenCount
         assistantContent = assistantContent.trim() ? assistantContent : ''
-        finalContent = assistantContent || finalContent
         const toolUses = toToolCallList(streamedToolCalls)
+        if (steeringInterrupted) {
+          finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导')
+          if (assistantContent) {
+            messages.push({ role: 'assistant', content: assistantContent })
+          }
+          await drainSteering()
+          iteration -= 1
+          continue
+        }
+        finalContent = assistantContent || finalContent
         if (!assistantContent && toolUses.length === 0) {
           throw new Error('AI response did not include a message')
         }
@@ -1178,6 +1267,18 @@ export class AgentRuntime {
         for (const toolUse of toolUses) {
           if (this.stopped) {
             throw new Error('USER_STOPPED')
+          }
+          if (this.steeringRequested) {
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolUse.id,
+              content: stringifyToolResult({
+                ok: false,
+                message: '用户追加了新的引导信息，本次尚未开始的工具调用已取消。',
+                error: 'SUPERSEDED_BY_STEERING',
+              }),
+            })
+            continue
           }
 
           const toolName = toolUse.function.name
@@ -1478,7 +1579,7 @@ export class AgentRuntime {
             callbacks.onTrace?.(approvalTrace)
 
             const approvalPreview = await buildEditorApprovalPreview(tool.name, args)
-            const approved = await callbacks.requestConfirmation?.(
+            const approvalDecision = await callbacks.requestConfirmation?.(
               tool.name,
               args,
               approvalPreview ?? { previewParams: args }
@@ -1487,10 +1588,34 @@ export class AgentRuntime {
             agentDebugLog('approval_result', {
               runId,
               toolName,
-              approved: Boolean(approved),
+              approved: approvalDecision === 'approved',
+              decision: approvalDecision,
             })
 
-            if (!approved) {
+            if (approvalDecision === 'steered') {
+              const supersededResult: AgentToolResult = {
+                ok: false,
+                message: '用户追加了新的引导信息，本次待确认操作已取消。',
+                error: 'SUPERSEDED_BY_STEERING',
+              }
+              toolCall.status = 'error'
+              toolCall.result = toolResultToLegacy(supersededResult)
+              callbacks.onToolCall?.(toolCall)
+              const updatedApprovalTrace = recorder.update(approvalTrace.id, {
+                status: 'error',
+                message: supersededResult.message,
+                output: supersededResult,
+              })
+              if (updatedApprovalTrace) callbacks.onTrace?.(updatedApprovalTrace)
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolUse.id,
+                content: stringifyToolResult(supersededResult),
+              })
+              continue
+            }
+
+            if (approvalDecision !== 'approved') {
               const deniedResult: AgentToolResult = {
                 ok: false,
                 message: '用户拒绝了这个操作。请不要重复调用同一高风险工具，改用只读回答或询问用户新的处理方式。',

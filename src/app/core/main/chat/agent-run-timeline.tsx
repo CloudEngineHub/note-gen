@@ -51,7 +51,10 @@ function eventIcon(event: AgentTraceEvent) {
 }
 
 function shouldShowEventMessage(event: AgentTraceEvent) {
-  return event.type === "tool_call" || event.type === "tool_result" || event.type === "error"
+  return event.type === "tool_call" ||
+    event.type === "tool_result" ||
+    event.type === "steering" ||
+    event.type === "error"
 }
 
 function hasMeaningfulTraceDetail(value: unknown) {

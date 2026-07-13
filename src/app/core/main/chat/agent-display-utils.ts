@@ -8,6 +8,7 @@ export const agentStatusText: Record<AgentRunStatus, string> = {
   waiting_approval: "等待确认",
   applying_change: "应用修改",
   recovering: "恢复中",
+  steering: "应用追加信息",
   completed: "已完成",
   stopped: "已停止",
   failed: "失败",

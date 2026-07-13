@@ -179,6 +179,7 @@ export const ChatInput = React.memo(function ChatInput() {
   const [placeholder, setPlaceholder] = useState('')
   const t = useTranslations()
   const defaultPlaceholder = t('record.chat.input.placeholder.default')
+  const steeringPlaceholder = t('record.chat.input.placeholder.steering')
   const [inputHistory, setInputHistory] = useLocalStorage<string[]>('chat-input-history', [])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [tempInput, setTempInput] = useState('')
@@ -587,7 +588,7 @@ export const ChatInput = React.memo(function ChatInput() {
   }
 
   function handleImageDragEnter(e: React.DragEvent<HTMLDivElement>) {
-    if (loading || !primaryModel || !hasFileTransfer(e.dataTransfer)) {
+    if (!primaryModel || !hasFileTransfer(e.dataTransfer)) {
       return
     }
 
@@ -601,7 +602,7 @@ export const ChatInput = React.memo(function ChatInput() {
   }
 
   function handleImageDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (loading || !primaryModel || !hasFileTransfer(e.dataTransfer)) {
+    if (!primaryModel || !hasFileTransfer(e.dataTransfer)) {
       return
     }
 
@@ -634,7 +635,7 @@ export const ChatInput = React.memo(function ChatInput() {
     imageDragDepthRef.current = 0
     setIsImageDragOver(false)
 
-    if (loading || !primaryModel) {
+    if (!primaryModel) {
       return
     }
 
@@ -1118,7 +1119,7 @@ ${previewLines.join('\n')}
                 : "min-h-[36px] max-h-[240px] text-xs placeholder:text-sm md:placeholder:text-sm md:text-sm"
             )}
             rows={1}
-            disabled={!primaryModel || loading}
+            disabled={!primaryModel}
             value={text}
             onChange={(e) => {
               setText(e.target.value)
@@ -1127,7 +1128,7 @@ ${previewLines.join('\n')}
               const newHeight = Math.min(textarea.scrollHeight, 240)
               textarea.style.height = `${newHeight}px`
             }}
-            placeholder={placeholder || defaultPlaceholder}
+            placeholder={loading ? steeringPlaceholder : placeholder || defaultPlaceholder}
             onKeyDown={(e) => {
               const textarea = e.target as HTMLTextAreaElement
               const cursorPosition = textarea.selectionStart
@@ -1212,7 +1213,7 @@ ${previewLines.join('\n')}
               icon={<ImageIcon className="size-4" />}
               tooltipText={t('record.chat.input.attachImage')}
               onClick={isMobile ? handleSelectFromGallery : handleSelectLocalImages}
-              disabled={!primaryModel || loading}
+              disabled={!primaryModel}
               buttonClassName={isMobile ? "rounded-2xl text-[hsl(var(--component-inactive-color))] hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground" : undefined}
             />
             <ChatSend inputValue={text} onSent={handleSent} linkedResource={linkedResource} attachedImages={attachedImages} quoteData={activeQuote} dockStyle={isMobile} ref={chatSendRef} />

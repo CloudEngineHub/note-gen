@@ -21,6 +21,7 @@ import { ImageAttachment } from "./image-attachments"
 import type { RagSource } from "@/lib/rag"
 import { cn } from "@/lib/utils"
 import type { AgentTraceEvent } from "@/lib/agent/types"
+import type { AgentApprovalDecision, AgentSteeringPayload } from "@/lib/agent/types"
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -85,6 +86,10 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
   const abortControllerRef = useRef<AbortController | null>(null)
   const agentHandlerRef = useRef<AgentHandler | null>(null)
   const manualStopRequestedRef = useRef(false)
+  const steeringSequenceRef = useRef(0)
+  const steeringChainRef = useRef<Promise<void>>(Promise.resolve())
+  const pendingSteeringRef = useRef<AgentSteeringPayload[]>([])
+  const activeRunRef = useRef(false)
   const t = useTranslations()
 
   // 跟踪上一次的 loading 状态
@@ -185,6 +190,69 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     return trimmed.slice(0, cutoff).trim()
   }
 
+  const buildSteeringContext = async (text: string) => {
+    const useArticleStore = (await import('@/stores/article')).default
+    const articleStore = useArticleStore.getState()
+    let context = ''
+
+    if (articleStore.activeFilePath && articleStore.currentArticle) {
+      context += `## 当前打开的笔记\n文件路径: ${articleStore.activeFilePath}\n\n内容:\n${articleStore.currentArticle}\n\n`
+    }
+
+    if (isRagEnabled) {
+      try {
+        let keywords = await invoke<{text: string, weight: number}[]>('rank_keywords', { text, topK: 15 })
+        keywords = filterRAGKeywords(keywords)
+        if (keywords.length > 0) {
+          const ragResult = linkedResource && isLinkedFolder(linkedResource)
+            ? await getContextForQueryInFolder(keywords, linkedResource.relativePath)
+            : await getContextForQuery(keywords)
+          if (ragResult.context) {
+            context += `## 知识库检索结果\n\n${ragResult.context}\n\n`
+          }
+          const currentSources = useChatStore.getState().agentState.ragSources || []
+          const currentDetails = useChatStore.getState().agentState.ragSourceDetails || []
+          setAgentState({
+            ragSources: Array.from(new Set([...currentSources, ...ragResult.sources])),
+            ragSourceDetails: [...currentDetails, ...ragResult.sourceDetails],
+          })
+          const activeChatId = useChatStore.getState().agentState.activeChatId
+          const activeChat = useChatStore.getState().chats.find(chat => chat.id === activeChatId)
+          if (activeChat) {
+            await saveChat({
+              ...activeChat,
+              ragSources: JSON.stringify(Array.from(new Set([...currentSources, ...ragResult.sources]))),
+              ragSourceDetails: JSON.stringify([...currentDetails, ...ragResult.sourceDetails]),
+            }, true)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to get RAG context for steering:', error)
+      }
+    }
+
+    if (linkedResource && !isLinkedFolder(linkedResource)) {
+      try {
+        const workspace = await getWorkspacePath()
+        const pathOptions = workspace.isCustom ? null : await getFilePathOptions(linkedResource.path)
+        const linkedFileContent = workspace.isCustom
+          ? await readTextFile(linkedResource.path)
+          : await readTextFile(pathOptions!.path, {
+              baseDir: pathOptions!.baseDir,
+            })
+        context += `${linkedResourcePreview ? `${linkedResourcePreview}\n` : ''}## 关联文件完整内容\n${linkedResource.relativePath}\n\n${linkedFileContent}\n\n`
+      } catch (error) {
+        console.error('Failed to read linked file for steering:', error)
+      }
+    }
+
+    if (quoteData) {
+      context += `## 用户引用内容\n文件: ${quoteData.fileName}\n范围: ${quoteData.from}-${quoteData.to}\n\n${quoteData.fullContent}\n\n`
+    }
+
+    return context
+  }
+
   useImperativeHandle(ref, () => ({
     sendChat: handleSubmit
   }))
@@ -201,7 +269,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       from?: number
       to?: number
     }
-  ): Promise<boolean> => {
+  ): Promise<AgentApprovalDecision> => {
     const tool = getToolByName(toolName)
     const sessionApprovalScope = getSessionApprovalScope(toolName, tool, params)
     const canApproveForSession = !!sessionApprovalScope
@@ -223,7 +291,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         activeConversationId,
         sessionApprovalScope,
       })
-      return Promise.resolve(true)
+      return Promise.resolve('approved')
     }
 
     return new Promise((resolve) => {
@@ -269,7 +337,11 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
             resolved: latestRecord?.status === 'confirmed',
           })
 
-          resolve(latestRecord?.status === 'confirmed')
+          resolve(latestRecord?.status === 'confirmed'
+            ? 'approved'
+            : latestRecord?.status === 'superseded'
+              ? 'steered'
+              : 'denied')
         }
       }, 100)
     })
@@ -474,6 +546,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
 
     // 保存到 ref
     agentHandlerRef.current = agentHandler
+    for (const payload of pendingSteeringRef.current.splice(0)) {
+      agentHandler.steer(payload)
+    }
 
     try {
       // 构建上下文信息
@@ -744,27 +819,75 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 
   // 对话（Agent 模式）
   async function handleSubmit() {
-    if (inputValue === '') return
+    if (!inputValue.trim()) return
+
+    if (activeRunRef.current) {
+      const sequence = ++steeringSequenceRef.current
+      const text = inputValue
+      const imageUrls = attachedImages.map(img => img.url)
+      const steeringQuote = quoteData ? {
+        fileName: quoteData.fileName,
+        startLine: quoteData.startLine,
+        endLine: quoteData.endLine,
+        from: quoteData.from,
+        to: quoteData.to,
+        fullContent: quoteData.fullContent,
+      } : undefined
+
+      agentHandlerRef.current?.beginSteering()
+      onSent?.()
+
+      steeringChainRef.current = steeringChainRef.current.then(async () => {
+        if (manualStopRequestedRef.current) return
+        let additionalContext = ''
+        try {
+          additionalContext = await buildSteeringContext(text)
+        } catch (error) {
+          console.error('Failed to build steering context:', error)
+        }
+        const payload: AgentSteeringPayload = {
+          sequence,
+          text,
+          imageUrls,
+          additionalContext,
+          currentQuote: steeringQuote,
+        }
+        if (agentHandlerRef.current) {
+          agentHandlerRef.current.steer(payload)
+        } else {
+          pendingSteeringRef.current.push(payload)
+        }
+      })
+      return
+    }
+
     manualStopRequestedRef.current = false
+    activeRunRef.current = true
     onSent?.()
 
     setLoading(true)
-    const imageUrls = attachedImages.map(img => img.url)
-    await insert({
-      tagId: currentTagId,
-      role: 'user',
-      content: inputValue,
-      type: 'chat',
-      inserted: false,
-      images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
-      quoteData: quoteData ? JSON.stringify(quoteData) : undefined,
-    })
-    await handleAgentMode(imageUrls)
-    setLoading(false)
+    try {
+      const imageUrls = attachedImages.map(img => img.url)
+      await insert({
+        tagId: currentTagId,
+        role: 'user',
+        content: inputValue,
+        type: 'chat',
+        inserted: false,
+        images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
+        quoteData: quoteData ? JSON.stringify(quoteData) : undefined,
+      })
+      await handleAgentMode(imageUrls)
+    } finally {
+      activeRunRef.current = false
+      setLoading(false)
+    }
   }
 
   const handleStop = async () => {
     manualStopRequestedRef.current = true
+    activeRunRef.current = false
+    pendingSteeringRef.current = []
 
     // 停止普通对话的流式输出
     if (abortControllerRef.current) {
@@ -782,22 +905,25 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     setLoading(false)
   }
 
-  return (
-    <>
-      <TooltipButton 
-        variant={dockStyle ? "ghost" : loading ? "destructive" : "default"}
-        size="sm"
-        icon={loading ? <Square className="size-4" /> : <Send className="size-4" />} 
-        disabled={!loading && (!primaryModel || !inputValue.trim())} 
-        tooltipText={loading ? t('record.chat.input.stop') : t('record.chat.input.send')} 
-        onClick={loading ? handleStop : handleSubmit} 
-        buttonClassName={dockStyle ? cn(
-          "rounded-2xl border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
-          loading && "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/10"
-        ) : undefined}
-      />
-    </>
-  )
+  const hasInput = Boolean(inputValue.trim())
+  const showStop = loading && !hasInput
+
+  return <TooltipButton
+    variant={dockStyle ? "ghost" : showStop ? "destructive" : "default"}
+    size="sm"
+    icon={showStop ? <Square /> : <Send />}
+    disabled={!showStop && (!primaryModel || !hasInput)}
+    tooltipText={showStop
+      ? t('record.chat.input.stop')
+      : loading
+        ? t('record.chat.input.steer')
+        : t('record.chat.input.send')}
+    onClick={showStop ? handleStop : handleSubmit}
+    buttonClassName={dockStyle ? cn(
+      "rounded-2xl border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
+      showStop && "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/10"
+    ) : undefined}
+  />
 })
 
 ChatSend.displayName = 'ChatSend';

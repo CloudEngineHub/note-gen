@@ -4,7 +4,7 @@ import { skillManager } from '@/lib/skills'
 import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
-import type { AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentStep, AgentTraceEvent, ToolCall } from './types'
+import type { AgentApprovalDecision, AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 
 export interface AgentHandlerConfig {
   activeChatId?: number
@@ -27,7 +27,7 @@ export interface AgentHandlerConfig {
       from?: number
       to?: number
     }
-  ) => Promise<boolean>
+  ) => Promise<AgentApprovalDecision>
   currentQuote?: {
     fileName: string
     startLine: number
@@ -42,6 +42,8 @@ export class AgentHandler {
   private runtime: AgentRuntime | null = null
   private stopped = false
   private readonly config: AgentHandlerConfig
+  private steeringPending = false
+  private pendingSteering: AgentSteeringPayload[] = []
 
   constructor(config: AgentHandlerConfig) {
     this.config = config
@@ -63,6 +65,14 @@ export class AgentHandler {
       currentStepStartTime: Date.now(),
     })
 
+    this.runtime = new AgentRuntime()
+    if (this.steeringPending) {
+      this.runtime.beginSteering()
+    }
+    for (const payload of this.pendingSteering.splice(0)) {
+      this.runtime.steer(payload)
+    }
+
     await this.initializeMcp()
     const skillsInfo = await this.getSkillsInfo()
 
@@ -81,8 +91,6 @@ export class AgentHandler {
       : contextOrMessages
         ? [{ role: 'system' as const, content: contextOrMessages }]
         : []
-
-    this.runtime = new AgentRuntime()
 
     try {
       const result = await this.runtime.run({
@@ -144,7 +152,7 @@ export class AgentHandler {
           this.config.onFinalAnswerRender?.(content)
         },
         requestConfirmation: async (toolName, params, context) => {
-          return Boolean(await this.config.requestConfirmation?.(toolName, params, context))
+          return await this.config.requestConfirmation?.(toolName, params, context) || 'denied'
         },
       })
 
@@ -185,6 +193,38 @@ export class AgentHandler {
   stop() {
     this.stopped = true
     this.runtime?.stop()
+  }
+
+  beginSteering() {
+    const state = useChatStore.getState()
+    const pending = state.agentState.pendingConfirmation
+    if (pending) {
+      state.setAgentState({
+        pendingConfirmation: undefined,
+        confirmationHistory: [
+          ...state.agentState.confirmationHistory,
+          {
+            toolName: pending.toolName,
+            params: pending.params,
+            status: 'superseded',
+            timestamp: Date.now(),
+          },
+        ],
+        status: 'steering',
+        isRunning: true,
+      })
+    }
+    this.steeringPending = true
+    this.runtime?.beginSteering()
+  }
+
+  steer(payload: AgentSteeringPayload) {
+    this.steeringPending = true
+    if (this.runtime) {
+      this.runtime.steer(payload)
+    } else {
+      this.pendingSteering.push(payload)
+    }
   }
 
   private async initializeMcp() {

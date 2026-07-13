@@ -2186,6 +2186,7 @@
         "chat": "Chat",
         "placeholder": {
           "default": "Type a message...",
+          "steering": "Add information to steer the current task...",
           "noApiKey": "No API Key configured, can't use AI chat...",
           "on": "AI suggestions on",
           "off": "AI suggestions off",
@@ -2202,6 +2203,7 @@
           "disable": "Clipboard monitoring (off)"
         },
         "send": "Send",
+        "steer": "Steer task",
         "stop": "Stop",
         "stopped": "Conversation stopped",
         "terminate": "Terminate",
