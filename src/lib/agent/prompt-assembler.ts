@@ -8,6 +8,19 @@ function formatToolCatalog(tools: AgentTool[]) {
     .join('\n')
 }
 
+function formatCurrentDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'
+
+  return [
+    '## Current Date',
+    `The current local date is ${year}-${month}-${day} (time zone: ${timeZone}).`,
+  ].join('\n')
+}
+
 function formatSkills(context: AgentContextSnapshot) {
   const skills = context.availableSkills ?? []
   if (skills.length === 0) {
@@ -81,6 +94,7 @@ export class AgentPromptAssembler {
   assemble(context: AgentContextSnapshot, tools: AgentTool[], systemPrompt = DEFAULT_SYSTEM_PROMPT) {
     const sections = [
       systemPrompt.trim(),
+      formatCurrentDate(),
       '',
       '## Available Tools',
       formatToolCatalog(tools),

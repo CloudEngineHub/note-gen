@@ -3,41 +3,6 @@ import { skillManager } from '@/lib/skills'
 import { executeSkillRuntime } from '@/lib/skills/runtime'
 import useArticleStore from '@/stores/article'
 
-export const getCurrentTimeTool: Tool = {
-  name: 'get_current_time',
-  description: 'Get the current date and time. Returns format: YYYY-MM-DD (e.g., 2026-01-18), which is suitable for direct use as part of a filename.',
-  category: 'system',
-  requiresConfirmation: false,
-  parameters: [],
-  execute: async (): Promise<ToolResult> => {
-    try {
-      const now = new Date()
-
-      const year = now.getFullYear()
-      const month = String(now.getMonth() + 1).padStart(2, '0')
-      const day = String(now.getDate()).padStart(2, '0')
-
-      // 安全的文件名格式：YYYY-MM-DD
-      const safeFileNameDate = `${year}-${month}-${day}`
-
-      return {
-        success: true,
-        data: safeFileNameDate,
-        message: `当前日期：${safeFileNameDate}`,
-      }
-    } catch (error) {
-      console.error('[get_current_time] 获取失败', {
-        error: String(error),
-        errorMessage: error instanceof Error ? error.message : String(error),
-      })
-      return {
-        success: false,
-        error: `获取时间失败: ${error}`,
-      }
-    }
-  },
-}
-
 /**
  * 选择 Skill 工具
  * 用于 AI 在第一次迭代时选择合适的 Skill 来指导后续操作
@@ -420,7 +385,6 @@ export const executeSkillScriptTool: Tool = {
 }
 
 export const systemTools: Tool[] = [
-  getCurrentTimeTool,
   selectSkillTool,
   loadSkillContentTool,
   executeSkillScriptTool,

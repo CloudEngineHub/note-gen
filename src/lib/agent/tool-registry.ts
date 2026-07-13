@@ -28,7 +28,7 @@ import { listFoldersTool, checkFolderExistsTool, createFolderTool, deleteFolderT
 import { listTagsTool, createTagTool, updateTagTool, deleteTagTool, searchTagsTool } from './tools/tag-tools'
 import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
 import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool } from './tools/memory-tools'
-import { executeSkillScriptTool, getCurrentTimeTool, loadSkillContentTool } from './tools/system-tools'
+import { executeSkillScriptTool, loadSkillContentTool } from './tools/system-tools'
 import type {
   AgentChange,
   AgentTool,
@@ -719,14 +719,6 @@ function buildMcpListToolsTool(): AgentTool {
 
 function buildTools(): AgentTool[] {
   return [
-    adaptLegacyTool({
-      name: 'system_get_current_time',
-      title: '获取当前日期',
-      category: 'system',
-      risk: 'read',
-      legacy: getCurrentTimeTool,
-      inputSchema: EMPTY_SCHEMA,
-    }),
     adaptLegacyTool({
       name: 'editor_get_state',
       title: '读取编辑器状态',
