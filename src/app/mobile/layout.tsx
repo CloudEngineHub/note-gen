@@ -44,6 +44,7 @@ export default function RootLayout({
   const { initSettingData, customThemeColors, appFontFamily } = useSettingStore()
   const { initMainHosting } = useImageStore()
   const { initCollapsibleList } = useArticleStore()
+  const { initVectorDb } = useVectorStore()
   const { currentLocale } = useI18n()
   useEffect(() => {
     if (isWritingRoute) {
@@ -70,13 +71,15 @@ export default function RootLayout({
 
     const initializeApp = async () => {
       try {
-        initSettingData()
+        await initSettingData()
         initMainHosting()
         await initAllDatabases()
         if (cancelled) return
         await initCollapsibleList()
         if (cancelled) return
         await initAutoDataSyncRuntime()
+        if (cancelled) return
+        await initVectorDb()
         if (cancelled) return
         initMcp()
       } catch (error) {
@@ -89,13 +92,6 @@ export default function RootLayout({
     return () => {
       cancelled = true
     }
-  }, [])
-
-  const { initVectorDb } = useVectorStore()
-  
-  // 初始化向量数据库
-  useEffect(() => {
-    initVectorDb()
   }, [])
 
   useEffect(() => {

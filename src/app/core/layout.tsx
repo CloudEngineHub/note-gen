@@ -296,7 +296,7 @@ export default function RootLayout({
 
     const initializeApp = async () => {
       try {
-        initSettingData()
+        await initSettingData()
         initMainHosting()
 
         // 先完成数据库和默认工作区初始化，避免首次启动时其他逻辑抢先读取空目录或未建表数据库。
