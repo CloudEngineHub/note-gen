@@ -23,7 +23,7 @@ import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
 import UniqueId from '@tiptap/extension-unique-id'
 import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
-import { AllSelection, EditorState, NodeSelection, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
+import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { dropPoint } from '@tiptap/pm/transform'
@@ -36,7 +36,7 @@ import { useEffect, useRef, useCallback, useMemo, useState, type MouseEvent as R
 import { Store } from '@tauri-apps/plugin-store'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
-import { readFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { handleImageUpload } from '@/lib/image-handler'
 import useArticleStore from '@/stores/article'
@@ -93,6 +93,7 @@ import useEditorShortcutStore from '@/stores/editor-shortcut'
 import type { EditorShortcutCommandId } from '@/config/editor-shortcuts'
 import { isAiSuggestionShortcutVisible } from '@/lib/ai-suggestion-shortcut-state'
 import { getFileManagerDragPath, hasFileManagerDragData } from '@/app/core/main/file/file-dnd'
+import { getMarkLocalAssetPath, type Mark } from '@/db/marks'
 import './style.css'
 
 const lowlight = createLowlight(common)
@@ -118,34 +119,99 @@ function createDragHandleElement(): HTMLElement {
   return element
 }
 
+type EditorBlockDragState = {
+  editor: CoreEditor
+  from: number
+  to: number
+  startDoc: CoreEditor['state']['doc']
+  targetPos: number | null
+}
+
+type EditorBlockPointerDragState = EditorBlockDragState & {
+  pointerId: number
+  startX: number
+  startY: number
+  moved: boolean
+  indicatorPos: number | null
+  indicator: HTMLDivElement
+  handle: HTMLElement
+}
+
+function moveEditorBlock(state: EditorBlockDragState) {
+  const { editor, from, to, startDoc, targetPos } = state
+
+  if (editor.isDestroyed || editor.state.doc !== startDoc || targetPos === null) {
+    return
+  }
+
+  const slice = startDoc.slice(from, to)
+  const insertPos = dropPoint(startDoc, targetPos, slice) ?? targetPos
+
+  if (insertPos >= from && insertPos <= to) {
+    return
+  }
+
+  const tr = editor.state.tr.deleteRange(from, to)
+  const mappedInsertPos = tr.mapping.map(insertPos)
+  const beforeInsert = tr.doc
+
+  tr.replaceRange(mappedInsertPos, mappedInsertPos, slice)
+
+  if (tr.doc.eq(beforeInsert)) {
+    return
+  }
+
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(mappedInsertPos, tr.doc.content.size))))
+  editor.view.focus()
+  editor.view.dispatch(tr.setMeta('uiEvent', 'drop'))
+}
+
+function getEditorBlockDropIndicatorTop(editor: CoreEditor, pos: number, fallbackTop: number) {
+  const $pos = editor.state.doc.resolve(pos)
+  if ($pos.parent.inlineContent) {
+    return editor.view.coordsAtPos(pos).top
+  }
+
+  const before = $pos.nodeBefore
+  const after = $pos.nodeAfter
+  if (!before && !after) {
+    return fallbackTop
+  }
+
+  const beforeDom = before
+    ? editor.view.nodeDOM(pos - before.nodeSize)
+    : null
+  const afterDom = after
+    ? editor.view.nodeDOM(pos)
+    : null
+  const beforeRect = beforeDom instanceof HTMLElement ? beforeDom.getBoundingClientRect() : null
+  const afterRect = afterDom instanceof HTMLElement ? afterDom.getBoundingClientRect() : null
+
+  if (beforeRect && afterRect) {
+    return (beforeRect.bottom + afterRect.top) / 2
+  }
+
+  return beforeRect?.bottom ?? afterRect?.top ?? fallbackTop
+}
+
+function clearEditorNativeDropCursor(editor: CoreEditor) {
+  if (!editor.isDestroyed) {
+    editor.view.dom.dispatchEvent(new Event('dragend'))
+  }
+}
+
 const INTERNAL_TEXT_FILE_PATH_RE = /\.(?:md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template)$/i
 const INTERNAL_IMAGE_FILE_PATH_RE = /\.(?:jpg|jpeg|png|gif|bmp|webp|svg)$/i
 const WINDOWS_ABSOLUTE_PATH_RE = /^[a-zA-Z]:[\\/]/
 
-type EditorDragHandleMoveRange = {
-  from: number
-  to: number
-}
+function getDroppedMarkImageMimeType(fileName: string) {
+  const extension = fileName.split('.').pop()?.toLowerCase()
 
-function shouldCopyInternalEditorDrag(event: DragEvent) {
-  if (typeof navigator === 'undefined') {
-    return event.ctrlKey
-  }
-
-  return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent)
-    ? event.altKey
-    : event.ctrlKey
-}
-
-function getSelectionMoveRange(selection: Selection): EditorDragHandleMoveRange | null {
-  if (selection.empty) {
-    return null
-  }
-
-  return {
-    from: Math.min(selection.from, selection.to),
-    to: Math.max(selection.from, selection.to),
-  }
+  if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg'
+  if (extension === 'webp') return 'image/webp'
+  if (extension === 'gif') return 'image/gif'
+  if (extension === 'svg') return 'image/svg+xml'
+  return 'image/png'
 }
 
 function isEditorAiGenerationAction(action: unknown): action is EditorAiGenerationAction {
@@ -1043,9 +1109,8 @@ export function TipTapEditor({
 
   // Content version ref for race condition prevention between editor and agent
   const contentVersionRef = useRef(0)
-  const editorDragHandleTargetRangeRef = useRef<EditorDragHandleMoveRange | null>(null)
-  const isEditorDragHandleDraggingRef = useRef(false)
-  const editorDragHandleMoveRangeRef = useRef<EditorDragHandleMoveRange | null>(null)
+  const editorDragHandleTargetRef = useRef<{ editor: CoreEditor; from: number; to: number } | null>(null)
+  const editorBlockPointerDragStateRef = useRef<EditorBlockPointerDragState | null>(null)
   const editorShortcuts = useEditorShortcutStore((state) => state.shortcuts)
   const editorShortcutsRef = useRef(editorShortcuts)
   const editorShortcutHandlersRef = useRef<Partial<Record<EditorShortcutCommandId, (targetEditor: CoreEditor) => boolean>>>({})
@@ -1060,17 +1125,6 @@ export function TipTapEditor({
   const runEditorShortcutCommand = useCallback((id: EditorShortcutCommandId, targetEditor: CoreEditor) => {
     return editorShortcutHandlersRef.current[id]?.(targetEditor) ?? false
   }, [])
-
-  const clearEditorDragHandleMoveState = useCallback(() => {
-    isEditorDragHandleDraggingRef.current = false
-    editorDragHandleMoveRangeRef.current = null
-  }, [])
-
-  const scheduleClearEditorDragHandleMoveState = useCallback(() => {
-    window.setTimeout(() => {
-      clearEditorDragHandleMoveState()
-    }, 100)
-  }, [clearEditorDragHandleMoveState])
 
   // When file path changes, reset initialization state to avoid old file content overwriting new file
   useEffect(() => {
@@ -1134,36 +1188,36 @@ export function TipTapEditor({
             DragHandle.configure({
               render: createDragHandleElement,
               onNodeChange: (options) => {
-                const { node } = options
-                const dragOptions = options as unknown as { pos?: unknown }
-                const pos = typeof dragOptions.pos === 'number'
-                  ? dragOptions.pos
-                  : -1
+                const { editor: targetEditor, node } = options
+                const pos = (options as typeof options & { pos?: number }).pos
 
-                editorDragHandleTargetRangeRef.current = node && pos >= 0
-                  ? {
-                      from: pos,
-                      to: pos + node.nodeSize,
-                    }
+                editorDragHandleTargetRef.current = node && typeof pos === 'number' && pos >= 0
+                  ? { editor: targetEditor, from: pos, to: pos + node.nodeSize }
                   : null
               },
-              onElementDragStart: (event) => {
-                isEditorDragHandleDraggingRef.current = true
-                editorDragHandleMoveRangeRef.current = editorDragHandleTargetRangeRef.current
-
-                if (!event.dataTransfer) {
-                  return
-                }
-
-                event.dataTransfer.effectAllowed = 'move'
-                event.dataTransfer.dropEffect = 'move'
-              },
-              onElementDragEnd: scheduleClearEditorDragHandleMoveState,
               computePositionConfig: {
                 middleware: [
                   {
                     name: 'editorDragHandleOffset',
-                    fn: ({ x, y }) => ({ x: x - 2, y }),
+                    fn: ({ x, y, elements }) => {
+                      const editorDom = elements.floating.parentElement
+                        ?.parentElement
+                        ?.querySelector<HTMLElement>('.ProseMirror')
+
+                      if (!editorDom) {
+                        return { x: x - 8, y }
+                      }
+
+                      const editorRect = editorDom.getBoundingClientRect()
+                      const editorPaddingLeft = Number.parseFloat(getComputedStyle(editorDom).paddingLeft) || 0
+                      const contentLeft = editorRect.left + editorPaddingLeft
+                      const referenceLeft = elements.reference.getBoundingClientRect().left
+
+                      return {
+                        x: x + contentLeft - referenceLeft - 8,
+                        y,
+                      }
+                    },
                   },
                 ],
               },
@@ -1415,74 +1469,6 @@ export function TipTapEditor({
     ],
     content: initialContent,
     contentType: 'markdown',
-    editorProps: {
-      dragCopies: (event) => {
-        if (isEditorDragHandleDraggingRef.current) {
-          return false
-        }
-
-        return shouldCopyInternalEditorDrag(event)
-      },
-      handleDrop: (view, event, slice) => {
-        const moveRange = editorDragHandleMoveRangeRef.current ?? getSelectionMoveRange(view.state.selection)
-        if (!isEditorDragHandleDraggingRef.current || !moveRange || moveRange.from === moveRange.to) {
-          return false
-        }
-
-        const eventPos = view.posAtCoords({ left: event.clientX, top: event.clientY })
-        if (!eventPos) {
-          clearEditorDragHandleMoveState()
-          return false
-        }
-
-        const insertPos = dropPoint(view.state.doc, eventPos.pos, slice) ?? eventPos.pos
-        if (insertPos >= moveRange.from && insertPos <= moveRange.to) {
-          event.preventDefault()
-          clearEditorDragHandleMoveState()
-          return true
-        }
-
-        const tr = view.state.tr
-        tr.deleteRange(moveRange.from, moveRange.to)
-
-        const mappedInsertPos = tr.mapping.map(insertPos)
-        const beforeInsert = tr.doc
-        const firstChild = slice.content.firstChild
-        const isNode = slice.openStart === 0 && slice.openEnd === 0 && slice.content.childCount === 1
-
-        if (isNode && firstChild) {
-          tr.replaceRangeWith(mappedInsertPos, mappedInsertPos, firstChild)
-        } else {
-          tr.replaceRange(mappedInsertPos, mappedInsertPos, slice)
-        }
-
-        if (tr.doc.eq(beforeInsert)) {
-          clearEditorDragHandleMoveState()
-          return false
-        }
-
-        const resolvedInsertPos = tr.doc.resolve(Math.min(mappedInsertPos, tr.doc.content.size))
-
-        if (
-          isNode &&
-          firstChild &&
-          NodeSelection.isSelectable(firstChild) &&
-          resolvedInsertPos.nodeAfter &&
-          resolvedInsertPos.nodeAfter.sameMarkup(firstChild)
-        ) {
-          tr.setSelection(new NodeSelection(resolvedInsertPos))
-        } else {
-          const selectionPos = Math.min(tr.doc.content.size, mappedInsertPos + slice.size)
-          tr.setSelection(TextSelection.near(tr.doc.resolve(selectionPos)))
-        }
-
-        view.focus()
-        view.dispatch(tr.setMeta('uiEvent', 'drop'))
-        event.preventDefault()
-        clearEditorDragHandleMoveState()
-        return true
-      },
-    },
     editable,
     onUpdate: ({ editor }) => {
       // Bug fix: Only trigger onChange if editor is ready (not during initialization)
@@ -1501,6 +1487,133 @@ export function TipTapEditor({
       }
     },
   })
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) {
+      return
+    }
+
+    const finishPointerDrag = (event: PointerEvent, shouldMove: boolean) => {
+      const dragState = editorBlockPointerDragStateRef.current
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return
+      }
+
+      editorBlockPointerDragStateRef.current = null
+      dragState.handle.dataset.dragging = 'false'
+      dragState.indicator.remove()
+
+      if (dragState.handle.hasPointerCapture(event.pointerId)) {
+        dragState.handle.releasePointerCapture(event.pointerId)
+      }
+
+      if (shouldMove && dragState.moved) {
+        moveEditorBlock(dragState)
+      }
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) {
+        return
+      }
+
+      const eventTarget = event.target
+      const handle = eventTarget instanceof Element
+        ? eventTarget.closest<HTMLElement>('.tiptap-drag-handle')
+        : null
+      const target = editorDragHandleTargetRef.current
+
+      if (!handle || !target || target.editor !== editor) {
+        return
+      }
+
+      editorBlockPointerDragStateRef.current = {
+        ...target,
+        startDoc: editor.state.doc,
+        targetPos: null,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        indicatorPos: null,
+        indicator: Object.assign(document.createElement('div'), {
+          className: 'tiptap-pointer-drop-indicator',
+        }),
+        handle,
+      }
+
+      handle.dataset.dragging = 'true'
+      handle.setPointerCapture(event.pointerId)
+
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = editorBlockPointerDragStateRef.current
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return
+      }
+
+      if (!dragState.moved && Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) >= 4) {
+        dragState.moved = true
+      }
+
+      if (dragState.moved) {
+        const targetPos = editor.view.posAtCoords({
+          left: event.clientX,
+          top: event.clientY,
+        })?.pos
+
+        if (targetPos !== undefined) {
+          dragState.targetPos = targetPos
+          const slice = dragState.startDoc.slice(dragState.from, dragState.to)
+          const indicatorPos = dropPoint(editor.state.doc, targetPos, slice) ?? targetPos
+
+          if (indicatorPos !== dragState.indicatorPos) {
+            dragState.indicatorPos = indicatorPos
+            const editorRect = editor.view.dom.getBoundingClientRect()
+            const indicatorTop = getEditorBlockDropIndicatorTop(editor, indicatorPos, event.clientY)
+
+            Object.assign(dragState.indicator.style, {
+              position: 'fixed',
+              zIndex: '2147483647',
+              left: `${editorRect.left}px`,
+              top: `${indicatorTop - 1}px`,
+              width: `${editorRect.width}px`,
+              height: '3px',
+              borderRadius: '999px',
+              backgroundColor: 'hsl(var(--primary))',
+              boxShadow: '0 0 0 1px hsl(var(--background))',
+              pointerEvents: 'none',
+            })
+
+            if (!dragState.indicator.isConnected) {
+              document.body.appendChild(dragState.indicator)
+            }
+          }
+        }
+
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+
+    const handlePointerUp = (event: PointerEvent) => finishPointerDrag(event, true)
+    const handlePointerCancel = (event: PointerEvent) => finishPointerDrag(event, false)
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('pointermove', handlePointerMove, true)
+    document.addEventListener('pointerup', handlePointerUp, true)
+    document.addEventListener('pointercancel', handlePointerCancel, true)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('pointermove', handlePointerMove, true)
+      document.removeEventListener('pointerup', handlePointerUp, true)
+      document.removeEventListener('pointercancel', handlePointerCancel, true)
+    }
+  }, [editor])
 
   const clearBlurSelectionHighlight = useCallback(() => {
     if (!editor || editor.isDestroyed) {
@@ -2542,14 +2655,46 @@ export function TipTapEditor({
 
       event.preventDefault()
       event.stopPropagation()
+      event.stopImmediatePropagation()
+      clearEditorNativeDropCursor(editor)
+
+      const droppedFiles = Array.from(dataTransfer.files || [])
+      const droppedImageFiles = droppedFiles.filter(file =>
+        file.type.startsWith('image/') || INTERNAL_IMAGE_FILE_PATH_RE.test(file.name)
+      )
+      const pos = editor.view.posAtCoords({ left: event.clientX, top: event.clientY })
+      const insertPos = pos?.pos || editor.state.selection.from
 
       void (async () => {
+        if (droppedImageFiles.length > 0 && droppedImageFiles.length === droppedFiles.length) {
+          const uploadedImages = await Promise.all(
+            droppedImageFiles.map(async file => ({
+              file,
+              result: await handleImageUpload(file, activeFilePathRef.current),
+            }))
+          )
+
+          editor.chain()
+            .focus()
+            .insertContentAt(
+              insertPos,
+              uploadedImages.map(({ file, result }) => ({
+                type: 'image',
+                attrs: {
+                  src: result.src,
+                  alt: file.name,
+                  relativeSrc: result.relativePath,
+                },
+              }))
+            )
+            .run()
+          return
+        }
+
         const links = await getDroppedFileMarkdownLinks(dataTransfer, activeFilePathRef.current)
-        const droppedFileNames = Array.from(dataTransfer.files || [])
+        const droppedFileNames = droppedFiles
           .map(file => file.name.trim())
           .filter(Boolean)
-        const pos = editor.view.posAtCoords({ left: event.clientX, top: event.clientY })
-        const insertPos = pos?.pos || editor.state.selection.from
 
         if (links.length === 0) {
           if (droppedFileNames.length > 0) {
@@ -2580,7 +2725,7 @@ export function TipTapEditor({
           .run()
       })().catch(error => {
         toast({
-          title: '插入文件链接失败',
+          title: droppedImageFiles.length > 0 ? tImage('failed') : '插入文件链接失败',
           description: error instanceof Error ? error.message : undefined,
           variant: 'destructive',
         })
@@ -2592,11 +2737,11 @@ export function TipTapEditor({
     if (!editor.view || !editor.view.dom) return
     const dom = editor.view.dom
     dom.addEventListener('paste', handlePaste as EventListener)
-    dom.addEventListener('drop', handleDrop as EventListener)
+    dom.addEventListener('drop', handleDrop as EventListener, true)
 
     return () => {
       dom.removeEventListener('paste', handlePaste as EventListener)
-      dom.removeEventListener('drop', handleDrop as EventListener)
+      dom.removeEventListener('drop', handleDrop as EventListener, true)
     }
   }, [editor])
 
@@ -3263,6 +3408,8 @@ export function TipTapEditor({
   useEffect(() => {
     if (!editor || !editor.view) return
 
+    let transformFrameId: number | null = null
+
     const transformImagePaths = () => {
       // 获取编辑器 DOM 中的所有图片
       const editorDom = editor.view.dom
@@ -3298,25 +3445,54 @@ export function TipTapEditor({
       }
     }
 
+    const scheduleTransformImagePaths = () => {
+      if (transformFrameId !== null) {
+        cancelAnimationFrame(transformFrameId)
+      }
+
+      transformFrameId = requestAnimationFrame(() => {
+        transformFrameId = null
+        transformImagePaths()
+      })
+    }
+
     // 监听 transaction 事件 - 在文档更新时立即转换
     const handleTransaction = () => {
-      transformImagePaths()
+      scheduleTransformImagePaths()
     }
 
     // 监听 selectionUpdate 事件
     const handleSelectionUpdate = () => {
-      transformImagePaths()
+      scheduleTransformImagePaths()
     }
+
+    const imageNodeObserver = new MutationObserver((mutations) => {
+      const hasAddedImageNode = mutations.some(mutation =>
+        Array.from(mutation.addedNodes).some(node =>
+          node instanceof HTMLImageElement ||
+          (node instanceof HTMLElement && node.querySelector('img'))
+        )
+      )
+
+      if (hasAddedImageNode) {
+        scheduleTransformImagePaths()
+      }
+    })
 
     editor.on('transaction', handleTransaction)
     editor.on('selectionUpdate', handleSelectionUpdate)
+    imageNodeObserver.observe(editor.view.dom, { childList: true, subtree: true })
 
     // 初始执行
-    transformImagePaths()
+    scheduleTransformImagePaths()
 
     return () => {
       editor.off('transaction', handleTransaction)
       editor.off('selectionUpdate', handleSelectionUpdate)
+      imageNodeObserver.disconnect()
+      if (transformFrameId !== null) {
+        cancelAnimationFrame(transformFrameId)
+      }
     }
   }, [editor])
 
@@ -3837,12 +4013,80 @@ export function TipTapEditor({
   const handleEditorDrop = useCallback((e: React.DragEvent) => {
     const markData = e.dataTransfer.getData('application/json')
     if (markData) {
+      e.preventDefault()
+      e.stopPropagation()
+      e.nativeEvent.stopImmediatePropagation()
+      if (editor) {
+        clearEditorNativeDropCursor(editor)
+      }
+
+      const dropPos = editor?.view.posAtCoords({
+        left: e.clientX,
+        top: e.clientY,
+      })?.pos
+
       try {
-        const mark = JSON.parse(markData)
+        const mark = JSON.parse(markData) as Mark
         if (mark && mark.id !== undefined) {
+          if ((mark.type === 'image' || mark.type === 'scan') && mark.url) {
+            void (async () => {
+              let src = mark.url
+              let relativeSrc = mark.url
+
+              if (!/^https?:\/\//i.test(mark.url)) {
+                const localAssetPath = getMarkLocalAssetPath(mark)
+                if (!localAssetPath) {
+                  throw new Error('无法获取图片记录的本地文件路径')
+                }
+
+                const bytes = await readFile(localAssetPath, { baseDir: BaseDirectory.AppData })
+                const fileName = localAssetPath.split('/').pop() || mark.url
+                const imageFile = new File([bytes], fileName, {
+                  type: getDroppedMarkImageMimeType(fileName),
+                })
+                const result = await handleImageUpload(imageFile, activeFilePathRef.current)
+                src = result.src
+                relativeSrc = result.relativePath
+              }
+
+              const insertPos = dropPos ?? editor?.state.selection.from
+              if (insertPos === undefined) {
+                return
+              }
+
+              editor?.chain()
+                .focus()
+                .insertContentAt(insertPos, {
+                  type: 'image',
+                  attrs: {
+                    src,
+                    alt: mark.desc || 'image',
+                    relativeSrc,
+                  },
+                })
+                .run()
+
+              toast({
+                title: '已插入记录',
+                description: mark.desc || '图片记录',
+              })
+            })().catch(error => {
+              toast({
+                title: tImage('failed'),
+                description: error instanceof Error ? error.message : undefined,
+                variant: 'destructive',
+              })
+            })
+            return
+          }
+
           import('@/lib/mark-to-markdown').then(({ markToMarkdown }) => {
             const markdown = markToMarkdown(mark)
-            editor?.commands.insertContent(markdown, { contentType: 'markdown' })
+            if (dropPos !== undefined) {
+              editor?.commands.insertContentAt(dropPos, markdown, { contentType: 'markdown' })
+            } else {
+              editor?.commands.insertContent(markdown, { contentType: 'markdown' })
+            }
             toast({
               title: '已插入记录',
               description: mark.desc || mark.content?.slice(0, 50) || '记录内容'
@@ -3853,7 +4097,7 @@ export function TipTapEditor({
         console.error('Failed to parse dropped mark:', error)
       }
     }
-  }, [editor])
+  }, [editor, tImage])
 
   // Handle math formula insertion from slash menu
   useEffect(() => {
@@ -4441,7 +4685,7 @@ export function TipTapEditor({
         onMouseDownCapture={handleEditorMouseDownCapture}
         onScroll={handleEditorScroll}
         onDragOver={(e) => e.preventDefault()}
-        onDrop={handleEditorDrop}
+        onDropCapture={handleEditorDrop}
       >
         <div
           className={getEditorContentContainerClass({
