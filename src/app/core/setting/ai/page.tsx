@@ -206,7 +206,9 @@ export default function AiPage() {
         temperature: config.temperature,
         topP: config.topP,
         voice: config.voice,
-        enableStream: config.enableStream
+        enableStream: config.enableStream,
+        maxTokens: config.maxTokens,
+        tokenLimitParam: config.tokenLimitParam
       }
       
       return {

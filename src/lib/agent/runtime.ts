@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import { createOpenAIClient, getAISettings, getSystemPromptContent, handleAIError, validateAIService } from '@/lib/ai/utils'
+import { createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService } from '@/lib/ai/utils'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
 import { AgentPermissionEngine, hasExplicitWriteIntent } from './permission-engine'
@@ -695,6 +695,7 @@ export class AgentRuntime {
             tools: agentToolRegistry.toOpenAITools(),
             tool_choice: buildToolChoice(context),
             stream: true,
+            ...getChatTokenLimitParams(aiConfig),
           }, {
             signal: this.abortController?.signal,
           })

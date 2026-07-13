@@ -115,6 +115,8 @@ export interface ModelConfig {
   topP?: number
   voice?: string
   enableStream?: boolean
+  maxTokens?: number
+  tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
 }
 
 export interface AiConfig {
@@ -136,6 +138,8 @@ export interface AiConfig {
   voice?: string
   speed?: number
   enableStream?: boolean
+  maxTokens?: number
+  tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
 }
 
 export interface Model {

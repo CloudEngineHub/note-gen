@@ -74,7 +74,9 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
           temperature: targetModel.temperature,
           topP: targetModel.topP,
           voice: targetModel.voice,
-          enableStream: targetModel.enableStream
+          enableStream: targetModel.enableStream,
+          maxTokens: targetModel.maxTokens,
+          tokenLimitParam: targetModel.tokenLimitParam
         }
         return result
       }
@@ -87,6 +89,16 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
   }
 
   return undefined
+}
+
+export function getChatTokenLimitParams(
+  config?: Pick<AiConfig, 'maxTokens' | 'tokenLimitParam'>
+): { max_completion_tokens?: number; max_tokens?: number } {
+  if (!config?.maxTokens || config.maxTokens < 1) return {}
+
+  return config.tokenLimitParam === 'max_tokens'
+    ? { max_tokens: config.maxTokens }
+    : { max_completion_tokens: config.maxTokens }
 }
 
 /**
@@ -314,12 +326,12 @@ export function withEditorFastAiRequestOptions<const T extends OpenAI.Chat.ChatC
   params: T,
   aiConfig?: AiConfig
 ): T {
-  if (!supportsEnableThinkingSwitch(aiConfig)) {
-    return params
-  }
+  const hasTaskTokenLimit = params.max_completion_tokens != null || params.max_tokens != null
+  const tokenLimitParams = hasTaskTokenLimit ? {} : getChatTokenLimitParams(aiConfig)
 
   return {
+    ...tokenLimitParams,
     ...params,
-    enable_thinking: false,
+    ...(supportsEnableThinkingSwitch(aiConfig) ? { enable_thinking: false } : {}),
   } as T
 }

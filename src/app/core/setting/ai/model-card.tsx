@@ -11,7 +11,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, CircleCheck, CircleX, LoaderCircle } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Trash2, CircleCheck, CircleX, LoaderCircle, ChevronDown } from "lucide-react"
 import { ModelConfig, ModelType, AiConfig } from "../config"
 import { useTranslations } from 'next-intl'
 import ModelSelect from "./modelSelect"
@@ -236,7 +237,7 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
       </div>      
       <AccordionContent className="px-4 pb-4 space-y-4">
         {/* 模型选择 */}
-        <div className="space-y-2">
+        <div className="grid gap-3">
           <Label>{t('model')}</Label>
           <ModelSelect
             model={modelConfig.model}
@@ -246,7 +247,7 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
         </div>
 
         {/* 模型类型 */}
-        <div className="space-y-2">
+        <div className="grid gap-3">
           <Label>{t('modelType.title')}</Label>
           <RadioGroup
             value={modelConfig.modelType}
@@ -278,8 +279,54 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
 
         {/* Chat模型的特殊配置 */}
         {modelConfig.modelType === 'chat' && (
-          <>
-            <div className="space-y-2">
+          <Collapsible className="rounded-lg border bg-muted/30 px-4 py-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="group h-auto w-full justify-between px-0 py-2 font-semibold hover:bg-transparent">
+                <span className="text-sm">{t('advancedParameters')}</span>
+                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-4 border-t pt-4 pb-2">
+              <div className="grid gap-3">
+              <Label>{t('maxTokens')}</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={modelConfig.maxTokens ?? ''}
+                placeholder={t('maxTokensPlaceholder')}
+                onChange={(event) => {
+                  const value = event.target.value
+                  onUpdate(modelConfig.id, 'maxTokens', value === '' ? undefined : Number(value))
+                }}
+              />
+              <p className="text-sm text-muted-foreground">{t('maxTokensDesc')}</p>
+              </div>
+
+              <div className="grid gap-3">
+              <Label>{t('tokenLimitParam')}</Label>
+              <RadioGroup
+                value={modelConfig.tokenLimitParam || 'max_completion_tokens'}
+                onValueChange={(value) => onUpdate(
+                  modelConfig.id,
+                  'tokenLimitParam',
+                  value as ModelConfig['tokenLimitParam']
+                )}
+                className="flex flex-wrap gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="max_completion_tokens" id={`max-completion-tokens-${modelConfig.id}`} />
+                  <Label htmlFor={`max-completion-tokens-${modelConfig.id}`}>max_completion_tokens</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="max_tokens" id={`max-tokens-${modelConfig.id}`} />
+                  <Label htmlFor={`max-tokens-${modelConfig.id}`}>max_tokens</Label>
+                </div>
+              </RadioGroup>
+              <p className="text-sm text-muted-foreground">{t('tokenLimitParamDesc')}</p>
+              </div>
+
+              <div className="grid gap-3">
               <Label>Temperature</Label>
               <div className="flex gap-2 items-center">
                 <Slider
@@ -293,9 +340,9 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
                   {(modelConfig.temperature || 0.7).toFixed(2)}
                 </span>
               </div>
-            </div>
+              </div>
 
-            <div className="space-y-2">
+              <div className="grid gap-3">
               <Label>Top P</Label>
               <div className="flex gap-2 items-center">
                 <Slider
@@ -310,26 +357,27 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
                   {(modelConfig.topP || 1.0).toFixed(2)}
                 </span>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>{t('enableStream')}</Label>
-                <div className="text-sm text-muted-foreground">
-                  {t('enableStreamDesc')}
-                </div>
               </div>
-              <Switch
-                checked={modelConfig.enableStream !== false}
-                onCheckedChange={(checked) => onUpdate(modelConfig.id, 'enableStream', checked)}
-              />
-            </div>
-          </>
+
+              <div className="flex items-center justify-between">
+                <div className="grid gap-1.5">
+                  <Label>{t('enableStream')}</Label>
+                  <div className="text-sm text-muted-foreground">
+                    {t('enableStreamDesc')}
+                  </div>
+                </div>
+                <Switch
+                  checked={modelConfig.enableStream !== false}
+                  onCheckedChange={(checked) => onUpdate(modelConfig.id, 'enableStream', checked)}
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* TTS模型的特殊配置 */}
         {modelConfig.modelType === 'tts' && (
-          <div className="space-y-2">
+          <div className="grid gap-3">
             <Label>{t('voice')}</Label>
             <Input
               value={modelConfig.voice || ''}
