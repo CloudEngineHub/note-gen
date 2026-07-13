@@ -18,10 +18,8 @@ import { Button } from '@/components/ui/button'
 import { McpToolCallCard } from './mcp-tool-call'
 import { AgentExecutionStatus } from './agent-execution-status'
 import { AgentPanelWithRag } from './agent-panel-with-rag'
-import { AgentChangesPanel } from './agent-changes-panel'
 import { ChatImages } from "./chat-images"
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { AgentChange } from '@/lib/agent/types'
 
 const BOTTOM_THRESHOLD = 24
 const USER_SCROLL_GRACE_MS = 300
@@ -372,17 +370,6 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
     }
   }, [chat.images])
 
-  const agentHistoryChanges = useMemo(() => {
-    if (!chat.agentHistory) return []
-
-    try {
-      const parsed = JSON.parse(chat.agentHistory) as { changes?: AgentChange[] }
-      return Array.isArray(parsed?.changes) ? parsed.changes : []
-    } catch {
-      return []
-    }
-  }, [chat.agentHistory])
-
   // 解析引用数据
   const quoteData = useMemo(() => {
     if (!chat.quoteData) return null
@@ -468,7 +455,7 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
                 ragSources={ragSources}
                 ragSourceDetails={ragSourceDetails}
                 agentHistoryJson={chat.agentHistory}
-                showChanges={false}
+                showChanges
               />
             )}
 
@@ -497,9 +484,6 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
 
             <ChatThinking chat={chat} />
             <ChatPreview text={content || ''} streaming={loading && isActiveAgentMessage} />
-            {!isGeneratingMessage && (
-              <AgentChangesPanel changes={isLiveAgentVisible ? agentState.changes || [] : agentHistoryChanges} />
-            )}
             {!isGeneratingMessage && (
               <MessageControl chat={chat}>
                 <MarkText chat={chat} />

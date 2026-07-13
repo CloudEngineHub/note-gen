@@ -11,9 +11,11 @@ import {
   Wrench,
 } from "lucide-react"
 import type { AgentChange, AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { AgentChangesPanel } from "./agent-changes-panel"
 import { AgentContextTray, type RagSourceDetail } from "./agent-context-tray"
 import { agentStatusText, formatAgentDuration, formatAgentToolName } from "./agent-display-utils"
+import ChatPreview from "./chat-preview"
 
 interface AgentRunTimelineProps {
   status?: AgentRunStatus
@@ -94,6 +96,38 @@ function shouldShowTraceEvent(event: AgentTraceEvent) {
 
 function filterTimelineEvents(events: AgentTraceEvent[]) {
   return events.filter(shouldShowTraceEvent)
+}
+
+function getModelResponseContent(event: AgentTraceEvent) {
+  if (
+    (event.type === "model_call" || event.type === "model_response") &&
+    typeof event.output === "string" &&
+    event.output.trim()
+  ) {
+    return event.output
+  }
+
+  return undefined
+}
+
+function formatProcessedDuration(duration?: number) {
+  if (duration === undefined) return ""
+  if (duration < 1000) return `${duration}ms`
+
+  const totalSeconds = Math.round(duration / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`
+  }
+
+  return `${seconds}s`
 }
 
 function formatTraceDetail(value: unknown) {
@@ -213,6 +247,7 @@ export function AgentRunTimeline({
   loadedSkills = [],
 }: AgentRunTimelineProps) {
   const [expandedEvents, setExpandedEvents] = React.useState<string[]>([])
+  const [processOpen, setProcessOpen] = React.useState(false)
 
   const events = React.useMemo(() => {
     if (traceEvents.length > 0) {
@@ -226,7 +261,7 @@ export function AgentRunTimeline({
   const [liveNow, setLiveNow] = React.useState(() => Date.now())
 
   React.useEffect(() => {
-    if (!hasRunningEvent) {
+    if (!isRunning && !hasRunningEvent) {
       return
     }
 
@@ -236,7 +271,7 @@ export function AgentRunTimeline({
     }, 100)
 
     return () => window.clearInterval(timer)
-  }, [hasRunningEvent])
+  }, [hasRunningEvent, isRunning])
 
   const toggleEvent = (id: string) => {
     setExpandedEvents((current) =>
@@ -252,9 +287,20 @@ export function AgentRunTimeline({
 
   const showStatusRow = (isRunning && !hasActiveVisibleEvent && status !== "idle") ||
     (events.length === 0 && (status === "failed" || status === "stopped"))
+  const durationEvents = traceEvents.length > 0 ? traceEvents : events
+  const processStartedAt = durationEvents.length > 0
+    ? Math.min(...durationEvents.map((event) => event.timestamp))
+    : undefined
+  const processFinishedAt = durationEvents.length > 0
+    ? Math.max(...durationEvents.map((event) => event.timestamp + (event.duration || 0)))
+    : undefined
+  const processDuration = processStartedAt === undefined
+    ? undefined
+    : Math.max(0, (isRunning ? liveNow : processFinishedAt || processStartedAt) - processStartedAt)
+  const processLabel = `已处理${processDuration === undefined ? "" : ` ${formatProcessedDuration(processDuration)}`}`
 
-  return (
-    <div className="flex flex-col gap-2">
+  const processContent = (
+    <div className="flex flex-col gap-2 pl-1">
       <AgentContextTray
         ragSources={ragSources}
         ragSourceDetails={ragSourceDetails}
@@ -266,8 +312,9 @@ export function AgentRunTimeline({
           {events.map((event) => {
             const expanded = expandedEvents.includes(event.id)
             const visibleMessage = shouldShowEventMessage(event) ? event.message : undefined
+            const modelResponseContent = getModelResponseContent(event)
             const inputDetail = compactTraceInput(event.input)
-            const outputDetail = compactTraceOutput(event, visibleMessage)
+            const outputDetail = modelResponseContent ? undefined : compactTraceOutput(event, visibleMessage)
             const hasDetails = Boolean(visibleMessage || inputDetail !== undefined || outputDetail !== undefined)
             const displayDuration = event.duration ?? (
               event.status === "running"
@@ -310,6 +357,12 @@ export function AgentRunTimeline({
                   )}
                 </button>
 
+                {modelResponseContent && (
+                  <div className="ml-6 border-l pl-3 pb-2 text-sm">
+                    <ChatPreview text={modelResponseContent} />
+                  </div>
+                )}
+
                 {expanded && hasDetails && (
                   <div className="ml-6 flex flex-col gap-2 border-l pl-3 pb-2 text-xs">
                     {visibleMessage && (
@@ -348,6 +401,24 @@ export function AgentRunTimeline({
       )}
 
       {showChanges && !isRunning && <AgentChangesPanel changes={changes} />}
+    </div>
+  )
+
+  return (
+    <div>
+      {isRunning ? processContent : (
+        <Collapsible open={processOpen} onOpenChange={setProcessOpen}>
+        <CollapsibleTrigger asChild>
+          <button type="button" className="group flex w-full items-center gap-2 py-1.5 text-left text-sm text-muted-foreground">
+            {statusIcon(status, isRunning)}
+            <span className="flex-1 truncate">{processLabel}</span>
+            <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
+          </button>
+        </CollapsibleTrigger>
+
+          <CollapsibleContent>{processContent}</CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   )
 }

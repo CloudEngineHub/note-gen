@@ -730,9 +730,6 @@ export class AgentRuntime {
           for (const toolCallDelta of delta.tool_calls || []) {
             if (!toolCallsStarted) {
               toolCallsStarted = true
-              if (candidateAnswerRendered) {
-                callbacks.onCandidateAnswerClear?.()
-              }
             }
 
             const index = toolCallDelta.index
@@ -794,12 +791,16 @@ export class AgentRuntime {
             : undefined
         )
         const responseTrace = recorder.update(modelTrace.id, {
+          type: 'model_response',
           title: assistantContent ? '模型响应' : toolUses.length > 0 ? '模型选择工具' : '模型思考',
           status: 'success',
           duration: Date.now() - modelTrace.timestamp,
           output: modelTraceOutput,
         })
         if (responseTrace) callbacks.onTrace?.(responseTrace)
+        if (toolCallsStarted && candidateAnswerRendered) {
+          callbacks.onCandidateAnswerClear?.()
+        }
         await agentEventBus.emit('after-model-call', { runId, content: assistantContent })
 
         if (toolUses.length === 0) {
