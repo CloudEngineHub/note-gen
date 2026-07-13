@@ -2022,6 +2022,10 @@
       "empty": {
         "title": "AIとの会話を開始",
         "subtitle": "チャットまたはエージェントモードでAIと対話",
+        "temporary": {
+          "title": "一時チャット",
+          "description": "このチャットを離れると、会話内容は消去されます"
+        },
         "currentModel": "現在のモデル",
         "currentPrompt": "現在のプロンプト",
         "currentMode": "会話モード",
@@ -2169,7 +2173,8 @@
           "loading": "読み込み中..."
         },
         "stopped": "对话已终止",
-        "newChat": "开始新对话"
+        "newChat": "新しいチャット",
+        "temporaryChat": "一時チャット"
       },
       "header": {
         "configApiKey": "API KEY の設定",

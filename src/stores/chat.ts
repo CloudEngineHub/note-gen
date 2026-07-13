@@ -130,6 +130,7 @@ interface ChatState {
   // 当前会话
   currentConversationId: number | null
   conversations: Conversation[]
+  isTemporaryConversation: boolean // 临时会话仅保存在内存中
 
   // 会话初始化和管理
   initConversations: () => Promise<void> // 初始化会话列表
@@ -139,7 +140,10 @@ interface ChatState {
   deleteConversation: (id: number) => Promise<void> // 删除会话
   toggleConversationPin: (id: number) => Promise<boolean> // 切换会话置顶状态
   startNewConversation: () => Promise<void> // 开始新对话（保存当前会话后创建新会话）
+  startTemporaryConversation: () => void // 开始不保存记录的临时会话
 }
+
+let nextTemporaryChatId = -1
 
 const useChatStore = create<ChatState>((set, get) => ({
   loading: false,
@@ -153,6 +157,11 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   maybeCondense: () => {
     const state = get()
+
+    // 临时会话不生成或保存压缩摘要
+    if (state.isTemporaryConversation) {
+      return
+    }
 
     // 防并发：已有压缩任务在执行，直接返回
     if (state._condenseLock) {
@@ -364,6 +373,7 @@ const useChatStore = create<ChatState>((set, get) => ({
   // 兼容旧代码：init 方法现在会初始化会话列表并切换到第一个会话
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   init: async (_tagId: number) => {
+    set({ isTemporaryConversation: false })
     await initChatsDb()
     // 先初始化会话列表
     await get().initConversations()
@@ -384,7 +394,18 @@ const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   insert: async (chat) => {
-    const { currentConversationId } = get()
+    const { currentConversationId, isTemporaryConversation } = get()
+
+    if (isTemporaryConversation) {
+      const data: Chat = {
+        ...chat,
+        id: nextTemporaryChatId--,
+        conversationId: undefined,
+        createdAt: Date.now(),
+      }
+      set({ chats: [...get().chats, data] })
+      return data
+    }
 
     // 确保有 conversationId，如果没有则创建新会话
     let conversationId = chat.conversationId || currentConversationId
@@ -458,7 +479,7 @@ const useChatStore = create<ChatState>((set, get) => ({
   },
   saveChat: async (chat, isSave = false) => {
     get().updateChat(chat)
-    if (isSave) {
+    if (isSave && !get().isTemporaryConversation) {
       await updateChat(chat)
     }
   },
@@ -466,6 +487,11 @@ const useChatStore = create<ChatState>((set, get) => ({
     const chats = get().chats
     const newChats = chats.filter(item => item.id !== id)
     set({ chats: newChats })
+
+    if (get().isTemporaryConversation) {
+      return
+    }
+
     await deleteChat(id)
 
     // 更新会话的消息数量
@@ -492,12 +518,17 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   // 兼容旧代码：clearChats 现在会清空当前会话的聊天记录
   clearChats: async (tagId) => {
+    const isTemporaryConversation = get().isTemporaryConversation
     set({ chats: [] })
     // 清空聊天记录时同步清理 Agent 状态
     get().resetAgentState()
     get().clearMcpToolCalls()
     get().clearPendingQuote()
     get().clearEditorSelectionQuote()
+
+    if (isTemporaryConversation) {
+      return
+    }
 
     // 更新会话的消息数量
     const { currentConversationId } = get()
@@ -520,7 +551,9 @@ const useChatStore = create<ChatState>((set, get) => ({
   },
 
   updateInsert: async (id) => {
-    await updateChatsInsertedById(id)
+    if (!get().isTemporaryConversation) {
+      await updateChatsInsertedById(id)
+    }
     const chats = get().chats
     const newChats = chats.map(item => {
       if (item.id === id) {
@@ -721,6 +754,7 @@ const useChatStore = create<ChatState>((set, get) => ({
   // === 新增：会话管理方法 ===
   currentConversationId: null,
   conversations: [],
+  isTemporaryConversation: false,
 
   initConversations: async () => {
     const { getAllConversations } = await import('@/db/conversations')
@@ -732,7 +766,7 @@ const useChatStore = create<ChatState>((set, get) => ({
     const { createConversation: createConv } = await import('@/db/conversations')
     const id = await createConv(title)
     // 设置为当前会话并刷新会话列表
-    set({ currentConversationId: id })
+    set({ currentConversationId: id, isTemporaryConversation: false })
     await get().initConversations()
     return id
   },
@@ -744,7 +778,13 @@ const useChatStore = create<ChatState>((set, get) => ({
     // 然后加载消息
     const { getChatsByConversation } = await import('@/db/chats')
     const data = await getChatsByConversation(id)
-    set({ currentConversationId: id, chats: data, pendingQuote: null, editorSelectionQuote: null })
+    set({
+      currentConversationId: id,
+      chats: data,
+      isTemporaryConversation: false,
+      pendingQuote: null,
+      editorSelectionQuote: null,
+    })
     // 刷新会话列表以确保 UI 显示最新的会话状态
     await get().initConversations()
   },
@@ -772,6 +812,7 @@ const useChatStore = create<ChatState>((set, get) => ({
         set({
           currentConversationId: null,
           chats: [],
+          isTemporaryConversation: false,
           pendingQuote: null,
           editorSelectionQuote: null,
           agentAutoApproveConversationId: null,
@@ -815,12 +856,27 @@ const useChatStore = create<ChatState>((set, get) => ({
     set({
       currentConversationId: null,
       chats: [],
+      isTemporaryConversation: false,
       pendingQuote: null,
       editorSelectionQuote: null,
       agentAutoApproveConversationId: null,
       agentAutoApproveRuntimeSkillId: null
     })
     // 清空 Agent 状态
+    get().resetAgentState()
+    get().clearMcpToolCalls()
+  },
+
+  startTemporaryConversation: () => {
+    set({
+      currentConversationId: null,
+      chats: [],
+      isTemporaryConversation: true,
+      pendingQuote: null,
+      editorSelectionQuote: null,
+      agentAutoApproveConversationId: null,
+      agentAutoApproveRuntimeSkillId: null,
+    })
     get().resetAgentState()
     get().clearMcpToolCalls()
   },

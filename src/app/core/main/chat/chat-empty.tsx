@@ -3,8 +3,15 @@
 import { useTranslations } from 'next-intl'
 import useChatStore from '@/stores/chat'
 import { useMemo, useState, useEffect } from 'react'
-import { Trash2, FileEdit, FileText, Lightbulb, ArrowRight, MessageCircle } from 'lucide-react'
+import { Trash2, FileEdit, FileText, Lightbulb, ArrowRight, MessageCircle, MessageSquareDashed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import emitter from '@/lib/emitter'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -30,7 +37,8 @@ export default function ChatEmpty() {
     conversations,
     currentConversationId,
     switchConversation,
-    deleteConversation
+    deleteConversation,
+    isTemporaryConversation,
   } = useChatStore()
 
   const [aiPrompts, setAiPrompts] = useState<QuickPrompt[]>([])
@@ -89,6 +97,20 @@ export default function ChatEmpty() {
 
   const handleDelete = async (id: number) => {
     await deleteConversation(id)
+  }
+
+  if (isTemporaryConversation) {
+    return (
+      <Empty className="absolute inset-0 rounded-none">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <MessageSquareDashed />
+          </EmptyMedia>
+          <EmptyTitle>{t('temporary.title')}</EmptyTitle>
+          <EmptyDescription>{t('temporary.description')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
   }
 
   return (

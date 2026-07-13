@@ -2015,6 +2015,10 @@
       "empty": {
         "title": "Iniciar Conversa com IA",
         "subtitle": "Use o modo Chat ou Agent para interagir com IA",
+        "temporary": {
+          "title": "Chat temporário",
+          "description": "Esta conversa será apagada quando você sair"
+        },
         "currentModel": "Modelo Atual",
         "currentPrompt": "Prompt Atual",
         "noModel": "Nenhum modelo definido",
@@ -2242,7 +2246,8 @@
           "loading": "Carregando..."
         },
         "stopped": "A conversa foi encerrada",
-        "newChat": "开始新对话"
+        "newChat": "Novo Chat",
+        "temporaryChat": "Chat temporário"
       },
       "header": {
         "configApiKey": "Configurar CHAVE DE API",

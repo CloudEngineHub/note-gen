@@ -2064,6 +2064,10 @@
       "empty": {
         "title": "Start chatting with AI",
         "subtitle": "Interact with AI using Chat or Agent mode",
+        "temporary": {
+          "title": "Temporary Chat",
+          "description": "This conversation is cleared when you leave"
+        },
         "currentModel": "Current Model",
         "currentPrompt": "Current Prompt",
         "currentMode": "Conversation Mode",
@@ -2215,6 +2219,7 @@
           "placeholder": "Search prompts"
         },
         "newChat": "New Chat",
+        "temporaryChat": "Temporary Chat",
         "mcp": {
           "tooltip": "MCP server"
         },

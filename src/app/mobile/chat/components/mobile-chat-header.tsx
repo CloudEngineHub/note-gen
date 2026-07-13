@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { History, MessageSquarePlus, Search, Trash2 } from "lucide-react"
+import { History, MessageSquareDashed, MessageSquarePlus, Search, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
@@ -30,10 +30,13 @@ function formatRelativeTime(timestamp: number, locale: string): string {
 export function MobileChatHeader() {
   const {
     startNewConversation,
+    startTemporaryConversation,
     conversations,
     currentConversationId,
+    isTemporaryConversation,
     switchConversation,
     deleteConversation,
+    chats,
     loading,
   } = useChatStore()
   const { language } = useSettingStore()
@@ -45,11 +48,13 @@ export function MobileChatHeader() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const hasCurrentMessages = conversations.some(
-    (conversation) =>
-      conversation.id === currentConversationId && conversation.messageCount > 0
-  )
-  const disableNewChat = !hasCurrentMessages || loading
+  const hasCurrentMessages = isTemporaryConversation
+    ? chats.length > 0
+    : conversations.some(
+      (conversation) =>
+        conversation.id === currentConversationId && conversation.messageCount > 0
+    )
+  const disableNewChat = (!hasCurrentMessages && !isTemporaryConversation) || loading
 
   const filteredConversations = useMemo(() => {
     return conversations
@@ -145,6 +150,16 @@ export function MobileChatHeader() {
               </div>
             </DrawerContent>
           </Drawer>
+
+          <Button
+            variant={isTemporaryConversation ? "secondary" : "ghost"}
+            size="icon"
+            aria-label={tInput("temporaryChat")}
+            onClick={startTemporaryConversation}
+            disabled={loading || isTemporaryConversation}
+          >
+            <MessageSquareDashed />
+          </Button>
 
           <Button
             variant="ghost"

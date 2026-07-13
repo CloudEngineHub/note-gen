@@ -2064,6 +2064,10 @@
       "empty": {
         "title": "开始与 AI 对话",
         "subtitle": "使用 Chat 或 Agent 模式与 AI 互动",
+        "temporary": {
+          "title": "临时会话",
+          "description": "离开后，本次对话内容将自动清空"
+        },
         "currentModel": "当前模型",
         "currentPrompt": "当前 Prompt",
         "currentMode": "对话模式",
@@ -2133,6 +2137,7 @@
           "placeholder": "搜索 Prompt"
         },
         "newChat": "开始新对话",
+        "temporaryChat": "临时会话",
         "chatLanguage": {
           "tooltip": "选择对话语言",
           "placeholder": "搜索语言"

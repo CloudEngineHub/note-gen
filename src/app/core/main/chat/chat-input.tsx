@@ -171,6 +171,7 @@ export const ChatInput = React.memo(function ChatInput() {
     editorSelectionQuote,
     clearEditorSelectionQuote,
     agentState,
+    isTemporaryConversation,
   } = useChatStore()
   const { marks, trashState } = useMarkStore()
   const { activeFilePath } = useArticleStore()
@@ -223,7 +224,7 @@ export const ChatInput = React.memo(function ChatInput() {
 
   // 添加输入到历史记录
   function addToHistory(input: string) {
-    if (!input.trim()) return
+    if (!input.trim() || isTemporaryConversation) return
     
     const newHistory = [input, ...(inputHistory || []).filter(item => item !== input)]
     // 限制历史记录数量为50条

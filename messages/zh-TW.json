@@ -2022,6 +2022,10 @@
       "empty": {
         "title": "開始與 AI 對話",
         "subtitle": "使用 Chat 或 Agent 模式與 AI 互動",
+        "temporary": {
+          "title": "臨時會話",
+          "description": "離開後，本次對話內容將自動清除"
+        },
         "currentModel": "當前模型",
         "currentPrompt": "當前 Prompt",
         "currentMode": "對話模式",
@@ -2169,7 +2173,8 @@
         "mcp": {
           "tooltip": "MCP 服务器"
         },
-        "newChat": "开始新对话"
+        "newChat": "開始新對話",
+        "temporaryChat": "臨時會話"
       },
       "header": {
         "configApiKey": "配置 API KEY",

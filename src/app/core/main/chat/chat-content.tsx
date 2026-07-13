@@ -20,6 +20,7 @@ import { AgentExecutionStatus } from './agent-execution-status'
 import { AgentPanelWithRag } from './agent-panel-with-rag'
 import { ChatImages } from "./chat-images"
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
 const BOTTOM_THRESHOLD = 24
 const USER_SCROLL_GRACE_MS = 300
@@ -222,8 +223,18 @@ const ChatContent = React.memo(function ChatContent() {
     return true
   }, [loading, agentState.isRunning, chats])
 
-  return <div ref={wrapperRef} id="chats-wrapper" className="relative flex min-h-0 flex-1 flex-col items-end gap-6 overflow-y-auto overflow-x-hidden w-full p-4 [overflow-anchor:none]">
-    <div ref={contentRef} className="w-full flex flex-col items-end gap-6">
+  return <div
+    ref={wrapperRef}
+    id="chats-wrapper"
+    className="relative flex min-h-0 flex-1 flex-col items-end gap-6 overflow-y-auto overflow-x-hidden w-full p-4 [overflow-anchor:none]"
+  >
+    <div
+      ref={contentRef}
+      className={cn(
+        "relative w-full flex flex-col items-end gap-6",
+        chats.length === 0 && "flex-1"
+      )}
+    >
       {
         chats.length ? chats.map((chat) => {
           return <Message key={chat.id} chat={chat} />
