@@ -6,6 +6,10 @@
     ·
     <a href="https://notegen.top/en/download">Download</a>
     ·
+    <a href="https://notegen.top/business">Business</a>
+    ·
+    <a href="https://notegen.top/donate">Donate</a>
+    ·
     <a href="https://github.com/codexu/note-gen/discussions">Discussions</a>
   </p>
   <p>
