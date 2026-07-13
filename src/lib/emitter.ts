@@ -116,6 +116,14 @@ interface Events {
   'editor-insert': { content: string; position?: number; resolve: (result: { success: boolean; insertedLength: number; newCursorPosition?: number }) => void };
   'editor-undo': void;
   'editor-redo': void;
+  'editor-agent-diff-preview': {
+    originalContent: string;
+    modifiedContent: string;
+    filePath?: string;
+    from?: number;
+    to?: number;
+  };
+  'editor-agent-diff-clear': void;
   'mobile-editor-toggle-outline': void;
   'editor-can-undo-redo': { resolve: (can: { undo: boolean; redo: boolean }) => void };
   'editor-undo-redo-changed': { undo: boolean; redo: boolean };

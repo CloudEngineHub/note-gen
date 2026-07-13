@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { DiffViewer } from "@/components/ui/diff-viewer"
 import { formatConfirmationPreview } from "@/lib/agent/tool-confirmation-display"
+import emitter from "@/lib/emitter"
 import { formatAgentToolName } from "./agent-display-utils"
 
 export interface PendingAgentConfirmation {
@@ -15,6 +16,8 @@ export interface PendingAgentConfirmation {
   originalContent?: string
   modifiedContent?: string
   filePath?: string
+  from?: number
+  to?: number
   canApproveForSession?: boolean
   sessionApprovalType?: "write" | "runtime-script-skill"
   sessionApprovalSkillId?: string
@@ -33,6 +36,28 @@ export function AgentApprovalPanel({
 }: AgentApprovalPanelProps) {
   const t = useTranslations()
   const [expanded, setExpanded] = React.useState(false)
+
+  React.useEffect(() => {
+    if (
+      pendingConfirmation?.originalContent === undefined ||
+      pendingConfirmation.modifiedContent === undefined
+    ) {
+      emitter.emit("editor-agent-diff-clear")
+      return
+    }
+
+    emitter.emit("editor-agent-diff-preview", {
+      originalContent: pendingConfirmation.originalContent,
+      modifiedContent: pendingConfirmation.modifiedContent,
+      filePath: pendingConfirmation.filePath,
+      from: pendingConfirmation.from,
+      to: pendingConfirmation.to,
+    })
+
+    return () => {
+      emitter.emit("editor-agent-diff-clear")
+    }
+  }, [pendingConfirmation])
 
   const approvalPreview = React.useMemo(() => {
     if (!pendingConfirmation) return null

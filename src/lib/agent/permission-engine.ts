@@ -39,6 +39,7 @@ const CURRENT_MARKDOWN_PRESERVE_PATTERN = /(不要|别|无需|禁止|不需要).
 const AUTHORING_INTENT_PATTERN = /(撰写|起草|编写|创作|写.{0,24}(文章|笔记|随笔|文档|报告|总结|方案|教程|故事|诗|Markdown|md|文件|内容))/i
 const WRITE_INTENT_PATTERN = /(修改|改写|编辑|润色|替换|插入|追加|添加|补充|删除|移除|创建|新建|保存|写入|更新|重命名|移动|复制|生成.{0,8}文件|整理(成|到|为|进)|记住|记录|应用|发布|发送|执行|运行|安装|部署|改(成|为|得|好|一下)|把.{0,20}(改|换|替换|写成|变成|调整|优化|润色|翻译(成|为|到)?)|将.{0,20}翻译(成|为|到)?|(?:当前|这篇|本文|笔记|文件|文档|内容|全文|全部|整篇).{0,16}翻译(成|为|到)?|让.{0,20}更(正式|专业|清晰|自然|流畅|简洁|准确)|调整|优化|完善|提升|modify|edit|change|rewrite|replace|insert|append|add|delete|remove|create|save|write|update|rename|move|copy|translate(?: .{0,20})? (?:to|into)|remember|record|apply|publish|send|execute|run|install|deploy)/i
 const STANDALONE_TRANSLATION_WRITE_PATTERN = /^(?:(?:请|帮我|给我|麻烦(?:你)?)\s*)?(?:翻译|译)(?:成|为|到)\s*(?:[\u4e00-\u9fff]{1,8}(?:文|语)|[a-z][a-z -]{1,30})\s*[。！!]*$/i
+const SELECTED_TRANSLATION_WRITE_PATTERN = /(?:这句|这句话|这段|这部分|这行|选中(?:的)?(?:内容|文本)?|所选(?:的)?(?:内容|文本)?|引用(?:的)?(?:内容|文本)?).{0,12}(?:翻译|译)(?:成|为|到)/i
 const OUTPUT_FILE_INTENT_PATTERN = /(生成|创建|新建|输出).{0,16}(pptx|docx|xlsx|pdf|图片|图像|文件|演示文稿|幻灯片|deck|slides|presentation)|create.{0,16}(pptx|docx|xlsx|pdf|image|file|deck|slides|presentation)|generate.{0,16}(pptx|docx|xlsx|pdf|image|file|deck|slides|presentation)/i
 
 function stripPathLiterals(userInput: string) {
@@ -102,6 +103,13 @@ export function hasEffectiveWriteIntent(
   }
 
   if (hasExplicitWriteIntent(userInput)) {
+    return true
+  }
+
+  if (
+    context?.currentQuote &&
+    (SELECTED_TRANSLATION_WRITE_PATTERN.test(userInput) || STANDALONE_TRANSLATION_WRITE_PATTERN.test(userInput))
+  ) {
     return true
   }
 

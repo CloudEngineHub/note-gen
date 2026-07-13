@@ -1,12 +1,13 @@
 import type OpenAI from 'openai'
 import { createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
+import { estimateTokens } from '@/lib/ai/token-counter'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
-import { AgentPermissionEngine, hasAuthoringIntent, hasEffectiveWriteIntent, hasExplicitWriteIntent } from './permission-engine'
+import { AgentPermissionEngine, hasAuthoringIntent, hasEffectiveWriteIntent } from './permission-engine'
 import { AgentPromptAssembler } from './prompt-assembler'
 import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
-import { agentToolRegistry } from './tool-registry'
+import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
 import { agentDebugLog, previewText } from './debug-log'
 import type {
   AgentChange,
@@ -164,6 +165,26 @@ function getForcedWriteTool(context: AgentContextSnapshot): string | undefined {
   return undefined
 }
 
+function hasDocumentWideBatchEditorIntent(context: AgentContextSnapshot) {
+  if (context.currentQuote || !isCurrentEditorWriteIntent(context)) {
+    return false
+  }
+
+  const hasBatchScope = /(全文|整篇|整个(?:文档|文件|笔记|文章)|全部|全都|所有|每一处|各处|多处|都)/i.test(context.userInput)
+  const hasBatchAction = /(翻译|译成|替换|修改|改写|重写|润色|统一|转换|删除|移除|translate|replace|rewrite|edit|remove)/i.test(context.userInput)
+
+  return hasBatchScope && hasBatchAction
+}
+
+function forceToolChoice(toolName: string): OpenAI.Chat.ChatCompletionToolChoiceOption {
+  return {
+    type: 'function',
+    function: {
+      name: toolName,
+    },
+  }
+}
+
 function requiresSelectedContext(userInput: string) {
   return /(这段|这句话|这行|选中|所选|引用|这部分|当前选区|selected|selection|this text|this paragraph|this line)/i.test(userInput)
 }
@@ -246,7 +267,7 @@ function hasMultipleFileUpdateIntent(userInput: string) {
   const hasUpdateAction = /(改成|改为|更新|翻译|转换|润色|重写|改写|替换|编辑|英文版|中文版|\b(?:update|translate|convert|rewrite|replace|edit)\b)/i.test(userInput)
   const hasMultipleReference = getRequestedFileCount(userInput) !== undefined ||
     /(多篇|几篇|逐篇|每篇)/i.test(userInput) ||
-    /(?:这些|上述|全部|全都|所有).{0,8}(?:笔记|文件|文档|文章|Markdown|md)|(?:笔记|文件|文档|文章).{0,8}(?:这些|上述|全部|全都|所有|分别)/i.test(userInput)
+    /(?:这些|上述|全部|全都|所有).{0,8}(?:笔记|文件|文档|文章|Markdown|md)|(?:笔记|文件|文档|文章).{0,8}(?:这些|上述|分别)/i.test(userInput)
 
   return hasUpdateAction && hasMultipleReference
 }
@@ -505,12 +526,7 @@ function buildToolChoice(context: AgentContextSnapshot): OpenAI.Chat.ChatComplet
     return 'auto'
   }
 
-  return {
-    type: 'function',
-    function: {
-      name: forcedTool,
-    },
-  }
+  return forceToolChoice(forcedTool)
 }
 
 function getForcedActionTool(context: AgentContextSnapshot) {
@@ -826,7 +842,9 @@ export class AgentRuntime {
 
     const client = await createOpenAIClient(aiConfig)
     const openAITools = agentToolRegistry.toOpenAITools(tools)
-    const toolChoice = buildToolChoice(context)
+    const baseToolChoice = buildToolChoice(context)
+    const documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
+    let documentWideSnapshotRead = false
     let finalContent = ''
     let missingWriteToolRepairCount = 0
     let invalidQuotedWriteRepairCount = 0
@@ -845,7 +863,7 @@ export class AgentRuntime {
     let activeModelStartedAt = 0
     let activeModelReasoning = ''
     let activeModelContent = ''
-    let activeModelStreamedCharacterCount = 0
+    let activeModelStreamedTokenCount = 0
 
     const finalizeInterruptedModelTrace = (status: 'success' | 'error', title: string) => {
       if (!activeModelTraceId) {
@@ -859,7 +877,7 @@ export class AgentRuntime {
         duration: Date.now() - activeModelStartedAt,
         output: activeModelContent || undefined,
         reasoning: activeModelReasoning || undefined,
-        streamedCharacterCount: activeModelStreamedCharacterCount,
+        streamedTokenCount: activeModelStreamedTokenCount,
       })
       if (interruptedTrace) callbacks.onTrace?.(interruptedTrace)
 
@@ -867,7 +885,7 @@ export class AgentRuntime {
       activeModelStartedAt = 0
       activeModelReasoning = ''
       activeModelContent = ''
-      activeModelStreamedCharacterCount = 0
+      activeModelStreamedTokenCount = 0
     }
 
     try {
@@ -902,15 +920,18 @@ export class AgentRuntime {
           title: '模型思考',
           status: 'running',
           message: `第 ${iteration} 轮`,
-          streamedCharacterCount: 0,
+          streamedTokenCount: 0,
         })
         activeModelTraceId = modelTrace.id
         activeModelStartedAt = modelTrace.timestamp
         activeModelReasoning = ''
         activeModelContent = ''
-        activeModelStreamedCharacterCount = 0
+        activeModelStreamedTokenCount = 0
         callbacks.onTrace?.(modelTrace)
 
+        const toolChoice = documentWideBatchEditorIntent
+          ? forceToolChoice(documentWideSnapshotRead ? 'editor_apply_transaction' : 'editor_get_state')
+          : baseToolChoice
         const stream = await this.recoveryManager.withRetry(() =>
           client.chat.completions.create(withFastAiRequestOptions({
             model: aiConfig?.model || '',
@@ -930,7 +951,8 @@ export class AgentRuntime {
         let toolCallsStarted = false
         let candidateAnswerRendered = false
         let assistantReasoning = ''
-        let streamedCharacterCount = 0
+        let streamedText = ''
+        let streamedTokenCount = 0
         let lastModelProgressTraceAt = 0
         const streamedToolCalls = new Map<number, StreamingToolCallAccumulator>()
 
@@ -953,12 +975,12 @@ export class AgentRuntime {
           const reasoningDelta = extendedDelta.reasoning_content || extendedDelta.reasoning
           if (typeof reasoningDelta === 'string') {
             assistantReasoning += reasoningDelta
-            streamedCharacterCount += reasoningDelta.length
+            streamedText += reasoningDelta
             activeModelReasoning = assistantReasoning
           }
           if (typeof delta.content === 'string' && delta.content) {
             assistantContent += delta.content
-            streamedCharacterCount += delta.content.length
+            streamedText += delta.content
             activeModelContent = assistantContent
             if (!toolCallsStarted && assistantContent.trim()) {
               candidateAnswerRendered = true
@@ -990,28 +1012,31 @@ export class AgentRuntime {
             }
             if (toolCallDelta.function?.name) {
               current.function.name += toolCallDelta.function.name
-              streamedCharacterCount += toolCallDelta.function.name.length
+              streamedText += toolCallDelta.function.name
             }
             if (toolCallDelta.function?.arguments) {
               current.function.arguments += toolCallDelta.function.arguments
-              streamedCharacterCount += toolCallDelta.function.arguments.length
+              streamedText += toolCallDelta.function.arguments
             }
 
             streamedToolCalls.set(index, current)
           }
 
-          activeModelStreamedCharacterCount = streamedCharacterCount
           const now = Date.now()
-          if (streamedCharacterCount > 0 && now - lastModelProgressTraceAt >= 100) {
+          if (streamedText && now - lastModelProgressTraceAt >= 100) {
+            streamedTokenCount = estimateTokens(streamedText)
+            activeModelStreamedTokenCount = streamedTokenCount
             lastModelProgressTraceAt = now
             const progressTrace = recorder.update(modelTrace.id, {
               output: assistantContent || undefined,
               reasoning: assistantReasoning || undefined,
-              streamedCharacterCount,
+              streamedTokenCount,
             })
             if (progressTrace) callbacks.onTrace?.(progressTrace)
           }
         }
+        streamedTokenCount = estimateTokens(streamedText)
+        activeModelStreamedTokenCount = streamedTokenCount
         assistantContent = assistantContent.trim() ? assistantContent : ''
         finalContent = assistantContent || finalContent
         const toolUses = toToolCallList(streamedToolCalls)
@@ -1049,14 +1074,14 @@ export class AgentRuntime {
           duration: Date.now() - modelTrace.timestamp,
           output: modelTraceOutput,
           reasoning: assistantReasoning || undefined,
-          streamedCharacterCount,
+          streamedTokenCount,
         })
         if (responseTrace) callbacks.onTrace?.(responseTrace)
         activeModelTraceId = undefined
         activeModelStartedAt = 0
         activeModelReasoning = ''
         activeModelContent = ''
-        activeModelStreamedCharacterCount = 0
+        activeModelStreamedTokenCount = 0
         if (toolCallsStarted && candidateAnswerRendered) {
           callbacks.onCandidateAnswerClear?.()
         }
@@ -1452,9 +1477,12 @@ export class AgentRuntime {
             })
             callbacks.onTrace?.(approvalTrace)
 
-            const approved = await callbacks.requestConfirmation?.(tool.name, args, {
-              previewParams: args,
-            })
+            const approvalPreview = await buildEditorApprovalPreview(tool.name, args)
+            const approved = await callbacks.requestConfirmation?.(
+              tool.name,
+              args,
+              approvalPreview ?? { previewParams: args }
+            )
 
             agentDebugLog('approval_result', {
               runId,
@@ -1660,6 +1688,37 @@ export class AgentRuntime {
           if (result.ok && isMutatingTool(tool)) {
             writeActionCompleted = true
             readToolResultHistory.clear()
+          }
+
+          if (result.ok && documentWideBatchEditorIntent && tool.name === 'editor_get_state') {
+            documentWideSnapshotRead = true
+          }
+
+          if (result.ok && documentWideBatchEditorIntent && tool.name === 'editor_apply_transaction') {
+            finalContent = '已在一次批量操作中完成当前文档的全部修改。'
+            agentDebugLog('document_wide_batch_write_completed', {
+              runId,
+              operationCount: Array.isArray(args.operations) ? args.operations.length : 0,
+            })
+            callbacks.onStatus?.('completed')
+            callbacks.onFinalAnswerRender?.(finalContent)
+            const finalTrace = recorder.add({
+              type: 'final',
+              title: '完成批量修改',
+              status: 'success',
+              message: finalContent,
+            })
+            callbacks.onTrace?.(finalTrace)
+
+            return {
+              runId,
+              content: finalContent,
+              stopped: false,
+              steps,
+              toolCalls,
+              changes,
+              trace: recorder.all(),
+            }
           }
 
           if (context.multipleFileCreation && tool.name === 'note_create_file') {

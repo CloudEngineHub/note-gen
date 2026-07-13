@@ -137,6 +137,7 @@ export interface AgentTraceEvent {
   output?: unknown
   message?: string
   reasoning?: string
+  streamedTokenCount?: number
   streamedCharacterCount?: number
 }
 
@@ -151,6 +152,8 @@ export interface AgentApprovalRequest {
   originalContent?: string
   modifiedContent?: string
   filePath?: string
+  from?: number
+  to?: number
   canApproveForSession?: boolean
   sessionApprovalType?: 'write' | 'runtime-script-skill'
   sessionApprovalSkillId?: string
@@ -183,6 +186,8 @@ export interface AgentRuntimeCallbacks {
       originalContent?: string
       modifiedContent?: string
       filePath?: string
+      from?: number
+      to?: number
     }
   ) => Promise<boolean>
 }
@@ -266,6 +271,8 @@ export interface AgentState {
     originalContent?: string
     modifiedContent?: string
     filePath?: string
+    from?: number
+    to?: number
     canApproveForSession?: boolean
     sessionApprovalType?: 'write' | 'runtime-script-skill'
     sessionApprovalSkillId?: string

@@ -212,6 +212,121 @@ function applyLineOperation(lines: string[], operation: EditorTransactionOperati
   }
 }
 
+function applyEditorTransactionOperations(
+  before: string,
+  operations: EditorTransactionOperation[]
+) {
+  let after = before
+
+  for (const operation of operations) {
+    if (operation.type === 'replace_range') {
+      const from = Math.max(0, operation.from ?? 0)
+      const to = Math.max(from, operation.to ?? from)
+      after = `${after.slice(0, from)}${editorOperationContent(operation)}${after.slice(to)}`
+      continue
+    }
+
+    const lines = after.split('\n')
+    applyLineOperation(lines, operation)
+    after = lines.join('\n')
+  }
+
+  return after
+}
+
+export interface EditorApprovalPreview {
+  previewParams: Record<string, unknown>
+  originalContent: string
+  modifiedContent: string
+  filePath?: string
+  from?: number
+  to?: number
+}
+
+export async function buildEditorApprovalPreview(
+  toolName: string,
+  input: Record<string, unknown>
+): Promise<EditorApprovalPreview | undefined> {
+  if (!['editor_apply_transaction', 'editor_replace_lines', 'editor_replace_range'].includes(toolName)) {
+    return undefined
+  }
+
+  if (toolName === 'editor_replace_range') {
+    const from = typeof input.from === 'number' ? Math.max(0, input.from) : undefined
+    const to = typeof input.to === 'number' && from !== undefined
+      ? Math.max(from, input.to)
+      : undefined
+    const replacement = typeof input.content === 'string' ? input.content : undefined
+    if (from === undefined || to === undefined || replacement === undefined) {
+      return undefined
+    }
+
+    const selectionResult = await getEditorSelectionTool.execute({})
+    const selection = selectionResult.data && typeof selectionResult.data === 'object'
+      ? selectionResult.data as { text?: unknown; from?: unknown; to?: unknown }
+      : undefined
+    const selectedText = selection?.from === from && selection?.to === to && typeof selection.text === 'string'
+      ? selection.text
+      : ''
+
+    return {
+      previewParams: input,
+      originalContent: selectedText,
+      modifiedContent: replacement,
+      filePath: useArticleStore.getState().activeFilePath || (
+        typeof input.filePath === 'string' ? input.filePath : undefined
+      ),
+      from,
+      to,
+    }
+  }
+
+  const stateResult = await getEditorContentTool.execute({})
+  if (!stateResult.success || !stateResult.data || typeof stateResult.data !== 'object') {
+    return undefined
+  }
+
+  const state = stateResult.data as { markdown?: unknown }
+  if (typeof state.markdown !== 'string') {
+    return undefined
+  }
+
+  const before = state.markdown
+  let after = before
+
+  if (toolName === 'editor_apply_transaction') {
+    const transaction = input as unknown as EditorTransactionInput
+    if (!Array.isArray(transaction.operations) || transaction.operations.length === 0) {
+      return undefined
+    }
+    after = applyEditorTransactionOperations(before, transaction.operations)
+  } else if (toolName === 'editor_replace_lines') {
+    const startLine = typeof input.startLine === 'number' ? input.startLine : 1
+    const endLine = typeof input.endLine === 'number' ? input.endLine : startLine
+    const replacement = typeof input.replaceContent === 'string' ? input.replaceContent : ''
+    const lines = before.split('\n')
+    lines.splice(
+      Math.max(0, startLine - 1),
+      Math.max(0, endLine - startLine + 1),
+      ...replacement.split('\n')
+    )
+    after = lines.join('\n')
+  }
+
+  if (after === before) {
+    return undefined
+  }
+
+  return {
+    previewParams: input,
+    originalContent: before,
+    modifiedContent: after,
+    filePath: useArticleStore.getState().activeFilePath || (
+      typeof input.filePath === 'string' ? input.filePath : undefined
+    ),
+  }
+}
+
 async function executeEditorTransaction(input: Record<string, unknown>): Promise<AgentToolResult> {
   const transaction = input as unknown as EditorTransactionInput
   if (!Array.isArray(transaction.operations) || transaction.operations.length === 0) {
@@ -233,20 +348,7 @@ async function executeEditorTransaction(input: Record<string, unknown>): Promise
     version?: number
   }
   const before = state.markdown || ''
-  let after = before
-
-  for (const operation of transaction.operations) {
-    if (operation.type === 'replace_range') {
-      const from = Math.max(0, operation.from ?? 0)
-      const to = Math.max(from, operation.to ?? from)
-      after = `${after.slice(0, from)}${editorOperationContent(operation)}${after.slice(to)}`
-      continue
-    }
-
-    const lines = after.split('\n')
-    applyLineOperation(lines, operation)
-    after = lines.join('\n')
-  }
+  const after = applyEditorTransactionOperations(before, transaction.operations)
 
   if (after === before) {
     return {
@@ -531,7 +633,7 @@ async function executeStructuralToolWithChange(
 const editorApplyTransactionTool: AgentTool = {
   name: 'editor_apply_transaction',
   title: '应用编辑器事务',
-  description: 'Apply one or more precise edits to the current Markdown editor using the latest editor snapshot.',
+  description: 'Apply one or more precise edits to the current Markdown editor using the latest editor snapshot. For document-wide or multi-location changes, include every edit in this single operations array so the user receives one combined preview and approval.',
   category: 'editor',
   risk: 'editor-write',
   inputSchema: {

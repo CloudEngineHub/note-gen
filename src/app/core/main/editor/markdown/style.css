@@ -19,6 +19,29 @@
   color: hsl(var(--foreground));
 }
 
+.tiptap-editor .ProseMirror .agent-diff-preview-removed {
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, hsl(var(--destructive)) 18%, transparent);
+  color: hsl(var(--destructive));
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.tiptap-editor .ProseMirror .agent-diff-preview-inserted {
+  display: block;
+  width: fit-content;
+  margin-block: 0.25rem;
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  box-decoration-break: clone;
+  color: #15803d;
+  white-space: pre-wrap;
+}
+
+.dark .tiptap-editor .ProseMirror .agent-diff-preview-inserted {
+  color: #86efac;
+}
+
 .tiptap-editor.tiptap-editor-no-inset .ProseMirror {
   padding: 0;
 }

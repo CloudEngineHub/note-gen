@@ -198,6 +198,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       originalContent?: string
       modifiedContent?: string
       filePath?: string
+      from?: number
+      to?: number
     }
   ): Promise<boolean> => {
     const tool = getToolByName(toolName)
@@ -627,7 +629,9 @@ ${fullContent}
 
 ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才允许编辑**。
 
-如果用户是在提问、解释、总结、分析、翻译、润色建议、代码说明，应该直接基于这段引用内容回答，**不要调用任何编辑工具**。
+如果用户是在提问、解释、总结、分析、询问译法、润色建议、代码说明，应该直接基于这段引用内容回答，**不要调用任何编辑工具**。
+
+如果用户明确说“这句/这段/选中内容翻译成某种语言”，这是编辑请求，必须直接使用 editor_replace_range；已有 from/to 已足够，禁止再调用 editor_get_state 或 editor_get_selection。
 
 **🚨 当且仅当用户明确要求修改时，必须精确替换用户选中的范围**: 当前引用内容来自编辑器选区，必须优先使用 editor_replace_range，只替换这段选中的内容：
 - from: ${from}
@@ -663,7 +667,9 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 - 禁止获取整个文档后再重写整篇
 - 禁止把 startLine/endLine 擅自改成 1/1` : hasValidLineNumbers ? `**仅在用户明确要求修改/改写/补充/插入时才允许编辑**。
 
-如果用户是在提问、解释、总结、分析、翻译、润色建议、代码说明，应该直接基于这段引用内容回答，**不要调用任何编辑工具**。
+如果用户是在提问、解释、总结、分析、询问译法、润色建议、代码说明，应该直接基于这段引用内容回答，**不要调用任何编辑工具**。
+
+如果用户明确说“这句/这段/选中内容翻译成某种语言”，这是编辑请求，必须直接使用 editor_replace_lines；已有行号已足够，禁止再调用 editor_get_state 或 editor_get_selection。
 
 **🚨 当且仅当用户明确要求修改时，必须使用行号修改**: 当用户引用内容并要求修改时，你必须使用 editor_replace_lines，传入精确的行号：
 - 单行修改: startLine: ${startLine}, endLine: ${endLine}

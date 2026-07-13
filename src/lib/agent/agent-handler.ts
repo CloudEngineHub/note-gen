@@ -24,6 +24,8 @@ export interface AgentHandlerConfig {
       originalContent?: string
       modifiedContent?: string
       filePath?: string
+      from?: number
+      to?: number
     }
   ) => Promise<boolean>
   currentQuote?: {

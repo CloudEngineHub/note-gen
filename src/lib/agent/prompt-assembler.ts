@@ -60,7 +60,7 @@ function formatActiveFile(context: AgentContextSnapshot) {
     '## Current Open File',
     `The current editor file is "${context.activeFilePath}".`,
     'Use editor tools only for this current open file. If the user explicitly names a different Markdown file path, use note_read_file and note_update_file for that target file instead of editor tools.',
-    'For a document-wide edit such as translation, call editor_get_state once, then use editor_replace_lines or editor_apply_transaction with that snapshot. Do not read the same editor state again unless a write reports that the content or version changed.',
+    'For a document-wide edit such as translating all matching text, call editor_get_state once, then submit every affected range together in one editor_apply_transaction operations array. The user must receive one combined preview and one approval request, never a sequence of separate writes. Do not read the same editor state again unless that single write reports that the content or version changed.',
   ].join('\n')
 }
 
@@ -80,9 +80,12 @@ function formatQuote(context: AgentContextSnapshot) {
     quote.from >= 0 && quote.to >= quote.from
       ? `Selection range: from=${quote.from}, to=${quote.to}. For explicit edits to the selection, use editor_replace_range or editor_apply_transaction and keep the edit inside this range unless the user explicitly asks for a larger scope.`
       : 'Exact selection offsets are unavailable. Use editor_replace_lines for explicit edits when line numbers are valid.',
+    quote.from >= 0 && quote.to >= quote.from
+      ? 'This exact selection range is sufficient for an edit. Do not call editor_get_state or editor_get_selection before replacing it.'
+      : '',
     'When editing a selection, the replacement content must be ONLY the rewritten selected text. Do not include surrounding headings, list items, unchanged paragraphs, separators, or any content outside the selected range.',
     'If the selection is a single body line, the replacement content must also be one body line. Never include Markdown headings such as "## 目标", blank lines, or adjacent paragraphs.',
-    'When the user asks to rewrite, formalize, polish, optimize, or improve selected text, the replacement must be meaningfully different from the selected text. Never call an editor write tool with unchanged content.',
+    'When the user asks to rewrite, translate, formalize, polish, optimize, or improve selected text, the replacement must be meaningfully different from the selected text. Never call an editor write tool with unchanged content.',
     quote.fullContent
       ? `Selected content:\n---\n${quote.fullContent}\n---`
       : '',

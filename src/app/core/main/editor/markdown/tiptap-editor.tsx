@@ -65,6 +65,7 @@ import { fetchAiTranslateStream } from '@/lib/ai/translate'
 import { AISuggestion } from './ai-suggestion'
 import { AISuggestionFloating } from './ai-suggestion-floating'
 import { AiSuggestionHighlight } from './ai-suggestion-highlight'
+import { AgentDiffPreview, agentDiffPreviewPluginKey } from './agent-diff-preview-extension'
 import emitter from '@/lib/emitter'
 import { QuoteMark } from './quote-mark'
 import { MarkdownParagraph, normalizeMarkdownPlaceholders } from './markdown-paragraph'
@@ -1188,6 +1189,7 @@ export function TipTapEditor({
       QuoteMark,
       AISuggestion,
       AiSuggestionHighlight,
+      AgentDiffPreview,
       UniqueId.configure({
         attributeName: 'data-id',
         types: ['paragraph', 'heading', 'blockquote', 'codeBlock', 'listItem', 'bulletList', 'orderedList', 'taskItem', 'table', 'tableRow', 'tableCell', 'tableHeader'],
@@ -4253,6 +4255,69 @@ export function TipTapEditor({
       editor.chain().focus().redo().run()
     }
 
+    const handleAgentDiffPreview = ({
+      originalContent,
+      modifiedContent,
+      filePath,
+      from,
+      to,
+    }: {
+      originalContent: string
+      modifiedContent: string
+      filePath?: string
+      from?: number
+      to?: number
+    }) => {
+      if (!editor || (filePath && activeFilePath && filePath !== activeFilePath)) {
+        return
+      }
+
+      editor.view.dispatch(editor.state.tr.setMeta(agentDiffPreviewPluginKey, {
+        type: 'show',
+        payload: { originalContent, modifiedContent, from, to },
+      }))
+
+      window.requestAnimationFrame(() => {
+        if (editor.isDestroyed || !scrollContainerRef.current) return
+
+        const scrollContainer = scrollContainerRef.current
+        const containerRect = scrollContainer.getBoundingClientRect()
+        const diffElement = editor.view.dom.querySelector<HTMLElement>(
+          '.agent-diff-preview-removed, .agent-diff-preview-inserted'
+        )
+        let targetTop: number | undefined
+
+        if (diffElement) {
+          targetTop = diffElement.getBoundingClientRect().top
+        } else if (from !== undefined) {
+          try {
+            const position = clampSelectionPosition(from, editor.state.doc.content.size)
+            targetTop = editor.view.coordsAtPos(position).top
+          } catch {
+            return
+          }
+        }
+
+        if (targetTop === undefined) return
+
+        const centeredScrollTop = scrollContainer.scrollTop
+          + targetTop
+          - containerRect.top
+          - scrollContainer.clientHeight / 2
+        const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight)
+
+        scrollContainer.scrollTo({
+          top: Math.max(0, Math.min(maxScrollTop, centeredScrollTop)),
+          behavior: 'smooth',
+        })
+      })
+    }
+
+    const handleAgentDiffClear = () => {
+      if (!editor) return
+      editor.view.dispatch(editor.state.tr.setMeta(agentDiffPreviewPluginKey, { type: 'clear' }))
+    }
+
     const handleMobileToggleOutline = () => {
       if (!isMobile) return
       setMobileOutlineOpen((prev) => !prev)
@@ -4279,6 +4344,8 @@ export function TipTapEditor({
       emitter.on('get-quote-from-editor', handleGetQuote)
       emitter.on('editor-undo', handleUndo)
       emitter.on('editor-redo', handleRedo)
+      emitter.on('editor-agent-diff-preview', handleAgentDiffPreview)
+      emitter.on('editor-agent-diff-clear', handleAgentDiffClear)
       emitter.on('mobile-editor-toggle-outline', handleMobileToggleOutline)
       emitter.on('editor-can-undo-redo', handleCanUndoRedo)
       editor.on('selectionUpdate', syncEditorSelectionQuote)
@@ -4295,6 +4362,8 @@ export function TipTapEditor({
       emitter.off('get-quote-from-editor', handleGetQuote)
       emitter.off('editor-undo', handleUndo)
       emitter.off('editor-redo', handleRedo)
+      emitter.off('editor-agent-diff-preview', handleAgentDiffPreview)
+      emitter.off('editor-agent-diff-clear', handleAgentDiffClear)
       emitter.off('mobile-editor-toggle-outline', handleMobileToggleOutline)
       emitter.off('editor-can-undo-redo', handleCanUndoRedo)
       editor?.off('selectionUpdate', syncEditorSelectionQuote)

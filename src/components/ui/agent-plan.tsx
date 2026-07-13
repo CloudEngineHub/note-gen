@@ -79,6 +79,8 @@ interface AgentPlanProps {
     originalContent?: string;
     modifiedContent?: string;
     filePath?: string;
+    from?: number;
+    to?: number;
     canApproveForSession?: boolean;
     sessionApprovalType?: "write" | "runtime-script-skill";
     sessionApprovalSkillId?: string;

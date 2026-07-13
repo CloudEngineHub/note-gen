@@ -15,6 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AgentChangesPanel } from "./agent-changes-panel"
 import { AgentContextTray, type RagSourceDetail } from "./agent-context-tray"
 import { agentStatusText, formatAgentDuration, formatAgentToolName } from "./agent-display-utils"
+import { estimateTokens } from "@/lib/ai/token-counter"
 import ChatPreview from "./chat-preview"
 
 interface AgentRunTimelineProps {
@@ -121,6 +122,19 @@ function getModelReasoningContent(event: AgentTraceEvent) {
   }
 
   return reasoning
+}
+
+function getReceivedTokenCount(event: AgentTraceEvent) {
+  if (event.streamedTokenCount !== undefined) {
+    return event.streamedTokenCount
+  }
+
+  const output = typeof event.output === "string"
+    ? event.output
+    : event.output
+      ? JSON.stringify(event.output)
+      : ""
+  return estimateTokens(`${event.reasoning || ""}${output}`)
 }
 
 function formatProcessedDuration(duration?: number) {
@@ -326,7 +340,7 @@ export function AgentRunTimeline({
       />
 
       {events.length > 0 && (
-        <ol className="flex flex-col gap-1">
+        <div role="list" className="flex flex-col gap-1">
           {events.map((event) => {
             const storedExpanded = expandedEvents.includes(event.id)
             const isModelEvent = event.type === "model_call" || event.type === "model_response"
@@ -350,8 +364,9 @@ export function AgentRunTimeline({
                 ? Math.max(0, liveNow - event.timestamp)
                 : undefined
             )
+            const receivedTokenCount = isModelEvent ? getReceivedTokenCount(event) : 0
             return (
-              <li key={event.id} className="text-sm">
+              <div key={event.id} role="listitem" className="text-sm">
                 <button
                   type="button"
                   className="group flex w-full items-start gap-2 py-1.5 text-left"
@@ -369,9 +384,9 @@ export function AgentRunTimeline({
                           {formatAgentDuration(displayDuration)}
                         </span>
                       )}
-                      {isModelEvent && (event.streamedCharacterCount || 0) > 0 && (
+                      {receivedTokenCount > 0 && (
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          · 已接收 {event.streamedCharacterCount?.toLocaleString()} 字符
+                          · {receivedTokenCount.toLocaleString()} tokens
                         </span>
                       )}
                     </span>
@@ -428,10 +443,10 @@ export function AgentRunTimeline({
                     )}
                   </div>
                 )}
-              </li>
+              </div>
             )
           })}
-        </ol>
+        </div>
       )}
 
       {showStatusRow && (
