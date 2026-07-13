@@ -1046,8 +1046,8 @@ export class AgentToolRegistry {
     return this.toolMap.get(name)
   }
 
-  toOpenAITools(): OpenAI.Chat.ChatCompletionTool[] {
-    return this.tools.map((tool) => ({
+  toOpenAITools(tools: AgentTool[] = this.tools): OpenAI.Chat.ChatCompletionTool[] {
+    return tools.map((tool) => ({
       type: 'function',
       function: {
         name: tool.name,

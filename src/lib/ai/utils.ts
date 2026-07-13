@@ -322,7 +322,7 @@ function supportsEnableThinkingSwitch(aiConfig?: AiConfig): boolean {
   return isQwenProvider && model.includes('qwen')
 }
 
-export function withEditorFastAiRequestOptions<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
+export function withFastAiRequestOptions<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
   params: T,
   aiConfig?: AiConfig
 ): T {
@@ -334,4 +334,11 @@ export function withEditorFastAiRequestOptions<const T extends OpenAI.Chat.ChatC
     ...params,
     ...(supportsEnableThinkingSwitch(aiConfig) ? { enable_thinking: false } : {}),
   } as T
+}
+
+export function withEditorFastAiRequestOptions<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
+  params: T,
+  aiConfig?: AiConfig
+): T {
+  return withFastAiRequestOptions(params, aiConfig)
 }

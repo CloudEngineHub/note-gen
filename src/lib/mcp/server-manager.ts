@@ -18,6 +18,14 @@ interface MCPBatchTestResult {
   }>
 }
 
+function sanitizeMcpError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return message
+    .replace(/([?&][^=&\s]*(?:key|token|secret|password)=)[^&\s)]+/gi, '$1[REDACTED]')
+    .replace(/(bearer\s+)[\w.-]+/gi, '$1[REDACTED]')
+}
+
 /**
  * MCP 服务器管理器
  * 管理多个 MCP 服务器的连接和工具调用
@@ -83,16 +91,17 @@ export class MCPServerManager {
       // 更新最后连接时间
       store.updateServer(config.id, { lastConnected: Date.now() })
     } catch (error) {
+      const sanitizedError = sanitizeMcpError(error)
       // 静默处理错误，设置错误状态
       store.setServerState(config.id, {
         id: config.id,
         status: 'error',
         tools: [],
         resources: [],
-        error: error instanceof Error ? error.message : String(error),
+        error: sanitizedError,
       })
       
-      throw error
+      throw new Error(sanitizedError)
     }
   }
   
@@ -132,7 +141,7 @@ export class MCPServerManager {
       try {
         await this.connectServer(server)
       } catch (error) {
-        console.error(`Failed to connect MCP server ${server.name}:`, error)
+        console.error(`Failed to connect MCP server ${server.name}:`, sanitizeMcpError(error))
       }
     }
   }

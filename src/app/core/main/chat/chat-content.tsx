@@ -464,7 +464,7 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
                 {(agentState.isRunning || hasLiveAgentTrace) && (
                   <AgentExecutionStatus />
                 )}
-                {agentState.isFinalAnswerMode && agentState.finalAnswerContent && (
+                {!agentState.isRunning && agentState.isFinalAnswerMode && agentState.finalAnswerContent && (
                   <ChatPreview
                     text={agentState.finalAnswerContent}
                     streaming={loading && isActiveAgentMessage}

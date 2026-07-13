@@ -46,6 +46,9 @@ export interface AgentContextSnapshot {
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
   selectedMcpServerIds?: string[]
+  multipleFileCreation?: boolean
+  multipleFileUpdate?: boolean
+  requestedFileCount?: number
 }
 
 export interface AgentQuoteSnapshot {
@@ -133,6 +136,8 @@ export interface AgentTraceEvent {
   input?: Record<string, unknown>
   output?: unknown
   message?: string
+  reasoning?: string
+  streamedCharacterCount?: number
 }
 
 export interface AgentApprovalRequest {

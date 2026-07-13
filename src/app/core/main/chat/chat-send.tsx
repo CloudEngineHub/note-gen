@@ -13,12 +13,41 @@ import { LinkedResource, isLinkedFolder } from "@/lib/files"
 import { readTextFile } from "@tauri-apps/plugin-fs"
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { AgentHandler } from "@/lib/agent/agent-handler"
+import { isRequestAbortError } from "@/lib/agent/runtime"
 import { agentDebugLog, previewText } from "@/lib/agent/debug-log"
 import { getToolByName } from "@/lib/agent/tools"
 import { getSessionApprovalScope, matchesSessionApproval } from "@/lib/agent/session-approval"
 import { ImageAttachment } from "./image-attachments"
 import type { RagSource } from "@/lib/rag"
 import { cn } from "@/lib/utils"
+import type { AgentTraceEvent } from "@/lib/agent/types"
+
+function getLastDisplayableAgentContent(
+  liveContent: string | undefined,
+  traceEvents: AgentTraceEvent[]
+) {
+  const currentContent = liveContent?.trim()
+  if (currentContent) {
+    return currentContent
+  }
+
+  for (let index = traceEvents.length - 1; index >= 0; index -= 1) {
+    const event = traceEvents[index]
+    if (
+      (event.type === 'model_call' || event.type === 'model_response')
+      && typeof event.output === 'string'
+      && event.output.trim()
+    ) {
+      return event.output.trim()
+    }
+
+    if (event.type === 'final' && event.message?.trim()) {
+      return event.message.trim()
+    }
+  }
+
+  return ''
+}
 
 interface QuoteData {
   quote: string
@@ -55,6 +84,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
   const { isRagEnabled } = useVectorStore()
   const abortControllerRef = useRef<AbortController | null>(null)
   const agentHandlerRef = useRef<AgentHandler | null>(null)
+  const manualStopRequestedRef = useRef(false)
   const t = useTranslations()
 
   // 跟踪上一次的 loading 状态
@@ -290,35 +320,51 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       onComplete: async (result, steps, stopped) => {
         // 获取 Agent 执行历史，保存结构化运行轨迹
         const { agentState } = useChatStore.getState()
+        const effectivelyStopped = Boolean(stopped)
+          || manualStopRequestedRef.current
+          || isRequestAbortError(result)
+        const completedAt = Date.now()
+        const traceEvents = (agentState.traceEvents || []).map(event => {
+          if (event.status !== 'running') {
+            return event
+          }
+
+          return {
+            ...event,
+            status: effectivelyStopped ? 'success' as const : event.status,
+            duration: event.duration ?? Math.max(0, completedAt - event.timestamp),
+          }
+        })
         // 使用 agentState.completedSteps 而不是 steps 参数，因为 completedSteps 包含 duration 信息
         const agentHistory = {
           steps: agentState.completedSteps || [],
           toolCalls: agentState.toolCalls,
-          traceEvents: agentState.traceEvents || [],
+          traceEvents,
           changes: agentState.changes || [],
           runId: agentState.runId,
-          status: agentState.status,
+          status: effectivelyStopped ? 'stopped' : agentState.status,
           loadedSkills: agentState.loadedSkills || [],
           iterations: agentState.currentIteration,
         }
 
-        // 如果是被终止的，构建包含终止信息的消息
         let finalContent = result
-        if (stopped) {
-          // 保留已产生的步骤，并添加终止信息
-          const stepCount = agentState.completedSteps?.length || 0
-          if (stepCount > 0) {
-            // 有已完成的步骤，显示这些步骤的内容
-            finalContent = `${t('record.chat.input.stopped')}\n\n已完成 ${stepCount} 个步骤：\n${agentState.completedSteps!.map((step, i) =>
-              `${i + 1}. ${step.action?.tool || '思考'}`
-            ).join('\n')}`
-          } else {
-            // 没有已完成步骤，显示简单的终止信息
-            finalContent = t('record.chat.input.stopped')
+        if (effectivelyStopped) {
+          const lastDisplayableContent = getLastDisplayableAgentContent(
+            agentState.finalAnswerContent,
+            traceEvents
+          )
+          if (lastDisplayableContent) {
+            finalContent = lastDisplayableContent
+          } else if (isRequestAbortError(finalContent)) {
+            finalContent = ''
           }
         }
+        if (effectivelyStopped && !finalContent.trim()) {
+          // 只有尚未产生任何正文时才显示终止提示；已有的流式正文原样保留。
+          finalContent = t('record.chat.input.stopped')
+        }
 
-        if (!stopped) {
+        if (!effectivelyStopped) {
           const partialSuccessContent = buildPartialSuccessContent(result, agentState.toolCalls)
           if (partialSuccessContent && /^工具 .+执行失败：|^工具 .+执行出错：|^Error:/.test(finalContent.trim())) {
             finalContent = partialSuccessContent
@@ -362,8 +408,36 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         // 获取当前消息状态，保留 ragSources 和 ragSourceDetails
         const currentState = useChatStore.getState()
         const currentMessage = currentState.chats.find(c => c.id === placeholderMessage.id)
+        const aborted = manualStopRequestedRef.current || isRequestAbortError(error)
+        const preservedContent = getLastDisplayableAgentContent(
+          currentState.agentState.finalAnswerContent,
+          currentState.agentState.traceEvents || []
+        )
+        const stoppedAt = Date.now()
+        const traceEvents = (currentState.agentState.traceEvents || []).map(event => {
+          if (event.status !== 'running') {
+            return event
+          }
 
-        // 更新占位消息为错误信息，保留 RAG 相关字段
+          return {
+            ...event,
+            status: aborted ? 'success' as const : 'error' as const,
+            duration: event.duration ?? Math.max(0, stoppedAt - event.timestamp),
+          }
+        })
+        const agentHistory = {
+          steps: currentState.agentState.completedSteps || [],
+          toolCalls: currentState.agentState.toolCalls,
+          traceEvents,
+          changes: currentState.agentState.changes || [],
+          runId: currentState.agentState.runId,
+          status: aborted ? 'stopped' : 'failed',
+          loadedSkills: currentState.agentState.loadedSkills || [],
+          iterations: currentState.agentState.currentIteration,
+        }
+
+        // SDK 可能把手动终止作为普通错误抛出。此时保留已流式输出的正文，
+        // 只有真正的执行错误才写入 Error 信息。
         await saveChat({
           id: placeholderMessage.id,
           tagId: placeholderMessage.tagId,
@@ -375,14 +449,20 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           // 保留来自 currentMessage 的 RAG 相关字段
           ragSources: currentMessage?.ragSources,
           ragSourceDetails: currentMessage?.ragSourceDetails,
-          content: `Error: ${error}`,
+          content: aborted
+            ? preservedContent || t('record.chat.input.stopped')
+            : `Error: ${error}`,
+          agentHistory: JSON.stringify(agentHistory),
         }, true)
 
         // 清空 Final Answer 模式状态
         setAgentState({
           activeChatId: undefined,
           isFinalAnswerMode: false,
-          finalAnswerContent: undefined
+          finalAnswerContent: undefined,
+          status: aborted ? 'stopped' : 'failed',
+          isRunning: false,
+          isThinking: false,
         })
 
         // 清空 ref
@@ -659,6 +739,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
   // 对话（Agent 模式）
   async function handleSubmit() {
     if (inputValue === '') return
+    manualStopRequestedRef.current = false
     onSent?.()
 
     setLoading(true)
@@ -677,6 +758,8 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
   }
 
   const handleStop = async () => {
+    manualStopRequestedRef.current = true
+
     // 停止普通对话的流式输出
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()

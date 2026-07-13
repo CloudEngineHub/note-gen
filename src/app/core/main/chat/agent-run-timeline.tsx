@@ -110,6 +110,19 @@ function getModelResponseContent(event: AgentTraceEvent) {
   return undefined
 }
 
+function getModelReasoningContent(event: AgentTraceEvent) {
+  const reasoning = event.reasoning?.trim()
+  if (!reasoning) {
+    return undefined
+  }
+
+  if (event.status === "running" && reasoning.length > 1200) {
+    return `…${reasoning.slice(-1200)}`
+  }
+
+  return reasoning
+}
+
 function formatProcessedDuration(duration?: number) {
   if (duration === undefined) return ""
   if (duration < 1000) return `${duration}ms`
@@ -257,7 +270,6 @@ export function AgentRunTimeline({
     return toolCalls.map(eventFromToolCall)
   }, [traceEvents, toolCalls])
   const hasRunningEvent = events.some((event) => event.status === "running")
-  const hasActiveVisibleEvent = events.some((event) => event.status === "running" || event.status === "pending")
   const [liveNow, setLiveNow] = React.useState(() => Date.now())
 
   React.useEffect(() => {
@@ -285,8 +297,7 @@ export function AgentRunTimeline({
     return null
   }
 
-  const showStatusRow = (isRunning && !hasActiveVisibleEvent && status !== "idle") ||
-    (events.length === 0 && (status === "failed" || status === "stopped"))
+  const showStatusRow = events.length === 0 && (status === "failed" || status === "stopped")
   const durationEvents = traceEvents.length > 0 ? traceEvents : events
   const processStartedAt = durationEvents.length > 0
     ? Math.min(...durationEvents.map((event) => event.timestamp))
@@ -297,7 +308,14 @@ export function AgentRunTimeline({
   const processDuration = processStartedAt === undefined
     ? undefined
     : Math.max(0, (isRunning ? liveNow : processFinishedAt || processStartedAt) - processStartedAt)
-  const processLabel = `已处理${processDuration === undefined ? "" : ` ${formatProcessedDuration(processDuration)}`}`
+  const modelExecutionCount = events.filter((event) =>
+    event.type === "model_call" || event.type === "model_response"
+  ).length
+  const processLabel = [
+    "已处理",
+    processDuration === undefined ? undefined : formatProcessedDuration(processDuration),
+    modelExecutionCount > 0 ? `· 执行 ${modelExecutionCount} 次` : undefined,
+  ].filter(Boolean).join(" ")
 
   const processContent = (
     <div className="flex flex-col gap-2 pl-1">
@@ -310,25 +328,35 @@ export function AgentRunTimeline({
       {events.length > 0 && (
         <ol className="flex flex-col gap-1">
           {events.map((event) => {
-            const expanded = expandedEvents.includes(event.id)
+            const storedExpanded = expandedEvents.includes(event.id)
+            const isModelEvent = event.type === "model_call" || event.type === "model_response"
             const visibleMessage = shouldShowEventMessage(event) ? event.message : undefined
             const modelResponseContent = getModelResponseContent(event)
+            const modelReasoningContent = getModelReasoningContent(event)
             const inputDetail = compactTraceInput(event.input)
             const outputDetail = modelResponseContent ? undefined : compactTraceOutput(event, visibleMessage)
-            const hasDetails = Boolean(visibleMessage || inputDetail !== undefined || outputDetail !== undefined)
+            const hasTraceDetails = Boolean(
+              visibleMessage || inputDetail !== undefined || outputDetail !== undefined
+            )
+            const hasDetails = Boolean(
+              modelReasoningContent ||
+              hasTraceDetails
+            )
+            const forceExpanded = isModelEvent && event.status === "running"
+            const expanded = forceExpanded || storedExpanded
+            const canToggle = hasDetails && !forceExpanded
             const displayDuration = event.duration ?? (
               event.status === "running"
                 ? Math.max(0, liveNow - event.timestamp)
                 : undefined
             )
-
             return (
               <li key={event.id} className="text-sm">
                 <button
                   type="button"
                   className="group flex w-full items-start gap-2 py-1.5 text-left"
-                  onClick={() => hasDetails && toggleEvent(event.id)}
-                  aria-expanded={hasDetails ? expanded : undefined}
+                  onClick={() => canToggle && toggleEvent(event.id)}
+                  aria-expanded={canToggle ? expanded : undefined}
                 >
                   <span className="mt-0.5 shrink-0">{eventIcon(event)}</span>
                   <span className="min-w-0 flex-1">
@@ -337,8 +365,13 @@ export function AgentRunTimeline({
                         {event.toolName ? formatAgentToolName(event.toolName) : event.title}
                       </span>
                       {displayDuration !== undefined && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                           {formatAgentDuration(displayDuration)}
+                        </span>
+                      )}
+                      {isModelEvent && (event.streamedCharacterCount || 0) > 0 && (
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          · 已接收 {event.streamedCharacterCount?.toLocaleString()} 字符
                         </span>
                       )}
                     </span>
@@ -348,7 +381,7 @@ export function AgentRunTimeline({
                       </span>
                     )}
                   </span>
-                  {hasDetails && (
+                  {canToggle && (
                     expanded ? (
                       <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                     ) : (
@@ -357,13 +390,21 @@ export function AgentRunTimeline({
                   )}
                 </button>
 
+                {modelReasoningContent && expanded && event.status !== "running" && (
+                  <div className="ml-6 border-l pl-3 pb-2 text-xs">
+                    <div className="max-h-48 overflow-y-auto rounded bg-muted/60 p-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-muted-foreground">
+                      {modelReasoningContent}
+                    </div>
+                  </div>
+                )}
+
                 {modelResponseContent && (
                   <div className="ml-6 border-l pl-3 pb-2 text-sm">
                     <ChatPreview text={modelResponseContent} />
                   </div>
                 )}
 
-                {expanded && hasDetails && (
+                {expanded && hasTraceDetails && (
                   <div className="ml-6 flex flex-col gap-2 border-l pl-3 pb-2 text-xs">
                     {visibleMessage && (
                       <div className="flex flex-col gap-1">

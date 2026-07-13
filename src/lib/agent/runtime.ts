@@ -1,8 +1,8 @@
 import type OpenAI from 'openai'
-import { createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService } from '@/lib/ai/utils'
+import { createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
-import { AgentPermissionEngine, hasExplicitWriteIntent } from './permission-engine'
+import { AgentPermissionEngine, hasAuthoringIntent, hasEffectiveWriteIntent, hasExplicitWriteIntent } from './permission-engine'
 import { AgentPromptAssembler } from './prompt-assembler'
 import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
@@ -24,7 +24,23 @@ import type {
 const DEFAULT_MAX_ITERATIONS = 15
 const MAX_MISSING_WRITE_TOOL_REPAIRS = 2
 const MAX_INVALID_QUOTED_WRITE_REPAIRS = 2
+const MAX_IDENTICAL_READ_RESULT_REPEATS = 2
 const MUTATING_TOOL_RISKS = new Set(['editor-write', 'file-create', 'file-update', 'delete', 'medium'])
+
+export function isRequestAbortError(error: unknown) {
+  if (typeof error === 'string') {
+    return /(?:request (?:was )?aborted|operation (?:was )?aborted|aborterror)/i.test(error)
+  }
+
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  const errorWithCode = error as { name?: string; code?: string; message?: string }
+  return errorWithCode.name === 'AbortError'
+    || errorWithCode.code === 'ABORT_ERR'
+    || /(?:request (?:was )?aborted|operation (?:was )?aborted|aborterror)/i.test(errorWithCode.message || '')
+}
 
 function parseToolArguments(rawArguments: string | undefined): Record<string, unknown> {
   if (!rawArguments || !rawArguments.trim()) {
@@ -128,7 +144,7 @@ function summarizeMessage(message: OpenAI.Chat.ChatCompletionMessageParam, index
 }
 
 function getForcedWriteTool(context: AgentContextSnapshot): string | undefined {
-  if (!hasExplicitWriteIntent(context.userInput)) {
+  if (!hasEffectiveWriteIntent(context)) {
     return undefined
   }
 
@@ -188,6 +204,51 @@ function hasCreateOnlyFileIntent(userInput: string) {
 
   return /(新建|创建|create)\s+[\w./-]+\.md|(?:新建|创建).{0,20}文件|create.{0,20}file/i.test(userInput) &&
     !/(更新|覆盖|替换|改写|改成|改为|如果.{0,8}存在|若.{0,8}存在|不存在.{0,8}则|update|overwrite|replace|upsert)/i.test(userInput)
+}
+
+function getRequestedFileCount(userInput: string) {
+  const numericMatch = userInput.match(/(?:^|[^第\d])([2-9]\d*)\s*(?:篇|个|份|则)/) ||
+    userInput.match(/\b([2-9]\d*)\s+(?:articles?|notes?|documents?|files?)\b/i)
+  if (numericMatch?.[1]) {
+    return Number(numericMatch[1])
+  }
+
+  const chineseMatch = userInput.match(/(?:^|[^第])([两二三四五六七八九十])\s*(?:篇|个|份|则)/)
+  if (!chineseMatch?.[1]) {
+    return undefined
+  }
+
+  const chineseNumbers: Record<string, number> = {
+    '两': 2,
+    '二': 2,
+    '三': 3,
+    '四': 4,
+    '五': 5,
+    '六': 6,
+    '七': 7,
+    '八': 8,
+    '九': 9,
+    '十': 10,
+  }
+
+  return chineseNumbers[chineseMatch[1]]
+}
+
+function hasMultipleFileCreationIntent(userInput: string) {
+  const hasCreationAction = /(创建|新建|生成|撰写|起草|编写|创作|(?:^|帮我|请|给我|为我|替我|再)写|\b(?:create|generate|write|draft)\b)/i.test(userInput)
+  const hasMultipleQuantity = getRequestedFileCount(userInput) !== undefined ||
+    /(多篇|几篇|若干篇|多份|多个|分别|各自)/i.test(userInput)
+
+  return hasCreationAction && hasMultipleQuantity
+}
+
+function hasMultipleFileUpdateIntent(userInput: string) {
+  const hasUpdateAction = /(改成|改为|更新|翻译|转换|润色|重写|改写|替换|编辑|英文版|中文版|\b(?:update|translate|convert|rewrite|replace|edit)\b)/i.test(userInput)
+  const hasMultipleReference = getRequestedFileCount(userInput) !== undefined ||
+    /(多篇|几篇|逐篇|每篇)/i.test(userInput) ||
+    /(?:这些|上述|全部|全都|所有).{0,8}(?:笔记|文件|文档|文章|Markdown|md)|(?:笔记|文件|文档|文章).{0,8}(?:这些|上述|全部|全都|所有|分别)/i.test(userInput)
+
+  return hasUpdateAction && hasMultipleReference
 }
 
 function isSameTargetFile(targetFilePath: string, activeFilePath: string) {
@@ -439,7 +500,7 @@ function repairQuotedEditorWriteArgs(
 }
 
 function buildToolChoice(context: AgentContextSnapshot): OpenAI.Chat.ChatCompletionToolChoiceOption {
-  const forcedTool = getForcedWriteTool(context)
+  const forcedTool = getForcedActionTool(context)
   if (!forcedTool) {
     return 'auto'
   }
@@ -450,6 +511,106 @@ function buildToolChoice(context: AgentContextSnapshot): OpenAI.Chat.ChatComplet
       name: forcedTool,
     },
   }
+}
+
+function getForcedActionTool(context: AgentContextSnapshot) {
+  if (hasExplicitMcpIntent(context.userInput)) {
+    return undefined
+  }
+
+  const forcedWriteTool = getForcedWriteTool(context)
+  if (forcedWriteTool) {
+    return forcedWriteTool
+  }
+
+  if (hasMultipleFileCreationIntent(context.userInput)) {
+    return undefined
+  }
+
+  if (hasCreateOnlyFileIntent(context.userInput)) {
+    return 'note_create_file'
+  }
+
+  if (!context.activeFilePath && hasAuthoringIntent(context.userInput)) {
+    return 'note_create_file'
+  }
+
+  return undefined
+}
+
+function isCurrentEditorWriteIntent(context: AgentContextSnapshot) {
+  if (
+    !context.activeFilePath ||
+    !hasEffectiveWriteIntent(context) ||
+    hasCreateOnlyFileIntent(context.userInput) ||
+    hasMultipleFileCreationIntent(context.userInput) ||
+    hasMultipleFileUpdateIntent(context.userInput) ||
+    getExplicitTargetFilePath(context.userInput)
+  ) {
+    return false
+  }
+
+  return !/(标签|tag\b|记录|mark\b|记忆|记住|memory\b|文件夹|目录|folder\b|skill\b|技能|脚本|script\b|mcp\b|删除.{0,8}(文件|笔记)|重命名|移动.{0,8}(文件|笔记)|复制.{0,8}(文件|笔记))/i.test(context.userInput)
+}
+
+function selectToolsForContext(context: AgentContextSnapshot, tools: AgentTool[]) {
+  let selectedTools = tools
+
+  if (hasExplicitMcpIntent(context.userInput)) {
+    return selectedTools.filter((tool) => tool.category === 'mcp')
+  }
+
+  if (hasMultipleFileUpdateIntent(context.userInput)) {
+    const batchUpdateToolNames = new Set([
+      'note_list_files',
+      'note_search_files',
+      'note_read_file',
+      'note_read_files_batch',
+      'note_update_file',
+    ])
+    return tools.filter((tool) => batchUpdateToolNames.has(tool.name))
+  }
+
+  const forcedTool = getForcedActionTool(context)
+  if (forcedTool) {
+    return tools.filter((tool) => tool.name === forcedTool)
+  }
+
+  if (hasMultipleFileCreationIntent(context.userInput)) {
+    return tools.filter((tool) => tool.name === 'note_create_file')
+  }
+
+  if (isCurrentEditorWriteIntent(context)) {
+    return selectedTools.filter((tool) =>
+      tool.category === 'editor' ||
+      tool.category === 'skill'
+    )
+  }
+
+  if (hasCreateOnlyFileIntent(context.userInput)) {
+    selectedTools = selectedTools.filter((tool) =>
+      tool.name === 'note_create_file' ||
+      tool.risk === 'read'
+    )
+  }
+
+  if (getDifferentExplicitTargetFile(context)) {
+    selectedTools = selectedTools.filter((tool) => tool.category !== 'editor')
+  }
+
+  if (requiresDocumentPositioning(context.userInput) && !hasExplicitCursorInsertIntent(context.userInput)) {
+    selectedTools = selectedTools.filter((tool) => tool.name !== 'editor_insert_at_cursor')
+  }
+
+  if (!context.activeFilePath) {
+    selectedTools = selectedTools.filter((tool) => tool.category !== 'editor')
+  }
+
+  if (!hasEffectiveWriteIntent(context)) {
+    selectedTools = selectedTools.filter((tool) => !isMutatingTool(tool))
+  }
+
+  return selectedTools
 }
 
 function indicatesWriteCompletedClaim(content: string) {
@@ -496,6 +657,14 @@ function isMutatingTool(tool: AgentTool) {
   return MUTATING_TOOL_RISKS.has(tool.risk)
 }
 
+function getReadToolCallSignature(tool: AgentTool, args: Record<string, unknown>) {
+  if (tool.risk !== 'read') {
+    return undefined
+  }
+
+  return `${tool.name}:${JSON.stringify(args)}`
+}
+
 export class AgentRuntime {
   private readonly contextManager = new AgentContextManager()
   private readonly promptAssembler = new AgentPromptAssembler()
@@ -519,12 +688,18 @@ export class AgentRuntime {
     const toolCalls: ToolCall[] = []
     const changes: AgentChange[] = []
 
+    const multipleFileCreation = hasMultipleFileCreationIntent(input.userInput)
+    const multipleFileUpdate = hasMultipleFileUpdateIntent(input.userInput)
+    const requestedFileCount = getRequestedFileCount(input.userInput)
     const context: AgentContextSnapshot = {
       activeChatId: input.activeChatId,
       activeFilePath: input.activeFilePath,
       userInput: input.userInput,
       currentQuote: input.currentQuote,
       availableSkills: input.availableSkills,
+      multipleFileCreation,
+      multipleFileUpdate,
+      requestedFileCount,
     }
 
     agentDebugLog('run_start', {
@@ -538,7 +713,7 @@ export class AgentRuntime {
     })
 
     if (
-      hasExplicitWriteIntent(input.userInput) &&
+      hasEffectiveWriteIntent(context) &&
       requiresSelectedContext(input.userInput) &&
       !input.currentQuote
     ) {
@@ -597,11 +772,13 @@ export class AgentRuntime {
       }
     }
 
-    const tools = agentToolRegistry.listTools()
+    const allTools = agentToolRegistry.listTools()
+    const tools = selectToolsForContext(context, allTools)
+    const customSystemPrompt = await getSystemPromptContent()
     const systemPrompt = this.promptAssembler.assemble(
       context,
       tools,
-      await getSystemPromptContent()
+      customSystemPrompt
     )
     const baseMessages = this.contextManager.prepareMessages(input.messages || [])
       .map(normalizeBaseMessage)
@@ -630,7 +807,6 @@ export class AgentRuntime {
       ).length,
       messages: messages.map(summarizeMessage),
     })
-
     callbacks.onStatus?.('preparing_context')
 
     const aiConfig = await getAISettings()
@@ -649,15 +825,58 @@ export class AgentRuntime {
     }
 
     const client = await createOpenAIClient(aiConfig)
+    const openAITools = agentToolRegistry.toOpenAITools(tools)
+    const toolChoice = buildToolChoice(context)
     let finalContent = ''
     let missingWriteToolRepairCount = 0
     let invalidQuotedWriteRepairCount = 0
     let writeActionCompleted = false
+    let multiCreateAttemptCount = 0
+    let multiCreateSuccessCount = 0
+    const multiCreateMessages: string[] = []
+    let multiUpdateAttemptCount = 0
+    let multiUpdateSuccessCount = 0
+    const multiUpdateMessages: string[] = []
+    const readToolResultHistory = new Map<string, {
+      result: string
+      repeatCount: number
+    }>()
+    let activeModelTraceId: string | undefined
+    let activeModelStartedAt = 0
+    let activeModelReasoning = ''
+    let activeModelContent = ''
+    let activeModelStreamedCharacterCount = 0
+
+    const finalizeInterruptedModelTrace = (status: 'success' | 'error', title: string) => {
+      if (!activeModelTraceId) {
+        return
+      }
+
+      const interruptedTrace = recorder.update(activeModelTraceId, {
+        type: 'model_response',
+        title,
+        status,
+        duration: Date.now() - activeModelStartedAt,
+        output: activeModelContent || undefined,
+        reasoning: activeModelReasoning || undefined,
+        streamedCharacterCount: activeModelStreamedCharacterCount,
+      })
+      if (interruptedTrace) callbacks.onTrace?.(interruptedTrace)
+
+      activeModelTraceId = undefined
+      activeModelStartedAt = 0
+      activeModelReasoning = ''
+      activeModelContent = ''
+      activeModelStreamedCharacterCount = 0
+    }
 
     try {
       for (let iteration = 1; iteration <= DEFAULT_MAX_ITERATIONS; iteration += 1) {
         if (this.stopped) {
           callbacks.onStatus?.('stopped')
+          if (finalContent) {
+            callbacks.onFinalAnswerRender?.(finalContent)
+          }
           return {
             runId,
             content: finalContent,
@@ -683,28 +902,36 @@ export class AgentRuntime {
           title: '模型思考',
           status: 'running',
           message: `第 ${iteration} 轮`,
+          streamedCharacterCount: 0,
         })
+        activeModelTraceId = modelTrace.id
+        activeModelStartedAt = modelTrace.timestamp
+        activeModelReasoning = ''
+        activeModelContent = ''
+        activeModelStreamedCharacterCount = 0
         callbacks.onTrace?.(modelTrace)
 
         const stream = await this.recoveryManager.withRetry(() =>
-          client.chat.completions.create({
+          client.chat.completions.create(withFastAiRequestOptions({
             model: aiConfig?.model || '',
             messages,
             temperature: aiConfig?.temperature,
             top_p: aiConfig?.topP,
-            tools: agentToolRegistry.toOpenAITools(),
-            tool_choice: buildToolChoice(context),
+            tools: openAITools,
+            tool_choice: toolChoice,
             stream: true,
             ...getChatTokenLimitParams(aiConfig),
-          }, {
+          }, aiConfig), {
             signal: this.abortController?.signal,
           })
         )
-
         let assistantContent = ''
         let finishReason: string | null | undefined
         let toolCallsStarted = false
         let candidateAnswerRendered = false
+        let assistantReasoning = ''
+        let streamedCharacterCount = 0
+        let lastModelProgressTraceAt = 0
         const streamedToolCalls = new Map<number, StreamingToolCallAccumulator>()
 
         for await (const chunk of stream) {
@@ -719,8 +946,20 @@ export class AgentRuntime {
 
           finishReason = choice.finish_reason ?? finishReason
           const delta = choice.delta
+          const extendedDelta = delta as typeof delta & {
+            reasoning?: string
+            reasoning_content?: string
+          }
+          const reasoningDelta = extendedDelta.reasoning_content || extendedDelta.reasoning
+          if (typeof reasoningDelta === 'string') {
+            assistantReasoning += reasoningDelta
+            streamedCharacterCount += reasoningDelta.length
+            activeModelReasoning = assistantReasoning
+          }
           if (typeof delta.content === 'string' && delta.content) {
             assistantContent += delta.content
+            streamedCharacterCount += delta.content.length
+            activeModelContent = assistantContent
             if (!toolCallsStarted && assistantContent.trim()) {
               candidateAnswerRendered = true
               callbacks.onCandidateAnswerRender?.(assistantContent)
@@ -751,15 +990,28 @@ export class AgentRuntime {
             }
             if (toolCallDelta.function?.name) {
               current.function.name += toolCallDelta.function.name
+              streamedCharacterCount += toolCallDelta.function.name.length
             }
             if (toolCallDelta.function?.arguments) {
               current.function.arguments += toolCallDelta.function.arguments
+              streamedCharacterCount += toolCallDelta.function.arguments.length
             }
 
             streamedToolCalls.set(index, current)
           }
-        }
 
+          activeModelStreamedCharacterCount = streamedCharacterCount
+          const now = Date.now()
+          if (streamedCharacterCount > 0 && now - lastModelProgressTraceAt >= 100) {
+            lastModelProgressTraceAt = now
+            const progressTrace = recorder.update(modelTrace.id, {
+              output: assistantContent || undefined,
+              reasoning: assistantReasoning || undefined,
+              streamedCharacterCount,
+            })
+            if (progressTrace) callbacks.onTrace?.(progressTrace)
+          }
+        }
         assistantContent = assistantContent.trim() ? assistantContent : ''
         finalContent = assistantContent || finalContent
         const toolUses = toToolCallList(streamedToolCalls)
@@ -796,15 +1048,22 @@ export class AgentRuntime {
           status: 'success',
           duration: Date.now() - modelTrace.timestamp,
           output: modelTraceOutput,
+          reasoning: assistantReasoning || undefined,
+          streamedCharacterCount,
         })
         if (responseTrace) callbacks.onTrace?.(responseTrace)
+        activeModelTraceId = undefined
+        activeModelStartedAt = 0
+        activeModelReasoning = ''
+        activeModelContent = ''
+        activeModelStreamedCharacterCount = 0
         if (toolCallsStarted && candidateAnswerRendered) {
           callbacks.onCandidateAnswerClear?.()
         }
         await agentEventBus.emit('after-model-call', { runId, content: assistantContent })
 
         if (toolUses.length === 0) {
-          if (hasExplicitWriteIntent(context.userInput) && indicatesNoChangeNeeded(assistantContent)) {
+          if (hasEffectiveWriteIntent(context) && indicatesNoChangeNeeded(assistantContent)) {
             agentDebugLog('no_change_needed_final', {
               runId,
               iteration,
@@ -833,7 +1092,7 @@ export class AgentRuntime {
 
           if (
             !writeActionCompleted &&
-            hasExplicitWriteIntent(context.userInput) &&
+            hasEffectiveWriteIntent(context) &&
             missingWriteToolRepairCount < MAX_MISSING_WRITE_TOOL_REPAIRS
           ) {
             missingWriteToolRepairCount += 1
@@ -1277,6 +1536,7 @@ export class AgentRuntime {
           const startedAt = Date.now()
           agentDebugLog('tool_execute_start', {
             runId,
+            iteration,
             toolName,
             args,
           })
@@ -1288,6 +1548,7 @@ export class AgentRuntime {
           const duration = Date.now() - startedAt
           agentDebugLog('tool_execute_end', {
             runId,
+            iteration,
             toolName,
             ok: result.ok,
             duration,
@@ -1335,14 +1596,165 @@ export class AgentRuntime {
             result,
           })
 
+          let modelFacingResult = result
+          let identicalReadResultRepeatCount = 0
+          const readToolCallSignature = getReadToolCallSignature(tool, args)
+          if (result.ok && readToolCallSignature) {
+            const serializedResult = stringifyToolResult(result)
+            const previousRead = readToolResultHistory.get(readToolCallSignature)
+
+            if (previousRead?.result === serializedResult) {
+              identicalReadResultRepeatCount = previousRead.repeatCount + 1
+              readToolResultHistory.set(readToolCallSignature, {
+                result: serializedResult,
+                repeatCount: identicalReadResultRepeatCount,
+              })
+              modelFacingResult = {
+                ...result,
+                message: [
+                  result.message,
+                  '这次读取与上次完全相同，上次结果仍在上下文中。不要再次读取；请使用已有结果执行下一步写入，或直接完成回答。',
+                ].join('\n\n'),
+              }
+            } else {
+              readToolResultHistory.set(readToolCallSignature, {
+                result: serializedResult,
+                repeatCount: 0,
+              })
+            }
+          }
+
           messages.push({
             role: 'tool',
             tool_call_id: toolUse.id,
-            content: stringifyToolResult(result),
+            content: stringifyToolResult(modelFacingResult),
           })
+
+          if (identicalReadResultRepeatCount >= MAX_IDENTICAL_READ_RESULT_REPEATS) {
+            callbacks.onCandidateAnswerClear?.()
+            finalContent = [
+              `模型连续重复调用 ${toolName}，且读取结果始终未变，已停止执行以避免循环。`,
+              writeActionCompleted ? '已保留此前完成的修改。' : '本次修改尚未完成。',
+            ].join('\n')
+            callbacks.onStatus?.('completed')
+            callbacks.onFinalAnswerRender?.(finalContent)
+            const finalTrace = recorder.add({
+              type: 'final',
+              title: '停止重复执行',
+              status: 'error',
+              message: finalContent,
+            })
+            callbacks.onTrace?.(finalTrace)
+
+            return {
+              runId,
+              content: finalContent,
+              stopped: false,
+              steps,
+              toolCalls,
+              changes,
+              trace: recorder.all(),
+            }
+          }
 
           if (result.ok && isMutatingTool(tool)) {
             writeActionCompleted = true
+            readToolResultHistory.clear()
+          }
+
+          if (context.multipleFileCreation && tool.name === 'note_create_file') {
+            multiCreateAttemptCount += 1
+            if (result.ok) {
+              multiCreateSuccessCount += 1
+            }
+            multiCreateMessages.push(result.message)
+
+            if (context.requestedFileCount && multiCreateAttemptCount >= context.requestedFileCount) {
+              finalContent = [
+                `已完成 ${multiCreateAttemptCount} 次文件创建尝试，成功 ${multiCreateSuccessCount} 个。`,
+                ...multiCreateMessages.map((message) => `- ${message}`),
+              ].join('\n')
+              callbacks.onStatus?.('completed')
+              callbacks.onFinalAnswerRender?.(finalContent)
+              const finalTrace = recorder.add({
+                type: 'final',
+                title: multiCreateSuccessCount > 0 ? '完成' : '创建失败',
+                status: multiCreateSuccessCount > 0 ? 'success' : 'error',
+                message: finalContent,
+              })
+              callbacks.onTrace?.(finalTrace)
+
+              return {
+                runId,
+                content: finalContent,
+                stopped: false,
+                steps,
+                toolCalls,
+                changes,
+                trace: recorder.all(),
+              }
+            }
+          }
+
+          if (context.multipleFileUpdate && tool.name === 'note_update_file') {
+            multiUpdateAttemptCount += 1
+            if (result.ok) {
+              multiUpdateSuccessCount += 1
+            }
+            multiUpdateMessages.push(result.message)
+
+            if (context.requestedFileCount && multiUpdateAttemptCount >= context.requestedFileCount) {
+              finalContent = [
+                `已完成 ${multiUpdateAttemptCount} 次文件更新尝试，成功 ${multiUpdateSuccessCount} 个。`,
+                ...multiUpdateMessages.map((message) => `- ${message}`),
+              ].join('\n')
+              callbacks.onStatus?.('completed')
+              callbacks.onFinalAnswerRender?.(finalContent)
+              const finalTrace = recorder.add({
+                type: 'final',
+                title: multiUpdateSuccessCount > 0 ? '完成' : '更新失败',
+                status: multiUpdateSuccessCount > 0 ? 'success' : 'error',
+                message: finalContent,
+              })
+              callbacks.onTrace?.(finalTrace)
+
+              return {
+                runId,
+                content: finalContent,
+                stopped: false,
+                steps,
+                toolCalls,
+                changes,
+                trace: recorder.all(),
+              }
+            }
+          }
+
+          const forcedActionTool = getForcedActionTool(context)
+          if (forcedActionTool === 'note_create_file' && tool.name === forcedActionTool) {
+            finalContent = result.message || (
+              result.ok
+                ? '已按要求创建笔记文件。'
+                : '未能创建笔记文件。'
+            )
+            callbacks.onStatus?.('completed')
+            callbacks.onFinalAnswerRender?.(finalContent)
+            const finalTrace = recorder.add({
+              type: 'final',
+              title: result.ok ? '完成' : '创建失败',
+              status: result.ok ? 'success' : 'error',
+              message: finalContent,
+            })
+            callbacks.onTrace?.(finalTrace)
+            return {
+              runId,
+              content: finalContent,
+              stopped: false,
+              steps,
+              toolCalls,
+              changes,
+              trace: recorder.all(),
+            }
           }
 
           const forcedWriteTool = getForcedWriteTool(context)
@@ -1390,8 +1802,20 @@ export class AgentRuntime {
         trace: recorder.all(),
       }
     } catch (error) {
-      if (error instanceof Error && error.message === 'USER_STOPPED') {
+      if (
+        this.stopped
+        || (error instanceof Error && error.message === 'USER_STOPPED')
+        || isRequestAbortError(error)
+      ) {
+        // AbortController may surface an AbortError before the stream loop can throw
+        // USER_STOPPED. Treat both paths as a normal stop and preserve what the
+        // current model has already streamed to the user.
+        finalContent = activeModelContent || finalContent
+        finalizeInterruptedModelTrace('success', '模型响应已停止')
         callbacks.onStatus?.('stopped')
+        if (finalContent) {
+          callbacks.onFinalAnswerRender?.(finalContent)
+        }
         return {
           runId,
           content: finalContent,
@@ -1404,13 +1828,15 @@ export class AgentRuntime {
       }
 
       callbacks.onStatus?.('failed')
+      finalizeInterruptedModelTrace('error', '模型响应失败')
       const message = handleAIError(error, false) || (error instanceof Error ? error.message : String(error))
-      recorder.add({
+      const errorTrace = recorder.add({
         type: 'error',
         title: '执行失败',
         status: 'error',
         message,
       })
+      callbacks.onTrace?.(errorTrace)
       throw new Error(message)
     }
   }

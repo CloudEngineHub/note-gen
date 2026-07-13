@@ -3,7 +3,7 @@ import useChatStore from '@/stores/chat'
 import { skillManager } from '@/lib/skills'
 import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
-import { AgentRuntime } from './runtime'
+import { AgentRuntime, isRequestAbortError } from './runtime'
 import type { AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentStep, AgentTraceEvent, ToolCall } from './types'
 
 export interface AgentHandlerConfig {
@@ -38,6 +38,7 @@ export interface AgentHandlerConfig {
 
 export class AgentHandler {
   private runtime: AgentRuntime | null = null
+  private stopped = false
   private readonly config: AgentHandlerConfig
 
   constructor(config: AgentHandlerConfig) {
@@ -62,6 +63,16 @@ export class AgentHandler {
 
     await this.initializeMcp()
     const skillsInfo = await this.getSkillsInfo()
+
+    if (this.stopped) {
+      store.setAgentState({
+        isRunning: false,
+        isThinking: false,
+        status: 'stopped',
+      })
+      this.config.onComplete?.('', [], true)
+      return ''
+    }
 
     const messages = Array.isArray(contextOrMessages)
       ? contextOrMessages
@@ -139,6 +150,25 @@ export class AgentHandler {
       this.config.onComplete?.(result.content, result.steps, result.stopped)
       return result.content
     } catch (error) {
+      if (this.stopped || isRequestAbortError(error)) {
+        const agentState = useChatStore.getState().agentState
+        const latestModelOutput = [...(agentState.traceEvents || [])]
+          .reverse()
+          .find(event => (
+            event.type === 'model_response' || event.type === 'model_call'
+          ) && typeof event.output === 'string')
+          ?.output
+        const partialContent = agentState.finalAnswerContent
+          || (typeof latestModelOutput === 'string' ? latestModelOutput : '')
+        store.setAgentState({
+          isRunning: false,
+          isThinking: false,
+          status: 'stopped',
+        })
+        this.config.onComplete?.(partialContent, agentState.completedSteps, true)
+        return partialContent
+      }
+
       store.setAgentState({
         isRunning: false,
         isThinking: false,
@@ -151,6 +181,7 @@ export class AgentHandler {
   }
 
   stop() {
+    this.stopped = true
     this.runtime?.stop()
   }
 
