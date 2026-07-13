@@ -4,7 +4,7 @@ import { estimateTokens } from '@/lib/ai/token-counter'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
 import { AgentPermissionEngine, hasAuthoringIntent, hasEffectiveWriteIntent } from './permission-engine'
-import { AgentPromptAssembler } from './prompt-assembler'
+import { AgentPromptAssembler, hasInlineCurrentEditorState } from './prompt-assembler'
 import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
 import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
@@ -682,6 +682,24 @@ function getReadToolCallSignature(tool: AgentTool, args: Record<string, unknown>
   return `${tool.name}:${JSON.stringify(args)}`
 }
 
+function getOpenAITools(tools: AgentTool[], editorStateReadLocked: boolean) {
+  const availableTools = editorStateReadLocked
+    ? tools.filter((tool) => tool.name !== 'editor_get_state')
+    : tools
+
+  return agentToolRegistry.toOpenAITools(availableTools)
+}
+
+function isEditorStateStaleResult(tool: AgentTool, result: AgentToolResult) {
+  if (result.ok || !isMutatingTool(tool)) {
+    return false
+  }
+
+  return /content has changed|editor content.*changed|内容已变化|版本.*(?:变化|不匹配)/i.test(
+    `${result.error || ''}\n${result.message || ''}`
+  )
+}
+
 export class AgentRuntime {
   private readonly contextManager = new AgentContextManager()
   private readonly promptAssembler = new AgentPromptAssembler()
@@ -733,6 +751,7 @@ export class AgentRuntime {
     const context: AgentContextSnapshot = {
       activeChatId: input.activeChatId,
       activeFilePath: input.activeFilePath,
+      currentEditorState: input.currentEditorState,
       userInput: input.userInput,
       currentQuote: input.currentQuote,
       availableSkills: input.availableSkills,
@@ -748,6 +767,7 @@ export class AgentRuntime {
       userInput: input.userInput,
       imageCount: input.imageUrls?.length || 0,
       hasQuote: Boolean(input.currentQuote),
+      hasEditorState: Boolean(input.currentEditorState),
       availableSkillCount: input.availableSkills?.length || 0,
     })
 
@@ -867,10 +887,11 @@ export class AgentRuntime {
     }
 
     const client = await createOpenAIClient(aiConfig)
-    let openAITools = agentToolRegistry.toOpenAITools(tools)
+    let editorStateReadLocked = hasInlineCurrentEditorState(context)
+    let openAITools = getOpenAITools(tools, editorStateReadLocked)
     let baseToolChoice = buildToolChoice(context)
     let documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
-    let documentWideSnapshotRead = false
+    let documentWideSnapshotRead = editorStateReadLocked
     let finalContent = ''
     let missingWriteToolRepairCount = 0
     let invalidQuotedWriteRepairCount = 0
@@ -885,6 +906,7 @@ export class AgentRuntime {
       result: string
       repeatCount: number
     }>()
+    let latestEditorStateResult: AgentToolResult | undefined
     let activeModelTraceId: string | undefined
     let activeModelStartedAt = 0
     let activeModelReasoning = ''
@@ -915,11 +937,13 @@ export class AgentRuntime {
       const latest = payloads[payloads.length - 1]
       context.userInput = latest.text
       context.currentQuote = latest.currentQuote
+      context.currentEditorState = undefined
       context.multipleFileCreation = hasMultipleFileCreationIntent(latest.text)
       context.multipleFileUpdate = hasMultipleFileUpdateIntent(latest.text)
       context.requestedFileCount = getRequestedFileCount(latest.text)
       tools = selectToolsForContext(context, allTools)
-      openAITools = agentToolRegistry.toOpenAITools(tools)
+      editorStateReadLocked = false
+      openAITools = getOpenAITools(tools, editorStateReadLocked)
       baseToolChoice = buildToolChoice(context)
       documentWideBatchEditorIntent = hasDocumentWideBatchEditorIntent(context)
       documentWideSnapshotRead = false
@@ -1687,17 +1711,30 @@ export class AgentRuntime {
           callbacks.onToolCall?.(toolCall)
 
           const startedAt = Date.now()
+          const reusableEditorStateResult = toolName === 'editor_get_state' && editorStateReadLocked
+            ? latestEditorStateResult
+            : undefined
+          const reusedLockedEditorState = reusableEditorStateResult !== undefined
           agentDebugLog('tool_execute_start', {
             runId,
             iteration,
             toolName,
             args,
+            reusedLockedEditorState,
           })
-          const result = await tool.execute(args, {
-            runId,
-            signal: this.abortController?.signal,
-            context,
-          })
+          const result: AgentToolResult = reusableEditorStateResult
+            ? {
+                ...reusableEditorStateResult,
+                message: [
+                  reusableEditorStateResult.message,
+                  '本轮已经读取过相同的编辑器状态，请直接使用此前返回的内容，不要再次读取。',
+                ].join('\n\n'),
+              }
+            : await tool.execute(args, {
+                runId,
+                signal: this.abortController?.signal,
+                context,
+              })
           const duration = Date.now() - startedAt
           agentDebugLog('tool_execute_end', {
             runId,
@@ -1751,7 +1788,9 @@ export class AgentRuntime {
 
           let modelFacingResult = result
           let identicalReadResultRepeatCount = 0
-          const readToolCallSignature = getReadToolCallSignature(tool, args)
+          const readToolCallSignature = reusedLockedEditorState
+            ? undefined
+            : getReadToolCallSignature(tool, args)
           if (result.ok && readToolCallSignature) {
             const serializedResult = stringifyToolResult(result)
             const previousRead = readToolResultHistory.get(readToolCallSignature)
@@ -1813,10 +1852,25 @@ export class AgentRuntime {
           if (result.ok && isMutatingTool(tool)) {
             writeActionCompleted = true
             readToolResultHistory.clear()
+            latestEditorStateResult = undefined
+            editorStateReadLocked = false
+            openAITools = getOpenAITools(tools, editorStateReadLocked)
+          } else if (isEditorStateStaleResult(tool, result)) {
+            latestEditorStateResult = undefined
+            editorStateReadLocked = false
+            documentWideSnapshotRead = false
+            openAITools = getOpenAITools(tools, editorStateReadLocked)
           }
 
-          if (result.ok && documentWideBatchEditorIntent && tool.name === 'editor_get_state') {
-            documentWideSnapshotRead = true
+          if (result.ok && tool.name === 'editor_get_state') {
+            if (!reusedLockedEditorState) {
+              latestEditorStateResult = result
+            }
+            editorStateReadLocked = true
+            openAITools = getOpenAITools(tools, editorStateReadLocked)
+            if (documentWideBatchEditorIntent) {
+              documentWideSnapshotRead = true
+            }
           }
 
           if (result.ok && documentWideBatchEditorIntent && tool.name === 'editor_apply_transaction') {

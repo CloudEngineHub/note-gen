@@ -42,6 +42,7 @@ export type AgentToolRisk =
 export interface AgentContextSnapshot {
   activeChatId?: number
   activeFilePath?: string
+  currentEditorState?: AgentEditorStateSnapshot
   userInput: string
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
@@ -49,6 +50,15 @@ export interface AgentContextSnapshot {
   multipleFileCreation?: boolean
   multipleFileUpdate?: boolean
   requestedFileCount?: number
+}
+
+export interface AgentEditorStateSnapshot {
+  markdown: string
+  wordCount: number
+  charCount: number
+  totalLines: number
+  numberedLines: string
+  version: number
 }
 
 export interface AgentQuoteSnapshot {
@@ -167,6 +177,7 @@ export interface AgentRuntimeInput {
   imageUrls?: string[]
   activeChatId?: number
   activeFilePath?: string
+  currentEditorState?: AgentEditorStateSnapshot
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
 }

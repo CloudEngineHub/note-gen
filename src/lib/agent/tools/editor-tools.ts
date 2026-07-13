@@ -4,6 +4,7 @@ import useArticleStore from '@/stores/article'
 import { replaceLinesInRange } from '@/lib/agent/react-diff-helpers'
 import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from '@/lib/workspace'
+import type { AgentEditorStateSnapshot } from '../types'
 
 const EDITOR_TOOL_RESPONSE_TIMEOUT_MS = 200
 let storeBackedContentVersion = 0
@@ -13,7 +14,7 @@ function incrementStoreBackedContentVersion() {
   return storeBackedContentVersion
 }
 
-function buildEditorContentPayload(markdown: string, version: number) {
+function buildEditorContentPayload(markdown: string, version: number): AgentEditorStateSnapshot & { text: string } {
   const normalizedMarkdown = markdown.replace(/&nbsp;/g, ' ')
   const text = normalizedMarkdown
   const markdownLines = normalizedMarkdown.split('\n')
@@ -32,6 +33,38 @@ function buildEditorContentPayload(markdown: string, version: number) {
     numberedLines,
     version,
   }
+}
+
+export async function readCurrentEditorState(): Promise<AgentEditorStateSnapshot> {
+  return new Promise((resolve) => {
+    let settled = false
+
+    const finalize = (data: AgentEditorStateSnapshot) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve(data)
+    }
+
+    const timeoutId = setTimeout(() => {
+      void hydrateStoreBackedEditorContent().then(finalize)
+    }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
+
+    emitter.emit('editor-get-content', {
+      resolve: (data) => {
+        clearTimeout(timeoutId)
+        finalize({
+          markdown: data.markdown,
+          wordCount: data.wordCount,
+          charCount: data.charCount,
+          totalLines: data.totalLines ?? data.markdown.split('\n').length,
+          numberedLines: data.numberedLines ?? buildEditorContentPayload(data.markdown, data.version).numberedLines,
+          version: data.version,
+        })
+      },
+    })
+  })
 }
 
 function getStoreBackedEditorContent() {
@@ -322,35 +355,12 @@ export const getEditorContentTool: Tool = {
   requiresConfirmation: false,
   parameters: [],
   execute: async (): Promise<ToolResult> => {
-    return new Promise((resolve) => {
-      let settled = false
-
-      const finalize = (data: { markdown: string; text: string; wordCount: number; charCount: number; totalLines?: number; numberedLines?: string; version: number }) => {
-        if (settled) {
-          return
-        }
-        settled = true
-        resolve({
-          success: true,
-          data: {
-            ...data,
-            version: data.version,
-          },
-          message: `编辑器内容：${data.markdown.slice(0, 50)}${data.markdown.length > 50 ? '...' : ''} (${data.wordCount} 字，${data.totalLines || '?'} 行, v${data.version})`,
-        })
-      }
-
-      const timeoutId = setTimeout(() => {
-        void hydrateStoreBackedEditorContent().then(finalize)
-      }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
-
-      emitter.emit('editor-get-content', {
-        resolve: (data: { markdown: string; text: string; wordCount: number; charCount: number; totalLines?: number; numberedLines?: string; version: number }) => {
-          clearTimeout(timeoutId)
-          finalize(data)
-        },
-      })
-    })
+    const data = await readCurrentEditorState()
+    return {
+      success: true,
+      data,
+      message: `编辑器内容：${data.markdown.slice(0, 50)}${data.markdown.length > 50 ? '...' : ''} (${data.wordCount} 字，${data.totalLines} 行, v${data.version})`,
+    }
   },
 }
 

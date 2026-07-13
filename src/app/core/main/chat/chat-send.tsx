@@ -556,15 +556,14 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       let ragSources: string[] = []
       let ragSourceDetails: RagSource[] = []
 
-      // 1. 如果有当前打开的笔记，自动传入其内容
-      if (articleStore.activeFilePath && articleStore.currentArticle) {
-        context = `## 当前打开的笔记\n文件路径: ${articleStore.activeFilePath}\n\n内容:\n${articleStore.currentArticle}\n\n`
-      }
+      // 1. 当前编辑器内容由 AgentHandler 在模型调用前读取实时快照并注入系统提示词。
+      // 这里不再重复追加 currentArticle，避免同一篇正文占用两份上下文。
 
       agentDebugLog('chat_context_active_note', {
         activeFilePath: articleStore.activeFilePath || null,
         currentArticleLength: articleStore.currentArticle?.length || 0,
-        injected: Boolean(articleStore.activeFilePath && articleStore.currentArticle),
+        injected: false,
+        injectedByRuntimeSnapshot: Boolean(articleStore.activeFilePath),
         preview: previewText(articleStore.currentArticle || ''),
       })
 

@@ -4,6 +4,7 @@ import { skillManager } from '@/lib/skills'
 import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
+import { readCurrentEditorState } from './tools/editor-tools'
 import type { AgentApprovalDecision, AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 
 export interface AgentHandlerConfig {
@@ -75,6 +76,9 @@ export class AgentHandler {
 
     await this.initializeMcp()
     const skillsInfo = await this.getSkillsInfo()
+    const currentEditorState = this.config.activeFilePath
+      ? await readCurrentEditorState().catch(() => undefined)
+      : undefined
 
     if (this.stopped) {
       store.setAgentState({
@@ -99,6 +103,7 @@ export class AgentHandler {
         imageUrls,
         activeChatId: this.config.activeChatId,
         activeFilePath: this.config.activeFilePath,
+        currentEditorState,
         currentQuote: this.config.currentQuote,
         availableSkills: skillsInfo,
       }, {
