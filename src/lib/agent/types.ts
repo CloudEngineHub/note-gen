@@ -169,6 +169,7 @@ export interface AgentApprovalRequest {
   canApproveForSession?: boolean
   sessionApprovalType?: 'write' | 'runtime-script-skill'
   sessionApprovalSkillId?: string
+  approvalKind?: AgentApprovalKind
 }
 
 export interface AgentRuntimeInput {
@@ -191,6 +192,7 @@ export interface AgentSteeringPayload {
 }
 
 export type AgentApprovalDecision = 'approved' | 'denied' | 'steered'
+export type AgentApprovalKind = 'operation' | 'intent'
 
 export interface AgentRuntimeCallbacks {
   onStatus?: (status: AgentRunStatus) => void
@@ -211,6 +213,7 @@ export interface AgentRuntimeCallbacks {
       filePath?: string
       from?: number
       to?: number
+      approvalKind?: AgentApprovalKind
     }
   ) => Promise<AgentApprovalDecision>
 }
@@ -269,6 +272,7 @@ export interface ConfirmationRecord {
   scope?: 'once' | 'conversation'
   sessionApprovalType?: 'write' | 'runtime-script-skill'
   sessionApprovalSkillId?: string
+  approvalKind?: AgentApprovalKind
 }
 
 export interface AgentState {
@@ -299,6 +303,7 @@ export interface AgentState {
     canApproveForSession?: boolean
     sessionApprovalType?: 'write' | 'runtime-script-skill'
     sessionApprovalSkillId?: string
+    approvalKind?: AgentApprovalKind
   }
   confirmationHistory: ConfirmationRecord[]
   loadedSkills?: AgentSkillSummary[]

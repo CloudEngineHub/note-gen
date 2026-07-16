@@ -2214,6 +2214,12 @@
             "confirm": "确认",
             "confirmed": "已确认",
             "cancelled": "已取消",
+            "intent": {
+              "title": "是否继续修改？",
+              "description": "你的请求可能需要修改内容。请确认是否继续执行这一次操作。",
+              "continue": "继续",
+              "session": "本次会话允许"
+            },
             "fallback": {
               "title": "即将执行操作",
               "description": "请确认这次操作的目标和内容。"

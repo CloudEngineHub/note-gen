@@ -5,7 +5,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
 import { readCurrentEditorState } from './tools/editor-tools'
-import type { AgentApprovalDecision, AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
+import type { AgentApprovalDecision, AgentApprovalKind, AgentChange, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 
 export interface AgentHandlerConfig {
   activeChatId?: number
@@ -27,6 +27,7 @@ export interface AgentHandlerConfig {
       filePath?: string
       from?: number
       to?: number
+      approvalKind?: AgentApprovalKind
     }
   ) => Promise<AgentApprovalDecision>
   currentQuote?: {

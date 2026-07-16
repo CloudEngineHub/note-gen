@@ -2169,7 +2169,13 @@
             "cancel": "取消",
             "confirm": "確認",
             "confirmed": "已確認",
-            "cancelled": "已取消"
+            "cancelled": "已取消",
+            "intent": {
+              "title": "是否繼續修改？",
+              "description": "你的請求可能需要修改內容。請確認是否繼續執行這一次操作。",
+              "continue": "繼續",
+              "session": "本次對話允許"
+            }
           }
         },
         "fileLink": {

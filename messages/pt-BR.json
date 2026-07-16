@@ -2236,7 +2236,13 @@
             "cancel": "Cancelar",
             "confirm": "Confirmar",
             "confirmed": "Confirmado",
-            "cancelled": "Cancelado"
+            "cancelled": "Cancelado",
+            "intent": {
+              "title": "Continuar com esta alteração?",
+              "description": "Sua solicitação pode exigir alterações no conteúdo. Confirme se deseja continuar com esta operação.",
+              "continue": "Continuar",
+              "session": "Permitir nesta sessão"
+            }
           }
         },
         "imageSelector": {

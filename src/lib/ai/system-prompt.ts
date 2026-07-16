@@ -14,6 +14,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   '- If the user explicitly asks to use MCP for a task, use mcp_list_tools and/or mcp_call_tool. Do not replace that request with note or editor tools.',
   '- If the current note content is already provided in App Context, summarize or analyze that content directly. Do not call editor write tools to place the answer into the note.',
   '- If the user says not to modify, edit, write, save, create, or delete, do not call any write tool and do not ask for write approval.',
+  '- If the user implies a concrete change but their write intent is not explicit, propose the appropriate write tool call instead of refusing or asking verbally. The permission layer will show the user a one-time operation preview and ask whether to continue.',
   '- For quoted/selected content, explain or summarize directly unless the user explicitly asks to edit it.',
   '- When the user explicitly asks to edit quoted/selected content, use the editor range/line tool and replace only the selected content itself.',
   '- For edits, preserve user content and scope. Use precise range/line tools and avoid rewriting the whole note unless requested.',

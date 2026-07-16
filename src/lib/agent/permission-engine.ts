@@ -1,4 +1,4 @@
-import type { AgentContextSnapshot, AgentTool, AgentToolRisk } from './types'
+import type { AgentApprovalKind, AgentContextSnapshot, AgentTool, AgentToolRisk } from './types'
 import { mcpServerManager } from '@/lib/mcp/server-manager'
 import type { MCPToolAnnotations } from '@/lib/mcp/types'
 
@@ -9,6 +9,7 @@ export interface PermissionDecision {
   canApproveForSession?: boolean
   sessionApprovalType?: 'write' | 'runtime-script-skill'
   sessionApprovalSkillId?: string
+  approvalKind?: AgentApprovalKind
 }
 
 const READ_RISKS = new Set<AgentToolRisk>(['read'])
@@ -218,7 +219,8 @@ export class AgentPermissionEngine {
       }
     }
 
-    const writeIntentDecision = this.evaluateWriteIntent(context)
+    const canApproveForSession = SESSION_APPROVABLE_RISKS.has(tool.risk)
+    const writeIntentDecision = this.evaluateWriteIntent(context, canApproveForSession)
     if (writeIntentDecision) {
       return writeIntentDecision
     }
@@ -231,7 +233,10 @@ export class AgentPermissionEngine {
     }
   }
 
-  private evaluateWriteIntent(context?: AgentContextSnapshot): PermissionDecision | null {
+  private evaluateWriteIntent(
+    context?: AgentContextSnapshot,
+    canApproveForSession = false
+  ): PermissionDecision | null {
     const userInput = context?.userInput?.trim() || ''
 
     if (!userInput) {
@@ -248,9 +253,12 @@ export class AgentPermissionEngine {
 
     if (!hasEffectiveWriteIntent(context)) {
       return {
-        allowed: false,
-        requiresApproval: false,
-        reason: '用户没有明确要求写入、修改、创建或删除。本次请求只能使用只读工具或直接回答。',
+        allowed: true,
+        requiresApproval: true,
+        canApproveForSession,
+        sessionApprovalType: canApproveForSession ? 'write' : undefined,
+        approvalKind: 'intent',
+        reason: '用户的写入意图不明确，需要确认是否继续执行这一次操作。',
       }
     }
 

@@ -21,7 +21,7 @@ import { ImageAttachment } from "./image-attachments"
 import type { RagSource } from "@/lib/rag"
 import { cn } from "@/lib/utils"
 import type { AgentTraceEvent } from "@/lib/agent/types"
-import type { AgentApprovalDecision, AgentSteeringPayload } from "@/lib/agent/types"
+import type { AgentApprovalDecision, AgentApprovalKind, AgentSteeringPayload } from "@/lib/agent/types"
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -268,6 +268,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       filePath?: string
       from?: number
       to?: number
+      approvalKind?: AgentApprovalKind
     }
   ): Promise<AgentApprovalDecision> => {
     const tool = getToolByName(toolName)
@@ -301,6 +302,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         context,
         canApproveForSession,
         sessionApprovalScope,
+        approvalKind: context?.approvalKind,
       })
 
       // 将确认请求保存到 store，在对话中显示

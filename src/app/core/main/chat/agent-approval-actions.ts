@@ -8,17 +8,19 @@ export function confirmPendingAgentAction(scope: AgentApprovalScope = "once") {
   const pendingConfirmation = latestState.agentState.pendingConfirmation
   if (!pendingConfirmation) return
 
+  const effectiveScope = scope
   const confirmationRecord = {
     toolName: pendingConfirmation.toolName,
     params: pendingConfirmation.params,
     status: "confirmed" as const,
     timestamp: Date.now(),
-    scope,
+    scope: effectiveScope,
     sessionApprovalType: pendingConfirmation.sessionApprovalType,
     sessionApprovalSkillId: pendingConfirmation.sessionApprovalSkillId,
+    approvalKind: pendingConfirmation.approvalKind,
   }
 
-  if (scope === "conversation" && latestState.currentConversationId !== null) {
+  if (effectiveScope === "conversation" && latestState.currentConversationId !== null) {
     latestState.setAgentAutoApproveConversationId(latestState.currentConversationId)
     latestState.setAgentAutoApproveRuntimeSkillId(
       pendingConfirmation.sessionApprovalType === "runtime-script-skill"
@@ -46,6 +48,7 @@ export function cancelPendingAgentAction() {
     params: pendingConfirmation.params,
     status: "cancelled" as const,
     timestamp: Date.now(),
+    approvalKind: pendingConfirmation.approvalKind,
   }
 
   agentDebugLog("approval_user_cancelled", confirmationRecord)

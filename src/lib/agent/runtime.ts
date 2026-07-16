@@ -705,6 +705,7 @@ export class AgentRuntime {
   private readonly promptAssembler = new AgentPromptAssembler()
   private readonly permissionEngine = new AgentPermissionEngine()
   private readonly recoveryManager = new AgentRecoveryManager()
+  private readonly approvedIntentTools = new Set<string>()
   private abortController: AbortController | null = null
   private stopped = false
   private steeringRequested = false
@@ -1553,16 +1554,21 @@ export class AgentRuntime {
           }
 
           const permission = this.permissionEngine.evaluate(tool, args, context)
+          const reusesIntentApproval = permission.approvalKind === 'intent' &&
+            this.approvedIntentTools.has(tool.name)
+          const requiresApproval = permission.requiresApproval && !reusesIntentApproval
           agentDebugLog('permission_decision', {
             runId,
             toolName,
             risk: tool.risk,
             allowed: permission.allowed,
-            requiresApproval: permission.requiresApproval,
+            requiresApproval,
             reason: permission.reason,
             canApproveForSession: permission.canApproveForSession,
             sessionApprovalType: permission.sessionApprovalType,
             sessionApprovalSkillId: permission.sessionApprovalSkillId,
+            approvalKind: permission.approvalKind,
+            reusesIntentApproval,
           })
           if (!permission.allowed) {
             const deniedResult: AgentToolResult = {
@@ -1586,7 +1592,7 @@ export class AgentRuntime {
             continue
           }
 
-          if (permission.requiresApproval) {
+          if (requiresApproval) {
             callbacks.onStatus?.('waiting_approval')
             agentDebugLog('approval_request', {
               runId,
@@ -1595,7 +1601,7 @@ export class AgentRuntime {
             })
             const approvalTrace = recorder.add({
               type: 'approval',
-              title: '等待用户确认',
+              title: permission.approvalKind === 'intent' ? '等待用户确认是否继续' : '等待用户确认',
               status: 'running',
               toolName,
               input: args,
@@ -1606,7 +1612,10 @@ export class AgentRuntime {
             const approvalDecision = await callbacks.requestConfirmation?.(
               tool.name,
               args,
-              approvalPreview ?? { previewParams: args }
+              {
+                ...(approvalPreview ?? { previewParams: args }),
+                approvalKind: permission.approvalKind,
+              }
             )
 
             agentDebugLog('approval_result', {
@@ -1614,6 +1623,7 @@ export class AgentRuntime {
               toolName,
               approved: approvalDecision === 'approved',
               decision: approvalDecision,
+              approvalKind: permission.approvalKind,
             })
 
             if (approvalDecision === 'steered') {
@@ -1684,6 +1694,10 @@ export class AgentRuntime {
                 changes,
                 trace: recorder.all(),
               }
+            }
+
+            if (permission.approvalKind === 'intent') {
+              this.approvedIntentTools.add(tool.name)
             }
 
             const updatedApprovalTrace = recorder.update(approvalTrace.id, {

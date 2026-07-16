@@ -2163,7 +2163,13 @@
             "cancel": "キャンセル",
             "confirm": "確認",
             "confirmed": "確認済み",
-            "cancelled": "キャンセル済み"
+            "cancelled": "キャンセル済み",
+            "intent": {
+              "title": "この変更を続行しますか？",
+              "description": "リクエストには内容の変更が必要な可能性があります。この操作を続行するか確認してください。",
+              "continue": "続行",
+              "session": "このセッションで許可"
+            }
           }
         },
         "imageSelector": {

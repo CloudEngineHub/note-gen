@@ -2299,6 +2299,12 @@
             "confirm": "Confirm",
             "confirmed": "Confirmed",
             "cancelled": "Cancelled",
+            "intent": {
+              "title": "Continue with this change?",
+              "description": "Your request may require changing content. Confirm whether to continue with this operation.",
+              "continue": "Continue",
+              "session": "Allow for this session"
+            },
             "fallback": {
               "title": "Review action",
               "description": "Please confirm the target and content of this action."
