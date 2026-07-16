@@ -301,6 +301,73 @@ export async function createOpenAIClient(AiConfig?: AiConfig): Promise<OpenAICom
   })
 }
 
+function getAIRequestErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
+export function isUnsupportedToolChoiceError(error: unknown): boolean {
+  const message = getAIRequestErrorMessage(error)
+  return /tool[_\s-]?choice/i.test(message)
+    && /不支持|not\s+support|unsupported|unknown\s+(?:parameter|field)|invalid\s+(?:parameter|field)/i.test(message)
+}
+
+function omitToolChoice(
+  params: OpenAI.Chat.ChatCompletionCreateParamsStreaming
+): OpenAI.Chat.ChatCompletionCreateParamsStreaming {
+  const fallbackParams = { ...params }
+  delete fallbackParams.tool_choice
+  return fallbackParams
+}
+
+/**
+ * 部分 OpenAI 兼容的思考模型支持 tools，但会拒绝 tool_choice。
+ * 首次请求遇到此类错误时，保留工具定义并省略 tool_choice 重试。
+ */
+export async function createChatCompletionStreamWithToolChoiceFallback(
+  client: OpenAICompatibleClient,
+  params: OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+  options?: { signal?: AbortSignal }
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+  const fallbackParams = omitToolChoice(params)
+  let initialStream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
+
+  try {
+    initialStream = await client.chat.completions.create(params, options)
+  } catch (error) {
+    if (params.tool_choice === undefined || !isUnsupportedToolChoiceError(error)) {
+      throw error
+    }
+    return client.chat.completions.create(fallbackParams, options)
+  }
+
+  return (async function* () {
+    let receivedChunk = false
+
+    try {
+      for await (const chunk of initialStream) {
+        receivedChunk = true
+        yield chunk
+      }
+    } catch (error) {
+      if (receivedChunk || params.tool_choice === undefined || !isUnsupportedToolChoiceError(error)) {
+        throw error
+      }
+
+      const fallbackStream = await client.chat.completions.create(fallbackParams, options)
+      for await (const chunk of fallbackStream) {
+        yield chunk
+      }
+    }
+  })()
+}
+
 function supportsEnableThinkingSwitch(aiConfig?: AiConfig): boolean {
   const model = aiConfig?.model?.toLowerCase() || ''
   const baseURL = aiConfig?.baseURL?.toLowerCase() || ''

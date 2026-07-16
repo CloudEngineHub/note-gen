@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
+import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, createChatCompletionStreamWithToolChoiceFallback, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
 
 /**
  * 非流式方式获取AI结果
@@ -141,9 +141,9 @@ export async function fetchAiStream(
       requestParams.tool_choice = 'auto'
     }
 
-    const stream = await openai.chat.completions.create(requestParams, {
+    const stream = await createChatCompletionStreamWithToolChoiceFallback(openai, requestParams, {
       signal: abortSignal
-    }) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
+    })
 
     let thinking = ''
     let fullContent = ''
@@ -333,7 +333,7 @@ export async function fetchAiStream(
           ...toolResults
         ]
         
-        const nextStream = await openai.chat.completions.create({
+        const nextStream = await createChatCompletionStreamWithToolChoiceFallback(openai, {
           model: aiConfig?.model || '',
           messages: conversationMessages,
           temperature: aiConfig?.temperature,
@@ -344,7 +344,7 @@ export async function fetchAiStream(
           ...getChatTokenLimitParams(aiConfig),
         }, {
           signal: abortSignal
-        }) as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
+        })
         
         // 重置工具调用数组
         currentToolCalls = []

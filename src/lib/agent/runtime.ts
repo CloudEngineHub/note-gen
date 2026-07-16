@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import { createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
+import { createChatCompletionStreamWithToolChoiceFallback, createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
 import { estimateTokens } from '@/lib/ai/token-counter'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
@@ -1032,7 +1032,7 @@ export class AgentRuntime {
           ? forceToolChoice(documentWideSnapshotRead ? 'editor_apply_transaction' : 'editor_get_state')
           : baseToolChoice
         const stream = await this.recoveryManager.withRetry(() =>
-          client.chat.completions.create(withFastAiRequestOptions({
+          createChatCompletionStreamWithToolChoiceFallback(client, withFastAiRequestOptions({
             model: aiConfig?.model || '',
             messages,
             temperature: aiConfig?.temperature,
