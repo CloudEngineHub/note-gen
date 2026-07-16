@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from 'next-intl';
 import { useLocalStorage } from 'react-use';
 import { Store } from "@tauri-apps/plugin-store";
@@ -44,6 +44,13 @@ export default function AiPage() {
   const [expandedModels, setExpandedModels] = useState<string[]>([])
   const [providerTemplates, setProviderTemplates] = useState<AiConfig[]>([])
   const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const aiModelListRef = useRef(aiModelList)
+  const storeWriteQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const isTitleComposingRef = useRef(false)
+
+  useEffect(() => {
+    aiModelListRef.current = aiModelList
+  }, [aiModelList])
   
   // 使用 useLocalStorage 记录当前选择的AI配置
   const [selectedAiConfig, setSelectedAiConfig] = useLocalStorage<string>('ai-config-selected', '')
@@ -125,15 +132,24 @@ export default function AiPage() {
 
   // 更新AI配置到store
   const updateAiConfig = async (config: AiConfig) => {
-    const store = await Store.load('store.json')
-    const aiModelList = await store.get<AiConfig[]>('aiModelList') || []
-    const index = aiModelList.findIndex(item => item.key === config.key)
-    
-    if (index >= 0) {
-      aiModelList[index] = config
-      await store.set('aiModelList', aiModelList)
-      setAiModelList(aiModelList)
-    }
+    const updatedList = aiModelListRef.current.map(item =>
+      item.key === config.key ? config : item
+    )
+
+    if (!updatedList.some(item => item.key === config.key)) return
+
+    // Keep input state in sync with native IME composition. Waiting for the
+    // async store round trip before updating React state resets the input to an
+    // older composition value and duplicates partial Pinyin syllables.
+    aiModelListRef.current = updatedList
+    setAiModelList(updatedList)
+
+    storeWriteQueueRef.current = storeWriteQueueRef.current.then(async () => {
+      const store = await Store.load('store.json')
+      await store.set('aiModelList', updatedList)
+    })
+
+    await storeWriteQueueRef.current
   }
 
   // 复制当前配置
@@ -368,8 +384,22 @@ export default function AiPage() {
               {!currentProviderTemplate && (
                 <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
                     <Input 
-                      value={currentConfig.title} 
-                      onChange={(e) => updateAiConfig({...currentConfig, title: e.target.value})} 
+                      key={currentConfig.key}
+                      defaultValue={currentConfig.title}
+                      onChange={(e) => {
+                        if (isTitleComposingRef.current) return
+                        void updateAiConfig({...currentConfig, title: e.target.value})
+                      }}
+                      onCompositionStart={() => {
+                        isTitleComposingRef.current = true
+                      }}
+                      onCompositionEnd={(e) => {
+                        const input = e.currentTarget
+                        window.setTimeout(() => {
+                          isTitleComposingRef.current = false
+                          void updateAiConfig({...currentConfig, title: input.value})
+                        }, 0)
+                      }}
                     />
                 </FormItem>
               )}
