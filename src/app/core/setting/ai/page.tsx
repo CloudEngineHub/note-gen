@@ -10,8 +10,10 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select"
 import {
   Accordion,
@@ -19,7 +21,7 @@ import {
 import Image from "next/image";
 
 import { SettingType, FormItem } from "../components/setting-base";
-import { AiConfig, ModelConfig, builtinProviderTemplates } from "../config";
+import { AiConfig, ModelConfig, ProxyMode, builtinProviderTemplates } from "../config";
 import useSettingStore from "@/stores/setting";
 import { noteGenModelKeys } from "@/app/model-config";
 import { BotMessageSquare, Copy, Eye, EyeOff, LoaderCircle, Plus, Trash2, X } from "lucide-react";
@@ -28,6 +30,7 @@ import DefaultModelsSection from "./default-models";
 import ModelCard from "./model-card";
 import CreateConfig from "./create";
 import { getCachedProviderTemplates, getProviderTemplateMatch, loadProviderTemplates } from "@/lib/ai/provider-templates-runtime";
+import { isValidProxyURL } from "@/lib/ai/tauri-client";
 
 
 export default function AiPage() {
@@ -58,6 +61,7 @@ export default function AiPage() {
   // 当前选中的AI配置
   const currentConfig = userCustomModels.find(model => model.key === selectedAiConfig)
   const currentProviderTemplate = getProviderTemplateMatch(currentConfig, providerTemplates)
+  const proxyURLInvalid = currentConfig?.proxyMode === 'custom' && !isValidProxyURL(currentConfig.proxyURL)
   
   const parseHeadersToKeyValue = (headers: Record<string, string> = {}) => {
     return Object.entries(headers).map(([key, value]) => ({
@@ -434,6 +438,47 @@ export default function AiPage() {
                       />
                     )}
                   </div>
+              </FormItem>
+
+              <FormItem title={t('proxyModeTitle')} desc={t('proxyModeDesc')}>
+                <div className="flex w-full flex-col gap-2" data-invalid={proxyURLInvalid || undefined}>
+                  <Select
+                    value={currentConfig.proxyMode || 'inherit'}
+                    onValueChange={(value: ProxyMode) => updateAiConfig({
+                      ...currentConfig,
+                      proxyMode: value,
+                    })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="inherit">{t('proxyModeInherit')}</SelectItem>
+                        <SelectItem value="direct">{t('proxyModeDirect')}</SelectItem>
+                        <SelectItem value="custom">{t('proxyModeCustom')}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {currentConfig.proxyMode === 'custom' && (
+                    <Input
+                      id="ai-provider-proxy-url"
+                      value={currentConfig.proxyURL || ''}
+                      placeholder={t('proxyURLPlaceholder')}
+                      aria-invalid={proxyURLInvalid}
+                      aria-describedby={proxyURLInvalid ? 'ai-provider-proxy-url-error' : undefined}
+                      onChange={(event) => updateAiConfig({
+                        ...currentConfig,
+                        proxyURL: event.target.value,
+                      })}
+                    />
+                  )}
+                  {proxyURLInvalid && (
+                    <p id="ai-provider-proxy-url-error" role="alert" className="text-sm text-destructive">
+                      {t('proxyURLInvalid')}
+                    </p>
+                  )}
+                </div>
               </FormItem>
 
               {/* 自定义Headers */}

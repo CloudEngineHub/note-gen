@@ -1,7 +1,7 @@
 import { Store } from "@tauri-apps/plugin-store";
 import { AiConfig } from "@/app/core/setting/config";
 import { handleAIError } from "./utils";
-import { invokeAiJson } from "./tauri-client";
+import { invokeAiJson, resolveAiRequestConfig } from "./tauri-client";
 
 // 嵌入请求响应类型
 interface EmbeddingResponse {
@@ -109,7 +109,7 @@ export async function checkRerankModelAvailable(): Promise<boolean> {
     const modelInfo = await getRerankModelInfo();
     if (!modelInfo) return false;
     
-    const { baseURL, apiKey, model } = modelInfo;
+    const { baseURL, model } = modelInfo;
     if (!baseURL || !model) return false;
     
     // 测试重排序模型
@@ -121,11 +121,7 @@ export async function checkRerankModelAvailable(): Promise<boolean> {
     
     // 发送测试请求
     const data = await invokeAiJson<any>({
-      config: {
-        baseUrl: baseURL,
-        apiKey: apiKey || undefined,
-        customHeaders: modelInfo.customHeaders,
-      },
+      config: await resolveAiRequestConfig(modelInfo),
       path: '/rerank',
       method: 'POST',
       body: {
@@ -155,7 +151,7 @@ export async function fetchEmbedding(text: string): Promise<number[] | null> {
         throw new Error('未配置嵌入模型或模型配置不正确');
       }
       
-      const { baseURL, apiKey, model } = modelInfo;
+      const { baseURL, model } = modelInfo;
 
       if (!baseURL || !model) {
         throw new Error('嵌入模型配置不完整');
@@ -163,11 +159,7 @@ export async function fetchEmbedding(text: string): Promise<number[] | null> {
       
       // 发送嵌入请求
       const data = await invokeAiJson<EmbeddingResponse>({
-        config: {
-          baseUrl: baseURL,
-          apiKey: apiKey || undefined,
-          customHeaders: modelInfo.customHeaders,
-        },
+        config: await resolveAiRequestConfig(modelInfo),
         path: '/embeddings',
         method: 'POST',
         body: {
@@ -210,7 +202,7 @@ export async function rerankDocuments(
       return documents;
     }
 
-    const { baseURL, apiKey, model } = modelInfo;
+    const { baseURL, model } = modelInfo;
 
     if (!baseURL || !model) {
       return documents;
@@ -219,11 +211,7 @@ export async function rerankDocuments(
     const passages = documents.map(doc => doc.content);
 
     const data = await invokeAiJson<any>({
-      config: {
-        baseUrl: baseURL,
-        apiKey: apiKey || undefined,
-        customHeaders: modelInfo.customHeaders,
-      },
+      config: await resolveAiRequestConfig(modelInfo),
       path: '/rerank',
       method: 'POST',
       body: {

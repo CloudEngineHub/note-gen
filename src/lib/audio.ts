@@ -2,7 +2,7 @@ import useSettingStore from '@/stores/setting'
 import { resolvePreferredSpeechEngine } from '@/lib/speech/runtime.ts'
 import type { SpeechTask } from '@/lib/speech/types.ts'
 import { NO_TRANSCRIPTION_MESSAGE } from '@/lib/speech/transcription-fallback.ts'
-import { blobToBytes, invokeAiBinary, invokeAiMultipart } from '@/lib/ai/tauri-client'
+import { blobToBytes, invokeAiBinary, invokeAiMultipart, resolveAiRequestConfig } from '@/lib/ai/tauri-client'
 
 /**
  * 使用浏览器原生语音合成API进行朗读
@@ -141,11 +141,7 @@ export async function fetchAudioSpeech(text: string, customVoice?: string, custo
 
   try {
     return await invokeAiBinary({
-      config: {
-        baseUrl: audioConfig.baseURL,
-        apiKey: audioConfig.apiKey,
-        customHeaders: audioConfig.customHeaders,
-      },
+      config: await resolveAiRequestConfig(audioConfig),
       path: '/audio/speech',
       method: 'POST',
       body: requestBody,
@@ -442,11 +438,7 @@ export async function fetchAudioTranscription(audioBlob: Blob): Promise<string> 
 
   try {
     const result = await invokeAiMultipart<AudioTranscriptionResponse>({
-      config: {
-        baseUrl: sttConfig.baseURL,
-        apiKey: sttConfig.apiKey,
-        customHeaders: sttConfig.customHeaders,
-      },
+      config: await resolveAiRequestConfig(sttConfig),
       path: '/audio/transcriptions',
       fileFieldName: 'file',
       fields: {

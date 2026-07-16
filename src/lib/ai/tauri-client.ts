@@ -1,16 +1,39 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import type OpenAI from 'openai'
 import type { ModelsPage } from 'openai/resources/models'
+import { Store } from '@tauri-apps/plugin-store'
 import type { AiConfig } from '@/app/core/setting/config'
 
 type JsonValue = Record<string, unknown>
 
-interface JsonRequestPayload {
-  config: {
-    baseUrl: string
-    apiKey?: string
-    customHeaders?: Record<string, string>
+export interface AiRequestConfig {
+  baseUrl: string
+  apiKey?: string
+  customHeaders?: Record<string, string>
+  proxy?: AiProxyConfig
+}
+
+export type AiProxyConfig =
+  | { mode: 'direct' }
+  | { mode: 'custom'; url: string }
+
+const SUPPORTED_PROXY_PROTOCOLS = new Set(['http:', 'https:', 'socks5:', 'socks5h:'])
+
+export function isValidProxyURL(proxyURL: string | undefined): boolean {
+  const value = proxyURL?.trim()
+  if (!value) return false
+
+  try {
+    const normalizedValue = /^[a-z][a-z\d+.-]*:\/\//i.test(value) ? value : `http://${value}`
+    const url = new URL(normalizedValue)
+    return !!url.hostname && SUPPORTED_PROXY_PROTOCOLS.has(url.protocol)
+  } catch {
+    return false
   }
+}
+
+interface JsonRequestPayload {
+  config: AiRequestConfig
   path: string
   method?: string
   body?: unknown
@@ -18,11 +41,7 @@ interface JsonRequestPayload {
 }
 
 interface MultipartRequestPayload {
-  config: {
-    baseUrl: string
-    apiKey?: string
-    customHeaders?: Record<string, string>
-  }
+  config: AiRequestConfig
   path: string
   fields?: Record<string, string>
   fileFieldName: string
@@ -107,11 +126,29 @@ function createRequestId() {
     : `${Date.now()}-${Math.random()}`
 }
 
-function normalizeConfig(aiConfig?: AiConfig) {
+export async function resolveAiRequestConfig(aiConfig?: AiConfig): Promise<AiRequestConfig> {
+  const proxyMode = aiConfig?.proxyMode || 'inherit'
+  let proxy: AiProxyConfig = { mode: 'direct' }
+
+  if (proxyMode === 'inherit') {
+    const store = await Store.load('store.json')
+    const globalProxyURL = (await store.get<string>('proxy'))?.trim()
+    if (globalProxyURL) {
+      proxy = { mode: 'custom', url: globalProxyURL }
+    }
+  } else if (proxyMode === 'custom') {
+    const customProxyURL = aiConfig?.proxyURL?.trim()
+    if (!isValidProxyURL(customProxyURL)) {
+      throw new Error('Invalid custom proxy URL.')
+    }
+    proxy = { mode: 'custom', url: customProxyURL as string }
+  }
+
   return {
     baseUrl: aiConfig?.baseURL || '',
     apiKey: aiConfig?.apiKey,
     customHeaders: aiConfig?.customHeaders,
+    proxy,
   }
 }
 
@@ -208,7 +245,7 @@ export async function invokeAiMultipart<T = JsonValue>(
 
 function createStreamingIterable<T>(
   request: {
-    config: ReturnType<typeof normalizeConfig>
+    config: AiRequestConfig
     requestId: string
     body: unknown
   },
@@ -258,8 +295,8 @@ export type OpenAICompatibleClient = {
   }
 }
 
-export function createTauriOpenAIClient(aiConfig?: AiConfig): OpenAICompatibleClient {
-  const config = normalizeConfig(aiConfig)
+export async function createTauriOpenAIClient(aiConfig?: AiConfig): Promise<OpenAICompatibleClient> {
+  const config = await resolveAiRequestConfig(aiConfig)
 
   return {
     chat: {

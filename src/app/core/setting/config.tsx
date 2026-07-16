@@ -106,6 +106,7 @@ const baseConfig = [
 export default baseConfig
 
 export type ModelType = 'chat' | 'image' | 'video' | 'tts' | 'stt' | 'embedding' | 'rerank';
+export type ProxyMode = 'inherit' | 'direct' | 'custom';
 
 export interface ModelConfig {
   id: string
@@ -129,6 +130,8 @@ export interface AiConfig {
   icon?: string
   apiKeyUrl?: string
   customHeaders?: Record<string, string>
+  proxyMode?: ProxyMode
+  proxyURL?: string
   models?: ModelConfig[]
   // 保持向后兼容
   model?: string

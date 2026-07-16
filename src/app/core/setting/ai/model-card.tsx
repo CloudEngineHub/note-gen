@@ -19,7 +19,7 @@ import ModelSelect from "./modelSelect"
 import { useState, useRef } from "react"
 import { createOpenAIClient } from "@/lib/ai/utils"
 import { toast } from "@/hooks/use-toast"
-import { blobToBytes, invokeAiBinary, invokeAiJson, invokeAiMultipart } from "@/lib/ai/tauri-client"
+import { blobToBytes, invokeAiBinary, invokeAiJson, invokeAiMultipart, resolveAiRequestConfig } from "@/lib/ai/tauri-client"
 
 interface ModelCardProps {
   modelConfig: ModelConfig
@@ -74,17 +74,14 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
         voice: model.voice,
         enableStream: model.enableStream
       }
+      const requestConfig = await resolveAiRequestConfig(fullAiConfig)
 
       switch (model.modelType) {
         case 'rerank':
           const query = 'Apple'
           const documents = ["apple","banana","fruit","vegetable"]
           const rerankData = await invokeAiJson<any>({
-            config: {
-              baseUrl: aiConfig.baseURL,
-              apiKey: aiConfig.apiKey,
-              customHeaders: aiConfig.customHeaders,
-            },
+            config: requestConfig,
             path: '/rerank',
             method: 'POST',
             body: {
@@ -101,11 +98,7 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
         case 'embedding':
           const testText = '测试文本'
           const embeddingDataJson = await invokeAiJson<any>({
-            config: {
-              baseUrl: aiConfig.baseURL,
-              apiKey: aiConfig.apiKey,
-              customHeaders: aiConfig.customHeaders,
-            },
+            config: requestConfig,
             path: '/embeddings',
             method: 'POST',
             body: {
@@ -122,11 +115,7 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
         case 'tts':
           const testAudioText = '测试音频生成'
           const ttsBuffer = await invokeAiBinary({
-            config: {
-              baseUrl: aiConfig.baseURL,
-              apiKey: aiConfig.apiKey,
-              customHeaders: aiConfig.customHeaders,
-            },
+            config: requestConfig,
             path: '/audio/speech',
             method: 'POST',
             body: {
@@ -144,11 +133,7 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
           const testAudioBlob = new Blob([new Uint8Array(100)], { type: 'audio/webm' })
           try {
             await invokeAiMultipart({
-              config: {
-                baseUrl: aiConfig.baseURL,
-                apiKey: aiConfig.apiKey,
-                customHeaders: aiConfig.customHeaders,
-              },
+              config: requestConfig,
               path: '/audio/transcriptions',
               fileFieldName: 'file',
               fields: {
