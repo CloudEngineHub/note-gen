@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/gitea";
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import { GiteaInstanceType, GITEA_INSTANCES } from "@/lib/sync/gitea.types";
-import { Eye, EyeOff, Globe, Server, Plus, RefreshCcw } from "lucide-react";
+import { Globe, Server, Plus, RefreshCcw } from "lucide-react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
 
@@ -241,21 +242,13 @@ export function GiteaSync() {
       {/* Token 输入 */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Gitea Access Token</label>
-        <div className="flex gap-2">
-          <Input
-            value={giteaAccessToken}
-            onChange={tokenChangeHandler}
-            type={giteaAccessTokenVisible ? 'text' : 'password'}
-            placeholder={t('settings.sync.enterToken')}
-          />
-          <Button variant="outline" size="icon" onClick={() => setGiteaAccessTokenVisible(!giteaAccessTokenVisible)}>
-            {giteaAccessTokenVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </Button>
-        </div>
-        <OpenBroswer
-          url={getTokenCreateUrl()}
-          title={t('settings.sync.newToken')}
-          className="text-sm text-blue-500 hover:underline"
+        <TokenInputControl
+          value={giteaAccessToken}
+          onChange={tokenChangeHandler}
+          visible={giteaAccessTokenVisible}
+          onVisibleChange={setGiteaAccessTokenVisible}
+          tokenUrl={getTokenCreateUrl()}
+          placeholder={t('settings.sync.enterToken')}
         />
       </div>
 

@@ -12,8 +12,9 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/gitee";
 import { Button } from "@/components/ui/button";
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
-import { Eye, EyeOff, Plus, RefreshCcw } from "lucide-react";
+import { Plus, RefreshCcw } from "lucide-react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
 
@@ -185,13 +186,14 @@ export function GiteeSync() {
       {/* Token 输入 */}
       <div className="space-y-2">
         <label className="text-sm font-medium">Gitee 私人令牌</label>
-        <div className="flex gap-2">
-          <Input value={giteeAccessToken} onChange={tokenChangeHandler} type={giteeAccessTokenVisible ? 'text' : 'password'} placeholder={t('settings.sync.enterToken')} />
-          <Button variant="outline" size="icon" onClick={() => setGiteeAccessTokenVisible(!giteeAccessTokenVisible)}>
-            {giteeAccessTokenVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </Button>
-        </div>
-        <OpenBroswer url="https://gitee.com/profile/personal_access_tokens/new" title={t('settings.sync.newToken')} className="text-sm text-blue-500 hover:underline" />
+        <TokenInputControl
+          value={giteeAccessToken}
+          onChange={tokenChangeHandler}
+          visible={giteeAccessTokenVisible}
+          onVisibleChange={setGiteeAccessTokenVisible}
+          tokenUrl="https://gitee.com/profile/personal_access_tokens/new"
+          placeholder={t('settings.sync.enterToken')}
+        />
       </div>
 
       {/* 自定义仓库 */}

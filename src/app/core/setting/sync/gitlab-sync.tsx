@@ -14,8 +14,9 @@ import { Button } from "@/components/ui/button";
 import { checkSyncProjectState, createSyncProject, getUserInfo } from "@/lib/sync/gitlab";
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import { GitlabInstanceType, GITLAB_INSTANCES } from "@/lib/sync/gitlab.types";
-import { Eye, EyeOff, Globe, Server, Plus, RefreshCcw } from "lucide-react";
+import { Globe, Server, Plus, RefreshCcw } from "lucide-react";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
 
@@ -118,11 +119,13 @@ export function GitlabSync() {
 
   // 获取当前实例的 Token 创建 URL
   function getTokenCreateUrl() {
+    const query = '?name=NoteGen&description=NoteGen+sync&scopes=api'
     if (gitlabInstanceType === GitlabInstanceType.SELF_HOSTED) {
-      return gitlabCustomUrl ? `${gitlabCustomUrl}/-/user_settings/personal_access_tokens` : '#'
+      const baseUrl = gitlabCustomUrl.replace(/\/+$/, '')
+      return baseUrl ? `${baseUrl}/-/user_settings/personal_access_tokens${query}` : '#'
     }
     const instance = GITLAB_INSTANCES[gitlabInstanceType]
-    return `${instance.baseUrl}/-/user_settings/personal_access_tokens`
+    return `${instance.baseUrl}/-/user_settings/personal_access_tokens${query}`
   }
 
   useEffect(() => {
@@ -220,21 +223,13 @@ export function GitlabSync() {
       {/* Token 输入 */}
       <div className="space-y-2">
         <label className="text-sm font-medium">GitLab Access Token</label>
-        <div className="flex gap-2">
-          <Input
-            value={gitlabAccessToken}
-            onChange={tokenChangeHandler}
-            type={gitlabAccessTokenVisible ? 'text' : 'password'}
-            placeholder={t('settings.sync.enterToken')}
-          />
-          <Button variant="outline" size="icon" onClick={() => setGitlabAccessTokenVisible(!gitlabAccessTokenVisible)}>
-            {gitlabAccessTokenVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </Button>
-        </div>
-        <OpenBroswer
-          url={getTokenCreateUrl()}
-          title={t('settings.sync.newToken')}
-          className="text-sm text-blue-500 hover:underline"
+        <TokenInputControl
+          value={gitlabAccessToken}
+          onChange={tokenChangeHandler}
+          visible={gitlabAccessTokenVisible}
+          onVisibleChange={setGitlabAccessTokenVisible}
+          tokenUrl={getTokenCreateUrl()}
+          placeholder={t('settings.sync.enterToken')}
         />
       </div>
 

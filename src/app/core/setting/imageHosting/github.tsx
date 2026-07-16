@@ -1,6 +1,6 @@
 'use client'
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from 'next-intl';
 import useSettingStore from "@/stores/setting";
@@ -17,6 +17,7 @@ import { createImageRepo, checkImageRepoState } from "@/lib/imageHosting/github"
 import { getImageRepoName } from "@/lib/sync/repo-utils";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { TokenInputControl } from "@/app/core/setting/sync/components/token-input-control";
 
 dayjs.extend(relativeTime)
 
@@ -214,18 +215,15 @@ export function GithubImageHosting() {
         <div className="space-y-2">
           <label className="text-sm font-medium">GitHub Access Token</label>
           <p className="text-xs text-muted-foreground">{t('settings.sync.newTokenDesc')}</p>
-          <div className="flex gap-2">
-            <Input
-              value={githubImageAccessToken}
-              onChange={tokenChangeHandler}
-              type={accessTokenVisible ? 'text' : 'password'}
-              placeholder="输入 GitHub Access Token"
-            />
-            <Button variant="outline" size="icon" onClick={() => setAccessTokenVisible(!accessTokenVisible)}>
-              {accessTokenVisible ? <Eye /> : <EyeOff />}
-            </Button>
-          </div>
-          <OpenBroswer url="https://github.com/settings/tokens/new" title={t('settings.sync.newToken')} className="text-sm text-blue-500 hover:underline" />
+          <TokenInputControl
+            value={githubImageAccessToken}
+            onChange={tokenChangeHandler}
+            visible={accessTokenVisible}
+            onVisibleChange={setAccessTokenVisible}
+            tokenUrl="https://github.com/settings/personal-access-tokens/new?name=NoteGen&description=NoteGen+image+hosting&expires_in=none&contents=write&administration=write"
+            placeholder={t('settings.sync.enterToken')}
+            docsSection="image-hosting"
+          />
         </div>
 
         {/* 仓库信息 */}

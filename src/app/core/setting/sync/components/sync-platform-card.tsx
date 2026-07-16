@@ -8,8 +8,8 @@ import { useTranslations } from 'next-intl'
 import { Store } from "@tauri-apps/plugin-store"
 import { SyncStateEnum } from "@/lib/sync/github.types"
 import { SyncPlatform } from "@/types/sync"
-import { Eye, EyeOff, RefreshCcw, Loader2, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
-import { OpenBroswer } from "@/components/open-broswer"
+import { RefreshCcw, Loader2, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
+import { TokenInputControl } from "./token-input-control"
 
 export interface SyncPlatformConfig {
   platform: SyncPlatform
@@ -108,26 +108,14 @@ export function SyncPlatformCard({
       {/* Token 输入 */}
       <div className="space-y-2">
         <label className="text-sm font-medium">{config.tokenLabel}</label>
-        <div className="flex gap-2">
-          <Input
-            value={accessToken}
-            onChange={handleTokenChange}
-            type={tokenVisible ? 'text' : 'password'}
-            placeholder={t('settings.sync.enterToken')}
-            disabled={isInitializing}
-          />
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setTokenVisible(!tokenVisible)}
-          >
-            {tokenVisible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </Button>
-        </div>
-        <OpenBroswer
-          url={config.tokenUrl}
-          title={t('settings.sync.newToken')}
-          className="text-sm text-blue-500 hover:underline"
+        <TokenInputControl
+          value={accessToken}
+          onChange={handleTokenChange}
+          visible={tokenVisible}
+          onVisibleChange={setTokenVisible}
+          tokenUrl={config.tokenUrl}
+          placeholder={t('settings.sync.enterToken')}
+          disabled={isInitializing}
         />
       </div>
 
