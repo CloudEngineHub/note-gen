@@ -39,6 +39,8 @@ export type AgentToolRisk =
   | 'external'
   | 'medium'
 
+export type AgentPermissionMode = 'read-only' | 'ask' | 'auto-edit'
+
 export interface AgentContextSnapshot {
   activeChatId?: number
   activeFilePath?: string
@@ -47,9 +49,6 @@ export interface AgentContextSnapshot {
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
   selectedMcpServerIds?: string[]
-  multipleFileCreation?: boolean
-  multipleFileUpdate?: boolean
-  requestedFileCount?: number
 }
 
 export interface AgentEditorStateSnapshot {
@@ -59,6 +58,15 @@ export interface AgentEditorStateSnapshot {
   totalLines: number
   numberedLines: string
   version: number
+  selection?: AgentEditorSelectionSnapshot
+}
+
+export interface AgentEditorSelectionSnapshot {
+  text: string
+  from: number
+  to: number
+  startLine: number
+  endLine: number
 }
 
 export interface AgentQuoteSnapshot {
@@ -167,9 +175,8 @@ export interface AgentApprovalRequest {
   from?: number
   to?: number
   canApproveForSession?: boolean
-  sessionApprovalType?: 'write' | 'runtime-script-skill'
+  sessionApprovalType?: 'runtime-script-skill'
   sessionApprovalSkillId?: string
-  approvalKind?: AgentApprovalKind
 }
 
 export interface AgentRuntimeInput {
@@ -181,6 +188,7 @@ export interface AgentRuntimeInput {
   currentEditorState?: AgentEditorStateSnapshot
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
+  permissionMode?: AgentPermissionMode
 }
 
 export interface AgentSteeringPayload {
@@ -192,7 +200,6 @@ export interface AgentSteeringPayload {
 }
 
 export type AgentApprovalDecision = 'approved' | 'denied' | 'steered'
-export type AgentApprovalKind = 'operation' | 'intent'
 
 export interface AgentRuntimeCallbacks {
   onStatus?: (status: AgentRunStatus) => void
@@ -213,7 +220,6 @@ export interface AgentRuntimeCallbacks {
       filePath?: string
       from?: number
       to?: number
-      approvalKind?: AgentApprovalKind
     }
   ) => Promise<AgentApprovalDecision>
 }
@@ -253,6 +259,7 @@ export interface ToolResult {
   data?: any
   error?: string
   message?: string
+  changes?: AgentChange[]
 }
 
 export interface ToolCall {
@@ -270,9 +277,8 @@ export interface ConfirmationRecord {
   status: 'pending' | 'confirmed' | 'cancelled' | 'superseded'
   timestamp: number
   scope?: 'once' | 'conversation'
-  sessionApprovalType?: 'write' | 'runtime-script-skill'
+  sessionApprovalType?: 'runtime-script-skill'
   sessionApprovalSkillId?: string
-  approvalKind?: AgentApprovalKind
 }
 
 export interface AgentState {
@@ -301,9 +307,8 @@ export interface AgentState {
     from?: number
     to?: number
     canApproveForSession?: boolean
-    sessionApprovalType?: 'write' | 'runtime-script-skill'
+    sessionApprovalType?: 'runtime-script-skill'
     sessionApprovalSkillId?: string
-    approvalKind?: AgentApprovalKind
   }
   confirmationHistory: ConfirmationRecord[]
   loadedSkills?: AgentSkillSummary[]
