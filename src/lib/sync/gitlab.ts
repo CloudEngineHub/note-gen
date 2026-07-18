@@ -3,7 +3,7 @@ import { Store } from '@tauri-apps/plugin-store';
 import { v4 as uuid } from 'uuid';
 import { fetch, Proxy } from '@tauri-apps/plugin-http';
 import { fetch as encodeFetch } from './encode-fetch'
-import { buildRemoteLogicalPath, debugSyncPath } from './remote-file'
+import { buildRemoteLogicalPath, debugSyncPath, encodeRemoteFileContent } from './remote-file'
 import { 
   GitlabInstanceType, 
   GitlabProjectInfo, 
@@ -87,7 +87,7 @@ export async function uploadFile({
   repo,
   path
 }: {
-  file: string;
+  file: string | Uint8Array;
   filename?: string;
   sha?: string;
   message?: string;
@@ -115,7 +115,7 @@ export async function uploadFile({
     })
 
     // 将内容转换为 Base64（GitLab API 要求）
-    const base64Content = Buffer.from(file, 'utf-8').toString('base64')
+    const base64Content = encodeRemoteFileContent(file)
 
     const baseUrl = await getGitlabApiBaseUrl();
     const headers = await getCommonHeaders();
@@ -482,9 +482,9 @@ export async function getFileContent({ path, ref, repo }: { path: string; ref: s
     });
 
     if (response.status >= 200 && response.status < 300) {
-      const content = await response.text();
-      // 将内容转换为 base64 编码，保持与 GitHub/Gitee 接口一致
-      const base64Content = btoa(unescape(encodeURIComponent(content)));
+      const content = new Uint8Array(await response.arrayBuffer());
+      // 将原始字节转换为 Base64，同时支持文本和二进制文件。
+      const base64Content = encodeRemoteFileContent(content);
       return {
         content: base64Content,
         encoding: 'base64'

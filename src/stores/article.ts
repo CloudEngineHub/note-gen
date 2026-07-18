@@ -267,6 +267,9 @@ interface NoteState {
   showCloudFiles: boolean
   initShowCloudFiles: () => Promise<void>
   setShowCloudFiles: (show: boolean) => Promise<void>
+  syncStaticAssets: boolean
+  initSyncStaticAssets: () => Promise<void>
+  setSyncStaticAssets: (enabled: boolean) => Promise<void>
   showKnowledgeBaseStatus: boolean
   initShowKnowledgeBaseStatus: () => Promise<void>
   setShowKnowledgeBaseStatus: (show: boolean) => Promise<void>
@@ -287,7 +290,9 @@ interface NoteState {
   fileTree: DirTree[]
   fileTreeLoading: boolean
   setFileTree: (tree: DirTree[]) => void
+  setEntryLoading: (relativePath: string, loading: boolean) => boolean
   markFileRemote: (relativePath: string, sha: string) => boolean
+  markFileLocal: (relativePath: string) => boolean
   addFile: (file: DirTree) => void
   ensurePathExpanded: (path: string) => Promise<void>
   insertLocalEntry: (relativePath: string, isDirectory: boolean) => boolean
@@ -778,6 +783,17 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const store = await getStore();
     await store.set('showCloudFiles', show)
   },
+  syncStaticAssets: true,
+  initSyncStaticAssets: async () => {
+    const store = await getStore()
+    const enabled = await store.get<boolean>('syncStaticAssets')
+    set({ syncStaticAssets: enabled ?? true })
+  },
+  setSyncStaticAssets: async (enabled: boolean) => {
+    set({ syncStaticAssets: enabled })
+    const store = await getStore()
+    await store.set('syncStaticAssets', enabled)
+  },
   showKnowledgeBaseStatus: true,
   initShowKnowledgeBaseStatus: async () => {
     const store = await getStore()
@@ -794,6 +810,29 @@ const useArticleStore = create<NoteState>((set, get) => ({
   setFileTree: (tree: DirTree[]) => {
     const sortedTree = get().sortFileTree(tree)
     set({ fileTree: sortedTree })
+  },
+  setEntryLoading: (relativePath: string, loading: boolean) => {
+    const cacheTree = cloneDeep(get().fileTree)
+
+    function updateEntry(items: DirTree[]): boolean {
+      for (const item of items) {
+        if (computedParentPath(item) === relativePath) {
+          item.loading = loading || undefined
+          return true
+        }
+        if (item.children && updateEntry(item.children)) {
+          return true
+        }
+      }
+      return false
+    }
+
+    if (!updateEntry(cacheTree)) {
+      return false
+    }
+
+    get().setFileTree(cacheTree)
+    return true
   },
   markFileRemote: (relativePath: string, sha: string) => {
     const cacheTree = cloneDeep(get().fileTree)
@@ -815,6 +854,30 @@ const useArticleStore = create<NoteState>((set, get) => ({
       return false
     }
 
+    get().setFileTree(cacheTree)
+    return true
+  },
+  markFileLocal: (relativePath: string) => {
+    const cacheTree = cloneDeep(get().fileTree)
+
+    function updateEntry(items: DirTree[]): boolean {
+      for (const item of items) {
+        if (item.isFile && computedParentPath(item) === relativePath) {
+          item.isLocale = true
+          item.loading = undefined
+          let parent = item.parent
+          while (parent) {
+            parent.isLocale = true
+            parent = parent.parent
+          }
+          return true
+        }
+        if (item.children && updateEntry(item.children)) return true
+      }
+      return false
+    }
+
+    if (!updateEntry(cacheTree)) return false
     get().setFileTree(cacheTree)
     return true
   },
@@ -1442,7 +1505,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
       try {
         if (workspace.isCustom) {
           children = (await readDir(fullFolderPath))
-            .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template|jpg|jpeg|png|gif|bmp|webp|svg)$/i)))
+            .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.'))
             .map(file => ({
               ...file,
               parent: currentFolder,
@@ -1457,7 +1520,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
           const dirRelative = await toWorkspaceRelativePath(fullFolderPath)
           const pathOptions = await getFilePathOptions(dirRelative)
           children = (await readDir(pathOptions.path, { baseDir: pathOptions.baseDir }))
-            .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.') && (file.isDirectory || file.name.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template|jpg|jpeg|png|gif|bmp|webp|svg)$/i)))
+            .filter(file => file.name !== '.DS_Store' && !file.name.startsWith('.'))
             .map(file => ({
               ...file,
               parent: currentFolder,

@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { BatchSelectionContextMenu } from "./batch-selection-context-menu";
 import type { FileSelectionEntry } from "./file-selection";
 import { pasteIntoFolder } from "./folder-item/paste-into-folder";
+import { downloadRemoteLibraryFile, uploadLocalLibraryFile } from "@/lib/sync/remote-library";
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -102,6 +103,8 @@ export function FileItem({
     selectedFilePaths,
     setSelectedFilePaths,
     clearSelectedFilePaths,
+    setEntryLoading,
+    markFileLocal,
   } = useArticleStore()
   const setArticleState = useArticleStore.setState
   const { setClipboardItem, clipboardItem, clipboardItems, clipboardOperation } = useClipboardStore()
@@ -110,6 +113,7 @@ export function FileItem({
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const [exportingFormat, setExportingFormat] = useState<MarkdownExportFormat | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   // 检查路径是否在 skills 文件夹下
   const isInSkillsFolder = (itemPath: string): boolean => {
@@ -186,6 +190,23 @@ export function FileItem({
     // 让文件管理器获得焦点，以便响应快捷键
     focusSidebar?.()
     const currentPath = computedParentPath(item)
+
+    if (!item.isLocale) {
+      setEntryLoading(currentPath, true)
+      try {
+        await downloadRemoteLibraryFile(currentPath)
+        markFileLocal(currentPath)
+      } catch (error) {
+        toast({
+          title: t('cloudLibrary.operationFailed'),
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        })
+        return
+      } finally {
+        setEntryLoading(currentPath, false)
+      }
+    }
 
     if (item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) {
       // 图片文件：设置 activeFilePath，让 EditorLayout 显示图片编辑器
@@ -719,6 +740,37 @@ export function FileItem({
     }
   }
 
+  async function handleUploadFile() {
+    if (isUploading || !item.isLocale || item.name === '') return
+
+    setIsUploading(true)
+    setEntryLoading(path, true)
+    const progressToast = toast({
+      title: t('context.uploadFileProgress'),
+      description: item.name,
+      duration: Infinity,
+    })
+    try {
+      const sha = await uploadLocalLibraryFile(path)
+      useArticleStore.getState().markFileRemote(path, sha)
+      progressToast.update({
+        title: t('context.uploadFileSuccess'),
+        description: item.name,
+        duration: 3000,
+      })
+    } catch (error) {
+      progressToast.update({
+        title: t('context.uploadFileError'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+        duration: 5000,
+      })
+    } finally {
+      setEntryLoading(path, false)
+      setIsUploading(false)
+    }
+  }
+
   async function handleEditEnd() {
     if (currentFolder && currentFolder.children) {
       const index = currentFolder?.children?.findIndex(item => item.name === '')
@@ -858,7 +910,9 @@ export function FileItem({
                 >
                   <span className={item.parent ? 'size-0' : `${iconSize} ml-1`}></span>
                   <div className="relative flex shrink-0 items-center">
-                    <ImageIcon className={`${iconSize} shrink-0`} />
+                    {item.loading
+                      ? <LoaderCircle className={`${iconSize} shrink-0 animate-spin`} />
+                      : <ImageIcon className={`${iconSize} shrink-0`} />}
                   </div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{item.name}</span>
                   {renderVectorIcon()}
@@ -877,6 +931,10 @@ export function FileItem({
                     </MobileMenuItem>
                     <MobileMenuItem disabled={!clipboardItem && clipboardItems.length === 0} onClick={handlePasteFile}>
                       {t('context.paste')}
+                    </MobileMenuItem>
+                    <MobileSeparator />
+                    <MobileMenuItem disabled={isUploading || !item.isLocale || item.name === ''} onClick={() => void handleUploadFile()}>
+                      {t('context.uploadFile')}
                     </MobileMenuItem>
                     <MobileSeparator />
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
@@ -927,6 +985,10 @@ export function FileItem({
                     </MobileMenuItem>
                     <MobileMenuItem disabled={!clipboardItem && clipboardItems.length === 0} onClick={handlePasteFile}>
                       {t('context.paste')}
+                    </MobileMenuItem>
+                    <MobileSeparator />
+                    <MobileMenuItem disabled={isUploading || !item.isLocale || item.name === ''} onClick={() => void handleUploadFile()}>
+                      {t('context.uploadFile')}
                     </MobileMenuItem>
                     <MobileSeparator />
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
@@ -997,6 +1059,18 @@ export function FileItem({
                   </ContextMenuItem>
                 </ContextMenuSubContent>
               </ContextMenuSub>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                inset
+                disabled={isUploading || !item.isLocale || item.name === ''}
+                onClick={() => void handleUploadFile()}
+                menuType="file"
+              >
+                {isUploading
+                  ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  : <FileUp className="mr-2 h-4 w-4" />}
+                {t('context.uploadFile')}
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <VectorKnowledgeMenu
                 item={item}

@@ -15,6 +15,7 @@ import {
   Eye,
   FolderInput,
   LoaderCircle,
+  PackageOpen,
   SortAsc,
   SortDesc,
   Upload,
@@ -61,6 +62,8 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
     collapsibleList,
     showCloudFiles,
     setShowCloudFiles,
+    syncStaticAssets,
+    setSyncStaticAssets,
     showKnowledgeBaseStatus,
     setShowKnowledgeBaseStatus,
     cancelVectorCalculation,
@@ -95,7 +98,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
   }
 
   async function handleUploadFiles() {
-    const accepted = await confirm(t('uploadFilesWarning'), {
+    const accepted = await confirm(t(syncStaticAssets ? 'uploadFilesWithAssetsWarning' : 'uploadFilesWarning'), {
       title: t('uploadFiles'),
       kind: 'warning',
     })
@@ -118,7 +121,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
           description: `${progress.current}/${progress.total} · ${progress.path}`,
           duration: Infinity,
         })
-      })
+      }, { includeStaticAssets: syncStaticAssets })
       await loadFileTree({ skipRemoteSync: true })
       await loadRemoteSyncFiles()
       progressToast.update({
@@ -155,7 +158,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
           description: `${progress.current}/${progress.total} · ${progress.path}`,
           duration: Infinity,
         })
-      })
+      }, { includeStaticAssets: true })
       await loadFileTree()
       progressToast.update({
         title: t('pullComplete'),
@@ -315,6 +318,22 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
             onClick={(event) => event.stopPropagation()}
             onCheckedChange={setShowCloudFiles}
             aria-label={t('showRemoteFiles')}
+          />
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            void setSyncStaticAssets(!syncStaticAssets)
+          }}
+        >
+          <PackageOpen className="mr-2 size-4" />
+          <span>{t('syncStaticAssets')}</span>
+          <Switch
+            className="ml-auto"
+            checked={syncStaticAssets}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(checked) => void setSyncStaticAssets(checked)}
+            aria-label={t('syncStaticAssets')}
           />
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!syncConfigured} onSelect={() => void handleUploadFiles()}>

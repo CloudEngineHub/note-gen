@@ -1,11 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BaseDirectory, exists, mkdir, remove, rename as fsRename, stat, writeTextFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, copyFile, exists, mkdir, readDir, remove, rename as fsRename, stat, writeTextFile } from '@tauri-apps/plugin-fs'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useTranslations } from 'next-intl'
 import type { Editor } from '@tiptap/react'
-import { ChevronLeft, FilePlus, Folder, FolderInput, FolderPlus, List, Pencil, Redo2, RefreshCw, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
+import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, Folder, FolderDown, FolderInput, FolderPlus, FolderUp, List, Pencil, Redo2, RefreshCw, Scissors, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -36,6 +36,9 @@ import { S3Config, WebDAVConfig } from '@/types/sync'
 import { buildMoveTargetPath, getPathAfterMove, isInvalidFolderMoveTarget, moveFileManagerEntry } from '@/app/core/main/file/file-dnd'
 import { cn } from '@/lib/utils'
 import { CloudLibraryMenu } from '@/app/core/main/file/cloud-library-menu'
+import { pullRemoteLibraryFolder, uploadLocalLibraryFile, uploadLocalLibraryFolder } from '@/lib/sync/remote-library'
+import useClipboardStore from '@/stores/clipboard'
+import { generateCopyFilename, generateCopyFoldername } from '@/lib/default-filename'
 
 interface WritingHeaderProps {
   editor: Editor | null
@@ -69,7 +72,14 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     setCollapsibleList,
     moveLocalEntry,
     syncOpenTabsForPathChange,
+    syncStaticAssets,
+    markFileRemote,
+    setEntryLoading,
+    showCloudFiles,
+    cleanTabsByDeletedFile,
+    cleanTabsByDeletedFolder,
   } = useArticleStore()
+  const { clipboardItem, clipboardItems, clipboardOperation, setClipboardItem } = useClipboardStore()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -81,6 +91,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
   const [createType, setCreateType] = useState<'file' | 'folder' | null>(null)
   const [createName, setCreateName] = useState('')
+  const [createTargetDir, setCreateTargetDir] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
 
   const [renameTarget, setRenameTarget] = useState<BrowserEntry | null>(null)
@@ -130,13 +141,14 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const rawEntries = useMemo(() => {
     const children = getChildrenByPath(fileTree, currentDir)
     return children
-      .filter((node) => node.isDirectory || isMarkdownFile(node))
+      .filter((node) => showCloudFiles || node.isLocale)
+      .filter((node) => node.isDirectory || syncStaticAssets || isMarkdownFile(node))
       .sort((a, b) => {
         if (a.isDirectory && !b.isDirectory) return -1
         if (!a.isDirectory && b.isDirectory) return 1
         return a.name.localeCompare(b.name)
       })
-  }, [fileTree, currentDir])
+  }, [fileTree, currentDir, showCloudFiles, syncStaticAssets])
 
   const visibleEntries = useMemo(() => {
     const mapped: BrowserEntry[] = rawEntries.map((node) => {
@@ -506,9 +518,235 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       return
     }
 
+    if (!entry.name.toLowerCase().endsWith('.md')) {
+      toast({ title: tFile('clipboard.notSupported') })
+      return
+    }
+
     await setActiveFilePath(entry.relativePath)
     await readArticle(entry.relativePath)
     setDrawerOpen(false)
+  }
+
+  const handleUploadEntry = async (entry: BrowserEntry) => {
+    if (!entry.isLocale || entry.isLoading) return
+
+    setEntryLoading(entry.relativePath, true)
+    const isFolder = entry.type === 'folder'
+    const progressToast = toast({
+      title: tContext(isFolder ? 'uploadFolderProgress' : 'uploadFileProgress'),
+      description: entry.name,
+      duration: Infinity,
+    })
+
+    try {
+      if (isFolder) {
+        const result = await uploadLocalLibraryFolder(entry.relativePath, progress => {
+          if (progress.phase === 'uploaded' && progress.path && progress.sha) {
+            markFileRemote(progress.path, progress.sha)
+          }
+          if (progress.path) {
+            progressToast.update({
+              title: tContext('uploadFolderProgress'),
+              description: `${progress.current}/${progress.total} · ${progress.path}`,
+              duration: Infinity,
+            })
+          }
+        })
+        progressToast.update({
+          title: tContext('uploadFolderSuccess'),
+          description: tContext('uploadFolderResult', {
+            uploaded: result.uploaded,
+            failed: result.failed.length,
+          }),
+          variant: result.failed.length > 0 ? 'destructive' : 'default',
+          duration: 5000,
+        })
+      } else {
+        const sha = await uploadLocalLibraryFile(entry.relativePath)
+        markFileRemote(entry.relativePath, sha)
+        progressToast.update({
+          title: tContext('uploadFileSuccess'),
+          description: entry.name,
+          duration: 3000,
+        })
+      }
+      await refreshTree(currentDir)
+    } catch (error) {
+      progressToast.update({
+        title: tContext(isFolder ? 'uploadFolderError' : 'uploadFileError'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+        duration: 5000,
+      })
+    } finally {
+      setEntryLoading(entry.relativePath, false)
+    }
+  }
+
+  const handleSyncFolder = async (entry: BrowserEntry) => {
+    if (entry.type !== 'folder' || entry.isLoading) return
+
+    setEntryLoading(entry.relativePath, true)
+    const progressToast = toast({
+      title: tContext('syncFolderProgress'),
+      description: entry.name,
+      duration: Infinity,
+    })
+    try {
+      const result = await pullRemoteLibraryFolder(entry.relativePath, progress => {
+        if (!progress.path) return
+        progressToast.update({
+          title: tContext('syncFolderProgress'),
+          description: `${progress.current}/${progress.total} · ${progress.path}`,
+          duration: Infinity,
+        })
+      })
+      progressToast.update({
+        title: tContext('syncFolderSuccess'),
+        description: tFile('cloudLibrary.pullResult', {
+          downloaded: result.downloaded,
+          skipped: result.skipped,
+          failed: result.failed.length,
+        }),
+        variant: result.failed.length > 0 ? 'destructive' : 'default',
+        duration: 5000,
+      })
+      await refreshTree(currentDir)
+    } catch (error) {
+      progressToast.update({
+        title: tContext('syncFolderError'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+        duration: 5000,
+      })
+    } finally {
+      setEntryLoading(entry.relativePath, false)
+    }
+  }
+
+  const copyLocalEntry = useCallback(async (
+    sourceRelativePath: string,
+    targetRelativePath: string,
+    isDirectory: boolean
+  ): Promise<void> => {
+    const source = await getFilePathOptions(sourceRelativePath)
+    const target = await getFilePathOptions(targetRelativePath)
+
+    if (!isDirectory) {
+      if (source.baseDir || target.baseDir) {
+        await copyFile(source.path, target.path, {
+          fromPathBaseDir: source.baseDir || BaseDirectory.AppData,
+          toPathBaseDir: target.baseDir || BaseDirectory.AppData,
+        })
+      } else {
+        await copyFile(source.path, target.path)
+      }
+      return
+    }
+
+    if (target.baseDir) {
+      await mkdir(target.path, { baseDir: target.baseDir, recursive: true })
+    } else {
+      await mkdir(target.path, { recursive: true })
+    }
+
+    const entries = source.baseDir
+      ? await readDir(source.path, { baseDir: source.baseDir })
+      : await readDir(source.path)
+    for (const child of entries) {
+      if (child.isSymlink) continue
+      const sourceChild = `${sourceRelativePath}/${child.name}`
+      const targetChild = `${targetRelativePath}/${child.name}`
+      if (child.isDirectory) {
+        await copyLocalEntry(sourceChild, targetChild, true)
+      } else if (child.isFile && !child.isSymlink) {
+        await copyLocalEntry(sourceChild, targetChild, false)
+      }
+    }
+  }, [])
+
+  const handleClipboardEntry = (entry: BrowserEntry, operation: 'copy' | 'cut') => {
+    if (!entry.isLocale) return
+    setClipboardItem({
+      path: entry.relativePath,
+      name: entry.name,
+      isDirectory: entry.type === 'folder',
+      sha: entry.sha,
+      isLocale: entry.isLocale,
+    }, operation)
+    toast({ title: tFile(`clipboard.${operation === 'copy' ? 'copied' : 'cut'}`) })
+  }
+
+  const handlePasteEntry = async (entry: BrowserEntry) => {
+    const sourceItems = clipboardItems.length > 0
+      ? clipboardItems
+      : clipboardItem ? [clipboardItem] : []
+    if (sourceItems.length === 0) {
+      toast({ title: tFile('clipboard.empty'), variant: 'destructive' })
+      return
+    }
+
+    const targetDir = entry.type === 'folder' ? entry.relativePath : parentPath(entry.relativePath)
+    try {
+      for (const sourceItem of sourceItems) {
+        if (
+          sourceItem.isDirectory &&
+          (targetDir === sourceItem.path || targetDir.startsWith(`${sourceItem.path}/`))
+        ) {
+          throw new Error(tFile('clipboard.notSupported'))
+        }
+        const targetName = sourceItem.isDirectory
+          ? await generateCopyFoldername(targetDir, sourceItem.name)
+          : await generateCopyFilename(targetDir, sourceItem.name)
+        const targetPath = targetDir ? `${targetDir}/${targetName}` : targetName
+        await copyLocalEntry(sourceItem.path, targetPath, sourceItem.isDirectory)
+      }
+
+      if (clipboardOperation === 'cut') {
+        for (const sourceItem of sourceItems) {
+          const source = await getFilePathOptions(sourceItem.path)
+          if (source.baseDir) {
+            await remove(source.path, { baseDir: source.baseDir, recursive: sourceItem.isDirectory })
+          } else {
+            await remove(source.path, { recursive: sourceItem.isDirectory })
+          }
+          if (sourceItem.isDirectory) {
+            await cleanTabsByDeletedFolder(sourceItem.path)
+          } else {
+            await cleanTabsByDeletedFile(sourceItem.path)
+          }
+        }
+        setClipboardItem(null, 'none')
+      }
+
+      await refreshTree(currentDir, { includeRemote: false })
+      toast({ title: tFile('clipboard.pasted') })
+    } catch (error) {
+      toast({
+        title: tFile('clipboard.pasteFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDuplicateFolder = async (entry: BrowserEntry) => {
+    if (entry.type !== 'folder' || !entry.isLocale) return
+    const targetDir = parentPath(entry.relativePath)
+    const targetName = await generateCopyFoldername(targetDir, entry.name)
+    const targetPath = targetDir ? `${targetDir}/${targetName}` : targetName
+    try {
+      await copyLocalEntry(entry.relativePath, targetPath, true)
+      await refreshTree(currentDir, { includeRemote: false })
+      toast({ title: tFile('clipboard.copied') })
+    } catch (error) {
+      toast({
+        title: tFile('clipboard.pasteFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    }
   }
 
   const handleCreateConfirm = async () => {
@@ -519,7 +757,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
     setCreating(true)
     try {
-      await ensureLocalFolder(currentDir)
+      const targetDir = createTargetDir ?? currentDir
+      await ensureLocalFolder(targetDir)
 
       if (createType === 'file') {
         let fileNameToCreate = rawName
@@ -527,7 +766,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           fileNameToCreate = `${fileNameToCreate}.md`
         }
 
-        const relativePath = currentDir ? `${currentDir}/${fileNameToCreate}` : fileNameToCreate
+        const relativePath = targetDir ? `${targetDir}/${fileNameToCreate}` : fileNameToCreate
         const pathOptions = await getFilePathOptions(relativePath)
         const fileExists = pathOptions.baseDir
           ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
@@ -539,14 +778,14 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           } else {
             await writeTextFile(pathOptions.path, '')
           }
-          await refreshTree(currentDir, {
+          await refreshTree(targetDir, {
             includeRemote: shouldLoadRemoteOnTreeRefresh({ isCreateFlow: true })
           })
           await setActiveFilePath(relativePath)
           setDrawerOpen(false)
         }
       } else {
-        const relativePath = currentDir ? `${currentDir}/${rawName}` : rawName
+        const relativePath = targetDir ? `${targetDir}/${rawName}` : rawName
         const pathOptions = await getFilePathOptions(relativePath)
         const folderExists = pathOptions.baseDir
           ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
@@ -558,7 +797,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           } else {
             await mkdir(pathOptions.path, { recursive: true })
           }
-          await refreshTree(currentDir, {
+          await refreshTree(targetDir, {
             includeRemote: shouldLoadRemoteOnTreeRefresh({ isCreateFlow: true })
           })
         }
@@ -566,6 +805,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
       setCreateType(null)
       setCreateName('')
+      setCreateTargetDir(null)
     } finally {
       setCreating(false)
     }
@@ -829,24 +1069,13 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                   />
                 </div>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={() => refreshTree(currentDir)}
-                  title={tToolbar('refresh')}
-                  aria-label={tToolbar('refresh')}
-                  disabled={isBrowserLoading}
-                >
-                  <RefreshCw className={`size-4 ${isBrowserLoading ? 'animate-spin' : ''}`} />
-                </Button>
-                <CloudLibraryMenu className="h-9 w-9 shrink-0 rounded-md border" />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
+                  className="size-9 shrink-0"
                   onClick={() => {
                     setCreateType('file')
                     setCreateName('')
+                    setCreateTargetDir(currentDir)
                   }}
                   title={tToolbar('newArticle')}
                   aria-label={tToolbar('newArticle')}
@@ -854,18 +1083,31 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                   <FilePlus className="size-4" />
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0"
+                  className="size-9 shrink-0"
                   onClick={() => {
                     setCreateType('folder')
                     setCreateName('')
+                    setCreateTargetDir(currentDir)
                   }}
                   title={tToolbar('newFolder')}
                   aria-label={tToolbar('newFolder')}
                 >
                   <FolderPlus className="size-4" />
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 shrink-0"
+                  onClick={() => refreshTree(currentDir)}
+                  title={tToolbar('refresh')}
+                  aria-label={tToolbar('refresh')}
+                  disabled={isBrowserLoading}
+                >
+                  <RefreshCw className={`size-4 ${isBrowserLoading ? 'animate-spin' : ''}`} />
+                </Button>
+                <CloudLibraryMenu className="size-9 shrink-0" />
               </div>
               {currentDir !== '' && (
                 <button
@@ -908,7 +1150,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                     {searchQuery.trim() ? t('noFiles') : tFile('mobile.emptyDir')}
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-0.5">
                     {visibleEntries.map((entry) => (
                       <EntryListItem
                         key={entry.relativePath}
@@ -934,6 +1176,85 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                         onDragEnd={handleDragEnd}
                         onDragCancel={resetDragState}
                         actions={[
+                          ...(entry.type === 'folder' ? [{
+                            key: 'new-file',
+                            label: tContext('newFile'),
+                            icon: <FilePlus className="size-4" />,
+                            onClick: () => {
+                              setCreateType('file')
+                              setCreateName('')
+                              setCreateTargetDir(entry.relativePath)
+                            },
+                            disabled: !entry.isLocale,
+                            variant: 'outline' as const,
+                          }, {
+                            key: 'new-folder',
+                            label: tContext('newFolder'),
+                            icon: <FolderPlus className="size-4" />,
+                            onClick: () => {
+                              setCreateType('folder')
+                              setCreateName('')
+                              setCreateTargetDir(entry.relativePath)
+                            },
+                            disabled: !entry.isLocale,
+                            variant: 'outline' as const,
+                          }] : []),
+                          ...(entry.type === 'file' ? [{
+                            key: 'upload',
+                            label: tContext('uploadFile'),
+                            icon: <FileUp className="size-4" />,
+                            onClick: () => handleUploadEntry(entry),
+                            disabled: !entry.isLocale || entry.isLoading,
+                            variant: 'outline' as const,
+                          }] : [{
+                            key: 'upload-folder',
+                            label: tContext('uploadFolder'),
+                            icon: <FolderUp className="size-4" />,
+                            onClick: () => handleUploadEntry(entry),
+                            disabled: !entry.isLocale || entry.isLoading,
+                            variant: 'outline' as const,
+                            separatorBefore: true,
+                          }, {
+                            key: 'sync-folder',
+                            label: tContext('syncFolder'),
+                            icon: <FolderDown className="size-4" />,
+                            onClick: () => handleSyncFolder(entry),
+                            disabled: entry.isLoading,
+                            variant: 'outline' as const,
+                          }]),
+                          {
+                            key: 'cut',
+                            label: tContext('cut'),
+                            icon: <Scissors className="size-4" />,
+                            onClick: () => handleClipboardEntry(entry, 'cut'),
+                            disabled: !entry.isLocale,
+                            variant: 'outline' as const,
+                            separatorBefore: true,
+                          },
+                          {
+                            key: 'copy',
+                            label: tContext('copy'),
+                            icon: <Copy className="size-4" />,
+                            onClick: () => handleClipboardEntry(entry, 'copy'),
+                            disabled: !entry.isLocale,
+                            variant: 'outline' as const,
+                          },
+                          ...(entry.type === 'folder' ? [{
+                            key: 'duplicate',
+                            label: tContext('duplicate'),
+                            icon: <Copy className="size-4" />,
+                            onClick: () => handleDuplicateFolder(entry),
+                            disabled: !entry.isLocale,
+                            variant: 'outline' as const,
+                          }] : []),
+                          {
+                            key: 'paste',
+                            label: tContext('paste'),
+                            icon: <ClipboardPaste className="size-4" />,
+                            onClick: () => handlePasteEntry(entry),
+                            disabled: !clipboardItem && clipboardItems.length === 0,
+                            variant: 'outline' as const,
+                          },
                           {
                             key: 'rename',
                             label: tContext('rename'),
@@ -941,6 +1262,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                             onClick: () => startRename(entry),
                             disabled: !entry.isLocale,
                             variant: 'outline',
+                            separatorBefore: true,
                           },
                           ...(entry.type === 'file' && entry.sha ? [{
                             key: 'delete-sync',
@@ -957,6 +1279,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                             onClick: () => handleDelete(entry),
                             disabled: !entry.isLocale,
                             variant: 'destructive',
+                            separatorBefore: true,
                           },
                         ]}
                       />
@@ -983,6 +1306,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           if (!open) {
             setCreateType(null)
             setCreateName('')
+            setCreateTargetDir(null)
           }
         }}
       />

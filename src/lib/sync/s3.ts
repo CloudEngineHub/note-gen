@@ -377,8 +377,9 @@ export async function testS3Connection(config: S3Config, proxy?: Proxy): Promise
 export async function s3Upload(
   config: S3Config,
   key: string,
-  content: string,
-  proxy?: Proxy
+  content: string | Uint8Array,
+  proxy?: Proxy,
+  contentType = 'text/markdown; charset=utf-8'
 ): Promise<{ etag: string } | null> {
   const uploadStartedAt = getPerfNow()
   let previousPerfAt = uploadStartedAt
@@ -399,14 +400,14 @@ export async function s3Upload(
       hasPathPrefix: Boolean(config.pathPrefix),
     })
     const url = buildS3Url(config, key)
-    const contentBytes = new TextEncoder().encode(content)
+    const contentBytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
     logPerf('encodeContent', {
       byteLength: contentBytes.byteLength,
     })
 
     const headers = {
       Host: new URL(url).host,
-      'Content-Type': 'text/markdown; charset=utf-8',
+      'Content-Type': contentType,
       'Content-Length': contentBytes.byteLength.toString()
     }
 
@@ -422,7 +423,7 @@ export async function s3Upload(
     const requestHeaders = new Headers()
     requestHeaders.append('Authorization', authorization)
     requestHeaders.append('X-Amz-Date', amzDate)
-    requestHeaders.append('Content-Type', 'text/markdown; charset=utf-8')
+    requestHeaders.append('Content-Type', contentType)
     requestHeaders.append('X-Amz-Content-Sha256', payloadHashHex)
 
     const response = await fetch(url, {
@@ -466,11 +467,11 @@ export async function s3Upload(
 /**
  * 从 S3 下载文件（类似拉取）
  */
-export async function s3Download(
+async function s3DownloadBytesInternal(
   config: S3Config,
   key: string,
   proxy?: Proxy
-): Promise<{ content: string; etag: string; lastModified: string } | null> {
+): Promise<{ content: Uint8Array; etag: string; lastModified: string } | null> {
   const startedAt = getPerfNow()
   let previousPerfAt = startedAt
   const logPerf = (step: string, payload: Record<string, unknown> = {}) => {
@@ -517,7 +518,7 @@ export async function s3Download(
     })
 
     if (response.status === 200) {
-      const content = await response.text()
+      const content = new Uint8Array(await response.arrayBuffer())
       const etag = response.headers.get('ETag') || ''
       const lastModified = response.headers.get('Last-Modified') || ''
       logPerf('readBody', {
@@ -549,6 +550,23 @@ export async function s3Download(
     console.error('S3 Download error:', error)
     return null
   }
+}
+
+export async function s3DownloadBytes(
+  config: S3Config,
+  key: string,
+  proxy?: Proxy
+): Promise<{ content: Uint8Array; etag: string; lastModified: string } | null> {
+  return await s3DownloadBytesInternal(config, key, proxy)
+}
+
+export async function s3Download(
+  config: S3Config,
+  key: string,
+  proxy?: Proxy
+): Promise<{ content: string; etag: string; lastModified: string } | null> {
+  const file = await s3DownloadBytesInternal(config, key, proxy)
+  return file ? { ...file, content: new TextDecoder().decode(file.content) } : null
 }
 
 /**

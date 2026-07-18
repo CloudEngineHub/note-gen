@@ -1,10 +1,17 @@
 'use client'
 
-import { ReactNode, useRef, useState } from 'react'
-import { Cloud, FileText, Folder } from 'lucide-react'
+import { Fragment, ReactNode, useRef, useState } from 'react'
+import { Cloud, FileText, Folder, LoaderCircle, MoreVertical } from 'lucide-react'
 import { BrowserEntry } from './types'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 type EntryAction = {
   key: string
@@ -13,6 +20,7 @@ type EntryAction = {
   onClick: () => void | Promise<void>
   disabled?: boolean
   variant?: 'default' | 'outline' | 'destructive'
+  separatorBefore?: boolean
 }
 
 interface EntryListItemProps {
@@ -59,7 +67,8 @@ export function EntryListItem({
   const [translateX, setTranslateX] = useState(0)
   const [opened, setOpened] = useState(false)
 
-  const actionWidth = actions.length * 60
+  const quickActions = actions.filter((action) => action.key === 'rename' || action.key === 'delete')
+  const actionWidth = quickActions.length * 60
   const itemTransform = isDragging && dragOffset
     ? `translate(${dragOffset.x}px, ${dragOffset.y}px)`
     : `translateX(${translateX}px)`
@@ -103,7 +112,7 @@ export function EntryListItem({
       clearLongPressTimer()
     }
 
-    if (actions.length === 0) return
+    if (quickActions.length === 0) return
 
     if (!isSwipingRef.current) {
       if (Math.abs(deltaX) < 8) return
@@ -130,7 +139,7 @@ export function EntryListItem({
       return
     }
 
-    if (actions.length === 0) return
+    if (quickActions.length === 0) return
     const maxLeft = -actionWidth
     const shouldOpen = translateX < maxLeft / 2
     setOpened(shouldOpen)
@@ -159,14 +168,14 @@ export function EntryListItem({
         isDropTarget && "outline-2 outline-primary outline-offset-2"
       )}
     >
-      {actions.length > 0 && (
+      {quickActions.length > 0 && (
         <div
           className={cn(
-            "absolute inset-y-0 right-0 flex items-center gap-2 px-2",
+            "absolute inset-y-0 right-0 z-0 flex items-center gap-2 bg-background px-2",
             isDragging && "hidden"
           )}
         >
-          {actions.map((action) => (
+          {quickActions.map((action) => (
             <Button
               key={action.key}
               type="button"
@@ -190,10 +199,10 @@ export function EntryListItem({
       )}
       <div
         className={cn(
-          "w-full rounded-md border bg-background px-3 py-2 text-left transition-transform duration-200 ease-out active:bg-accent",
-          isActive && "border-primary shadow-sm",
-          isDropTarget && "border-primary bg-primary/5",
-          isDragging && "border-primary bg-background shadow-xl transition-none"
+          "relative z-10 min-h-11 w-full rounded-md bg-background px-2 py-1.5 text-left transition-transform duration-200 ease-out hover:bg-accent active:bg-accent",
+          isActive && "bg-accent text-accent-foreground",
+          isDropTarget && "bg-primary/5",
+          isDragging && "bg-background shadow-xl ring-1 ring-primary transition-none"
         )}
         style={{ transform: itemTransform }}
         onTouchStart={handleTouchStart}
@@ -201,43 +210,78 @@ export function EntryListItem({
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
       >
-        <button
-          type="button"
-          onClick={() => {
-            if (suppressClickRef.current) {
-              suppressClickRef.current = false
-              return
-            }
-            if (opened) {
-              setOpened(false)
-              setTranslateX(0)
-              return
-            }
-            onOpen(entry)
-          }}
-          className="w-full min-w-0 text-left"
-        >
-          <div className="flex items-center gap-2">
-            {entry.type === 'folder' ? (
-              <Folder className="size-4 text-muted-foreground shrink-0" />
-            ) : (
-              <FileText className="size-4 text-muted-foreground shrink-0" />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (suppressClickRef.current) {
+                suppressClickRef.current = false
+                return
+              }
+              if (opened) {
+                setOpened(false)
+                setTranslateX(0)
+                return
+              }
+              onOpen(entry)
+            }}
+            className="min-w-0 flex-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              {entry.isLoading ? (
+                <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" />
+              ) : entry.type === 'folder' ? (
+                <Folder className="size-4 shrink-0 text-muted-foreground" />
+              ) : (
+                <FileText className="size-4 shrink-0 text-muted-foreground" />
+              )}
+              <p className="min-w-0 flex-1 truncate text-sm font-medium">{entry.name}</p>
+              {!entry.isLocale && (
+                <span
+                  className="inline-flex shrink-0 items-center text-muted-foreground"
+                  title={remoteLabel}
+                  aria-label={remoteLabel}
+                >
+                  <Cloud className="size-4 stroke-[2.25]" />
+                </span>
+              )}
+            </div>
+            {subtitle && (
+              <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>
             )}
-            <p className="text-sm font-medium truncate flex-1 min-w-0">{entry.name}</p>
-            {!entry.isLocale && (
-              <span
-                className="inline-flex items-center shrink-0 text-sky-600 dark:text-sky-400"
-                title={remoteLabel}
-                aria-label={remoteLabel}
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9 shrink-0"
+                aria-label={entry.name}
+                onClick={(event) => event.stopPropagation()}
+                onTouchStart={(event) => event.stopPropagation()}
+                data-vaul-no-drag
               >
-                <Cloud className="size-4 stroke-[2.25]" />
-              </span>
-            )}
-          </div>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground truncate mt-1">{subtitle}</p>
-          )}
-        </button>
+                <MoreVertical />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {actions.map((action) => (
+                <Fragment key={action.key}>
+                  {action.separatorBefore && <DropdownMenuSeparator />}
+                  <DropdownMenuItem
+                    disabled={action.disabled}
+                    className={cn(action.variant === 'destructive' && 'text-destructive focus:text-destructive')}
+                    onSelect={() => void action.onClick()}
+                  >
+                    {action.icon}
+                    {action.label}
+                  </DropdownMenuItem>
+                </Fragment>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   )

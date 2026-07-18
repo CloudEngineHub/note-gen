@@ -3,7 +3,7 @@ import { Store } from '@tauri-apps/plugin-store';
 import { v4 as uuid } from 'uuid';
 import { GithubError, GithubRepoInfo, OctokitResponse } from './github.types';
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
-import { buildRepoContentPath, buildRepoContentsEndpoint, debugSyncPath } from './remote-file'
+import { buildRepoContentPath, buildRepoContentsEndpoint, debugSyncPath, encodeRemoteFileContent } from './remote-file'
 export { decodeBase64ToString } from './remote-file';
 
 export function uint8ArrayToBase64(data: Uint8Array) {
@@ -68,7 +68,7 @@ const GITHUB_RELEASES_CACHE_TTL_MS = 1000 * 60 * 30;
 
 export async function uploadFile(
   { file, filename, sha, message, repo, path }:
-  { file: string, filename?: string, sha?: string, message?: string, repo: string, path?: string })
+  { file: string | Uint8Array, filename?: string, sha?: string, message?: string, repo: string, path?: string })
 {
   const store = await Store.load('store.json');
   const accessToken = await store.get('accessToken')
@@ -90,7 +90,7 @@ export async function uploadFile(
     })
 
     // 将内容转换为 Base64（GitHub API 要求）
-    const base64Content = Buffer.from(file, 'utf-8').toString('base64')
+    const base64Content = encodeRemoteFileContent(file)
 
     // 设置请求头
     const headers = new Headers();

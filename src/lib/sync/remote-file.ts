@@ -129,18 +129,28 @@ export function hasEmptyRemoteFileContent(file: unknown) {
 }
 
 export function decodeBase64ToString(content: unknown) {
+  return new TextDecoder().decode(decodeBase64ToBytes(content))
+}
+
+export function decodeBase64ToBytes(content: unknown): Uint8Array {
   if (typeof content !== 'string') {
     throw new Error('远程文件内容不是有效的 Base64 字符串')
   }
 
   const normalized = content.replace(/\s+/g, '')
   if (!normalized) {
-    return ''
+    return new Uint8Array()
   }
 
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 === 1) {
     throw new Error('远程文件内容不是有效的 Base64 字符串')
   }
 
-  return Buffer.from(normalized, 'base64').toString('utf-8')
+  return new Uint8Array(Buffer.from(normalized, 'base64'))
+}
+
+export function encodeRemoteFileContent(content: string | Uint8Array): string {
+  return typeof content === 'string'
+    ? Buffer.from(content, 'utf-8').toString('base64')
+    : Buffer.from(content).toString('base64')
 }

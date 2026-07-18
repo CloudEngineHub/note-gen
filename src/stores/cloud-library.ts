@@ -4,6 +4,7 @@ import {
   uploadAllLocalLibraryFiles,
   type PullAllProgress,
   type PullAllResult,
+  type RemoteLibraryOptions,
   type UploadAllResult,
 } from '@/lib/sync/remote-library'
 import {
@@ -25,8 +26,8 @@ type CloudLibraryState = {
   lastUploadResult: UploadAllResult | null
   lastUploadedSnapshot: RagSnapshotManifest | null
   lastDownloadedSnapshot: RagSnapshotDownloadResult | null
-  pullAllFiles: (onProgress?: (progress: PullAllProgress) => void) => Promise<PullAllResult>
-  uploadAllFiles: (onProgress?: (progress: PullAllProgress) => void) => Promise<UploadAllResult>
+  pullAllFiles: (onProgress?: (progress: PullAllProgress) => void, options?: RemoteLibraryOptions) => Promise<PullAllResult>
+  uploadAllFiles: (onProgress?: (progress: PullAllProgress) => void, options?: RemoteLibraryOptions) => Promise<UploadAllResult>
   uploadKnowledgeBase: () => Promise<RagSnapshotManifest>
   downloadKnowledgeBase: () => Promise<RagSnapshotDownloadResult>
   clearError: () => void
@@ -47,7 +48,7 @@ const useCloudLibraryStore = create<CloudLibraryState>((set) => ({
   lastUploadedSnapshot: null,
   lastDownloadedSnapshot: null,
 
-  pullAllFiles: async (onProgress) => {
+  pullAllFiles: async (onProgress, options) => {
     set({
       operation: 'pull-files',
       progressCurrent: 0,
@@ -56,7 +57,7 @@ const useCloudLibraryStore = create<CloudLibraryState>((set) => ({
       error: '',
     })
     try {
-      const result = await pullAllRemoteLibraryFiles(progress => {
+      const result = await pullAllRemoteLibraryFiles(options, progress => {
         set({
           progressCurrent: progress.current,
           progressTotal: progress.total,
@@ -74,7 +75,7 @@ const useCloudLibraryStore = create<CloudLibraryState>((set) => ({
     }
   },
 
-  uploadAllFiles: async (onProgress) => {
+  uploadAllFiles: async (onProgress, options) => {
     set({
       operation: 'upload-files',
       progressCurrent: 0,
@@ -83,7 +84,7 @@ const useCloudLibraryStore = create<CloudLibraryState>((set) => ({
       error: '',
     })
     try {
-      const result = await uploadAllLocalLibraryFiles(progress => {
+      const result = await uploadAllLocalLibraryFiles(options, progress => {
         set({
           progressCurrent: progress.current,
           progressTotal: progress.total,

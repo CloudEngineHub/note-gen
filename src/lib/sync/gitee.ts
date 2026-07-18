@@ -2,7 +2,7 @@ import { toast } from '@/hooks/use-toast';
 import { Store } from '@tauri-apps/plugin-store';
 import { v4 as uuid } from 'uuid';
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
-import { buildRepoContentPath, buildRepoContentsEndpoint, debugSyncPath, pickNestedFileEntry } from './remote-file'
+import { buildRepoContentPath, buildRepoContentsEndpoint, debugSyncPath, encodeRemoteFileContent, pickNestedFileEntry } from './remote-file'
 export { decodeBase64ToString } from './remote-file'
 // Remove unused imports - these types are not actually used in this file
 
@@ -182,7 +182,7 @@ async function resolveDirectoryFileEntryContent(
 
 export async function uploadFile(
   { file, filename, sha, message, repo, path }:
-  { file: string, filename?: string, sha?: string, message?: string, repo: string, path?: string })
+  { file: string | Uint8Array, filename?: string, sha?: string, message?: string, repo: string, path?: string })
 {
   const store = await Store.load('store.json');
   const accessToken = await store.get('giteeAccessToken')
@@ -221,7 +221,7 @@ export async function uploadFile(
     })
 
     // 将内容转换为 Base64（Gitee API 要求）
-    const base64Content = Buffer.from(file, 'utf-8').toString('base64')
+    const base64Content = encodeRemoteFileContent(file)
 
     // 设置请求头
     const headers = new Headers();

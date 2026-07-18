@@ -9,6 +9,7 @@ import { toMarkdownImagePath } from './markdown-image-path'
 import { getNormalizedImageHosting } from './image-hosting-config'
 import { getWritingAssetsDirName } from './writing-assets-path'
 import useArticleStore from '@/stores/article'
+import { uploadLocalLibraryFile } from '@/lib/sync/remote-library'
 
 export interface ImageUploadResult {
   /** Webview 可访问的 URL（用于编辑器显示） */
@@ -57,6 +58,15 @@ export async function handleImageUpload(
   if (activeFilePath) {
     try {
       const { imageRelativePath, markdownRelativePath } = await saveImageLocally(file, activeFilePath)
+      const articleStore = useArticleStore.getState()
+      if (articleStore.syncStaticAssets) {
+        try {
+          const sha = await uploadLocalLibraryFile(imageRelativePath)
+          articleStore.markFileRemote(imageRelativePath, sha)
+        } catch (error) {
+          console.error('[ImageHandler] Failed to auto-upload local image:', error)
+        }
+      }
       // 将本地路径转换为 Webview 可访问的 URL
       const webviewUrl = await convertImageByWorkspace(imageRelativePath)
       return {

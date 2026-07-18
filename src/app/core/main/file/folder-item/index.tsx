@@ -10,7 +10,8 @@ import { computedParentPath, getCurrentFolder, joinRelativePath } from "@/lib/pa
 import useSettingStore from '@/stores/setting'
 import { isSkillsFolder } from "@/lib/skills/utils"
 import { cn } from "@/lib/utils"
-import SyncFolder from './sync-folder'
+import DownloadFolder from './sync-folder'
+import { UploadFolder } from './upload-folder'
 import { NewFile } from './new-file'
 import { NewFolder } from './new-folder'
 import { ViewDirectory } from './view-directory'
@@ -858,9 +859,8 @@ export function FolderItem({
                         {t('context.paste')}
                       </MobileMenuItem>
                       <MobileSeparator />
-                      <MobileMenuItem disabled>
-                        同步
-                      </MobileMenuItem>
+                      <UploadFolder item={item} mobile />
+                      <DownloadFolder item={item} mobile />
                       <MobileSeparator />
                       <MobileMenuItem onClick={handleStartRename} disabled={!!item.sha && !item.isLocale}>
                         {t('context.rename')}
@@ -903,7 +903,8 @@ export function FolderItem({
             <DuplicateFolder item={item} />
             <PasteInFolder item={item} shortcut={`${modKey}V`} />
             <ContextMenuSeparator />
-            <SyncFolder item={item} />
+            <UploadFolder item={item} />
+            <DownloadFolder item={item} />
             <ContextMenuSeparator />
             <RenameFolder item={item} onStartRename={handleStartRename} shortcut={renameKey} />
             <DeleteFolder item={item} shortcut={deleteKey} />

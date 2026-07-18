@@ -1,9 +1,11 @@
 'use client'
 
 import { confirm } from '@tauri-apps/plugin-dialog'
-import { BookOpenCheck, CloudDownload, Database, Download, LoaderCircle, Upload } from 'lucide-react'
+import { BookOpenCheck, Cloud, Database, DatabaseZap, Download, EllipsisVertical, LoaderCircle, PackageOpen, Upload } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,28 +22,77 @@ import { cn } from '@/lib/utils'
 
 export function CloudLibraryMenu({ className }: { className?: string }) {
   const t = useTranslations('article.file.cloudLibrary')
-  const { loadFileTree, initVectorIndexedFiles } = useArticleStore()
-  const { processAllDocuments, isProcessing } = useVectorStore()
+  const {
+    loadFileTree,
+    loadRemoteSyncFiles,
+    markFileRemote,
+    initVectorIndexedFiles,
+    syncStaticAssets,
+    initSyncStaticAssets,
+    setSyncStaticAssets,
+    showCloudFiles,
+    initShowCloudFiles,
+    setShowCloudFiles,
+  } = useArticleStore()
+  const { processAllDocuments, isProcessing, isAutoVectorEnabled, setAutoVectorEnabled } = useVectorStore()
   const {
     operation,
     progressCurrent,
     progressTotal,
     progressPath,
     pullAllFiles,
+    uploadAllFiles,
     uploadKnowledgeBase,
     downloadKnowledgeBase,
   } = useCloudLibraryStore()
   const busy = operation !== null || isProcessing
 
+  useEffect(() => {
+    void initSyncStaticAssets()
+    void initShowCloudFiles()
+  }, [initShowCloudFiles, initSyncStaticAssets])
+
   async function handlePullAll() {
     try {
-      const result = await pullAllFiles()
+      const result = await pullAllFiles(undefined, { includeStaticAssets: true })
       await loadFileTree()
       toast({
         title: t('pullComplete'),
         description: t('pullResult', {
           downloaded: result.downloaded,
           skipped: result.skipped,
+          failed: result.failed.length,
+        }),
+        variant: result.failed.length > 0 ? 'destructive' : 'default',
+      })
+    } catch (error) {
+      toast({
+        title: t('operationFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    }
+  }
+
+  async function handleUploadAll() {
+    const accepted = await confirm(t(syncStaticAssets ? 'uploadFilesWithAssetsWarning' : 'uploadFilesWarning'), {
+      title: t('uploadFiles'),
+      kind: 'warning',
+    })
+    if (!accepted) return
+
+    try {
+      const result = await uploadAllFiles(progress => {
+        if (progress.phase === 'uploaded' && progress.path && progress.sha) {
+          markFileRemote(progress.path, progress.sha)
+        }
+      }, { includeStaticAssets: syncStaticAssets })
+      await loadFileTree({ skipRemoteSync: true })
+      await loadRemoteSyncFiles()
+      toast({
+        title: t('uploadFilesComplete'),
+        description: t('uploadFilesResult', {
+          uploaded: result.uploaded,
           failed: result.failed.length,
         }),
         variant: result.failed.length > 0 ? 'destructive' : 'default',
@@ -120,18 +171,70 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
           aria-label={t('title')}
           title={t('title')}
         >
-          {busy ? <LoaderCircle className="size-4 animate-spin" /> : <CloudDownload className="size-4" />}
+          {busy ? <LoaderCircle className="size-4 animate-spin" /> : <EllipsisVertical className="size-4" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
         <DropdownMenuLabel>{t('files')}</DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            void setShowCloudFiles(!showCloudFiles)
+          }}
+        >
+          <Cloud className="mr-2 size-4" />
+          <span>{t('showRemoteFiles')}</span>
+          <Switch
+            className="ml-auto"
+            checked={showCloudFiles}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(checked) => void setShowCloudFiles(checked)}
+            aria-label={t('showRemoteFiles')}
+          />
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            void setSyncStaticAssets(!syncStaticAssets)
+          }}
+        >
+          <PackageOpen className="mr-2 size-4" />
+          <span>{t('syncStaticAssets')}</span>
+          <Switch
+            className="ml-auto"
+            checked={syncStaticAssets}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(checked) => void setSyncStaticAssets(checked)}
+            aria-label={t('syncStaticAssets')}
+          />
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void handleUploadAll()} disabled={busy}>
+          <Upload className="mr-2 size-4" />
+          {t('uploadFiles')}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void handlePullAll()} disabled={busy}>
-          <CloudDownload className="mr-2 size-4" />
-          {t('pullAll')}
+          <Download className="mr-2 size-4" />
+          {t('downloadFiles')}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t('knowledgeBase')}</DropdownMenuLabel>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            void setAutoVectorEnabled(!isAutoVectorEnabled)
+          }}
+        >
+          <DatabaseZap className="mr-2 size-4" />
+          <span>{t('autoUpdate')}</span>
+          <Switch
+            className="ml-auto"
+            checked={isAutoVectorEnabled}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(checked) => void setAutoVectorEnabled(checked)}
+            aria-label={t('autoUpdate')}
+          />
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void processAllDocuments()} disabled={busy}>
           <Database className="mr-2 size-4" />
           {t('recalculate')}

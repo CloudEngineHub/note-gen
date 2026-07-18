@@ -248,6 +248,7 @@ export function FileSidebar() {
     initCollapsibleList,
     initSortSettings,
     initShowCloudFiles,
+    initSyncStaticAssets,
     initShowKnowledgeBaseStatus,
   } = useArticleStore()
   const { sidebarRef, focusSidebar } = useFileManagerShortcuts()
@@ -256,6 +257,7 @@ export function FileSidebar() {
     initCollapsibleList()
     initSortSettings()
     initShowCloudFiles()
+    initSyncStaticAssets()
     initShowKnowledgeBaseStatus()
   }, [])
 

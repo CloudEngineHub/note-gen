@@ -6,6 +6,7 @@ import { decodeBase64ToString, getRemoteFileContent } from '@/lib/sync/remote-fi
 import type { S3Config, WebDAVConfig } from '@/types/sync'
 import type { Mark } from '@/db/marks'
 import type { Tag } from '@/db/tags'
+import { downloadRecordAssets, uploadRecordAssets } from '@/lib/sync/record-assets'
 
 export type AutoDataSyncDomain = 'records' | 'settings'
 type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
@@ -512,6 +513,11 @@ export async function downloadAutoDataSyncNow(
 
     const tagResult = await useTagStore.getState().downloadTags({ allowMissingRemote: true })
     const markResult = await useMarkStore.getState().downloadMarks({ allowMissingRemote: true })
+    await downloadRecordAssets(markResult)
+    await Promise.all([
+      useMarkStore.getState().fetchMarks(),
+      useMarkStore.getState().fetchAllMarks(),
+    ])
     const settingsResult = await useSettingsSyncStore.getState().downloadSettings({ allowMissingRemote: true })
     debugAutoDataSync('download domain results', {
       tags: tagResult,
@@ -715,6 +721,7 @@ async function mergeAutoDataSyncConflict(): Promise<boolean> {
     await tagsDb.insertTags(mergedTags)
     await marksDb.deleteAllMarks()
     await marksDb.insertMarks(mergedMarks)
+    await downloadRecordAssets(mergedMarks)
     await Promise.all([
       useTagStore.getState().fetchTags(),
       useMarkStore.getState().fetchMarks(),
@@ -1130,6 +1137,9 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
       import('@/stores/mark'),
     ])
 
+    const { getAllMarks } = await import('@/db/marks')
+    const marks = await getAllMarks()
+    await uploadRecordAssets(marks)
     const tagResult = await useTagStore.getState().uploadTags()
     const markResult = await useMarkStore.getState().uploadMarks()
     debugAutoDataSync('records upload results', {

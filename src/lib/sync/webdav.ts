@@ -422,8 +422,9 @@ async function ensureParentDirsExist(
 export async function webdavUpload(
   config: WebDAVConfig,
   key: string,
-  content: string,
-  proxy?: Proxy
+  content: string | Uint8Array,
+  proxy?: Proxy,
+  contentType = 'text/markdown; charset=utf-8'
 ): Promise<{ etag: string } | null> {
   const uploadStartedAt = getPerfNow()
   let previousPerfAt = uploadStartedAt
@@ -452,7 +453,7 @@ export async function webdavUpload(
     logPerf('ensureParentDirs')
 
     const url = buildWebDAVUrl(config, key)
-    const contentBytes = new TextEncoder().encode(content)
+    const contentBytes = typeof content === 'string' ? new TextEncoder().encode(content) : content
     logPerf('encodeContent', {
       byteLength: contentBytes.byteLength,
     })
@@ -461,7 +462,7 @@ export async function webdavUpload(
       method: 'PUT',
       headers: {
         'Authorization': buildAuthHeader(config.username, config.password),
-        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Type': contentType,
         'Content-Length': contentBytes.byteLength.toString()
       },
       body: contentBytes,
@@ -520,11 +521,11 @@ export async function webdavUpload(
 /**
  * 从 WebDAV 下载文件
  */
-export async function webdavDownload(
+async function webdavDownloadBytesInternal(
   config: WebDAVConfig,
   key: string,
   proxy?: Proxy
-): Promise<{ content: string; etag: string; lastModified: string } | null> {
+): Promise<{ content: Uint8Array; etag: string; lastModified: string } | null> {
   const startedAt = getPerfNow()
   try {
     if (shouldSkipForTemporaryBlock(config, 'download', { key })) {
@@ -549,7 +550,7 @@ export async function webdavDownload(
 
     if (response.status === 200) {
       const textStartedAt = getPerfNow()
-      const content = await response.text()
+      const content = new Uint8Array(await response.arrayBuffer())
       const etag = response.headers.get('ETag') || ''
       const lastModified = response.headers.get('Last-Modified') || ''
       debugSyncPerf('webdav.download.readBody', {
@@ -591,6 +592,23 @@ export async function webdavDownload(
     console.error('WebDAV download error:', error)
     return null
   }
+}
+
+export async function webdavDownloadBytes(
+  config: WebDAVConfig,
+  key: string,
+  proxy?: Proxy
+): Promise<{ content: Uint8Array; etag: string; lastModified: string } | null> {
+  return await webdavDownloadBytesInternal(config, key, proxy)
+}
+
+export async function webdavDownload(
+  config: WebDAVConfig,
+  key: string,
+  proxy?: Proxy
+): Promise<{ content: string; etag: string; lastModified: string } | null> {
+  const file = await webdavDownloadBytesInternal(config, key, proxy)
+  return file ? { ...file, content: new TextDecoder().decode(file.content) } : null
 }
 
 /**

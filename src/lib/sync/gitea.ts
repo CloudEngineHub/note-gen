@@ -3,7 +3,7 @@ import { Store } from '@tauri-apps/plugin-store';
 import { v4 as uuid } from 'uuid';
 import { fetch, Proxy } from '@tauri-apps/plugin-http';
 import { fetch as encodeFetch } from './encode-fetch'
-import { buildRemoteLogicalPath, buildRepoContentPath, debugSyncPath } from './remote-file'
+import { buildRemoteLogicalPath, buildRepoContentPath, debugSyncPath, encodeRemoteFileContent } from './remote-file'
 import { 
   GiteaInstanceType, 
   GiteaRepositoryInfo, 
@@ -88,7 +88,7 @@ export async function uploadFile({
   repo,
   path
 }: {
-  file: string;
+  file: string | Uint8Array;
   filename?: string;
   sha?: string;
   message?: string;
@@ -115,7 +115,7 @@ export async function uploadFile({
     })
 
     // 将内容转换为 Base64（Gitea API 要求）
-    const base64Content = Buffer.from(file, 'utf-8').toString('base64')
+    const base64Content = encodeRemoteFileContent(file)
 
     const baseUrl = await getGiteaApiBaseUrl();
     const headers = await getCommonHeaders();
