@@ -2601,6 +2601,7 @@
         "title": "遠端檔案與知識庫",
         "more": "更多",
         "fileView": "檔案檢視",
+        "showKnowledgeBaseStatus": "顯示知識庫狀態",
         "files": "遠端檔案",
         "showRemoteFiles": "顯示遠端檔案",
         "preparingFiles": "正在取得檔案清單...",

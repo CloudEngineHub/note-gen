@@ -2691,6 +2691,7 @@
         "title": "Remote Files & Knowledge Base",
         "more": "More",
         "fileView": "File View",
+        "showKnowledgeBaseStatus": "Show Knowledge Base Status",
         "files": "Remote Files",
         "showRemoteFiles": "Show Remote Files",
         "preparingFiles": "Loading file list...",

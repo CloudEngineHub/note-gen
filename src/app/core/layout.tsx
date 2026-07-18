@@ -309,6 +309,8 @@ export default function RootLayout({
         initEditorShortcuts()
         await initVectorDb()
         if (cancelled) return
+        await useArticleStore.getState().initVectorIndexedFiles()
+        if (cancelled) return
 
         initQuickRecordText()
         initShowWindow()

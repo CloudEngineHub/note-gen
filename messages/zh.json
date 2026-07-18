@@ -2691,6 +2691,7 @@
         "title": "远程文件与知识库",
         "more": "更多",
         "fileView": "文件视图",
+        "showKnowledgeBaseStatus": "显示知识库状态",
         "files": "远程文件",
         "showRemoteFiles": "显示远程文件",
         "preparingFiles": "正在获取文件列表...",

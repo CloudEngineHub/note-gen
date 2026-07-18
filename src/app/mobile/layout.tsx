@@ -81,6 +81,8 @@ export default function RootLayout({
         if (cancelled) return
         await initVectorDb()
         if (cancelled) return
+        await useArticleStore.getState().initVectorIndexedFiles()
+        if (cancelled) return
         initMcp()
       } catch (error) {
         console.error('Failed to initialize mobile app:', error)

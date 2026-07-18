@@ -2611,6 +2611,7 @@
         "title": "リモートファイルと知識ベース",
         "more": "その他",
         "fileView": "ファイル表示",
+        "showKnowledgeBaseStatus": "知識ベースの状態を表示",
         "files": "リモートファイル",
         "showRemoteFiles": "リモートファイルを表示",
         "preparingFiles": "ファイル一覧を取得しています...",

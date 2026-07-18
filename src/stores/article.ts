@@ -267,6 +267,9 @@ interface NoteState {
   showCloudFiles: boolean
   initShowCloudFiles: () => Promise<void>
   setShowCloudFiles: (show: boolean) => Promise<void>
+  showKnowledgeBaseStatus: boolean
+  initShowKnowledgeBaseStatus: () => Promise<void>
+  setShowKnowledgeBaseStatus: (show: boolean) => Promise<void>
 
   // Initialize tabs from store
   initOpenTabs: () => Promise<void>
@@ -775,6 +778,17 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const store = await getStore();
     await store.set('showCloudFiles', show)
   },
+  showKnowledgeBaseStatus: true,
+  initShowKnowledgeBaseStatus: async () => {
+    const store = await getStore()
+    const show = await store.get<boolean>('showKnowledgeBaseStatus')
+    set({ showKnowledgeBaseStatus: show ?? true })
+  },
+  setShowKnowledgeBaseStatus: async (show: boolean) => {
+    set({ showKnowledgeBaseStatus: show })
+    const store = await getStore()
+    await store.set('showKnowledgeBaseStatus', show)
+  },
 
   fileTree: [],
   setFileTree: (tree: DirTree[]) => {
@@ -960,6 +974,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
   loadFileTree: async (options) => {
     set({ fileTreeLoading: true })
     set({ fileTree: [] })
+    const vectorIndexPromise = get().initVectorIndexedFiles()
 
     // 确保 collapsibleList 已初始化
     if (!get().collapsibleListInitialized) {
@@ -1090,15 +1105,15 @@ const useArticleStore = create<NoteState>((set, get) => ({
       }
     }
         
+    // 在展示文件树前确保知识库索引映射已准备完成，避免状态图标延迟出现。
+    await vectorIndexPromise
+
     // 排序文件树
     const sortedDirs = get().sortFileTree(dirs)
     set({ fileTree: sortedDirs })
 
     // 先显示本地文件树
     set({ fileTreeLoading: false })
-
-    // 初始化向量索引状态（异步，不阻塞界面）
-    get().initVectorIndexedFiles()
 
     // 异步加载远程同步文件（不阻塞界面）
     if (!options?.skipRemoteSync) {
@@ -2492,16 +2507,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
   // 初始化向量索引状态 - 加载所有已索引的文件
   initVectorIndexedFiles: async () => {
     try {
-      const { getAllVectorDocumentFilenames, getVectorDocumentsByFilename } = await import('@/db/vector')
-      const indexedFiles = await getAllVectorDocumentFilenames()
-
-      // 构建 vectorIndexedFiles Map
-      const vectorIndexedDocs = []
-      for (const file of indexedFiles) {
-        const docs = await getVectorDocumentsByFilename(file.filename)
-        vectorIndexedDocs.push(...docs)
-      }
-
+      const { getAllVectorDocuments } = await import('@/db/vector')
+      const vectorIndexedDocs = await getAllVectorDocuments()
       const vectorIndexedMap = buildVectorIndexedMap(vectorIndexedDocs)
 
       set({ vectorIndexedFiles: vectorIndexedMap })

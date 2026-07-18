@@ -2594,6 +2594,7 @@
         "title": "Arquivos remotos e base de conhecimento",
         "more": "Mais",
         "fileView": "Visualização de arquivos",
+        "showKnowledgeBaseStatus": "Mostrar status da base de conhecimento",
         "files": "Arquivos remotos",
         "showRemoteFiles": "Mostrar arquivos remotos",
         "preparingFiles": "Carregando lista de arquivos...",

@@ -95,6 +95,7 @@ export function FileItem({
     setFileTree,
     loadFileTree,
     vectorIndexedFiles,
+    showKnowledgeBaseStatus,
     checkFileVectorIndexed,
     cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder,
@@ -148,7 +149,7 @@ export function FileItem({
 
   // 向量计算状态图标
   const renderVectorIcon = () => {
-    if (isInSkillsFolder(path)) return null
+    if (!showKnowledgeBaseStatus || isInSkillsFolder(path)) return null
 
     const status = item.vectorCalcStatus
 
@@ -860,7 +861,7 @@ export function FileItem({
                     <ImageIcon className={`${iconSize} shrink-0`} />
                   </div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{item.name}</span>
-                  {path === activeFilePath && renderVectorIcon()}
+                  {renderVectorIcon()}
                 </div>
                 {isMobile && (
                   <MobileActionMenu className="ml-1">
@@ -910,7 +911,7 @@ export function FileItem({
                     )}
                   </div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{item.name}</span>
-                  {path === activeFilePath && renderVectorIcon()}
+                  {renderVectorIcon()}
                 </div>
                 {isMobile && (
                   <MobileActionMenu className="ml-1">

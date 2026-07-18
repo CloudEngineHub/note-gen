@@ -12,6 +12,7 @@ import {
   DatabaseZap,
   Download,
   EllipsisVertical,
+  Eye,
   FolderInput,
   LoaderCircle,
   SortAsc,
@@ -60,6 +61,8 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
     collapsibleList,
     showCloudFiles,
     setShowCloudFiles,
+    showKnowledgeBaseStatus,
+    setShowKnowledgeBaseStatus,
     cancelVectorCalculation,
   } = useArticleStore()
   const {
@@ -278,6 +281,22 @@ export function FileMoreMenu({ isImporting, onImportMarkdown }: FileMoreMenuProp
             ? <ChevronsDownUp className="mr-2 size-4" />
             : <ChevronsUpDown className="mr-2 size-4" />}
           {collapsibleList.length > 0 ? tToolbar('collapseAll') : tToolbar('expandAll')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            void setShowKnowledgeBaseStatus(!showKnowledgeBaseStatus)
+          }}
+        >
+          <Eye className="mr-2 size-4" />
+          <span>{t('showKnowledgeBaseStatus')}</span>
+          <Switch
+            className="ml-auto"
+            checked={showKnowledgeBaseStatus}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(checked) => void setShowKnowledgeBaseStatus(checked)}
+            aria-label={t('showKnowledgeBaseStatus')}
+          />
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

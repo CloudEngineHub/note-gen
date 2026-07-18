@@ -98,6 +98,7 @@ export function FolderItem({
     fileTree,
     setFileTree,
     vectorIndexedFiles,
+    showKnowledgeBaseStatus,
     moveLocalEntry,
     syncOpenTabsForPathChange,
     cleanTabsByDeletedFile,
@@ -121,7 +122,7 @@ export function FolderItem({
   // 计算文件夹的向量状态
   const folderVectorStatus = useCallback(() => {
     let totalCount = 0
-    let indexedCount = 0
+    let loadedIndexedCount = 0
 
     function countFiles(node: DirTree) {
       if (!node.children) {
@@ -129,7 +130,7 @@ export function FolderItem({
         if (node.name.endsWith('.md')) {
           totalCount++
           if (vectorIndexedFiles.has(computedParentPath(node))) {
-            indexedCount++
+            loadedIndexedCount++
           }
         }
         return
@@ -140,18 +141,22 @@ export function FolderItem({
     }
 
     countFiles(item)
+    const pathPrefix = `${path}/`
+    const indexedCount = Array.from(vectorIndexedFiles.keys())
+      .filter(filePath => filePath.startsWith(pathPrefix))
+      .length
 
     return {
       totalCount,
-      indexedCount,
-      hasVector: totalCount > 0 && indexedCount > 0,
-      isComplete: totalCount > 0 && indexedCount === totalCount
+      indexedCount: totalCount > 0 ? loadedIndexedCount : indexedCount,
+      hasVector: indexedCount > 0 || loadedIndexedCount > 0,
+      isComplete: totalCount > 0 && loadedIndexedCount === totalCount
     }
-  }, [item, vectorIndexedFiles])
+  }, [item, path, vectorIndexedFiles])
 
   // 渲染文件夹的向量状态图标
   const renderFolderVectorIcon = () => {
-    if (isInSkillsFolder(path)) return null
+    if (!showKnowledgeBaseStatus || isInSkillsFolder(path)) return null
 
     const status = item.vectorCalcStatus
     const vectorStatus = folderVectorStatus()
@@ -166,7 +171,9 @@ export function FolderItem({
       return (
         <div className="mr-2 flex shrink-0 items-center">
           <span className={`text-xs text-muted-foreground ${vectorStatus.isComplete ? 'opacity-100' : 'opacity-60'}`}>
-            {vectorStatus.indexedCount}/{vectorStatus.totalCount}
+            {vectorStatus.totalCount > 0
+              ? `${vectorStatus.indexedCount}/${vectorStatus.totalCount}`
+              : vectorStatus.indexedCount}
           </span>
           <Database className={`${iconSize} ml-1 shrink-0 text-muted-foreground ${vectorStatus.isComplete ? 'opacity-100' : 'opacity-60'}`} />
         </div>
