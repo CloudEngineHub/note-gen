@@ -315,7 +315,7 @@ function getAIRequestErrorMessage(error: unknown): string {
 export function isUnsupportedToolChoiceError(error: unknown): boolean {
   const message = getAIRequestErrorMessage(error)
   return /tool[_\s-]?choice/i.test(message)
-    && /不支持|not\s+support|unsupported|unknown\s+(?:parameter|field)|invalid\s+(?:parameter|field)/i.test(message)
+    && /不支持|不存在|not\s+support|unsupported|unknown\s+(?:parameter|field)|invalid\s+(?:parameter|field)|does\s+not\s+exist\s+in\s+tools|not\s+found\s+in\s+tools|not\s+available/i.test(message)
 }
 
 function omitToolChoice(

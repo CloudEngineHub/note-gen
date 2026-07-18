@@ -682,7 +682,7 @@ async function executeStructuralToolWithChange(
 const editorApplyTransactionTool: AgentTool = {
   name: 'editor_apply_transaction',
   title: '应用编辑器事务',
-  description: 'Atomically apply one or more non-overlapping line edits to the current Markdown editor. Every line number refers to the same original editor version, so operation order does not matter. Use editor_replace_range instead for an exact quoted selection.',
+  description: 'Atomically apply multiple non-overlapping line edits to the current Markdown editor in one approval. Operations accept only replace_lines, insert_before_line, or insert_after_line. Never use replace_range inside operations. Use editor_replace_lines for one contiguous block and editor_replace_range only for an exact quoted selection.',
   category: 'editor',
   risk: 'editor-write',
   inputSchema: {
@@ -692,7 +692,7 @@ const editorApplyTransactionTool: AgentTool = {
       version: { type: 'number', description: 'Required editor version from the run-start snapshot or editor_get_state.' },
       operations: {
         type: 'array',
-        description: 'Non-overlapping edits whose line numbers all refer to the original editor snapshot.',
+        description: 'Multiple non-overlapping edits whose line numbers all refer to the original editor snapshot. Allowed operation types: replace_lines, insert_before_line, insert_after_line.',
         items: {
           type: 'object',
           properties: {
@@ -929,7 +929,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'editor_replace_lines',
       title: '替换编辑器行',
-      description: 'Replace exact 1-based editor lines with replaceContent. Prefer this for current-document section or block edits when line numbers are available.',
+      description: 'Replace one contiguous range of exact 1-based editor lines with complete Markdown in replaceContent. Preserve structural markers such as "# ", "- ", and "> ". Prefer this for a single current-document line, section, or block edit.',
       category: 'editor',
       risk: 'editor-write',
       legacy: replaceEditorContentTool,

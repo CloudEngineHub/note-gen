@@ -298,6 +298,113 @@ function validateToolInputShape(tool: AgentTool, args: Record<string, unknown>):
   return null
 }
 
+function preserveOriginalMarkdownPrefix(
+  context: AgentContextSnapshot,
+  lineNumber: number,
+  content: string
+) {
+  if (content.includes('\n')) {
+    return content
+  }
+
+  const numberedLine = context.currentEditorState?.numberedLines
+    .split('\n')
+    .find((line) => new RegExp(`^\\s*${lineNumber}\\s*\\|`).test(line))
+  const originalLine = numberedLine?.replace(/^\s*\d+\s*\|\s?/, '') || ''
+  const originalPrefix = originalLine.match(/^(\s*#{1,6}\s+)/)?.[1]
+  const replacementHasPrefix = /^\s*#{1,6}\s+/.test(content)
+  const requestsPlainText = /(?:改为|改成|转换为|变成).*(?:正文|普通文本|段落|plain\s+text|paragraph)/i
+    .test(context.userInput)
+
+  return originalPrefix && !replacementHasPrefix && !requestsPlainText
+    ? `${originalPrefix}${content}`
+    : content
+}
+
+function repairEditorWriteArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+  context: AgentContextSnapshot
+): Record<string, unknown> {
+  if (
+    toolName === 'editor_replace_lines' &&
+    Number.isInteger(args.startLine) &&
+    args.startLine === args.endLine &&
+    typeof args.replaceContent === 'string'
+  ) {
+    const replaceContent = preserveOriginalMarkdownPrefix(
+      context,
+      args.startLine as number,
+      args.replaceContent
+    )
+    return replaceContent === args.replaceContent
+      ? args
+      : { ...args, replaceContent }
+  }
+
+  if (toolName !== 'editor_apply_transaction' || !Array.isArray(args.operations)) {
+    return args
+  }
+
+  let repaired = false
+  const operations = args.operations.map((rawOperation) => {
+    if (!rawOperation || typeof rawOperation !== 'object' || Array.isArray(rawOperation)) {
+      return rawOperation
+    }
+
+    const operation = rawOperation as Record<string, unknown>
+    if (
+      operation.type === 'replace_lines' &&
+      Number.isInteger(operation.startLine) &&
+      operation.startLine === operation.endLine &&
+      typeof operation.content === 'string'
+    ) {
+      const content = preserveOriginalMarkdownPrefix(
+        context,
+        operation.startLine as number,
+        operation.content
+      )
+      if (content !== operation.content) {
+        repaired = true
+        return { ...operation, content }
+      }
+      return rawOperation
+    }
+
+    if (operation.type !== 'replace_range') {
+      return rawOperation
+    }
+
+    const startLine = Number.isInteger(operation.startLine)
+      ? operation.startLine
+      : operation.from
+    const endLine = Number.isInteger(operation.endLine)
+      ? operation.endLine
+      : operation.to
+    let content = typeof operation.content === 'string'
+      ? operation.content
+      : operation.replaceContent
+
+    if (!Number.isInteger(startLine) || !Number.isInteger(endLine) || typeof content !== 'string') {
+      return rawOperation
+    }
+
+    if (startLine === endLine) {
+      content = preserveOriginalMarkdownPrefix(context, startLine as number, content)
+    }
+
+    repaired = true
+    return {
+      type: 'replace_lines',
+      startLine,
+      endLine,
+      content,
+    }
+  })
+
+  return repaired ? { ...args, operations } : args
+}
+
 function extractSingleLineReplacement(content: string) {
   const lines = content
     .replace(/\r\n/g, '\n')
@@ -312,6 +419,14 @@ function extractSingleLineReplacement(content: string) {
   }
 
   return lines[0]
+}
+
+function stripUnselectedHeadingMarker(selectedText: string, content: string) {
+  if (/^#{1,6}\s/.test(selectedText) || !/^#{1,6}\s/.test(content)) {
+    return content
+  }
+
+  return content.replace(/^#{1,6}\s+/, '')
 }
 
 function repairQuotedEditorWriteArgs(
@@ -331,11 +446,17 @@ function repairQuotedEditorWriteArgs(
   const from = getNumberArg(args, 'from')
   const to = getNumberArg(args, 'to')
   const content = getStringArg(args, 'content')
-  if (from !== quote.from || to !== quote.to || !content.includes('\n')) {
+  if (from !== quote.from || to !== quote.to) {
     return null
   }
 
-  const repairedContent = extractSingleLineReplacement(content)
+  const singleLineContent = content.includes('\n')
+    ? extractSingleLineReplacement(content)
+    : content
+  const repairedContent = stripUnselectedHeadingMarker(
+    quote.fullContent || '',
+    singleLineContent
+  )
   if (!repairedContent || repairedContent === content) {
     return null
   }
@@ -935,6 +1056,18 @@ export class AgentRuntime {
               content: stringifyToolResult(parseErrorResult),
             })
             continue
+          }
+
+          const repairedEditorArgs = repairEditorWriteArgs(toolName, args, context)
+          if (repairedEditorArgs !== args) {
+            agentDebugLog('tool_args_auto_repaired', {
+              runId,
+              toolName,
+              originalArgs: args,
+              repairedArgs: repairedEditorArgs,
+              reason: 'Normalized editor line replacement arguments and preserved Markdown structure.',
+            })
+            args = repairedEditorArgs
           }
 
           agentDebugLog('tool_call_received', {

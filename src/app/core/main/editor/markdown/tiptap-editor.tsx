@@ -4437,11 +4437,27 @@ export function TipTapEditor({
 
             editor.commands.setContent(updatedMarkdown, { contentType: 'markdown' })
           } else {
-            editor.chain()
-              .focus()
-              .deleteRange({ from, to })
-              .insertContent(newContent, { contentType: 'markdown' })
-              .run()
+            const $from = editor.state.doc.resolve(from)
+            const $to = editor.state.doc.resolve(to)
+            const isInlineTextReplacement = !newContent.includes('\n')
+              && $from.sameParent($to)
+              && $from.parent.isTextblock
+
+            if (isInlineTextReplacement) {
+              editor.chain()
+                .focus()
+                .command(({ tr }) => {
+                  tr.insertText(newContent, from, to)
+                  return true
+                })
+                .run()
+            } else {
+              editor.chain()
+                .focus()
+                .deleteRange({ from, to })
+                .insertContent(newContent, { contentType: 'markdown' })
+                .run()
+            }
           }
 
           // Increment version after successful replacement
