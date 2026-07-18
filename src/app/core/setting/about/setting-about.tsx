@@ -4,7 +4,7 @@ import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemDescription, It
 import { Separator } from "@/components/ui/separator";
 import { useTranslations } from 'next-intl';
 import Updater from "./updater";
-import { BriefcaseBusiness, Bug, ExternalLink, Github, HandHeart, HomeIcon, MessageSquare } from "lucide-react";
+import { BriefcaseBusiness, Bug, ExternalLink, GitFork, HandHeart, HomeIcon, MessageSquare } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
       url: "https://github.com/codexu/note-gen",
       title: t('items.github.title'),
       desc: t('items.github.desc'),
-      icon: <Github />,
+      icon: <GitFork />,
       buttonName: t('items.github.buttonName')
     },
     {

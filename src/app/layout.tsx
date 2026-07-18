@@ -1,5 +1,5 @@
 'use client'
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css";
 import 'react-photo-view/dist/react-photo-view.css';
 import { Suspense, useEffect } from "react";
@@ -7,6 +7,7 @@ import { NextIntlProvider } from "@/components/providers/NextIntlProvider";
 import Script from "next/script";
 import { getSyncPushQueue } from "@/lib/sync/sync-push-queue";
 import { ConsoleFilter } from "@/components/console-filter";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function RootLayout({
   children,
@@ -45,11 +46,13 @@ export default function RootLayout({
         <body suppressHydrationWarning>
           <ConsoleFilter />
           <Suspense>
-            <NextIntlProvider>
-              {children}
-            </NextIntlProvider>
+            <TooltipProvider>
+              <NextIntlProvider>
+                {children}
+              </NextIntlProvider>
+            </TooltipProvider>
           </Suspense>
-          <Toaster />
+          <Toaster closeButton richColors position="bottom-right" />
         </body>
       </html>
     </>

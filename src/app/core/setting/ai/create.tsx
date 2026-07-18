@@ -22,8 +22,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { AiConfig } from "../config";
 import * as React from "react"
 import { v4 } from 'uuid';
-import { AvatarImage } from "@/components/ui/avatar";
-import { Avatar } from "@radix-ui/react-avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import useSettingStore from "@/stores/setting";
 import { useLocalStorage } from "react-use";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -173,7 +172,6 @@ function CreateConfigDialog({ open, setOpen, onConfigCreated }: { open: boolean;
 export default function CreateConfig({ hasCustomModels = false, onConfigCreated }: CreateConfigProps) {
   const t = useTranslations('settings.ai');
   const [open, setOpen] = useState(false)
-
 
   if (hasCustomModels) {
     // 有自定义模型时，只显示按钮

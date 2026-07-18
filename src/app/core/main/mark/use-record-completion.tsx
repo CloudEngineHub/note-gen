@@ -1,6 +1,5 @@
 'use client'
 
-import { ToastAction } from '@/components/ui/toast'
 import { EmitterRecordEvents } from '@/config/emitters'
 import { toast } from '@/hooks/use-toast'
 import emitter from '@/lib/emitter'
@@ -55,16 +54,12 @@ export function useRecordCompletion() {
       description: tagName
         ? `${savedDescription || t('record.capture.saved')} · ${t('record.capture.saveTarget')}: ${tagName}`
         : savedDescription,
-      action: markId ? (
-        <ToastAction
-          altText={t('record.capture.viewRecord')}
-          onClick={() => {
-            void openSavedRecord(markId, tagId)
-          }}
-        >
-          {t('record.capture.viewRecord')}
-        </ToastAction>
-      ) : undefined,
+      action: markId ? {
+        label: t('record.capture.viewRecord'),
+        onClick: () => {
+          void openSavedRecord(markId, tagId)
+        },
+      } : undefined,
     })
   }, [openSavedRecord, t])
 }

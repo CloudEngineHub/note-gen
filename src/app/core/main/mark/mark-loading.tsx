@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 export function MarkLoading({mark}: {mark: MarkQueue}){
   const [timeNow, setTimeNow] = useState(Date.now())
-  const timer = useRef<NodeJS.Timeout>()
+  const timer = useRef<NodeJS.Timeout | null>(null)
   const typeT = useTranslations('record.mark.type');
   const captureT = useTranslations('record.capture');
   const tags = useTagStore((state) => state.tags)
@@ -19,7 +19,7 @@ export function MarkLoading({mark}: {mark: MarkQueue}){
       setTimeNow(Date.now())
     }, 1000);
     return () => {
-      clearInterval(timer.current);
+      if (timer.current) clearInterval(timer.current);
     };
   }, []);
 

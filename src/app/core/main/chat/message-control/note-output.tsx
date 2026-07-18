@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label"
 import { extractTitle } from "@/lib/markdown"
 import { getFilePathOptions, getWorkspacePath, getGenericPathOptions } from "@/lib/workspace"
 import useTagStore from "@/stores/tag"
-import { CheckedState } from "@radix-ui/react-checkbox"
 import { BaseDirectory, readDir, writeTextFile } from "@tauri-apps/plugin-fs"
 import { Store } from "@tauri-apps/plugin-store"
 import { SquarePen, TriangleAlert } from "lucide-react"
@@ -25,6 +24,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Chat } from "@/db/chats"
 import { useTranslations } from "next-intl"
 import useArticleStore from "@/stores/article"
+
+type CheckedState = boolean | "indeterminate"
 
 export function NoteOutput({chat}: {chat: Chat}) {
   const { deleteTag, currentTagId } = useTagStore()

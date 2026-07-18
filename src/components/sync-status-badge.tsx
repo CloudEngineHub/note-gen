@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { CheckCircle2, ArrowUpCircle, ArrowDownCircle, AlertTriangle, Loader2, CloudOff } from 'lucide-react'
-import { Badge, BadgeProps } from '@/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSyncManager } from '@/hooks/use-sync-manager'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ interface SyncStatusBadgeProps {
   path?: string
   showLabel?: boolean
   className?: string
-  badgeProps?: BadgeProps
+  badgeProps?: React.ComponentProps<typeof Badge>
 }
 
 export function SyncStatusBadge({ path, showLabel = false, className, badgeProps }: SyncStatusBadgeProps) {

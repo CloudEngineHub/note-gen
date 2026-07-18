@@ -45,7 +45,7 @@ export function ActivityDrawer({ open, onOpenChange }: ActivityDrawerProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" hideCloseButton className="top-[36px] w-[452px] p-4 sm:max-w-none">
+      <SheetContent side="right" showCloseButton={false} className="top-[36px] w-[452px] p-4 sm:max-w-none">
         <div className="scrollbar-hide h-full overflow-y-auto">
           <ActivityPanel
             data={data}

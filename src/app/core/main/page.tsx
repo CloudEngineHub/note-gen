@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { useSidebarStore } from "@/stores/sidebar"
 import { useEffect, useState, useRef } from 'react'
 import { Store } from '@tauri-apps/plugin-store'
-import { ImperativePanelHandle } from 'react-resizable-panels'
+import { Layout, PanelImperativeHandle } from 'react-resizable-panels'
 
 function getDefaultLayout(layoutKey: string) {
   const storageKey = `react-resizable-panels:main-layout:${layoutKey}`
@@ -59,9 +59,9 @@ function ResizableWrapper() {
     initSidebarState
   } = useSidebarStore()
   
-  const leftPanelRef = useRef<ImperativePanelHandle>(null)
-  const centerPanelRef = useRef<ImperativePanelHandle>(null)
-  const rightPanelRef = useRef<ImperativePanelHandle>(null)
+  const leftPanelRef = useRef<PanelImperativeHandle>(null)
+  const centerPanelRef = useRef<PanelImperativeHandle>(null)
+  const rightPanelRef = useRef<PanelImperativeHandle>(null)
   
   const MIN_SIDEBAR_WIDTH_PX = 280
   const MIN_EDITOR_WIDTH_PX = 400
@@ -144,9 +144,10 @@ function ResizableWrapper() {
   
   const actualLayout = getActualLayout()
   
-  const onLayout = (sizes: number[]) => {
+  const onLayout = (layout: Layout) => {
     // 保存当前面板布局
     const storageKey = `react-resizable-panels:main-layout:${layoutKey}`
+    const sizes = ['left', 'center', 'right'].map((id) => layout[id] ?? 0)
     localStorage.setItem(storageKey, JSON.stringify(sizes));
   };
 
@@ -159,11 +160,12 @@ function ResizableWrapper() {
     panels.push(
       <ResizablePanel
         key="left"
-        ref={leftPanelRef}
-        defaultSize={actualLayout[index++]}
-        minSize={minSidebarSize}
+        id="left"
+        panelRef={leftPanelRef}
+        defaultSize={`${actualLayout[index++]}%`}
+        minSize={`${minSidebarSize}%`}
         collapsible={true}
-        collapsedSize={0}
+        collapsedSize="0%"
       >
         <LeftSidebar />
       </ResizablePanel>
@@ -183,11 +185,12 @@ function ResizableWrapper() {
     panels.push(
       <ResizablePanel
         key="center"
-        ref={centerPanelRef}
-        defaultSize={actualLayout[index++]}
-        minSize={minEditorSize}
+        id="center"
+        panelRef={centerPanelRef}
+        defaultSize={`${actualLayout[index++]}%`}
+        minSize={`${minEditorSize}%`}
         collapsible={true}
-        collapsedSize={0}
+        collapsedSize="0%"
       >
         <EditorLayout />
       </ResizablePanel>
@@ -206,11 +209,12 @@ function ResizableWrapper() {
     panels.push(
       <ResizablePanel
         key="right"
-        ref={rightPanelRef}
-        defaultSize={actualLayout[index++]}
-        minSize={minSidebarSize}
+        id="right"
+        panelRef={rightPanelRef}
+        defaultSize={`${actualLayout[index++]}%`}
+        minSize={`${minSidebarSize}%`}
         collapsible={true}
-        collapsedSize={0}
+        collapsedSize="0%"
       >
         <Chat />
       </ResizablePanel>
@@ -221,8 +225,8 @@ function ResizableWrapper() {
 
   return (
     <ResizablePanelGroup 
-      direction="horizontal" 
-      onLayout={onLayout} 
+      orientation="horizontal"
+      onLayoutChanged={onLayout}
       className="h-full"
     >
       {renderLayout()}

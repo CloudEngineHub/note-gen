@@ -70,11 +70,13 @@ function AccordionItemWrapper({
     <AccordionItem value={value} {...props}>
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === ContextMenu) {
-          return React.cloneElement(child as React.ReactElement, {
-            children: React.Children.map((child as React.ReactElement).props.children, (contextChild: any) => {
+          const contextMenu = child as React.ReactElement<{ children?: React.ReactNode }>
+          return React.cloneElement(contextMenu, {
+            children: React.Children.map(contextMenu.props.children, (contextChild) => {
               if (React.isValidElement(contextChild) && contextChild.type === ContextMenuTrigger) {
-                return React.cloneElement(contextChild as React.ReactElement, {
-                  children: React.Children.map((contextChild as React.ReactElement).props.children, (triggerChild: any) => {
+                const contextMenuTrigger = contextChild as React.ReactElement<{ children?: React.ReactNode }>
+                return React.cloneElement(contextMenuTrigger, {
+                  children: React.Children.map(contextMenuTrigger.props.children, (triggerChild) => {
                     // 将 sortable 属性应用到 AccordionTrigger
                     if (React.isValidElement(triggerChild) && triggerChild.type === AccordionTrigger) {
                       return (
@@ -118,7 +120,7 @@ function SortableTagItem({ tag, children }: { tag: Tag; children: React.ReactNod
   // 将拖拽激活器引用传递给子组件
   return (
     <div ref={setNodeRef} style={style}>
-      {React.cloneElement(children as React.ReactElement, { 
+      {React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
         sortableAttributes: attributes,
         sortableListeners: listeners,
         sortableActivatorRef: setActivatorNodeRef
