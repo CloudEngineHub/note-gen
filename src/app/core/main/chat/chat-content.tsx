@@ -1,7 +1,7 @@
 import React from 'react'
 import useChatStore from '@/stores/chat'
 import useTagStore from '@/stores/tag'
-import { ArrowDownToLine, X, Loader2, QuoteIcon } from 'lucide-react'
+import { X, Loader2, QuoteIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Chat } from '@/db/chats'
 import ChatPreview from './chat-preview'
@@ -21,193 +21,22 @@ import { AgentPanelWithRag } from './agent-panel-with-rag'
 import { ChatImages } from "./chat-images"
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-
-const BOTTOM_THRESHOLD = 24
-const USER_SCROLL_GRACE_MS = 300
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from '@/components/ui/message-scroller'
 
 const ChatContent = React.memo(function ChatContent() {
   const { chats, init, agentState, loading } = useChatStore()
   const { currentTagId } = useTagStore()
-  const [isOnBottom, setIsOnBottom] = useState(true)
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
-  const wrapperRef = React.useRef<HTMLDivElement>(null)
-  const contentRef = React.useRef<HTMLDivElement>(null)
-  const bottomAnchorRef = React.useRef<HTMLDivElement>(null)
-  const programmaticScrollRef = React.useRef(false)
-  const autoScrollEnabledRef = React.useRef(true)
-  const delayedScrollTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastUserScrollAtRef = React.useRef(0)
-
-  const isNearBottom = useCallback((element: Element) => {
-    return element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_THRESHOLD
-  }, [])
-
-  const handleScroll = useCallback(() => {
-    const md = wrapperRef.current
-    if (!md) return
-
-    const onBottom = isNearBottom(md)
-    setIsOnBottom(onBottom)
-
-    if (programmaticScrollRef.current) {
-      if (onBottom) {
-        programmaticScrollRef.current = false
-      }
-      return
-    }
-
-    const isLikelyUserScroll = Date.now() - lastUserScrollAtRef.current < USER_SCROLL_GRACE_MS
-
-    // 只有用户主动离开底部时才关闭自动滚动
-    if (onBottom) {
-      setAutoScrollEnabled(true)
-    } else if (isLikelyUserScroll) {
-      setAutoScrollEnabled(false)
-    }
-  }, [isNearBottom])
-
-  const markUserScrollIntent = useCallback(() => {
-    lastUserScrollAtRef.current = Date.now()
-  }, [])
-
-  const performAutoScroll = useCallback(() => {
-    programmaticScrollRef.current = true
-    bottomAnchorRef.current?.scrollIntoView({ block: 'end' })
-    setIsOnBottom(true)
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        programmaticScrollRef.current = false
-        const md = wrapperRef.current
-        if (md) {
-          setIsOnBottom(isNearBottom(md))
-        }
-      }, 0)
-    })
-
-    if (delayedScrollTimeoutRef.current) {
-      clearTimeout(delayedScrollTimeoutRef.current)
-    }
-
-    delayedScrollTimeoutRef.current = setTimeout(() => {
-      if (!autoScrollEnabledRef.current) return
-
-      programmaticScrollRef.current = true
-      bottomAnchorRef.current?.scrollIntoView({ block: 'end' })
-      setIsOnBottom(true)
-
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          programmaticScrollRef.current = false
-          const md = wrapperRef.current
-          if (md) {
-            setIsOnBottom(isNearBottom(md))
-          }
-        }, 0)
-      })
-    }, 500)
-  }, [isNearBottom])
-
-  // 手动滚动到底部并启用自动滚动
-  const handleScrollToBottom = useCallback(() => {
-    performAutoScroll()
-    setAutoScrollEnabled(true)
-  }, [performAutoScroll])
-
-  useEffect(() => {
-    const md = wrapperRef.current
-    if (!md) return
-
-    const handleTouchStart = () => markUserScrollIntent()
-    const handleTouchMove = () => markUserScrollIntent()
-    const handleWheel = () => markUserScrollIntent()
-    const handlePointerDown = () => markUserScrollIntent()
-
-    md.addEventListener('scroll', handleScroll)
-    md.addEventListener('touchstart', handleTouchStart, { passive: true })
-    md.addEventListener('touchmove', handleTouchMove, { passive: true })
-    md.addEventListener('wheel', handleWheel, { passive: true })
-    md.addEventListener('pointerdown', handlePointerDown, { passive: true })
-
-    return () => {
-      md.removeEventListener('scroll', handleScroll)
-      md.removeEventListener('touchstart', handleTouchStart)
-      md.removeEventListener('touchmove', handleTouchMove)
-      md.removeEventListener('wheel', handleWheel)
-      md.removeEventListener('pointerdown', handlePointerDown)
-    }
-  }, [handleScroll, markUserScrollIntent])
 
   useEffect(() => {
     init(currentTagId)
   }, [currentTagId, init])
-
-  useEffect(() => {
-    autoScrollEnabledRef.current = autoScrollEnabled
-  }, [autoScrollEnabled])
-
-  useEffect(() => {
-    const md = wrapperRef.current
-    const content = contentRef.current
-    if (!md || !content) return
-
-    const syncScrollState = () => {
-      const onBottom = isNearBottom(md)
-
-      if (autoScrollEnabled) {
-        performAutoScroll()
-        return
-      }
-
-      setIsOnBottom(onBottom)
-    }
-
-    const observer = new ResizeObserver(syncScrollState)
-    const mutationObserver = new MutationObserver(() => {
-      syncScrollState()
-    })
-
-    observer.observe(content)
-    mutationObserver.observe(content, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    })
-
-    return () => {
-      observer.disconnect()
-      mutationObserver.disconnect()
-    }
-  }, [autoScrollEnabled, isNearBottom, performAutoScroll])
-
-  // 监听消息变化，仅在启用自动滚动时才滚动
-  useEffect(() => {
-    if (autoScrollEnabled) {
-      performAutoScroll()
-    }
-  }, [chats, autoScrollEnabled, performAutoScroll])
-
-  // Agent 执行时，仅在启用自动滚动时才滚动到底部
-  useEffect(() => {
-    if (autoScrollEnabled && agentState.isRunning) {
-      performAutoScroll()
-    }
-  }, [agentState.currentThought, agentState.thoughtHistory, agentState.traceEvents, agentState.changes, agentState.pendingConfirmation, agentState.isRunning, autoScrollEnabled, performAutoScroll])
-
-  // Loading 状态变化时，仅在启用自动滚动时才滚动到底部
-  useEffect(() => {
-    if (autoScrollEnabled && loading) {
-      performAutoScroll()
-    }
-  }, [loading, autoScrollEnabled, performAutoScroll])
-
-  useEffect(() => {
-    return () => {
-      if (delayedScrollTimeoutRef.current) {
-        clearTimeout(delayedScrollTimeoutRef.current)
-      }
-    }
-  }, [])
 
   // 判断是否应该显示 loading：loading=true 且最后一个 AI 消息还没有内容
   const shouldShowLoading = useMemo(() => {
@@ -223,43 +52,44 @@ const ChatContent = React.memo(function ChatContent() {
     return true
   }, [loading, agentState.isRunning, chats])
 
-  return <div
-    ref={wrapperRef}
-    id="chats-wrapper"
-    className="relative flex min-h-0 flex-1 flex-col items-end gap-6 overflow-y-auto overflow-x-hidden w-full p-4 [overflow-anchor:none]"
-  >
-    <div
-      ref={contentRef}
-      className={cn(
-        "relative w-full flex flex-col items-end gap-6",
-        chats.length === 0 && "flex-1"
-      )}
-    >
-      {
-        chats.length ? chats.map((chat) => {
-          return <Message key={chat.id} chat={chat} />
-        }) : <ChatEmpty />
-      }
+  return (
+    <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+      <MessageScroller className="flex-1">
+        <MessageScrollerViewport id="chats-wrapper" className="overflow-x-hidden p-4">
+          <MessageScrollerContent
+            className={cn("items-end", chats.length === 0 && "h-full")}
+          >
+            {chats.length ? chats.map((chat) => (
+              <MessageScrollerItem
+                key={chat.id}
+                messageId={String(chat.id)}
+                scrollAnchor={chat.role === 'user'}
+                className="w-full"
+              >
+                <Message chat={chat} />
+              </MessageScrollerItem>
+            )) : (
+              <MessageScrollerItem className="flex w-full flex-1">
+                <ChatEmpty />
+              </MessageScrollerItem>
+            )}
 
-      {/* Loading 指示器 - 服务器等待时显示 */}
-      {shouldShowLoading && (
-        <div className="flex w-full min-w-0 -mt-6">
-          <div className='text-sm leading-6 flex-1 flex items-center gap-2 text-muted-foreground'>
-            <Loader2 className="size-4 animate-spin" />
-            <span>正在思考...</span>
-          </div>
-        </div>
-      )}
-
-      <div ref={bottomAnchorRef} className="h-px w-full" />
-    </div>
-
-    {
-      !isOnBottom && <Button variant="outline" className='sticky bottom-0 size-8 right-0' onClick={handleScrollToBottom}>
-        <ArrowDownToLine className='size-4' />
-      </Button>
-    }
-  </div>
+            {shouldShowLoading && (
+              <MessageScrollerItem className="w-full">
+                <div className="flex w-full min-w-0">
+                  <div className="flex flex-1 items-center gap-2 text-sm leading-6 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>正在思考...</span>
+                  </div>
+                </div>
+              </MessageScrollerItem>
+            )}
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton />
+      </MessageScroller>
+    </MessageScrollerProvider>
+  )
 })
 ChatContent.displayName = 'ChatContent'
 

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "shadcn/tailwind.css";
 
 /* 导入动画库 */
 @import "tw-animate-css";
