@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { FolderOpen, FolderSync, SortAsc, SortDesc, ChevronsDownUp, ChevronsUpDown, ArrowDownAZ, Calendar, Clock, ChevronDown, FolderPlus, Cloud } from "lucide-react"
+import { FolderOpen, ChevronDown, FolderPlus } from "lucide-react"
 import useSettingStore from "@/stores/setting"
 import useArticleStore from "@/stores/article"
 import { useSkillsStore } from "@/stores/skills"
@@ -15,10 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import { Separator } from "@/components/ui/separator"
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { BottomBarIconButton } from "@/components/bottom-bar-icon-button"
 import { getWorkspaceDisplayName } from "@/lib/workspace-name"
 
 export function FileFooter() {
@@ -28,18 +25,9 @@ export function FileFooter() {
     clearCollapsibleList,
     loadFileTree,
     setActiveFilePath,
-    setCurrentArticle,
-    sortType,
-    setSortType,
-    sortDirection,
-    setSortDirection,
-    toggleAllFolders,
-    collapsibleList,
-    showCloudFiles,
-    setShowCloudFiles
+    setCurrentArticle
   } = useArticleStore()
   const tFile = useTranslations('settings.file')
-  const tToolbar = useTranslations('article.file.toolbar')
 
   // 当前工作区名称
   const currentWorkspaceName = useMemo(() => {
@@ -101,7 +89,7 @@ export function FileFooter() {
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="flex h-5 flex-1 justify-between border-0 bg-transparent px-1.5 text-xs text-muted-foreground hover:bg-accent focus:ring-0"
+            className="flex h-5 flex-1 justify-between border-0 bg-transparent px-1.5 text-xs text-muted-foreground hover:bg-accent focus-visible:border-transparent focus-visible:ring-0"
           >
             <span className="truncate text-xs">{currentWorkspaceName}</span>
             <ChevronDown className="ml-1 size-3 shrink-0 opacity-50" />
@@ -150,77 +138,6 @@ export function FileFooter() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Separator orientation="vertical" />
-
-      {/* 右侧：排序、云端开关、展开、刷新 */}
-      <div className="flex items-center gap-1">
-        {/* 云端文件开关 */}
-        <BottomBarIconButton
-          icon={<Cloud className={`size-3 ${showCloudFiles ? 'text-primary' : 'opacity-40'}`} />}
-          label={showCloudFiles ? tToolbar('hideCloudFiles') : tToolbar('showCloudFiles')}
-          onClick={() => setShowCloudFiles(!showCloudFiles)}
-          active={showCloudFiles}
-        />
-
-        {/* 排序 */}
-        <TooltipProvider>
-          <DropdownMenu>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative size-5 rounded-sm">
-                    {sortDirection === 'asc' ? <SortAsc className={`size-3 ${sortType !== 'none' ? 'text-primary' : ''}`} /> : <SortDesc className={`size-3 ${sortType !== 'none' ? 'text-primary' : ''}`} />}
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{tToolbar('sort')}</p>
-              </TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setSortType('name')} className={sortType === 'name' ? 'bg-accent' : ''}>
-                <ArrowDownAZ className="mr-2 h-4 w-4" />
-                {tToolbar('sortByName')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortType('created')} className={sortType === 'created' ? 'bg-accent' : ''}>
-                <Calendar className="mr-2 h-4 w-4" />
-                {tToolbar('sortByCreated')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortType('modified')} className={sortType === 'modified' ? 'bg-accent' : ''}>
-                <Clock className="mr-2 h-4 w-4" />
-                {tToolbar('sortByModified')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')} className="border-t mt-1 pt-1">
-                {sortDirection === 'asc' ? (
-                  <>
-                    <SortDesc className="mr-2 h-4 w-4" />
-                    {tToolbar('sortDesc')}
-                  </>
-                ) : (
-                  <>
-                    <SortAsc className="mr-2 h-4 w-4" />
-                    {tToolbar('sortAsc')}
-                  </>
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TooltipProvider>
-
-        {/* 折叠/展开 */}
-        <BottomBarIconButton 
-          icon={collapsibleList.length > 0 ? <ChevronsDownUp className="size-3" /> : <ChevronsUpDown className="size-3" />} 
-          label={collapsibleList.length > 0 ? tToolbar('collapseAll') : tToolbar('expandAll')} 
-          onClick={toggleAllFolders}
-        />
-
-        {/* 刷新 */}
-        <BottomBarIconButton 
-          icon={<FolderSync className="size-3" />} 
-          label={tToolbar('refresh')} 
-          onClick={loadFileTree}
-        />
-      </div>
     </div>
   )
 }

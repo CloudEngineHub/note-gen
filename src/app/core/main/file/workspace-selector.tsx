@@ -38,7 +38,7 @@ export function WorkspaceSelector() {
   return (
     <div className="border-t bg-muted/30 h-6 flex items-center">
       <Select value={workspacePath} onValueChange={handleWorkspaceChange}>
-        <SelectTrigger className="h-6 border-0 bg-transparent hover:bg-transparent focus:ring-0 text-sm">
+        <SelectTrigger className="h-6 border-0 bg-transparent text-sm hover:bg-transparent focus-visible:border-transparent focus-visible:ring-0">
           <span className="truncate text-xs text-right">{currentWorkspaceName}</span>
         </SelectTrigger>
         <SelectContent>

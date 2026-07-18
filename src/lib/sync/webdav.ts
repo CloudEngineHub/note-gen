@@ -813,9 +813,11 @@ function parsePropfindResponse(
 
         const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '')
 
-        // 跳过根目录本身
-        if (href === `${normalizedPrefix}/` || href === normalizedPrefix || href.endsWith('/')) {
-          // 这是一个目录，跳过文件列表中的目录
+        const isDirectory = href.endsWith('/')
+        const hrefWithoutTrailingSlash = href.replace(/\/+$/, '')
+
+        // 跳过当前目录本身，但保留它的直接子目录，供完整远端遍历使用。
+        if (hrefWithoutTrailingSlash === normalizedPrefix) {
           continue
         }
 
@@ -827,10 +829,12 @@ function parsePropfindResponse(
         }
 
         // 移除开头的斜杠
-        href = href.replace(/^\/+/, '')
+        href = href.replace(/^\/+/, '').replace(/\/+$/, '')
+
+        if (!href) continue
 
         results.push({
-          key: href,
+          key: isDirectory ? `${href}/` : href,
           etag: etagMatch ? etagMatch[1].replace(/"/g, '') : '',
           lastModified: lastModMatch ? lastModMatch[1] : '',
           size: sizeMatch ? parseInt(sizeMatch[1], 10) : 0

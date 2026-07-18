@@ -1,7 +1,7 @@
 "use client"
 
 import { TooltipButton } from "@/components/tooltip-button"
-import { FilePlus, FolderPlus, FolderInput, LoaderCircle } from "lucide-react"
+import { FilePlus, FolderPlus, RefreshCw } from "lucide-react"
 import { useTranslations } from "next-intl"
 import * as React from "react"
 import useArticleStore from "@/stores/article"
@@ -11,14 +11,28 @@ import { readDir, copyFile, mkdir, exists } from '@tauri-apps/plugin-fs'
 import { join } from '@tauri-apps/api/path'
 import { getWorkspacePath } from '@/lib/workspace'
 import { toast } from '@/hooks/use-toast'
+import { FileMoreMenu } from './file-more-menu'
 
 export function FileActions() {
-  const { newFolder, newFile, loadFileTree } = useArticleStore()
+  const { newFolder, newFile, loadFileTree, loadRemoteSyncFiles, fileTreeLoading } = useArticleStore()
   const t = useTranslations('article.file.toolbar')
   const [isImporting, setIsImporting] = React.useState(false)
+  const [isRefreshing, setIsRefreshing] = React.useState(false)
 
   const debounceNewFile = debounce(newFile, 200)
   const debounceNewFolder = debounce(newFolder, 200)
+
+  async function handleRefresh() {
+    if (isRefreshing) return
+
+    setIsRefreshing(true)
+    try {
+      await loadFileTree({ skipRemoteSync: true })
+      await loadRemoteSyncFiles()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
 
   // 递归复制文件夹中的所有 markdown 文件和图片
   async function copyMarkdownFilesRecursively(
@@ -132,12 +146,16 @@ export function FileActions() {
         onClick={debounceNewFolder}
         side="bottom"
       />
-      <TooltipButton 
-        icon={isImporting ? <LoaderCircle className="animate-spin h-4 w-4" /> : <FolderInput className="h-4 w-4" />} 
-        tooltipText={isImporting ? t('importing') : t('importMarkdown')} 
-        onClick={handleImportMarkdown}
-        disabled={isImporting}
+      <TooltipButton
+        icon={<RefreshCw className={`h-4 w-4 ${fileTreeLoading || isRefreshing ? 'animate-spin' : ''}`} />}
+        tooltipText={t('refresh')}
+        onClick={() => void handleRefresh()}
+        disabled={fileTreeLoading || isRefreshing}
         side="bottom"
+      />
+      <FileMoreMenu
+        isImporting={isImporting}
+        onImportMarkdown={() => void handleImportMarkdown()}
       />
     </div>
   )

@@ -35,6 +35,7 @@ import { Store } from '@tauri-apps/plugin-store'
 import { S3Config, WebDAVConfig } from '@/types/sync'
 import { buildMoveTargetPath, getPathAfterMove, isInvalidFolderMoveTarget, moveFileManagerEntry } from '@/app/core/main/file/file-dnd'
 import { cn } from '@/lib/utils'
+import { CloudLibraryMenu } from '@/app/core/main/file/cloud-library-menu'
 
 interface WritingHeaderProps {
   editor: Editor | null
@@ -838,6 +839,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                 >
                   <RefreshCw className={`size-4 ${isBrowserLoading ? 'animate-spin' : ''}`} />
                 </Button>
+                <CloudLibraryMenu className="h-9 w-9 shrink-0 rounded-md border" />
                 <Button
                   variant="outline"
                   size="icon"

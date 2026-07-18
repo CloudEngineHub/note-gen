@@ -51,42 +51,27 @@ function generateContentHash(content: string): string {
 async function runWithConcurrencyLimit<T>(
   tasks: (() => Promise<T>)[],
   limit: number,
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number, taskIndex: number) => void
 ): Promise<T[]> {
   const results: T[] = new Array(tasks.length);
-  const executing: Promise<void>[] = [];
+  let nextTaskIndex = 0;
   let completed = 0;
 
-  for (const [index, task] of tasks.entries()) {
-    const promise = task()
-      .then(result => {
-        results[index] = result;
-        completed++;
-        if (onProgress) {
-          onProgress(completed, tasks.length);
-        }
-      })
-      .catch(error => {
-        results[index] = error as T;
-        completed++;
-        if (onProgress) {
-          onProgress(completed, tasks.length);
-        }
-        throw error;
-      });
+  async function runWorker(): Promise<void> {
+    while (nextTaskIndex < tasks.length) {
+      const taskIndex = nextTaskIndex++;
 
-    executing.push(promise);
-
-    if (executing.length >= limit) {
-      await Promise.race(executing);
-      executing.splice(
-        executing.findIndex(p => p === promise),
-        1
-      );
+      try {
+        results[taskIndex] = await tasks[taskIndex]();
+      } finally {
+        completed++;
+        onProgress?.(completed, tasks.length, taskIndex);
+      }
     }
   }
 
-  await Promise.all(executing);
+  const workerCount = Math.min(Math.max(1, limit), tasks.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
   return results;
 }
 
@@ -612,9 +597,9 @@ export async function processAllMarkdownFiles(onProgress?: (current: number, tot
         }
       }),
       3, // 并发限制为 3，避免过多 API 调用
-      (completed, total) => {
+      (completed, total, taskIndex) => {
         if (onProgress && completed > 0) {
-          const currentFile = filesToProcess[completed - 1]?.name || '';
+          const currentFile = filesToProcess[taskIndex]?.name || '';
           onProgress(completed, total, currentFile);
         }
       }

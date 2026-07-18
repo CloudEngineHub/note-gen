@@ -284,6 +284,7 @@ interface NoteState {
   fileTree: DirTree[]
   fileTreeLoading: boolean
   setFileTree: (tree: DirTree[]) => void
+  markFileRemote: (relativePath: string, sha: string) => boolean
   addFile: (file: DirTree) => void
   ensurePathExpanded: (path: string) => Promise<void>
   insertLocalEntry: (relativePath: string, isDirectory: boolean) => boolean
@@ -336,7 +337,7 @@ interface NoteState {
   lastEditTime: number
   pendingVectorContent: { path: string; content: string } | null
   scheduleVectorCalculation: (path: string, content: string) => void
-  executeVectorCalculation: () => Promise<void>
+  executeVectorCalculation: (options?: { force?: boolean }) => Promise<void>
   cancelVectorCalculation: () => void
   triggerVectorCalculation: () => Promise<void> // 手动触发向量计算
   // 向量索引状态
@@ -779,6 +780,29 @@ const useArticleStore = create<NoteState>((set, get) => ({
   setFileTree: (tree: DirTree[]) => {
     const sortedTree = get().sortFileTree(tree)
     set({ fileTree: sortedTree })
+  },
+  markFileRemote: (relativePath: string, sha: string) => {
+    const cacheTree = cloneDeep(get().fileTree)
+
+    function updateEntry(items: DirTree[]): boolean {
+      for (const item of items) {
+        if (item.isFile && computedParentPath(item) === relativePath) {
+          item.sha = sha
+          return true
+        }
+        if (item.children && updateEntry(item.children)) {
+          return true
+        }
+      }
+      return false
+    }
+
+    if (!updateEntry(cacheTree)) {
+      return false
+    }
+
+    get().setFileTree(cacheTree)
+    return true
   },
   addFile: (file: DirTree) => {
     set({ fileTree: [file, ...get().fileTree] })
@@ -2312,6 +2336,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
   // 安排向量计算（防抖5秒）
   scheduleVectorCalculation: (path: string, content: string) => {
+    if (!useVectorStore.getState().isAutoVectorEnabled) {
+      get().cancelVectorCalculation()
+      return
+    }
+
     const state = get()
     
     // 清除之前的定时器
@@ -2354,12 +2383,26 @@ const useArticleStore = create<NoteState>((set, get) => ({
   },
 
   // 执行向量计算
-  executeVectorCalculation: async () => {
+  executeVectorCalculation: async (options = {}) => {
     const state = get()
     
     // 如果没有待处理内容或正在计算中，直接返回
     if (!state.pendingVectorContent || state.isVectorCalculating) {
       return
+    }
+
+    if (!options.force) {
+      if (!useVectorStore.getState().isAutoVectorEnabled) {
+        get().cancelVectorCalculation()
+        return
+      }
+
+      const store = await getStore()
+      const disabledFiles = await store.get<string[]>('vectorAutoCalcDisabled') || []
+      if (disabledFiles.includes(state.pendingVectorContent.path)) {
+        get().cancelVectorCalculation()
+        return
+      }
     }
     
     try {
@@ -2487,7 +2530,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
       }
     })
 
-    await get().executeVectorCalculation()
+    await get().executeVectorCalculation({ force: true })
   },
 
   // 设置向量计算状态

@@ -10,6 +10,8 @@ export interface VectorDocument {
   updated_at: number; // 时间戳
 }
 
+export type VectorDocumentSnapshot = Omit<VectorDocument, 'id'>;
+
 // 向量缓存项
 interface CachedVector {
   id: number;
@@ -143,6 +145,49 @@ export async function initVectorDb() {
 
   // 初始化缓存
   await vectorCache.update();
+}
+
+export async function getAllVectorDocuments(): Promise<VectorDocumentSnapshot[]> {
+  return await db.select<VectorDocumentSnapshot[]>(`
+    select filename, chunk_id, content, embedding, updated_at
+    from vector_documents
+    order by filename, chunk_id
+  `);
+}
+
+async function insertVectorDocumentSnapshots(documents: VectorDocumentSnapshot[]): Promise<void> {
+  for (const document of documents) {
+    await db.execute(
+      `insert into vector_documents
+        (filename, chunk_id, content, embedding, updated_at)
+       values ($1, $2, $3, $4, $5)`,
+      [
+        document.filename,
+        document.chunk_id,
+        document.content,
+        document.embedding,
+        document.updated_at,
+      ]
+    );
+  }
+}
+
+export async function replaceAllVectorDocuments(documents: VectorDocumentSnapshot[]): Promise<void> {
+  // tauri-plugin-sql may execute successive statements on different pooled
+  // connections, so a manual BEGIN here can lock the following DELETE. Keep a
+  // complete recovery snapshot instead and restore it if replacement fails.
+  const previousDocuments = await getAllVectorDocuments();
+
+  try {
+    await db.execute('delete from vector_documents');
+    await insertVectorDocumentSnapshots(documents);
+    await vectorCache.update();
+  } catch (error) {
+    await db.execute('delete from vector_documents');
+    await insertVectorDocumentSnapshots(previousDocuments);
+    await vectorCache.update();
+    throw error;
+  }
 }
 
 // 插入或更新向量文档

@@ -637,7 +637,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       onPointerCancel={resetPointerSelection}
       onClickCapture={handleClickCapture}
     >
-      {selectedFilePaths.length > 0 && (
+      {selectedFilePaths.length > 1 && (
         <div className="pointer-events-none sticky top-2 left-2 z-10 ml-2 w-fit rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm">
           {tRecordToolbar('selectedCount', { count: selectedFilePaths.length })}
         </div>

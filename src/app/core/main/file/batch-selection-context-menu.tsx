@@ -46,10 +46,14 @@ export function BatchSelectionContextMenu({
 
   return (
     <>
-      <ContextMenuLabel menuType="file">
-        {tRecordToolbar('selectedCount', { count })}
-      </ContextMenuLabel>
-      <ContextMenuSeparator />
+      {count > 1 && (
+        <>
+          <ContextMenuLabel menuType="file">
+            {tRecordToolbar('selectedCount', { count })}
+          </ContextMenuLabel>
+          <ContextMenuSeparator />
+        </>
+      )}
       <ContextMenuItem inset disabled={!allLocal} onClick={handleCutSelected} menuType="file">
         <File className="mr-2 h-4 w-4" />
         {t('context.cut')}

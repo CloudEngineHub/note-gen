@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 
 interface VectorState {
   isRagEnabled: boolean;           // 是否启用RAG检索功能
+  isAutoVectorEnabled: boolean;    // 是否在文件保存后自动更新向量
   isProcessing: boolean;           // 是否正在处理向量
   lastProcessTime: number | null;  // 最后一次处理向量的时间
   hasRerankModel: boolean;         // 是否有可用的重排序模型
@@ -18,6 +19,7 @@ interface VectorState {
 
   // RAG启用/禁用
   setRagEnabled: (enabled: boolean) => Promise<void>;
+  setAutoVectorEnabled: (enabled: boolean) => Promise<void>;
 
   // 处理向量
   processAllDocuments: () => Promise<void>;
@@ -28,6 +30,7 @@ interface VectorState {
 
 const useVectorStore = create<VectorState>((set, get) => ({
   isRagEnabled: false,
+  isAutoVectorEnabled: true,
   isProcessing: false,
   lastProcessTime: null,
   hasRerankModel: false,
@@ -44,21 +47,25 @@ const useVectorStore = create<VectorState>((set, get) => ({
       // 读取用户设置
       const store = await Store.load('store.json');
       const isRagEnabled = await store.get<boolean>('isRagEnabled') || false;
+      const isAutoVectorEnabled = await store.get<boolean>('autoVectorEnabled') ?? true;
       const lastProcessTime = await store.get<number>('lastVectorProcessTime') || null;
 
       set({
         isRagEnabled,
+        isAutoVectorEnabled,
         lastProcessTime
       });
 
       // 检查嵌入模型可用性
-      const modelAvailable = await get().checkEmbeddingModel();
-      if (!modelAvailable) {
-        toast({
-          title: '向量数据库',
-          description: '未配置嵌入模型或模型不可用，请在AI设置中配置嵌入模型',
-          variant: 'destructive',
-        });
+      if (isAutoVectorEnabled || isRagEnabled) {
+        const modelAvailable = await get().checkEmbeddingModel();
+        if (!modelAvailable) {
+          toast({
+            title: '向量数据库',
+            description: '未配置嵌入模型或模型不可用，请在AI设置中配置嵌入模型',
+            variant: 'destructive',
+          });
+        }
       }
 
       // 检查重排序模型是否可用
@@ -81,10 +88,18 @@ const useVectorStore = create<VectorState>((set, get) => ({
     }
   },
 
+  setAutoVectorEnabled: async (enabled: boolean) => {
+    const store = await Store.load('store.json');
+    await store.set('autoVectorEnabled', enabled);
+    set({ isAutoVectorEnabled: enabled });
+  },
+
   // 处理所有文档向量
   processAllDocuments: async () => {
     // 如果已经在处理中，直接返回
     if (get().isProcessing) return;
+
+    let processingToast: ReturnType<typeof toast> | undefined;
 
     try {
       // 检查嵌入模型是否可用
@@ -102,20 +117,19 @@ const useVectorStore = create<VectorState>((set, get) => ({
       set({ isProcessing: true });
 
       // 显示处理开始的提示
-      toast({
+      processingToast = toast({
         title: '向量处理',
         description: '开始处理文档向量，这可能需要一些时间...',
+        duration: Infinity,
       });
 
       // 处理所有文档，带进度回调
       const result = await processAllMarkdownFiles((current, total, fileName) => {
-        // 更新进度提示（只显示关键节点）
-        if (current === 1 || current === total || current % 5 === 0) {
-          toast({
-            title: '向量处理中',
-            description: `正在处理 ${fileName} (${current}/${total})`,
-          });
-        }
+        processingToast?.update({
+          title: '向量处理中',
+          description: `已处理 ${current}/${total}：${fileName}`,
+          duration: Infinity,
+        });
       });
 
       // 更新处理时间和状态
@@ -143,20 +157,28 @@ const useVectorStore = create<VectorState>((set, get) => ({
         }
       }
 
-      toast({
+      processingToast.update({
         title: result.failed > 0 ? '向量处理完成（部分失败）' : '向量处理完成',
         description,
         variant: result.failed > 0 ? 'destructive' : 'default',
+        duration: 5000,
       });
     } catch (error) {
       console.error('处理文档向量失败:', error);
       set({ isProcessing: false });
 
-      toast({
+      const errorToast = {
         title: '向量处理失败',
         description: '处理文档向量时发生错误，请查看控制台日志',
         variant: 'destructive',
-      });
+        duration: 5000,
+      } as const;
+
+      if (processingToast) {
+        processingToast.update(errorToast);
+      } else {
+        toast(errorToast);
+      }
     }
   },
 
