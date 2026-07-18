@@ -4,6 +4,9 @@ import { Editor } from '@tiptap/react'
 import { Maximize2, RotateCcw, Trash2, Link, Type } from 'lucide-react'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 
 interface ImageBubbleMenuProps {
   editor: Editor
@@ -228,15 +231,14 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
       }}
     >
       <div
-        className="flex items-center gap-0.5 px-1 py-1 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 border border-border rounded-lg shadow-lg"
+        className="flex items-center gap-1 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
         onClick={handleMenuClick}
         onMouseDown={(e) => e.preventDefault()}
       >
         {editMode === 'none' && (
           <>
             {/* 修改地址 */}
-            <button
-              className="p-1.5 rounded hover:bg-muted transition-colors"
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={() => {
                 const node = editor.state.doc.nodeAt(imageInfo.pos)
                 setSrcText(node?.attrs.relativeSrc || node?.attrs.src || imageInfo.src)
@@ -244,12 +246,11 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
               }}
               title={t('editSrc')}
             >
-              <Link className="w-4 h-4" />
-            </button>
+              <Link />
+            </Button>
 
             {/* 修改 alt */}
-            <button
-              className="p-1.5 rounded hover:bg-muted transition-colors"
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={() => {
                 const node = editor.state.doc.nodeAt(imageInfo.pos)
                 setAltText(node?.attrs.alt || imageInfo.alt)
@@ -257,12 +258,11 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
               }}
               title={t('editAlt')}
             >
-              <Type className="w-4 h-4" />
-            </button>
+              <Type />
+            </Button>
 
             {/* 修改尺寸 */}
-            <button
-              className="p-1.5 rounded hover:bg-muted transition-colors"
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={() => {
                 const node = editor.state.doc.nodeAt(imageInfo.pos)
                 const width = parseImageDimension(node?.attrs.width) ?? Math.round(imageInfo.rect.width)
@@ -273,35 +273,33 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
               }}
               title={t('editSize')}
             >
-              <Maximize2 className="w-4 h-4" />
-            </button>
+              <Maximize2 />
+            </Button>
 
-            <div className="w-px h-5 bg-border mx-1" />
+            <Separator orientation="vertical" className="mx-1 h-5" />
 
             {/* 重置尺寸 */}
-            <button
-              className="p-1.5 rounded hover:bg-muted transition-colors"
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={resetSize}
               title={t('resetSize')}
             >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+              <RotateCcw />
+            </Button>
 
             {/* 删除 */}
-            <button
-              className="p-1.5 rounded hover:bg-muted transition-colors text-destructive"
+            <Button type="button" variant="destructive" size="icon-sm"
               onClick={deleteImage}
               title={t('delete')}
             >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <Trash2 />
+            </Button>
           </>
         )}
 
         {editMode === 'alt' && (
           <div className="flex items-center gap-1 px-1">
-            <Type className="w-4 h-4 text-muted-foreground" />
-            <input
+            <Type className="text-muted-foreground" />
+            <Input
               type="text"
               placeholder={t('altPlaceholder')}
               value={altText}
@@ -314,28 +312,22 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
                 }
               }}
               onFocus={(e) => e.target.select()}
-              className="w-40 px-2 py-1 text-sm bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-40"
               autoFocus
             />
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={saveAltText}
-            >
+            <Button type="button" variant="ghost" size="xs" onClick={saveAltText}>
               {t('confirm')}
-            </button>
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={() => setEditMode('none')}
-            >
+            </Button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => setEditMode('none')}>
               {t('cancel')}
-            </button>
+            </Button>
           </div>
         )}
 
         {editMode === 'src' && (
           <div className="flex items-center gap-1 px-1">
-            <Link className="w-4 h-4 text-muted-foreground" />
-            <input
+            <Link className="text-muted-foreground" />
+            <Input
               type="text"
               placeholder={t('srcPlaceholder')}
               value={srcText}
@@ -348,28 +340,22 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
                 }
               }}
               onFocus={(e) => e.target.select()}
-              className="w-60 px-2 py-1 text-sm bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-60"
               autoFocus
             />
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={saveSrc}
-            >
+            <Button type="button" variant="ghost" size="xs" onClick={saveSrc}>
               {t('confirm')}
-            </button>
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={() => setEditMode('none')}
-            >
+            </Button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => setEditMode('none')}>
               {t('cancel')}
-            </button>
+            </Button>
           </div>
         )}
 
         {editMode === 'size' && (
           <div className="flex items-center gap-1 px-1">
-            <Maximize2 className="w-4 h-4 text-muted-foreground" />
-            <input
+            <Maximize2 className="text-muted-foreground" />
+            <Input
               type="number"
               min={1}
               step={1}
@@ -384,11 +370,11 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
                 }
               }}
               onFocus={(e) => e.target.select()}
-              className="w-20 px-2 py-1 text-sm bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-20"
               autoFocus
             />
             <span className="text-xs text-muted-foreground">x</span>
-            <input
+            <Input
               type="number"
               min={1}
               step={1}
@@ -403,27 +389,20 @@ export function ImageBubbleMenu({ editor }: ImageBubbleMenuProps) {
                 }
               }}
               onFocus={(e) => e.target.select()}
-              className="w-20 px-2 py-1 text-sm bg-muted rounded border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-20"
             />
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={saveSize}
-            >
+            <Button type="button" variant="ghost" size="xs" onClick={saveSize}>
               {t('confirm')}
-            </button>
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
+            </Button>
+            <Button type="button" variant="ghost" size="xs"
               onClick={resetSize}
               title={t('resetSize')}
             >
               {t('reset')}
-            </button>
-            <button
-              className="p-1 rounded hover:bg-muted text-xs"
-              onClick={() => setEditMode('none')}
-            >
+            </Button>
+            <Button type="button" variant="ghost" size="xs" onClick={() => setEditMode('none')}>
               {t('cancel')}
-            </button>
+            </Button>
           </div>
         )}
       </div>

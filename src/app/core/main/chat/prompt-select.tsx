@@ -5,8 +5,6 @@ import { Drama } from "lucide-react"
 import usePromptStore from "@/stores/prompt"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
-import { cn } from "@/lib/utils"
-import { Check } from "lucide-react"
 import { TooltipButton } from "@/components/tooltip-button"
 
 export function PromptSelect() {
@@ -46,18 +44,13 @@ export function PromptSelect() {
                 <CommandItem
                   key={item.id}
                   value={item.id}
+                  data-checked={currentPrompt?.id === item.id}
                   onSelect={(currentValue) => {
                     promptSelectChangeHandler(currentValue)
                     setOpen(false)
                   }}
                 >
                   {item.title}
-                  <Check
-                    className={cn(
-                      "ml-auto",
-                      currentPrompt?.id === item.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -17,10 +17,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import {
-  Check,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
 import { useTranslations } from "next-intl"
 import { TooltipButton } from "@/components/tooltip-button"
 
@@ -123,6 +119,7 @@ export function ModelSelect() {
                   <CommandItem
                     key={item.model.id}
                     value={item.model.id}
+                    data-checked={primaryModel === item.model.id}
                     onSelect={(currentValue) => {
                       modelSelectChangeHandler(currentValue)
                       setOpen(false)
@@ -131,12 +128,6 @@ export function ModelSelect() {
                     <div className="flex flex-col">
                       <span className="font-medium">{item.model.model}</span>
                     </div>
-                    <Check
-                      className={cn(
-                        "ml-auto size-4",
-                        primaryModel === item.model.id ? "opacity-100" : "opacity-0"
-                      )}
-                    />
                   </CommandItem>
                 ))}
               </CommandGroup>

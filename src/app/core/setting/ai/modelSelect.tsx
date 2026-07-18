@@ -3,8 +3,7 @@ import useSettingStore from "@/stores/setting";
 import { Input } from "@/components/ui/input";
 import { createOpenAIClient } from "@/lib/ai/utils";
 import type OpenAI from "openai";
-import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronsUpDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -188,15 +187,10 @@ export default function ModelSelect(
                     <CommandItem
                       key={item.id}
                       value={item.id}
+                      data-checked={model === item.id}
                       onSelect={() => handleSelectOrCreate(item.id)}
                       className="text-sm py-2 cursor-pointer"
                     >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          model === item.id ? "opacity-100" : "opacity-0"
-                        )}
-                      />
                       {item.id}
                     </CommandItem>
                   ))}

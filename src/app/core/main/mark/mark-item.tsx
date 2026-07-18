@@ -26,6 +26,8 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 import { AudioPlayer } from "@/components/audio-player";
 import { ImageViewer } from "@/components/image-viewer";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { MarkMobileActions } from "./mark-mobile-actions";
 import { markToMarkdown } from "@/lib/mark-to-markdown";
 import useSettingStore from "@/stores/setting";
@@ -161,12 +163,13 @@ const MarkDetailTrigger = React.memo(({
           {label}
         </span>
         {interactive ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
             aria-label={label}
             aria-pressed={activeMarkId === mark.id}
             onClick={openDetail}
-            className="absolute inset-0 cursor-pointer"
+            className="absolute inset-0 h-auto w-full rounded-none bg-transparent p-0 hover:bg-transparent"
           />
         ) : null}
       </div>
@@ -184,12 +187,14 @@ const MarkDetailTrigger = React.memo(({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="link"
       aria-pressed={activeMarkId === mark.id}
       onClick={openDetail}
       style={clampContainerStyle}
       className={cn(
+        'h-auto justify-start p-0 font-normal',
         triggerClassName,
         activeMarkId === mark.id && "text-primary"
       )}
@@ -199,27 +204,12 @@ const MarkDetailTrigger = React.memo(({
       >
         {label}
       </span>
-    </button>
+    </Button>
   )
 })
 MarkDetailTrigger.displayName = 'MarkDetailTrigger'
 
 export type MarkItemVariant = 'list' | 'compact' | 'cards'
-
-function getImageStatusClasses(status: string | null) {
-  switch (status) {
-  case 'pending':
-    return "border-amber-300/70 bg-amber-50 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-200"
-  case 'failed':
-    return "border-red-300/70 bg-red-50 text-red-800 dark:border-red-500/40 dark:bg-red-500/15 dark:text-red-200"
-  case 'noText':
-    return "border-zinc-300/70 bg-zinc-50 text-zinc-700 dark:border-zinc-500/40 dark:bg-zinc-500/15 dark:text-zinc-200"
-  case 'savedOnly':
-    return "border-blue-300/70 bg-blue-50 text-blue-800 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-200"
-  default:
-    return "border-zinc-300/70 bg-zinc-50 text-zinc-700 dark:border-zinc-500/40 dark:bg-zinc-500/15 dark:text-zinc-200"
-  }
-}
 
 function ImageRecordStatusBadge({
   status,
@@ -241,14 +231,13 @@ function ImageRecordStatusBadge({
       : null
 
   return (
-    <span className={cn(
-      "inline-flex shrink-0 items-center gap-1 rounded-full border font-medium",
-      compact ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-[11px]",
-      getImageStatusClasses(status)
-    )}>
+    <Badge
+      variant={status === 'failed' ? 'destructive' : status === 'pending' ? 'outline' : 'secondary'}
+      className={cn(compact && "h-4 px-1.5 text-[10px]")}
+    >
       {icon}
       <span className="max-w-28 truncate">{label}</span>
-    </span>
+    </Badge>
   )
 }
 
@@ -311,10 +300,10 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
 
   const todoPriorityDotClass = itemContent.todo
     ? itemContent.todo.priority === 'high'
-      ? 'bg-red-500'
+      ? 'bg-destructive'
       : itemContent.todo.priority === 'low'
-        ? 'bg-green-500'
-        : 'bg-orange-500'
+        ? 'bg-muted-foreground'
+        : 'bg-primary'
     : ''
 
   const handleCheckboxChange = useCallback(() => {
@@ -383,7 +372,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     const shouldShowPreview = Boolean(displayPreview && displayPreview !== displayTitle)
 
     return (
-      <div className="mt-2 w-full min-w-0 max-w-full space-y-1.5 overflow-hidden">
+      <div className="mt-2 flex w-full min-w-0 max-w-full flex-col gap-1.5 overflow-hidden">
         <MarkDetailTrigger
           mark={mark}
           content={displayTitle}
@@ -444,7 +433,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
         {mark.type === 'recording' && mark.url ? (
           <AudioPlayer audioPath={mark.url} compact />
         ) : null}
-        <span className="shrink-0 text-xs text-zinc-500">{dayjs(mark.createdAt).format('HH:mm')}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{dayjs(mark.createdAt).format('HH:mm')}</span>
       </div>
     )
   }
@@ -453,8 +442,8 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     const isImageCard = mark.type === 'image' || mark.type === 'scan'
 
     return (
-      <div className="w-full min-w-0 max-w-full space-y-2.5 overflow-hidden">
-        <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500">
+      <div className="flex w-full min-w-0 max-w-full flex-col gap-2.5 overflow-hidden">
+        <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground">
           {interactive && isMultiSelectMode && (
             <div className="shrink-0 pr-1">
               <Checkbox
@@ -472,7 +461,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
           <span className="ml-auto shrink-0 text-xs">{dayjs(mark.createdAt).format('MM-DD HH:mm')}</span>
         </div>
         {isImageCard && mark.url ? (
-          <div className="relative w-full min-w-0 max-w-full overflow-hidden rounded-md bg-zinc-100">
+          <div className="relative w-full min-w-0 max-w-full overflow-hidden rounded-md bg-muted">
             <ImageViewer
               url={mark.url}
               path={mark.type === 'scan' ? 'screenshot' : 'image'}
@@ -486,7 +475,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
             ) : null}
           </div>
         ) : null}
-        <div className="w-full min-w-0 max-w-full space-y-1.5 overflow-hidden">
+        <div className="flex w-full min-w-0 max-w-full flex-col gap-1.5 overflow-hidden">
           {mark.type === 'todo' ? interactive ? (
             <TodoEditTrigger mark={mark} className={`block max-w-full truncate text-${recordTextSize} font-semibold hover:underline`}>
               {itemContent.title || itemContent.preview || t(mark.type)}
@@ -549,19 +538,19 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
               href={mark.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="block max-w-full truncate text-xs text-blue-600 hover:underline"
+              className="block max-w-full truncate text-xs text-primary hover:underline"
             >
               {mark.url}
             </a>
           ) : (
-            <span className="block max-w-full truncate text-xs text-blue-600">
+            <span className="block max-w-full truncate text-xs text-primary">
               {mark.url}
             </span>
           ) : null}
           {!isImageCard && mark.type === 'todo' && itemContent.todo ? (
-            <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-xs text-zinc-500">
+            <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-xs text-muted-foreground">
               <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-                {itemContent.todo.completed ? <CheckSquare className="size-3.5 text-green-600" /> : <Square className="size-3.5 text-zinc-400" />}
+                {itemContent.todo.completed ? <CheckSquare className="size-3.5 text-primary" /> : <Square className="size-3.5 text-muted-foreground" />}
                 <span className="min-w-0 truncate">{itemContent.todo.completed ? todoT('completed') : todoT('uncompleted')}</span>
               </div>
             </div>
@@ -581,7 +570,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'scan':
     return (
         <div className={`min-w-0 max-w-full flex-1 overflow-hidden text-${recordTextSize} ${lineHeight} pr-10 md:pr-2`}>
-          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500">
+          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground">
             <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
               {t(mark.type)}
             </span>
@@ -594,12 +583,12 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'image':
     return (
         <div className={`min-w-0 max-w-full flex-1 overflow-hidden text-${recordTextSize} ${lineHeight} pr-10 md:pr-2`}>
-          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500">
+          <div className="flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground">
             <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
               {t(mark.type)}
             </span>
             <ImageRecordStatusBadge status={imageStatus} label={imageStatusText} compact />
-            {isHttpUrl(mark.url) ? <ImageUp className="size-3 text-zinc-400" /> : null}
+            {isHttpUrl(mark.url) ? <ImageUp className="size-3 text-muted-foreground" /> : null}
             <span className={`ml-auto shrink-0 text-${recordTextSize}`}>{dayjs(mark.createdAt).fromNow()}</span>
           </div>
           {renderListTextBlock(itemContent.title || mark.desc || imageStatusText || t(mark.type), itemContent.preview)}
@@ -608,7 +597,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'link':
     return (
         <div className="min-w-0 max-w-full flex-1 overflow-hidden pr-10 md:pr-0">
-          <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500 text-${recordTextSize} ${lineHeight}`}>
+          <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground text-${recordTextSize} ${lineHeight}`}>
             <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
               {t(mark.type)}
             </span>
@@ -621,12 +610,12 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
                 href={mark.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`block max-w-full truncate text-${recordTextSize} text-blue-500 hover:underline`}
+                className={`block max-w-full truncate text-${recordTextSize} text-primary hover:underline`}
               >
                 {mark.url}
               </a>
             ) : (
-              <span className={`block max-w-full truncate text-${recordTextSize} text-blue-500`}>
+              <span className={`block max-w-full truncate text-${recordTextSize} text-primary`}>
                 {mark.url}
               </span>
             )}
@@ -636,7 +625,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'text':
       return (
           <div className="min-w-0 max-w-full flex-1 overflow-hidden pr-10 md:pr-0">
-            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500 text-${recordTextSize} ${lineHeight}`}>
+            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground text-${recordTextSize} ${lineHeight}`}>
               <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
                 {t(mark.type)}
               </span>
@@ -648,14 +637,16 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'recording':
       return (
           <div className="min-w-0 max-w-full flex-1 overflow-hidden pr-10 md:pr-0">
-            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500 text-${recordTextSize} ${lineHeight}`}>
+            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground text-${recordTextSize} ${lineHeight}`}>
               <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
                 {t(mark.type)}
               </span>
               {interactive && shouldShowRecordingAction && (
-                <button
+                <Button
                   type="button"
-                  className="shrink-0 text-zinc-500 transition-colors hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="shrink-0 text-muted-foreground"
                   onClick={handleRecordingAction}
                   disabled={isRetryingTranscription}
                   title={sttModel
@@ -663,11 +654,11 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
                     : recordingT('configureModel')}
                 >
                   {sttModel ? (
-                    <RefreshCw className={`size-3.5 ${isRetryingTranscription ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={isRetryingTranscription ? 'animate-spin' : undefined} />
                   ) : (
-                    <Settings2 className="size-3.5" />
+                    <Settings2 />
                   )}
-                </button>
+                </Button>
               )}
               <span className={`ml-auto shrink-0 text-${recordTextSize}`}>{dayjs(mark.createdAt).fromNow()}</span>
             </div>
@@ -682,7 +673,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     case 'file':
       return (
           <div className="min-w-0 max-w-full flex-1 overflow-hidden pr-10 md:pr-0">
-            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-zinc-500 text-${recordTextSize} ${lineHeight}`}>
+            <div className={`flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden text-muted-foreground text-${recordTextSize} ${lineHeight}`}>
               <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
                 {t(mark.type)}
               </span>
@@ -1032,22 +1023,18 @@ export const MarkItem = React.memo(({mark, variant = 'list', interactive = true}
             <ContextMenuItem inset disabled={isMultiSelectMode} onClick={handleRestore} menuType="record">
               {t('record.mark.toolbar.restore')}
             </ContextMenuItem>
-            <ContextMenuItem inset onClick={handleDelForever} menuType="record">
-              <span className="text-red-900">
+            <ContextMenuItem variant="destructive" inset onClick={handleDelForever} menuType="record">
                 {isMultiSelectMode && selectedMarkIds.size > 0 
                   ? t('record.mark.toolbar.deleteSelectedForever', { count: selectedMarkIds.size })
                   : t('record.mark.toolbar.deleteForever')
                 }
-              </span>
             </ContextMenuItem>
           </> :
-          <ContextMenuItem inset onClick={handleDelMark} menuType="record">
-            <span className="text-red-900">
+          <ContextMenuItem variant="destructive" inset onClick={handleDelMark} menuType="record">
               {isMultiSelectMode && selectedMarkIds.size > 0 
                 ? t('record.mark.toolbar.deleteSelected', { count: selectedMarkIds.size })
                 : t('record.mark.toolbar.delete')
               }
-            </span>
           </ContextMenuItem>
         }
       </ContextMenuContent>

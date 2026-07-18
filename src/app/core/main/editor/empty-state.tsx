@@ -13,6 +13,9 @@ import useSettingStore from '@/stores/setting'
 import { useSidebarStore } from '@/stores/sidebar'
 import { getActiveOnboardingStep, getNextOnboardingStep, type OnboardingProgress, type OnboardingStepId } from './onboarding-state'
 import { createNewNoteFromEmptyState } from './empty-state-actions'
+import { Button } from '@/components/ui/button'
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Kbd } from '@/components/ui/kbd'
 
 interface ActionItem {
   icon: React.ReactNode
@@ -188,10 +191,10 @@ export function EmptyState({
   const showOnboardingCard = !onboardingProgress.dismissed && (showCompletedCard || Boolean(currentOnboardingStep))
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center h-full bg-background p-8">
-      <div className="max-w-2xl w-full space-y-8">
+    <Empty className="h-full rounded-none bg-background p-8">
+      <div className="flex w-full max-w-2xl flex-col gap-8 text-left text-pretty">
         {/* Header */}
-        <div className="text-center space-y-3">
+        <EmptyHeader className="mx-auto gap-3 text-center text-balance">
           <div className="flex items-center justify-center gap-3 mb-2">
             <Image 
               src="/app-icon.png" 
@@ -204,67 +207,74 @@ export function EmptyState({
               NoteGen
             </h1>
           </div>
-          <h2 className="text-xl font-semibold tracking-tight">
+          <EmptyTitle className="text-xl">
             {t('title')}
-          </h2>
-          <p className="text-muted-foreground text-sm">
+          </EmptyTitle>
+          <EmptyDescription>
             {t('subtitle')}
-          </p>
-        </div>
+          </EmptyDescription>
+        </EmptyHeader>
 
         {showOnboardingCard && (
           <div className="rounded-2xl border bg-card/80 p-5 shadow-sm">
             <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 <h3 className="text-base font-semibold">{t('onboarding.title')}</h3>
                 <p className="text-sm text-muted-foreground">{t('onboarding.subtitle')}</p>
               </div>
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
                 onClick={() => void onDismissOnboarding()}
-                className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className="shrink-0 text-muted-foreground"
               >
                 {t('onboarding.dismiss')}
-              </button>
+              </Button>
             </div>
 
             {showCompletedCard && completedStep ? (
-              <div className="mt-4 rounded-xl border border-emerald-500/50 bg-emerald-500/5 p-4 transition-colors">
+              <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       {t('onboarding.stepCompletedLabel', { current: completedOnboardingIndex + 1, total: onboardingSteps.length })}
                     </p>
-                    <h4 className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                    <h4 className="text-sm font-medium">
                       {t(`onboarding.completedStates.${completedStep.id}.title`)}
                     </h4>
-                    <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                    <p className="text-xs text-muted-foreground">
                       {t(`onboarding.completedStates.${completedStep.id}.desc`)}
                     </p>
                   </div>
-                  <button
+                  <Button
+                    type="button"
+                    size="xs"
                     onClick={() => void onContinueToNextStep()}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500"
+                    className="shrink-0"
                   >
                     {t('onboarding.continue')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : currentOnboardingStep ? (
               <div className="mt-4 rounded-xl border border-primary/60 bg-primary/5 p-4 transition-colors">
                 <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
+                  <div className="flex flex-col gap-1">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
                       {t('onboarding.stepLabel', { current: currentOnboardingIndex + 1, total: onboardingSteps.length })}
                     </p>
                     <h4 className="text-sm font-medium">{currentOnboardingStep.title}</h4>
                     <p className="text-xs text-muted-foreground">{currentOnboardingStep.description}</p>
                   </div>
-                  <button
+                  <Button
+                    type="button"
+                    size="xs"
                     onClick={() => void onStartOnboardingStep(currentOnboardingStep.id)}
-                    className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
+                    className="shrink-0"
                   >
                     {visibleOnboardingStep === currentOnboardingStep.id ? t('onboarding.viewHint') : t('onboarding.start')}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -274,10 +284,12 @@ export function EmptyState({
         {/* Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {actions.map((action, index) => (
-            <button
+            <Button
+              type="button"
+              variant="outline"
               key={index}
               onClick={action.onClick}
-              className="group relative flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-accent hover:border-primary/50 transition-all duration-200 text-left"
+              className="group h-auto items-start justify-start gap-4 whitespace-normal p-4 text-left"
             >
               <div className="flex-shrink-0 mt-1 text-muted-foreground group-hover:text-primary transition-colors">
                 {action.icon}
@@ -288,21 +300,21 @@ export function EmptyState({
                     {action.title}
                   </h3>
                   {action.shortcut && (
-                    <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                    <Kbd className="hidden sm:inline-flex">
                       {action.shortcut}
-                    </kbd>
+                    </Kbd>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {action.description}
                 </p>
               </div>
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Tips */}
-        <div className="text-center space-y-2 pt-4">
+        <div className="flex flex-col gap-2 pt-4 text-center">
           <p className="text-xs text-muted-foreground">
             查看使用文档：
             <a 
@@ -316,6 +328,6 @@ export function EmptyState({
           </p>
         </div>
       </div>
-    </div>
+    </Empty>
   )
 }

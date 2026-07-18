@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/drawer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Calendar, User, GitMerge, ArrowDownToLine, ArrowUpFromLine, X } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -29,7 +30,6 @@ import { useI18n } from '@/hooks/useI18n'
 import { useSyncConfirmStore } from '@/stores/sync-confirm'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { isMobileDevice as checkIsMobileDevice } from '@/lib/check'
-import { cn } from '@/lib/utils'
 import emitter from '@/lib/emitter'
 import { getSyncPushQueue } from '@/lib/sync/sync-push-queue'
 import { useEffect } from 'react'
@@ -142,9 +142,9 @@ export function SyncConfirmDialog() {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="space-y-4 px-4 overflow-y-auto">
+                <div className="flex flex-col gap-4 overflow-y-auto px-4">
                   {commitInfo && (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-medium">最新提交信息</h4>
                         <Badge variant="outline" className="text-xs">
@@ -152,7 +152,7 @@ export function SyncConfirmDialog() {
                         </Badge>
                       </div>
 
-                      <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                      <div className="flex flex-col gap-3 rounded-lg bg-muted/30 p-4">
                         <div>
                           <p className="text-sm font-medium mb-1">提交消息</p>
                           <p className="text-sm">{commitInfo.message}</p>
@@ -173,7 +173,7 @@ export function SyncConfirmDialog() {
                           {(commitInfo.additions !== undefined || commitInfo.deletions !== undefined) && (
                             <div className="flex items-center gap-2">
                               {commitInfo.additions !== undefined && commitInfo.additions > 0 && (
-                                <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+                                <Badge variant="secondary">
                                   +{commitInfo.additions}
                                 </Badge>
                               )}
@@ -218,9 +218,9 @@ export function SyncConfirmDialog() {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="space-y-4 px-4 overflow-y-auto">
+                <div className="flex flex-col gap-4 overflow-y-auto px-4">
                   {commitInfo && (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-medium">远程版本信息</h4>
                         <Badge variant="outline" className="text-xs">
@@ -228,7 +228,7 @@ export function SyncConfirmDialog() {
                         </Badge>
                       </div>
 
-                      <div className="bg-muted/30 p-4 rounded-lg space-y-2">
+                      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-4">
                         <div>
                           <p className="text-sm font-medium mb-1">提交消息</p>
                           <p className="text-sm">{commitInfo.message}</p>
@@ -247,11 +247,11 @@ export function SyncConfirmDialog() {
                     </div>
                   )}
 
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <Alert>
+                    <AlertDescription>
                       请选择如何处理此冲突：保留本地版本、保留远程版本，或取消后手动合并。
-                    </p>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
                 </div>
 
                 <DrawerFooter className="flex-col gap-2">
@@ -291,14 +291,14 @@ export function SyncConfirmDialog() {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="space-y-4 px-4 overflow-y-auto">
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-lg">
-                    <p className="text-sm text-red-800 dark:text-red-200">
+                <div className="flex flex-col gap-4 overflow-y-auto px-4">
+                  <Alert variant="destructive">
+                    <AlertDescription>
                       远程文件的 SHA 与本地记录不一致，可能已被其他设备修改。
-                    </p>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
 
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">本地记录 SHA：</span>
                       <code className="bg-muted px-2 py-1 rounded text-xs">
@@ -342,9 +342,9 @@ export function SyncConfirmDialog() {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
+                <div className="flex flex-col gap-4 py-4">
                   {commitInfo && (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-medium">最新提交信息</h4>
                         <Badge variant="outline" className="text-xs">
@@ -352,7 +352,7 @@ export function SyncConfirmDialog() {
                         </Badge>
                       </div>
 
-                      <div className="bg-muted/30 p-4 rounded-lg space-y-3">
+                      <div className="flex flex-col gap-3 rounded-lg bg-muted/30 p-4">
                         <div>
                           <p className="text-sm font-medium mb-1">提交消息</p>
                           <p className="text-sm">{commitInfo.message}</p>
@@ -373,7 +373,7 @@ export function SyncConfirmDialog() {
                           {(commitInfo.additions !== undefined || commitInfo.deletions !== undefined) && (
                             <div className="flex items-center gap-2">
                               {commitInfo.additions !== undefined && commitInfo.additions > 0 && (
-                                <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+                                <Badge variant="secondary">
                                   +{commitInfo.additions}
                                 </Badge>
                               )}
@@ -418,9 +418,9 @@ export function SyncConfirmDialog() {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
+                <div className="flex flex-col gap-4 py-4">
                   {commitInfo && (
-                    <div className="space-y-3">
+                    <div className="flex flex-col gap-3">
                       <div className="flex items-center gap-2">
                         <h4 className="text-sm font-medium">远程版本信息</h4>
                         <Badge variant="outline" className="text-xs">
@@ -428,7 +428,7 @@ export function SyncConfirmDialog() {
                         </Badge>
                       </div>
 
-                      <div className="bg-muted/30 p-4 rounded-lg space-y-2">
+                      <div className="flex flex-col gap-2 rounded-lg bg-muted/30 p-4">
                         <div>
                           <p className="text-sm font-medium mb-1">提交消息</p>
                           <p className="text-sm">{commitInfo.message}</p>
@@ -447,15 +447,11 @@ export function SyncConfirmDialog() {
                     </div>
                   )}
 
-                  <div className={cn(
-                    "p-4 rounded-lg",
-                    "bg-yellow-50 dark:bg-yellow-900/20",
-                    "border border-yellow-200 dark:border-yellow-800"
-                  )}>
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <Alert>
+                    <AlertDescription>
                       请选择如何处理此冲突：保留本地版本、保留远程版本，或取消后手动合并。
-                    </p>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
                 </div>
 
                 <DialogFooter className="gap-2">
@@ -493,18 +489,14 @@ export function SyncConfirmDialog() {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                  <div className={cn(
-                    "p-4 rounded-lg",
-                    "bg-red-50 dark:bg-red-900/20",
-                    "border border-red-200 dark:border-red-800"
-                  )}>
-                    <p className="text-sm text-red-800 dark:text-red-200">
+                <div className="flex flex-col gap-4 py-4">
+                  <Alert variant="destructive">
+                    <AlertDescription>
                       远程文件的 SHA 与本地记录不一致，可能已被其他设备修改。
-                    </p>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
 
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">本地记录 SHA：</span>
                       <code className="bg-muted px-2 py-1 rounded text-xs">

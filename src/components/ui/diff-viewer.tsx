@@ -3,6 +3,8 @@
 import * as React from "react"
 import { diffLines, diffWords } from "diff"
 import { cn } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { TriangleAlert } from "lucide-react"
 
 export interface DiffViewerProps {
   /** Original content (before) */
@@ -97,9 +99,9 @@ export function DiffViewer({
       let result = ""
       changes.forEach((part) => {
         const className = part.added
-          ? "bg-green-500/30 text-green-900 dark:text-green-100"
+          ? "bg-primary/10 text-foreground"
           : part.removed
-          ? "bg-red-500/30 text-red-900 dark:text-red-100 line-through"
+          ? "bg-destructive/10 text-destructive line-through"
           : ""
         result += `<span class="${className}">${part.value}</span>`
       })
@@ -131,7 +133,7 @@ export function DiffViewer({
       )}
       style={containerStyle}
     >
-      <div className="sticky top-0 z-10 flex border-b bg-muted px-4 py-2 font-medium text-xs text-muted-foreground">
+      <div className="sticky top-0 z-10 flex border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
         <span className="flex-1">
           {mode === "lines" ? "Line Diff" : "Word Diff"}
         </span>
@@ -143,9 +145,12 @@ export function DiffViewer({
 
       {/* Warning when all lines are changed */}
       {showAllChangedWarning && mode === "lines" && (
-        <div className="border-b border-yellow-500/30 bg-yellow-500/5 px-4 py-2 text-xs text-yellow-900 dark:text-yellow-100">
-          ⚠️ All lines have been modified. Showing full file comparison.
-        </div>
+        <Alert className="rounded-none border-x-0 border-t-0">
+          <TriangleAlert />
+          <AlertDescription>
+            All lines have been modified. Showing full file comparison.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="flex">
@@ -156,8 +161,8 @@ export function DiffViewer({
                 key={idx}
                 className={cn(
                   "flex border-b border-l-2 last:border-b-0",
-                  line.type === "added" && "border-l-green-500 bg-green-500/10",
-                  line.type === "removed" && "border-l-red-500 bg-red-500/10",
+                  line.type === "added" && "border-l-primary bg-primary/5",
+                  line.type === "removed" && "border-l-destructive bg-destructive/5",
                   line.type === "unchanged" && "border-l-transparent"
                 )}
               >
@@ -165,8 +170,8 @@ export function DiffViewer({
                   <div
                     className={cn(
                       "w-12 shrink-0 border-r px-2 text-center text-xs text-muted-foreground",
-                      line.type === "added" && "bg-green-500/5",
-                      line.type === "removed" && "bg-red-500/5"
+                      line.type === "added" && "bg-primary/5",
+                      line.type === "removed" && "bg-destructive/5"
                     )}
                   >
                     {line.number || ""}
@@ -175,8 +180,8 @@ export function DiffViewer({
                 <pre className="flex-1 whitespace-pre-wrap break-words px-3 py-1">
                   <code
                     className={cn(
-                      line.type === "added" && "text-green-900 dark:text-green-100",
-                      line.type === "removed" && "text-red-900 dark:text-red-100",
+                      line.type === "added" && "text-foreground",
+                      line.type === "removed" && "text-destructive",
                       line.type === "unchanged" && "text-foreground"
                     )}
                     dangerouslySetInnerHTML={{
@@ -221,9 +226,9 @@ export function InlineDiff({ original, modified, className }: InlineDiffProps) {
           key={idx}
           className={cn(
             part.added &&
-              "bg-green-500/30 text-green-900 dark:text-green-100 rounded px-0.5",
+              "rounded bg-primary/10 px-0.5 text-foreground",
             part.removed &&
-              "bg-red-500/30 text-red-900 dark:text-red-100 line-through rounded px-0.5"
+              "rounded bg-destructive/10 px-0.5 text-destructive line-through"
           )}
         >
           {part.value}

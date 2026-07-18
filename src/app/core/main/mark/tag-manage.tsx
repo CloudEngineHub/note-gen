@@ -507,7 +507,7 @@ export function TagManage() {
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
-                  <AccordionContent className="px-0 pb-0">
+                  <AccordionContent className="h-auto px-0 pb-0">
 
                     {/* 显示当前标签的队列（正在处理中的记录） */}
                     {queues.filter(queue => queue.tagId === tag.id).map((queue) => (

@@ -10,11 +10,11 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Drawer, DrawerContent } from '@/components/ui/drawer'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { File, FolderTree, NotebookPen, SearchX, Tags } from 'lucide-react'
 import { useTranslations } from 'next-intl'
@@ -93,7 +93,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       
       // 添加高亮的匹配文本
       parts.push(
-        <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 text-foreground px-0.5 rounded">
+        <mark key={index} className="rounded bg-primary/15 px-0.5 text-foreground">
           {text.substring(index, index + lowerQuery.length)}
         </mark>
       )
@@ -128,8 +128,8 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   function getResultTone(item: EnhancedSearchResult) {
     return item.searchType === 'record'
-      ? 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/20'
-      : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+      ? 'border border-primary/20 bg-primary/10 text-primary'
+      : 'border border-border bg-muted text-muted-foreground'
   }
 
   const performSearch = useCallback((value: string) => {
@@ -358,35 +358,23 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             {t('search.results', { count: filteredSearchResult.length })}
           </div>
           <Separator orientation="vertical" className="h-5" />
-          <div className="flex items-center gap-1 rounded-full border border-border/70 bg-muted/20 p-1">
-            <Button
-              type="button"
-              variant={searchFilter === 'all' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 rounded-full px-3 text-xs"
-              onClick={() => setSearchFilter('all')}
-            >
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={searchFilter}
+            onValueChange={(value) => value && setSearchFilter(value as SearchFilter)}
+          >
+            <ToggleGroupItem value="all" aria-label={t('common.all')}>
               {t('common.all')}
-            </Button>
-            <Button
-              type="button"
-              variant={searchFilter === 'record' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 rounded-full px-3 text-xs"
-              onClick={() => setSearchFilter('record')}
-            >
+            </ToggleGroupItem>
+            <ToggleGroupItem value="record" aria-label={t('search.item.record')}>
               {t('search.item.record')}
-            </Button>
-            <Button
-              type="button"
-              variant={searchFilter === 'article' ? 'secondary' : 'ghost'}
-              size="sm"
-              className="h-7 rounded-full px-3 text-xs"
-              onClick={() => setSearchFilter('article')}
-            >
+            </ToggleGroupItem>
+            <ToggleGroupItem value="article" aria-label={t('search.item.article')}>
               {t('search.item.article')}
-            </Button>
-          </div>
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
       </div>
       <CommandList className={isMobileRoute ? "h-[64vh] max-h-[64vh]" : "min-h-0 flex-1 max-h-none"}>
@@ -546,7 +534,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="h-[56vh] max-h-[56vh] max-w-4xl overflow-hidden border-border/70 bg-background p-0 shadow-2xl">
+      <DialogContent showCloseButton={false} className="h-[56vh] max-h-[56vh] max-w-4xl overflow-hidden p-0 sm:max-w-4xl">
         <DialogTitle className="sr-only">{t('search.placeholder')}</DialogTitle>
         <Command
           shouldFilter={false}

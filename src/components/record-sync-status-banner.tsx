@@ -35,9 +35,9 @@ const SUCCESS_VISIBLE_DURATION = 2_000
 function getToneClassName(tone: BannerTone) {
   switch (tone) {
     case 'success':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
+      return 'border-primary/20 bg-primary/5 text-foreground'
     case 'warning':
-      return 'border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+      return 'border-border bg-muted/50 text-foreground'
     case 'danger':
       return 'border-destructive/30 bg-destructive/10 text-destructive'
     case 'neutral':
@@ -201,11 +201,11 @@ export function RecordSyncStatusBanner({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="h-7 shrink-0 px-2 text-xs"
+            size="xs"
+            className="shrink-0"
             onClick={() => void retryAutoDataSync()}
           >
-            <RefreshCw className="mr-1 size-3.5" />
+            <RefreshCw data-icon="inline-start" />
             {t('retry')}
           </Button>
         ) : null}
@@ -213,11 +213,11 @@ export function RecordSyncStatusBanner({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
-            className="h-7 shrink-0 px-2 text-xs"
+            size="xs"
+            className="shrink-0"
             onClick={() => router.push(settingsHref)}
           >
-            <Settings className="mr-1 size-3.5" />
+            <Settings data-icon="inline-start" />
             {t('settings')}
           </Button>
         ) : null}

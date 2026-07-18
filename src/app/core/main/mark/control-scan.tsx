@@ -506,7 +506,7 @@ export function ControlScan() {
       <TooltipButton icon={<ScanText />} tooltipText={t('record.capture.screenshotRecordTitle')} onClick={openScreenshotDialog} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          className="max-w-none translate-x-0 translate-y-0 border-none bg-black p-4 text-white sm:rounded-none"
+          className="max-w-none translate-x-0 translate-y-0 border-none bg-black p-4 text-white sm:max-w-none sm:rounded-none"
           showCloseButton={false}
           style={{
             left: 0,

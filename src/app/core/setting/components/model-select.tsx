@@ -17,10 +17,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import {
-  Check,
-} from "lucide-react"
-import { cn } from "@/lib/utils"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { TooltipButton } from "@/components/tooltip-button"
@@ -270,18 +266,13 @@ export function ModelSelect({
                   <CommandItem
                     key={item.model.id}
                     value={item.model.id}
+                    data-checked={isModelSelected(item)}
                     onSelect={(currentValue) => {
                       modelSelectChangeHandler(currentValue)
                       setOpen(false)
                     }}
                   >
                     {item.model.model}
-                    <Check
-                      className={cn(
-                        "ml-auto",
-                        isModelSelected(item) ? "opacity-100" : "opacity-0"
-                      )}
-                    />
                   </CommandItem>
                 ))}
               </CommandGroup>

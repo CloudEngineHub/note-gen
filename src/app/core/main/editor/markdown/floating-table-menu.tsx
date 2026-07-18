@@ -11,7 +11,8 @@ import {
   AlignRight,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { ButtonGroup, ButtonGroupSeparator } from '@/components/ui/button-group'
 
 interface FloatingTableMenuProps {
   editor: Editor
@@ -157,113 +158,94 @@ export function FloatingTableMenu({ editor }: FloatingTableMenuProps) {
         left: position.left,
       }}
     >
-      {/* Arrow */}
-      <div className="absolute -top-0 left-6 -translate-x-1/2 translate-y-[-100%]">
-        <div className="w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-border" />
-      </div>
-
       {/* Table toolbar */}
-      <div className="flex items-center gap-0.5 px-1 py-1 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border border-border rounded-lg shadow-lg">
+      <ButtonGroup className="rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
         {/* Insert table button (when no table selected) */}
         {!isTableActive && (
-          <button
+          <Button type="button" variant="ghost" size="icon-sm"
             onClick={insertTable}
             disabled={!canInsertTable}
-            className={cn(
-              'p-1.5 rounded hover:bg-muted transition-colors',
-              !canInsertTable && 'opacity-50 cursor-not-allowed'
-            )}
             title="插入表格"
           >
-            <TableIcon className="w-4 h-4" />
-          </button>
+            <TableIcon />
+          </Button>
         )}
 
         {/* Table operations (when table is active) */}
         {isTableActive && (
           <>
             {/* Add row/column */}
-            <button
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={addRowBefore}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="在上方插入行"
             >
-              <Rows className="w-4 h-4" />
-            </button>
-            <button
+              <Rows />
+            </Button>
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={addRowAfter}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="在下方插入行"
             >
-              <Rows className="w-4 h-4 rotate-180" />
-            </button>
-            <button
+              <Rows className="rotate-180" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={addColumnBefore}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="在左侧插入列"
             >
-              <Columns className="w-4 h-4" />
-            </button>
-            <button
+              <Columns />
+            </Button>
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={addColumnAfter}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="在右侧插入列"
             >
-              <Columns className="w-4 h-4 rotate-180" />
-            </button>
+              <Columns className="rotate-180" />
+            </Button>
 
-            <div className="w-px h-5 bg-border mx-1" />
+            <ButtonGroupSeparator />
 
             {/* Alignment */}
-            <button
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={setColumnAlignmentLeft}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="左对齐"
             >
-              <AlignLeft className="w-4 h-4" />
-            </button>
-            <button
+              <AlignLeft />
+            </Button>
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={setColumnAlignmentCenter}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="居中对齐"
             >
-              <AlignCenter className="w-4 h-4" />
-            </button>
-            <button
+              <AlignCenter />
+            </Button>
+            <Button type="button" variant="ghost" size="icon-sm"
               onClick={setColumnAlignmentRight}
-              className="p-1.5 rounded hover:bg-muted transition-colors"
               title="右对齐"
             >
-              <AlignRight className="w-4 h-4" />
-            </button>
+              <AlignRight />
+            </Button>
 
-            <div className="w-px h-5 bg-border mx-1" />
+            <ButtonGroupSeparator />
 
             {/* Delete */}
-            <button
+            <Button type="button" variant="destructive" size="icon-sm"
               onClick={deleteColumn}
-              className="p-1.5 rounded hover:bg-destructive/10 text-destructive transition-colors"
               title="删除列"
             >
-              <Trash2 className="w-4 h-4" />
-            </button>
-            <button
+              <Trash2 />
+            </Button>
+            <Button type="button" variant="destructive" size="icon-sm"
               onClick={deleteRow}
-              className="p-1.5 rounded hover:bg-destructive/10 text-destructive transition-colors"
               title="删除行"
             >
-              <Rows className="w-4 h-4" />
-            </button>
-            <button
+              <Rows />
+            </Button>
+            <Button type="button" variant="destructive" size="icon-sm"
               onClick={deleteTable}
-              className="p-1.5 rounded hover:bg-destructive/10 text-destructive transition-colors"
               title="删除表格"
             >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <Trash2 />
+            </Button>
           </>
         )}
-      </div>
+      </ButtonGroup>
     </div>
   )
 }
