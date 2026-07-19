@@ -8,7 +8,7 @@ import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/github"
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types"
-import { Avatar, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 dayjs.extend(relativeTime)
 
@@ -95,7 +95,8 @@ export function GithubSync() {
         {/* 自定义仓库信息展示 */}
         <div className="flex items-center gap-4">
           <Avatar className="size-12">
-            <AvatarImage src={syncRepoInfo?.owner.avatar_url || ''} />
+            <AvatarImage src={syncRepoInfo?.owner.avatar_url || ''} alt={syncRepoInfo?.owner.login || 'GitHub'} />
+            <AvatarFallback>GH</AvatarFallback>
           </Avatar>
           <div>
             <h3 className="text-xl font-bold mb-1">

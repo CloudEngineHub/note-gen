@@ -22,7 +22,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { AiConfig } from "../config";
 import * as React from "react"
 import { v4 } from 'uuid';
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import useSettingStore from "@/stores/setting";
 import { useLocalStorage } from "react-use";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -211,13 +211,18 @@ function ProviderItem({item, onClick}: {item: AiConfig, onClick: (model: AiConfi
   return (
     <div onClick={() => onClick(item)} className="h-12 flex items-center rounded-md gap-2 justify-between p-2 border hover:text-third hover:bg-third-foreground cursor-pointer">
         <div className="flex items-center gap-2">
-          <div className="size-6 bg-white rounded flex items-center justify-center">
-            {item.icon ? 
-              <Avatar>
-                <AvatarImage className="size-4" src={item.icon || ''} />
-              </Avatar>
-            : <BotMessageSquare className="size-4 text-primary" />}
-          </div>
+          {item.icon ? (
+            <Avatar size="sm" className="bg-white">
+              <AvatarImage className="object-contain p-1" src={item.icon} alt={item.title} />
+              <AvatarFallback className="bg-white">
+                <BotMessageSquare className="size-4 text-muted-foreground" />
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="flex size-6 items-center justify-center rounded bg-white">
+              <BotMessageSquare className="size-4 text-primary" />
+            </div>
+          )}
           <p className="text-sm font-bold">{item.title}</p>
         </div>
         <ChevronRight className="size-4" />

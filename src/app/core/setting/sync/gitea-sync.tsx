@@ -15,7 +15,7 @@ import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/gite
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import { GiteaInstanceType, GITEA_INSTANCES } from "@/lib/sync/gitea.types";
 import { Globe, Server, Plus, RefreshCcw } from "lucide-react";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
@@ -305,7 +305,8 @@ export function GiteaSync() {
         <div className="border-t mt-4 pt-4">
           <div className="flex items-center gap-4">
             <Avatar className="size-10">
-              <AvatarImage src={giteaUserInfo?.avatar_url || ''} />
+              <AvatarImage src={giteaUserInfo?.avatar_url || ''} alt={giteaUserInfo?.login || 'Gitea'} />
+              <AvatarFallback>GA</AvatarFallback>
             </Avatar>
             <div>
               <h3 className="text-xl font-bold mb-1">

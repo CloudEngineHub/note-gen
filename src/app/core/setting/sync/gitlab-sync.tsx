@@ -15,7 +15,7 @@ import { checkSyncProjectState, createSyncProject, getUserInfo } from "@/lib/syn
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import { GitlabInstanceType, GITLAB_INSTANCES } from "@/lib/sync/gitlab.types";
 import { Globe, Server, Plus, RefreshCcw } from "lucide-react";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
@@ -286,7 +286,8 @@ export function GitlabSync() {
         <div className="border-t mt-4 pt-4">
           <div className="flex items-center gap-4">
             <Avatar className="size-10">
-              <AvatarImage src={gitlabUserInfo?.avatar_url || ''} />
+              <AvatarImage src={gitlabUserInfo?.avatar_url || ''} alt={gitlabUserInfo?.username || 'GitLab'} />
+              <AvatarFallback>GL</AvatarFallback>
             </Avatar>
             <div>
               <h3 className="text-xl font-bold mb-1">

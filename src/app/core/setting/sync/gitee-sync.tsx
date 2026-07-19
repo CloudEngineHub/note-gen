@@ -13,7 +13,7 @@ import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/gite
 import { Button } from "@/components/ui/button";
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import { Plus, RefreshCcw } from "lucide-react";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TokenInputControl } from "./components/token-input-control";
 
 dayjs.extend(relativeTime)
@@ -249,7 +249,8 @@ export function GiteeSync() {
         <div className="border-t mt-4 pt-4">
           <div className="flex items-center gap-4">
             <Avatar className="size-10">
-              <AvatarImage src={giteeSyncRepoInfo?.owner?.avatar_url || ''} />
+              <AvatarImage src={giteeSyncRepoInfo?.owner?.avatar_url || ''} alt={giteeSyncRepoInfo?.owner?.login || 'Gitee'} />
+              <AvatarFallback>GT</AvatarFallback>
             </Avatar>
             <div>
               <h3 className="text-xl font-bold mb-1">

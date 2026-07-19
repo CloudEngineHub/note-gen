@@ -15,7 +15,7 @@ import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
 import useImageStore from "@/stores/imageHosting";
 import { createImageRepo, checkImageRepoState } from "@/lib/imageHosting/github";
 import { getImageRepoName } from "@/lib/sync/repo-utils";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { TokenInputControl } from "@/app/core/setting/sync/components/token-input-control";
 
@@ -233,7 +233,8 @@ export function GithubImageHosting() {
             <div className="p-4 border rounded-lg">
               <div className="flex items-center gap-4">
                 <Avatar className="size-12">
-                  <AvatarImage src={imageRepoInfo?.owner.avatar_url || ''} />
+                  <AvatarImage src={imageRepoInfo?.owner.avatar_url || ''} alt={imageRepoInfo?.owner.login || 'GitHub'} />
+                  <AvatarFallback>GH</AvatarFallback>
                 </Avatar>
                 <div>
                   <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
