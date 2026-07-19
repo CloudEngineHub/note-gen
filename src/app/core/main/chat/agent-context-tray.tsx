@@ -10,6 +10,8 @@ import {
 } from "lucide-react"
 import useArticleStore from "@/stores/article"
 import type { AgentSkillSummary } from "@/lib/agent/types"
+import { cn } from "@/lib/utils"
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
 
 export interface RagSourceDetail {
   filepath: string
@@ -60,29 +62,29 @@ export function AgentContextTray({
     <div className="flex flex-col gap-1">
       {ragSources.length > 0 && (
         <div>
-          <button
-            type="button"
-            className="group flex w-full items-center gap-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => setShowRag((value) => !value)}
-          >
-            <Database className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">已检索 {ragSources.length} 个文件</span>
-            <ChevronRight
-              className={`size-4 shrink-0 transition-transform ${showRag ? "rotate-90" : ""}`}
-            />
-          </button>
+          <Marker asChild>
+            <button
+              type="button"
+              className="group py-1.5 transition-colors hover:text-foreground"
+              onClick={() => setShowRag((value) => !value)}
+            >
+              <MarkerIcon><Database /></MarkerIcon>
+              <MarkerContent className="flex-1 truncate">已检索 {ragSources.length} 个文件</MarkerContent>
+              <MarkerIcon>
+                <ChevronRight className={cn("transition-transform", showRag && "rotate-90")} />
+              </MarkerIcon>
+            </button>
+          </Marker>
 
           {showRag && (
-            <div className="ml-6 flex flex-col gap-1 border-l pl-3">
+            <div className="flex flex-col gap-1 pl-6">
               {ragSources.map((source) => {
                 const detail = detailMap.get(source)
                 return (
-                  <div key={source} className="py-1 text-xs">
-                    <div className="flex items-center justify-between gap-2 text-muted-foreground">
-                      <div className="flex min-w-0 items-center gap-1.5">
-                        <FileText className="size-3.5 shrink-0" />
-                        <span className="truncate">{source}</span>
-                      </div>
+                  <div key={source} className="flex flex-col gap-1 py-1 text-xs">
+                    <Marker>
+                      <MarkerIcon><FileText /></MarkerIcon>
+                      <MarkerContent className="flex-1 truncate">{source}</MarkerContent>
                       {detail?.filepath && (
                         <button
                           type="button"
@@ -92,9 +94,9 @@ export function AgentContextTray({
                           打开
                         </button>
                       )}
-                    </div>
+                    </Marker>
                     {detail?.content && (
-                      <div className="mt-1 truncate text-muted-foreground">
+                      <div className="truncate pl-6 text-muted-foreground">
                         {detail.content}
                       </div>
                     )}
@@ -108,40 +110,43 @@ export function AgentContextTray({
 
       {loadedSkills.length > 0 && (
         <div>
-          <button
-            type="button"
-            className="group flex w-full items-center gap-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => setShowSkills((value) => !value)}
-          >
-            <Sparkles className="size-4 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">
-              已使用 {loadedSkills.length} 个技能
-            </span>
-            <ChevronRight
-              className={`size-4 shrink-0 transition-transform ${showSkills ? "rotate-90" : ""}`}
-            />
-          </button>
+          <Marker asChild>
+            <button
+              type="button"
+              className="group py-1.5 transition-colors hover:text-foreground"
+              onClick={() => setShowSkills((value) => !value)}
+            >
+              <MarkerIcon><Sparkles /></MarkerIcon>
+              <MarkerContent className="flex-1 truncate">
+                已使用 {loadedSkills.length} 个技能
+              </MarkerContent>
+              <MarkerIcon>
+                <ChevronRight className={cn("transition-transform", showSkills && "rotate-90")} />
+              </MarkerIcon>
+            </button>
+          </Marker>
 
           {showSkills && (
-            <div className="ml-6 flex flex-col gap-2 border-l pl-3">
+            <div className="flex flex-col gap-2 pl-6">
               {loadedSkills.map((skill) => {
                 const descriptionExpanded = expandedSkillDescriptions.includes(skill.id)
 
                 return (
-                  <div key={skill.id} className="py-1 text-xs">
-                    <div className="flex min-w-0 items-center gap-1.5 text-foreground">
-                      <Sparkles className="size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="truncate font-medium">{skill.name}</span>
-                    </div>
-                    <div className="mt-0.5 truncate text-muted-foreground">
+                  <div key={skill.id} className="flex flex-col gap-0.5 py-1 text-xs">
+                    <Marker>
+                      <MarkerIcon><Sparkles /></MarkerIcon>
+                      <MarkerContent className="truncate font-medium text-foreground">{skill.name}</MarkerContent>
+                    </Marker>
+                    <div className="truncate pl-6 text-muted-foreground">
                       {skill.id}
                     </div>
                     {skill.description && (
-                      <div className="mt-1 flex min-w-0 items-start gap-1 text-muted-foreground">
+                      <div className="flex min-w-0 items-start gap-1 pl-6 text-muted-foreground">
                         <div
-                          className={`min-w-0 flex-1 ${
+                          className={cn(
+                            "min-w-0 flex-1",
                             descriptionExpanded ? "whitespace-pre-wrap break-words" : "truncate"
-                          }`}
+                          )}
                         >
                           {skill.description}
                         </div>

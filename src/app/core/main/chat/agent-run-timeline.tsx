@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import type { AgentChange, AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
 import { AgentChangesPanel } from "./agent-changes-panel"
 import { AgentContextTray, type RagSourceDetail } from "./agent-context-tray"
 import { agentStatusText, formatAgentDuration, formatAgentToolName } from "./agent-display-utils"
@@ -32,22 +33,22 @@ interface AgentRunTimelineProps {
 
 function eventIcon(event: AgentTraceEvent) {
   if (event.status === "error") {
-    return <AlertTriangle className="size-4 text-destructive" />
+    return <AlertTriangle className="text-destructive" />
   }
 
   if (event.status === "running") {
-    return <Loader2 className="size-4 animate-spin text-blue-500" />
+    return <Loader2 className="animate-spin text-primary" />
   }
 
   if (event.type === "tool_call" || event.type === "tool_result") {
-    return <Wrench className="size-4 text-blue-500" />
+    return <Wrench />
   }
 
   if (event.type === "final") {
-    return <CheckCircle2 className="size-4 text-green-500" />
+    return <CheckCircle2 />
   }
 
-  return <Sparkles className="size-4 text-primary" />
+  return <Sparkles className="text-primary" />
 }
 
 function shouldShowEventMessage(event: AgentTraceEvent) {
@@ -184,7 +185,7 @@ function compactTraceOutput(event: AgentTraceEvent, visibleMessage?: string) {
   }
 
   if (event.type === "model_call" || event.type === "model_response") {
-    return value
+    return undefined
   }
 
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -234,14 +235,14 @@ function traceDetailClassName(event: AgentTraceEvent) {
 
 function statusIcon(status: AgentRunStatus, isRunning: boolean) {
   if (isRunning) {
-    return <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+    return <Loader2 className="animate-spin text-primary" />
   }
 
   if (status === "failed") {
-    return <AlertTriangle className="size-4 shrink-0 text-destructive" />
+    return <AlertTriangle className="text-destructive" />
   }
 
-  return <CheckCircle2 className="size-4 shrink-0 text-muted-foreground" />
+  return <CheckCircle2 />
 }
 
 function eventFromToolCall(toolCall: ToolCall): AgentTraceEvent {
@@ -335,7 +336,7 @@ export function AgentRunTimeline({
   ].filter(Boolean).join(" ")
 
   const processContent = (
-    <div className="flex flex-col gap-2 pl-1">
+    <div className="flex flex-col gap-2">
       <AgentContextTray
         ragSources={ragSources}
         ragSourceDetails={ragSourceDetails}
@@ -370,14 +371,15 @@ export function AgentRunTimeline({
             const receivedTokenCount = isModelEvent ? getReceivedTokenCount(event) : 0
             return (
               <div key={event.id} role="listitem" className="text-sm">
-                <button
-                  type="button"
-                  className="group flex w-full items-start gap-2 py-1.5 text-left"
-                  onClick={() => canToggle && toggleEvent(event.id)}
-                  aria-expanded={canToggle ? expanded : undefined}
-                >
-                  <span className="mt-0.5 shrink-0">{eventIcon(event)}</span>
-                  <span className="min-w-0 flex-1">
+                <Marker asChild>
+                  <button
+                    type="button"
+                    className="group items-start py-1.5 transition-colors hover:text-foreground"
+                    onClick={() => canToggle && toggleEvent(event.id)}
+                    aria-expanded={canToggle ? expanded : undefined}
+                  >
+                    <MarkerIcon className="mt-0.5">{eventIcon(event)}</MarkerIcon>
+                    <MarkerContent className="flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className={expanded ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}>
                         {event.toolName ? formatAgentToolName(event.toolName) : event.title}
@@ -398,32 +400,31 @@ export function AgentRunTimeline({
                         {visibleMessage}
                       </span>
                     )}
-                  </span>
-                  {canToggle && (
-                    expanded ? (
-                      <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    )
-                  )}
-                </button>
+                    </MarkerContent>
+                    {canToggle && (
+                      <MarkerIcon className="mt-0.5">
+                        {expanded ? <ChevronDown /> : <ChevronRight />}
+                      </MarkerIcon>
+                    )}
+                  </button>
+                </Marker>
 
                 {modelReasoningContent && expanded && event.status !== "running" && (
-                  <div className="ml-6 border-l pl-3 pb-2 text-xs">
+                  <div className="pb-2 pl-6 text-xs">
                     <div className="max-h-48 overflow-y-auto rounded bg-muted/60 p-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-muted-foreground">
                       {modelReasoningContent}
                     </div>
                   </div>
                 )}
 
-                {modelResponseContent && (
-                  <div className="ml-6 border-l pl-3 pb-2 text-sm">
+                {modelResponseContent && isRunning && (
+                  <div className="pb-2 text-sm">
                     <ChatPreview text={modelResponseContent} />
                   </div>
                 )}
 
                 {expanded && hasTraceDetails && (
-                  <div className="ml-6 flex flex-col gap-2 border-l pl-3 pb-2 text-xs">
+                  <div className="flex flex-col gap-2 pb-2 pl-6 text-xs">
                     {visibleMessage && (
                       <div className="flex flex-col gap-1">
                         <div className="font-medium text-muted-foreground">描述</div>
@@ -453,10 +454,10 @@ export function AgentRunTimeline({
       )}
 
       {showStatusRow && (
-        <div className="flex items-center gap-2 py-1.5 text-sm text-muted-foreground">
-          {statusIcon(status, isRunning)}
-          <span className="truncate">{agentStatusText[status]}</span>
-        </div>
+        <Marker role="status" className="py-1.5">
+          <MarkerIcon>{statusIcon(status, isRunning)}</MarkerIcon>
+          <MarkerContent>{agentStatusText[status]}</MarkerContent>
+        </Marker>
       )}
 
       {showChanges && !isRunning && <AgentChangesPanel changes={changes} />}
@@ -467,13 +468,17 @@ export function AgentRunTimeline({
     <div>
       {isRunning ? processContent : (
         <Collapsible open={processOpen} onOpenChange={setProcessOpen}>
-        <CollapsibleTrigger asChild>
-          <button type="button" className="group flex w-full items-center gap-2 py-1.5 text-left text-sm text-muted-foreground">
-            {statusIcon(status, isRunning)}
-            <span className="flex-1 truncate">{processLabel}</span>
-            <ChevronRight className="size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-          </button>
-        </CollapsibleTrigger>
+          <CollapsibleTrigger asChild>
+            <Marker asChild>
+              <button type="button" className="group py-1.5 transition-colors hover:text-foreground">
+                <MarkerIcon>{statusIcon(status, isRunning)}</MarkerIcon>
+                <MarkerContent className="flex-1 truncate">{processLabel}</MarkerContent>
+                <MarkerIcon>
+                  <ChevronRight className="transition-transform group-data-[state=open]:rotate-90" />
+                </MarkerIcon>
+              </button>
+            </Marker>
+          </CollapsibleTrigger>
 
           <CollapsibleContent>{processContent}</CollapsibleContent>
         </Collapsible>
