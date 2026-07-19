@@ -16,14 +16,14 @@ export function confirmPendingAgentAction(scope: AgentApprovalScope = "once") {
     timestamp: Date.now(),
     scope: effectiveScope,
     sessionApprovalType: pendingConfirmation.sessionApprovalType,
-    sessionApprovalSkillId: pendingConfirmation.sessionApprovalSkillId,
+    sessionApprovalKey: pendingConfirmation.sessionApprovalKey,
   }
 
   if (effectiveScope === "conversation" && latestState.currentConversationId !== null) {
     latestState.setAgentAutoApproveConversationId(latestState.currentConversationId)
-    latestState.setAgentAutoApproveRuntimeSkillId(
-      pendingConfirmation.sessionApprovalType === "runtime-script-skill"
-        ? pendingConfirmation.sessionApprovalSkillId || null
+    latestState.setAgentAutoApproveRuntimeScriptKey(
+      pendingConfirmation.sessionApprovalType === "runtime-script"
+        ? pendingConfirmation.sessionApprovalKey || null
         : null
     )
   }

@@ -385,7 +385,11 @@
       "instructionsHelp": "给 AI 的详细指令，支持 Markdown 格式",
       "deleteSkillTitle": "删除 Skill",
       "deleteSkillDesc": "确定要删除这个 Skill 吗？此操作无法撤销。",
-      "skillDeleted": "Skill 删除成功"
+      "skillDeleted": "Skill 删除成功",
+      "pythonRuntime": "Python 运行环境",
+      "isolatedRuntime": "隔离环境",
+      "systemRuntime": "系统环境",
+      "runtimeUnavailable": "不可用"
     },
     "editor": {
       "title": "编辑器设置",
@@ -2275,7 +2279,11 @@
               },
               "execute_skill_script": {
                 "title": "运行脚本",
-                "description": "将执行由 skill 提供的脚本或命令。"
+                "description": "将执行此 Skill 中已注册的脚本。"
+              },
+              "install_skill_python_dependencies": {
+                "title": "安装 Skill Python 依赖",
+                "description": "将把列出的 PyPI wheel 安装到此 Skill 的隔离环境中，请逐项确认。"
               }
             }
           }

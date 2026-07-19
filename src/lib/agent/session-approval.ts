@@ -1,8 +1,9 @@
 import type { AgentTool } from './types'
+import { getSkillScriptPermissionKey } from '@/lib/skills/runtime'
 
 export interface SessionApprovalScope {
-  type: 'runtime-script-skill'
-  skillId?: string
+  type: 'runtime-script'
+  permissionKey: string
 }
 
 export function getSessionApprovalScope(
@@ -15,15 +16,17 @@ export function getSessionApprovalScope(
   }
 
   if (tool.risk === 'script' || toolName === 'skill_execute_script') {
-    const skillId = typeof params.skill_id === 'string'
-      ? params.skill_id
-      : typeof params.skillId === 'string'
-        ? params.skillId
-        : undefined
-
-    return skillId
-      ? { type: 'runtime-script-skill', skillId }
+    const skillId = typeof params.skill_id === 'string' ? params.skill_id : ''
+    const scriptId = typeof params.script_id === 'string' ? params.script_id : ''
+    const args = Array.isArray(params.args)
+      ? params.args.map(String)
+      : Array.isArray(params.arguments)
+        ? params.arguments.map(String)
+        : []
+    const permissionKey = skillId && scriptId
+      ? getSkillScriptPermissionKey(skillId, scriptId, args)
       : null
+    return permissionKey ? { type: 'runtime-script', permissionKey } : null
   }
 
   return null
@@ -32,7 +35,7 @@ export function getSessionApprovalScope(
 export function matchesSessionApproval(
   approvedConversationId: number | null,
   activeConversationId: number | null,
-  approvedRuntimeScriptSkillId: string | null,
+  approvedRuntimeScriptKey: string | null,
   scope: SessionApprovalScope | null
 ): boolean {
   if (!scope || approvedConversationId === null || activeConversationId === null) {
@@ -43,6 +46,5 @@ export function matchesSessionApproval(
     return false
   }
 
-  return Boolean(scope.skillId) &&
-    approvedRuntimeScriptSkillId === scope.skillId
+  return approvedRuntimeScriptKey === scope.permissionKey
 }

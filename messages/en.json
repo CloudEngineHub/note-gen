@@ -385,7 +385,11 @@
       "instructionsHelp": "Detailed instructions for AI, supports Markdown format",
       "deleteSkillTitle": "Delete Skill",
       "deleteSkillDesc": "Are you sure you want to delete this Skill? This action cannot be undone.",
-      "skillDeleted": "Skill deleted successfully"
+      "skillDeleted": "Skill deleted successfully",
+      "pythonRuntime": "Python runtime",
+      "isolatedRuntime": "isolated",
+      "systemRuntime": "system",
+      "runtimeUnavailable": "unavailable"
     },
     "editor": {
       "title": "Editor Settings",
@@ -2360,7 +2364,11 @@
               },
               "execute_skill_script": {
                 "title": "Run script",
-                "description": "A skill-provided script or command will be executed."
+                "description": "A registered script from this Skill will be executed."
+              },
+              "install_skill_python_dependencies": {
+                "title": "Install Skill Python dependencies",
+                "description": "The listed PyPI wheels will be installed into this Skill's isolated environment. Review every package before continuing."
               }
             }
           }

@@ -42,6 +42,7 @@ reqwest_dav = "=0.2.1"
 tauri-plugin-opener = "2.4.0"
 uuid = { version = "1.10", features = ["v4"] }
 zip = { version = "4", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
 
 [dependencies.tauri-plugin-sql]
 features = ["sqlite"]

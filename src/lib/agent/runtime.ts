@@ -8,6 +8,7 @@ import { AgentPromptAssembler, hasInlineCurrentEditorSelection, hasInlineCurrent
 import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
 import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
+import { skillManager } from '@/lib/skills'
 import { agentDebugLog, previewText } from './debug-log'
 import type {
   AgentChange,
@@ -570,6 +571,13 @@ function selectToolsForContext(
     selectedTools = selectedTools.filter((tool) => tool.category !== 'editor')
   }
 
+  // The complete catalog is already present in the system prompt. Exposing a
+  // second listing tool encourages models to enumerate it repeatedly instead
+  // of loading the one matching Skill.
+  if ((context.availableSkills?.length || 0) > 0) {
+    selectedTools = selectedTools.filter((tool) => tool.name !== 'skill_list')
+  }
+
   return selectedTools
 }
 
@@ -757,6 +765,7 @@ export class AgentRuntime {
         stringifyToolResult(result),
       ].join(':'))
     }
+    const loadedSkillIds = new Set<string>()
     let consecutiveNoProgressRounds = 0
     let forceFinalResponseReason: string | undefined
     let latestEditorStateResult: AgentToolResult | undefined
@@ -917,7 +926,7 @@ export class AgentRuntime {
           return true
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
-        const openAITools = agentToolRegistry.toOpenAITools(offeredTools)
+        const openAITools = agentToolRegistry.toOpenAITools(offeredTools, loadedSkillIds)
         const toolParams = openAITools.length > 0
           ? { tools: openAITools, tool_choice: 'auto' as const }
           : {}
@@ -1253,6 +1262,56 @@ export class AgentRuntime {
             continue
           }
 
+          if (
+            (toolName === 'skill_execute_script' || toolName === 'skill_read_resource')
+            && (
+              typeof args.skill_id !== 'string'
+              || !loadedSkillIds.has(args.skill_id)
+            )
+          ) {
+            const notLoadedResult: AgentToolResult = {
+              ok: false,
+              message: `Skill "${String(args.skill_id || '')}" is not loaded in this task. Call skill_load once before using its resources or scripts.`,
+              error: 'SKILL_NOT_LOADED',
+            }
+            toolCall.status = 'error'
+            toolCall.result = toolResultToLegacy(notLoadedResult)
+            callbacks.onToolCall?.(toolCall)
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolUse.id,
+              content: stringifyToolResult(notLoadedResult),
+            })
+            continue
+          }
+
+          if (toolName === 'skill_execute_script' && typeof args.skill_id === 'string') {
+            const availableScripts = skillManager.getSkill(args.skill_id)?.scripts.map(script => script.name) || []
+            if (
+              typeof args.script_id !== 'string'
+              || !availableScripts.includes(args.script_id)
+            ) {
+              const invalidScriptResult: AgentToolResult = {
+                ok: false,
+                message: [
+                  `Invalid script_id for loaded Skill "${args.skill_id}": ${String(args.script_id || '')}.`,
+                  `Choose one exact registered ID: ${availableScripts.join(', ') || '(none)'}.`,
+                  'Do not invent, abbreviate, or recreate a script.',
+                ].join('\n'),
+                error: 'INVALID_REGISTERED_SCRIPT_ID',
+              }
+              toolCall.status = 'error'
+              toolCall.result = toolResultToLegacy(invalidScriptResult)
+              callbacks.onToolCall?.(toolCall)
+              messages.push({
+                role: 'tool',
+                tool_call_id: toolUse.id,
+                content: stringifyToolResult(invalidScriptResult),
+              })
+              continue
+            }
+          }
+
           const invalidEditorTarget = validateEditorTargetFile(context, tool, args)
           if (invalidEditorTarget) {
             agentDebugLog('tool_args_rejected', {
@@ -1350,7 +1409,7 @@ export class AgentRuntime {
             reason: permission.reason,
             canApproveForSession: permission.canApproveForSession,
             sessionApprovalType: permission.sessionApprovalType,
-            sessionApprovalSkillId: permission.sessionApprovalSkillId,
+            sessionApprovalKey: permission.sessionApprovalKey,
           })
           if (!permission.allowed) {
             const deniedResult: AgentToolResult = {
@@ -1660,6 +1719,10 @@ export class AgentRuntime {
             cancelRemainingToolCalls(toolIndex, reason)
             prepareFinalResponse(reason)
             continue agentLoop
+          }
+
+          if (result.ok && tool.name === 'skill_load' && typeof args.skill_id === 'string') {
+            loadedSkillIds.add(args.skill_id)
           }
 
           if (result.ok && mutationCallSignature && !repeatedSuccessfulMutation) {

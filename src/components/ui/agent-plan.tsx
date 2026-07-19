@@ -45,8 +45,8 @@ interface ConfirmationRecord {
   status: "pending" | "confirmed" | "cancelled";
   timestamp: number;
   scope?: "once" | "conversation";
-  sessionApprovalType?: "runtime-script-skill";
-  sessionApprovalSkillId?: string;
+  sessionApprovalType?: "runtime-script";
+  sessionApprovalKey?: string;
 }
 
 interface ReActStep {
@@ -83,8 +83,8 @@ interface AgentPlanProps {
     from?: number;
     to?: number;
     canApproveForSession?: boolean;
-    sessionApprovalType?: "runtime-script-skill";
-    sessionApprovalSkillId?: string;
+    sessionApprovalType?: "runtime-script";
+    sessionApprovalKey?: string;
   };
   confirmationHistory?: ConfirmationRecord[];
   currentStepStartTime?: number; // 当前步骤开始时间戳
@@ -970,8 +970,8 @@ export function AgentPlan({
                 >
                   <CheckCircle2 data-icon="inline-start" />
                   <span>
-                    {pendingConfirmation.sessionApprovalType === "runtime-script-skill"
-                      ? "本会话允许此 Skill 脚本"
+                    {pendingConfirmation.sessionApprovalType === "runtime-script"
+                      ? "本会话允许此次脚本调用"
                       : "本会话都允许"}
                   </span>
                 </Button>

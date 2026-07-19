@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Sparkles, Trash, Loader2, Edit2 } from 'lucide-react'
 import { useSkillsStore } from '@/stores/skills'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { inspectSkillPython, type SkillPythonStatus } from '@/lib/skills/runtime'
 import { SkillMetadata } from '@/lib/skills/types'
 import {
   AlertDialog,
@@ -34,9 +36,11 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [pythonStatus, setPythonStatus] = useState<SkillPythonStatus | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const skillContent = getSkill(skill.id)
+  const hasPythonScripts = skillContent?.scripts.some(script => script.type === 'python') ?? false
 
   // 初始化指令内容
   useEffect(() => {
@@ -44,6 +48,19 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
       setInstructions(skillContent.instructions)
     }
   }, [skillContent])
+
+  useEffect(() => {
+    if (!hasPythonScripts) return
+    let active = true
+    void inspectSkillPython(skill.id)
+      .then(status => {
+        if (active) setPythonStatus(status)
+      })
+      .catch(error => console.error('Failed to inspect Skill Python runtime:', error))
+    return () => {
+      active = false
+    }
+  }, [hasPythonScripts, skill.id])
 
   // 自动保存
   useEffect(() => {
@@ -141,6 +158,20 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
         <p className="text-sm text-muted-foreground mt-2 truncate">
           {skill.description}
         </p>
+        {hasPythonScripts && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{t('pythonRuntime')}:</span>
+            {!pythonStatus ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : pythonStatus.available ? (
+              <Badge variant="secondary">
+                Python {pythonStatus.version} · {pythonStatus.managed ? t('isolatedRuntime') : t('systemRuntime')}
+              </Badge>
+            ) : (
+              <Badge variant="destructive">{t('runtimeUnavailable')}</Badge>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {/* 指令编辑器 - 只在编辑模式下显示 */}

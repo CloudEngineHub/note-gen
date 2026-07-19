@@ -10,6 +10,8 @@ export interface JsonSchema {
   type?: string | string[]
   description?: string
   enum?: JsonPrimitive[]
+  const?: JsonPrimitive
+  oneOf?: JsonSchema[]
   properties?: Record<string, JsonSchema>
   required?: string[]
   items?: JsonSchema
@@ -175,8 +177,8 @@ export interface AgentApprovalRequest {
   from?: number
   to?: number
   canApproveForSession?: boolean
-  sessionApprovalType?: 'runtime-script-skill'
-  sessionApprovalSkillId?: string
+  sessionApprovalType?: 'runtime-script'
+  sessionApprovalKey?: string
 }
 
 export interface AgentRuntimeInput {
@@ -277,8 +279,8 @@ export interface ConfirmationRecord {
   status: 'pending' | 'confirmed' | 'cancelled' | 'superseded'
   timestamp: number
   scope?: 'once' | 'conversation'
-  sessionApprovalType?: 'runtime-script-skill'
-  sessionApprovalSkillId?: string
+  sessionApprovalType?: 'runtime-script'
+  sessionApprovalKey?: string
 }
 
 export interface AgentState {
@@ -307,8 +309,8 @@ export interface AgentState {
     from?: number
     to?: number
     canApproveForSession?: boolean
-    sessionApprovalType?: 'runtime-script-skill'
-    sessionApprovalSkillId?: string
+    sessionApprovalType?: 'runtime-script'
+    sessionApprovalKey?: string
   }
   confirmationHistory: ConfirmationRecord[]
   loadedSkills?: AgentSkillSummary[]

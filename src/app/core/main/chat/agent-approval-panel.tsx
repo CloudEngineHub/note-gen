@@ -19,8 +19,8 @@ export interface PendingAgentConfirmation {
   from?: number
   to?: number
   canApproveForSession?: boolean
-  sessionApprovalType?: "runtime-script-skill"
-  sessionApprovalSkillId?: string
+  sessionApprovalType?: "runtime-script"
+  sessionApprovalKey?: string
 }
 
 interface AgentApprovalPanelProps {
@@ -35,7 +35,11 @@ export function AgentApprovalPanel({
   onCancel,
 }: AgentApprovalPanelProps) {
   const t = useTranslations()
-  const [expanded, setExpanded] = React.useState(false)
+  const [expanded, setExpanded] = React.useState(true)
+
+  React.useEffect(() => {
+    setExpanded(true)
+  }, [pendingConfirmation?.toolName, pendingConfirmation?.params])
 
   React.useEffect(() => {
     if (

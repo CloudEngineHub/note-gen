@@ -28,10 +28,16 @@ import { listFoldersTool, checkFolderExistsTool, createFolderTool, deleteFolderT
 import { listTagsTool, createTagTool, updateTagTool, deleteTagTool, searchTagsTool } from './tools/tag-tools'
 import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
 import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool } from './tools/memory-tools'
-import { executeSkillScriptTool, loadSkillContentTool } from './tools/system-tools'
+import {
+  executeRegisteredSkillScript,
+  executeSkillScriptTool,
+  installSkillDependencies,
+  installSkillPythonDependenciesTool,
+} from './tools/system-tools'
 import type {
   AgentChange,
   AgentTool,
+  AgentToolExecutionContext,
   AgentToolResult,
   JsonSchema,
   Tool,
@@ -68,6 +74,40 @@ function createChangeId() {
 
 function asString(value: unknown) {
   return typeof value === 'string' ? value : ''
+}
+
+const RESERVED_SKILL_RUNTIME_PATH = /(?:^|\/)skills\/[^/]+\/runtime(?:\/|$)/i
+
+function getRequestedFilePath(input: Record<string, unknown>) {
+  const filePath = asString(input.filePath)
+  if (filePath) return normalizeFilePathForCompare(filePath)
+  const fileName = asString(input.fileName)
+  const folderPath = asString(input.folderPath)
+  return normalizeFilePathForCompare(folderPath ? `${folderPath}/${fileName}` : fileName)
+}
+
+function rejectGeneratedSkillRuntimeFile(input: Record<string, unknown>): AgentToolResult | undefined {
+  const filePath = getRequestedFilePath(input)
+  if (!RESERVED_SKILL_RUNTIME_PATH.test(filePath)) return undefined
+
+  return {
+    ok: false,
+    message: [
+      `已阻止在笔记工作区创建或修改 Skill 运行时代码：${filePath}。`,
+      '已安装的 Skill 资源是只读的；请使用 skill_read_resource 读取，并通过 skill_execute_script 执行已注册脚本。',
+    ].join('\n'),
+    error: 'RESERVED_SKILL_RUNTIME_PATH',
+  }
+}
+
+function rejectGeneratedSkillRuntimeFolder(input: Record<string, unknown>): AgentToolResult | undefined {
+  const folderPath = normalizeFilePathForCompare(asString(input.folderPath))
+  if (!RESERVED_SKILL_RUNTIME_PATH.test(folderPath)) return undefined
+  return {
+    ok: false,
+    message: `已阻止创建保留的 Skill 运行时目录：${folderPath}。Skill 资源只能通过 Skill 工具访问。`,
+    error: 'RESERVED_SKILL_RUNTIME_PATH',
+  }
 }
 
 function buildFileChange(config: {
@@ -170,7 +210,7 @@ function adaptLegacyTool(config: {
   legacy: Tool
   inputSchema?: JsonSchema
   beforeExecute?: (input: Record<string, unknown>) => AgentToolResult | undefined
-  execute?: (input: Record<string, unknown>) => Promise<AgentToolResult>
+  execute?: (input: Record<string, unknown>, context: AgentToolExecutionContext) => Promise<AgentToolResult>
 }): AgentTool {
   return {
     name: config.name,
@@ -180,14 +220,14 @@ function adaptLegacyTool(config: {
     risk: config.risk,
     legacyName: config.legacy.name,
     inputSchema: config.inputSchema || legacyInputSchema(config.legacy),
-    execute: async (input) => {
+    execute: async (input, context) => {
       const blocked = config.beforeExecute?.(input)
       if (blocked) {
         return blocked
       }
 
       if (config.execute) {
-        return config.execute(input)
+        return config.execute(input, context)
       }
 
       return resultFromLegacy(await config.legacy.execute(input as Record<string, any>))
@@ -847,20 +887,122 @@ function buildSkillLoadTool(): AgentTool {
   return {
     name: 'skill_load',
     title: '加载 Skill',
-    description: 'Load the complete guidance and support files for a skill by ID.',
+    description: 'Load one installed Skill atomically. Returns its complete instructions, read-only resource index, and exact registered script IDs. Load a matching Skill once, then act using the returned resources; do not call skill_list or reload it.',
     category: 'skill',
     risk: 'read',
-    legacyName: loadSkillContentTool.name,
     inputSchema: {
       type: 'object',
       properties: {
         skill_id: { type: 'string', description: 'Skill ID to load.' },
-        file_type: { type: 'string', description: 'Optional support filename or file type.' },
       },
       required: ['skill_id'],
       additionalProperties: false,
     },
-    execute: async (input) => resultFromLegacy(await loadSkillContentTool.execute(input as Record<string, any>)),
+    execute: async (input) => {
+      const skillId = asString(input.skill_id)
+      const skill = skillManager.getSkill(skillId)
+      const fileInfo = skillManager.getSkillFileInfo(skillId)
+      if (!skill || !fileInfo) {
+        return {
+          ok: false,
+          message: `Skill not found: ${skillId}`,
+          error: 'SKILL_NOT_FOUND',
+        }
+      }
+
+      const resources = [
+        { path: 'SKILL.md', uri: `skill://${skillId}/SKILL.md`, type: 'instructions', readable: true, executable: false },
+        ...skill.scripts.map(script => ({
+          path: `scripts/${script.name}`,
+          uri: `skill://${skillId}/scripts/${script.name}`,
+          type: 'script',
+          readable: true,
+          executable: true,
+        })),
+        ...skill.references.map(reference => {
+          const stored = reference.path.replace(/\\/g, '/')
+          const directory = fileInfo.directory.replace(/\\/g, '/').replace(/\/+$/, '')
+          const path = stored.startsWith(`${directory}/`)
+            ? stored.slice(directory.length + 1)
+            : stored
+          return { path, uri: `skill://${skillId}/${path}`, type: 'reference', readable: true, executable: false }
+        }),
+        ...skill.assets.map(asset => {
+          const stored = asset.path.replace(/\\/g, '/')
+          const directory = fileInfo.directory.replace(/\\/g, '/').replace(/\/+$/, '')
+          const path = stored.startsWith(`${directory}/`)
+            ? stored.slice(directory.length + 1)
+            : stored
+          return { path, uri: `skill://${skillId}/${path}`, type: 'asset', readable: true, executable: false }
+        }),
+      ]
+
+      return {
+        ok: true,
+        message: [
+          `Loaded Skill "${skillId}" with complete instructions and ${skill.scripts.length} registered script(s).`,
+          'The returned skill:// resources are installed and read-only. Never recreate or copy them into the note workspace.',
+          skill.scripts.length > 0
+            ? `Available script IDs: ${skill.scripts.map(script => script.name).join(', ')}`
+            : 'This Skill has no registered scripts.',
+          `For a user-visible output argument, always use a relative path beginning with article/outputs/${skillId}/. The runtime also redirects new recognized artifact files into that directory.`,
+          `Registered scripts run with article/outputs/${skillId}/ as their working directory, so bare relative output names remain inside the user-visible output area.`,
+          'Do not call skill_load or skill_list again for this Skill in the current task.',
+        ].join('\n'),
+        data: {
+          id: skillId,
+          name: skill.metadata.name,
+          description: skill.metadata.description,
+          base_uri: `skill://${skillId}/`,
+          output_directory: `article/outputs/${skillId}/`,
+          instructions: skill.instructions,
+          resources,
+          scripts: skill.scripts.map(script => ({
+            id: script.name,
+            type: script.type,
+            description: script.description,
+            sha256: script.sha256,
+          })),
+        },
+      }
+    },
+  }
+}
+
+function buildSkillReadResourceTool(): AgentTool {
+  return {
+    name: 'skill_read_resource',
+    title: '读取 Skill 资源',
+    description: 'Read one exact installed Skill resource listed by skill_load. Use this only when the complete instructions say a particular reference or script source is needed. Resources are read-only and must not be copied into the note workspace.',
+    category: 'skill',
+    risk: 'read',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_id: { type: 'string', description: 'Loaded Skill ID.' },
+        path: { type: 'string', description: 'Exact relative resource path returned by skill_load, such as scripts/new_notebook.py.' },
+      },
+      required: ['skill_id', 'path'],
+      additionalProperties: false,
+    },
+    execute: async (input) => {
+      const skillId = asString(input.skill_id)
+      const path = asString(input.path)
+      try {
+        const content = await skillManager.readSkillResource(skillId, path)
+        return {
+          ok: true,
+          message: `Read read-only Skill resource skill://${skillId}/${path}. Do not recreate this file in the note workspace.`,
+          data: { skill_id: skillId, path, uri: `skill://${skillId}/${path}`, content },
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'SKILL_RESOURCE_READ_FAILED',
+        }
+      }
+    },
   }
 }
 
@@ -1070,6 +1212,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'note_read_file',
       title: '读取笔记文件',
+      description: 'Read a text-based workspace file by relative path. This includes Markdown notes and generated text artifacts such as JSON, CSV, TXT, and Jupyter .ipynb files. Use the exact output path returned by a successful tool.',
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFileTool,
@@ -1102,6 +1245,7 @@ function buildTools(): AgentTool[] {
       category: 'note',
       risk: 'file-create',
       legacy: createFileTool,
+      beforeExecute: rejectGeneratedSkillRuntimeFile,
       execute: executeCreateFileWithChange,
     }),
     adaptLegacyTool({
@@ -1110,6 +1254,7 @@ function buildTools(): AgentTool[] {
       category: 'note',
       risk: 'file-update',
       legacy: updateMarkdownFileTool,
+      beforeExecute: rejectGeneratedSkillRuntimeFile,
       execute: executeUpdateFileWithChange,
     }),
     adaptLegacyTool({
@@ -1146,7 +1291,7 @@ function buildTools(): AgentTool[] {
     }),
     adaptLegacyTool({ name: 'folder_list', title: '列出文件夹', category: 'folder', risk: 'read', legacy: listFoldersTool }),
     adaptLegacyTool({ name: 'folder_check_exists', title: '检查文件夹', category: 'folder', risk: 'read', legacy: checkFolderExistsTool }),
-    adaptLegacyTool({ name: 'folder_create', title: '创建文件夹', category: 'folder', risk: 'file-create', legacy: createFolderTool, execute: executeFolderCreateWithChange }),
+    adaptLegacyTool({ name: 'folder_create', title: '创建文件夹', category: 'folder', risk: 'file-create', legacy: createFolderTool, beforeExecute: rejectGeneratedSkillRuntimeFolder, execute: executeFolderCreateWithChange }),
     adaptLegacyTool({ name: 'folder_delete', title: '删除文件夹', category: 'folder', risk: 'delete', legacy: deleteFolderTool, execute: executeFolderDeleteWithChange }),
     adaptLegacyTool({ name: 'tag_list', title: '列出标签', category: 'tag', risk: 'read', legacy: listTagsTool }),
     adaptLegacyTool({ name: 'tag_search', title: '搜索标签', category: 'tag', risk: 'read', legacy: searchTagsTool }),
@@ -1285,13 +1430,28 @@ function buildTools(): AgentTool[] {
     }),
     buildSkillListTool(),
     buildSkillLoadTool(),
+    buildSkillReadResourceTool(),
     adaptLegacyTool({
       name: 'skill_execute_script',
       title: '执行 Skill 脚本',
-      description: 'Execute an approved runtime script for a loaded Skill. If long script content is needed, create the script first with note_create_file, then execute it.',
+      description: 'Execute one registered, integrity-checked script from a loaded Skill. Arbitrary commands and generated runtime scripts are not supported.',
       category: 'skill',
       risk: 'script',
       legacy: executeSkillScriptTool,
+      execute: async (input, context) => resultFromLegacy(
+        await executeRegisteredSkillScript(input, context.signal)
+      ),
+    }),
+    adaptLegacyTool({
+      name: 'skill_install_python_dependencies',
+      title: '安装 Skill Python 依赖',
+      description: 'After explicit user approval, install exact PyPI wheel packages into this Skill\'s isolated Python environment. URLs, paths, flags, and automatic installation are not supported.',
+      category: 'skill',
+      risk: 'script',
+      legacy: installSkillPythonDependenciesTool,
+      execute: async (input, context) => resultFromLegacy(
+        await installSkillDependencies(input, context.signal)
+      ),
     }),
     buildMcpListToolsTool(),
     buildMcpCallTool(),
@@ -1310,13 +1470,45 @@ export class AgentToolRegistry {
     return this.toolMap.get(name)
   }
 
-  toOpenAITools(tools: AgentTool[] = this.tools): OpenAI.Chat.ChatCompletionTool[] {
+  toOpenAITools(
+    tools: AgentTool[] = this.tools,
+    loadedSkillIds: ReadonlySet<string> = new Set()
+  ): OpenAI.Chat.ChatCompletionTool[] {
     return tools.map((tool) => ({
       type: 'function',
       function: {
         name: tool.name,
-        description: `${tool.title}. ${tool.description}`,
-        parameters: tool.inputSchema as Record<string, unknown>,
+        description: `${tool.title}. ${
+          tool.name === 'skill_execute_script' && loadedSkillIds.size > 0
+            ? `${tool.description} Loaded script mapping: ${[...loadedSkillIds]
+                .map(skillId => `${skillId}=[${(skillManager.getSkill(skillId)?.scripts || []).map(script => script.name).join(', ')}]`)
+                .join('; ')}.`
+            : tool.description
+        }`,
+        parameters: (
+          tool.name === 'skill_execute_script' && loadedSkillIds.size > 0
+            ? {
+                ...tool.inputSchema,
+                properties: {
+                  ...tool.inputSchema.properties,
+                  skill_id: {
+                    ...tool.inputSchema.properties?.skill_id,
+                    type: 'string',
+                    enum: [...loadedSkillIds],
+                    description: 'Exact loaded Skill ID.',
+                  },
+                  script_id: {
+                    ...tool.inputSchema.properties?.script_id,
+                    type: 'string',
+                    enum: [...new Set([...loadedSkillIds].flatMap(skillId =>
+                      (skillManager.getSkill(skillId)?.scripts || []).map(script => script.name)
+                    ))],
+                    description: 'Exact registered script ID returned by skill_load. Never invent or abbreviate it.',
+                  },
+                },
+              }
+            : tool.inputSchema
+        ) as Record<string, unknown>,
       },
     }))
   }

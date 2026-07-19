@@ -53,8 +53,8 @@ interface AgentPanelWithRagProps {
     from?: number
     to?: number
     canApproveForSession?: boolean
-    sessionApprovalType?: "runtime-script-skill"
-    sessionApprovalSkillId?: string
+    sessionApprovalType?: "runtime-script"
+    sessionApprovalKey?: string
   }
   confirmationHistory?: Array<{
     toolName: string
@@ -62,8 +62,8 @@ interface AgentPanelWithRagProps {
     status: "pending" | "confirmed" | "cancelled"
     timestamp: number
     scope?: "once" | "conversation"
-    sessionApprovalType?: "runtime-script-skill"
-    sessionApprovalSkillId?: string
+    sessionApprovalType?: "runtime-script"
+    sessionApprovalKey?: string
   }>
   currentStepStartTime?: number
   onConfirm?: (scope?: "once" | "conversation") => void

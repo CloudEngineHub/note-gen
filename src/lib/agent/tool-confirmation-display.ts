@@ -75,7 +75,12 @@ const TOOL_CONFIRMATION_DISPLAY: Record<string, ToolConfirmationDisplayConfig> =
   skill_execute_script: {
     titleKey: 'record.chat.input.agent.confirmation.tools.execute_skill_script.title',
     descriptionKey: 'record.chat.input.agent.confirmation.tools.execute_skill_script.description',
-    summaryFields: ['skill_id', 'command', 'args'],
+    summaryFields: ['skill_id', 'script_id', 'args'],
+  },
+  skill_install_python_dependencies: {
+    titleKey: 'record.chat.input.agent.confirmation.tools.install_skill_python_dependencies.title',
+    descriptionKey: 'record.chat.input.agent.confirmation.tools.install_skill_python_dependencies.description',
+    summaryFields: ['skill_id', 'packages'],
   },
   create_files_batch: {
     titleKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.title',

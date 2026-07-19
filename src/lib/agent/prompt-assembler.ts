@@ -55,7 +55,7 @@ function formatSkills(context: AgentContextSnapshot) {
 
   return [
     '## Skills',
-    'Skills are guidance documents, not direct actions. Use skill_load when a skill is relevant, then use concrete tools to act.',
+    'Skills are guidance documents with read-only installed resources. When one matches the request, call skill_load exactly once. It returns the complete instructions, resource index, and registered script IDs. Do not call skill_list, recreate Skill files in the note workspace, or guess script names.',
     ...skills.map((skill) => `- ${skill.id}: ${skill.name}${skill.description ? ` - ${skill.description}` : ''}`),
   ].join('\n')
 }

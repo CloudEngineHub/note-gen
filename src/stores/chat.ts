@@ -100,8 +100,8 @@ interface ChatState {
   updateAgentToolCall: (id: string, updates: Partial<ToolCall>) => void
   agentAutoApproveConversationId: number | null
   setAgentAutoApproveConversationId: (conversationId: number | null) => void
-  agentAutoApproveRuntimeSkillId: string | null
-  setAgentAutoApproveRuntimeSkillId: (skillId: string | null) => void
+  agentAutoApproveRuntimeScriptKey: string | null
+  setAgentAutoApproveRuntimeScriptKey: (permissionKey: string | null) => void
 
   // Placeholder 状态
   isPlaceholderEnabled: boolean
@@ -322,9 +322,9 @@ const useChatStore = create<ChatState>((set, get) => ({
   setAgentAutoApproveConversationId: (conversationId: number | null) => {
     set({ agentAutoApproveConversationId: conversationId })
   },
-  agentAutoApproveRuntimeSkillId: null,
-  setAgentAutoApproveRuntimeSkillId: (skillId: string | null) => {
-    set({ agentAutoApproveRuntimeSkillId: skillId })
+  agentAutoApproveRuntimeScriptKey: null,
+  setAgentAutoApproveRuntimeScriptKey: (permissionKey: string | null) => {
+    set({ agentAutoApproveRuntimeScriptKey: permissionKey })
   },
 
   isPlaceholderEnabled: true,
@@ -816,7 +816,7 @@ const useChatStore = create<ChatState>((set, get) => ({
           pendingQuote: null,
           editorSelectionQuote: null,
           agentAutoApproveConversationId: null,
-          agentAutoApproveRuntimeSkillId: null
+          agentAutoApproveRuntimeScriptKey: null
         })
         get().resetAgentState()
         get().clearMcpToolCalls()
@@ -860,7 +860,7 @@ const useChatStore = create<ChatState>((set, get) => ({
       pendingQuote: null,
       editorSelectionQuote: null,
       agentAutoApproveConversationId: null,
-      agentAutoApproveRuntimeSkillId: null
+      agentAutoApproveRuntimeScriptKey: null
     })
     // 清空 Agent 状态
     get().resetAgentState()
@@ -875,7 +875,7 @@ const useChatStore = create<ChatState>((set, get) => ({
       pendingQuote: null,
       editorSelectionQuote: null,
       agentAutoApproveConversationId: null,
-      agentAutoApproveRuntimeSkillId: null,
+      agentAutoApproveRuntimeScriptKey: null,
     })
     get().resetAgentState()
     get().clearMcpToolCalls()

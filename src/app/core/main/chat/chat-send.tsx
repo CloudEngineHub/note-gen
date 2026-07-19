@@ -90,6 +90,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
   const steeringChainRef = useRef<Promise<void>>(Promise.resolve())
   const pendingSteeringRef = useRef<AgentSteeringPayload[]>([])
   const activeRunRef = useRef(false)
+  const repeatedScriptApprovalRef = useRef<{ signature: string; count: number }>({ signature: '', count: 0 })
   const t = useTranslations()
 
   // 跟踪上一次的 loading 状态
@@ -263,16 +264,28 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     const tool = getToolByName(toolName)
     const sessionApprovalScope = getSessionApprovalScope(toolName, tool, params)
     const canApproveForSession = !!sessionApprovalScope
+    const approvalSignature = sessionApprovalScope
+      ? `${toolName}:${JSON.stringify(params)}`
+      : ''
+    if (approvalSignature) {
+      repeatedScriptApprovalRef.current = repeatedScriptApprovalRef.current.signature === approvalSignature
+        ? { signature: approvalSignature, count: repeatedScriptApprovalRef.current.count + 1 }
+        : { signature: approvalSignature, count: 1 }
+    }
+    const requiresRepeatConfirmation = repeatedScriptApprovalRef.current.count >= 3
+    if (requiresRepeatConfirmation) {
+      repeatedScriptApprovalRef.current = { signature: '', count: 0 }
+    }
 
     const currentChatState = useChatStore.getState()
     const activeConversationId = currentChatState.currentConversationId
     const autoApproveConversationId = currentChatState.agentAutoApproveConversationId
-    const autoApproveRuntimeSkillId = currentChatState.agentAutoApproveRuntimeSkillId
+    const autoApproveRuntimeScriptKey = currentChatState.agentAutoApproveRuntimeScriptKey
 
-    if (matchesSessionApproval(
+    if (!requiresRepeatConfirmation && matchesSessionApproval(
       autoApproveConversationId,
       activeConversationId,
-      autoApproveRuntimeSkillId,
+      autoApproveRuntimeScriptKey,
       sessionApprovalScope
     )) {
       agentDebugLog('approval_auto_approved', {
@@ -302,7 +315,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           ...context,
           canApproveForSession,
           sessionApprovalType: sessionApprovalScope?.type,
-          sessionApprovalSkillId: sessionApprovalScope?.skillId,
+          sessionApprovalKey: sessionApprovalScope?.permissionKey,
         }
       })
       
@@ -855,6 +868,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 
     manualStopRequestedRef.current = false
     activeRunRef.current = true
+    repeatedScriptApprovalRef.current = { signature: '', count: 0 }
     onSent?.()
 
     setLoading(true)

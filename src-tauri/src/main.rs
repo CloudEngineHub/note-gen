@@ -16,6 +16,7 @@ mod mcp;
 mod mcp_runtime;
 mod ocr_packages;
 mod screenshot;
+mod skill_runtime;
 mod skills;
 mod tray;
 mod window;
@@ -35,6 +36,10 @@ use mcp_runtime::{
 };
 use ocr_packages::{list_ocr_providers, run_ocr_provider};
 use screenshot::{cleanup_temp_screenshot_dir, screenshot};
+use skill_runtime::{
+    cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
+    SkillProcessManager,
+};
 use skills::import_skill_zip;
 use tray::update_tray_record_toolbar_config;
 
@@ -53,6 +58,7 @@ fn main() {
         .manage(McpServerManager::new())
         .manage(RuntimeInstallManager::new())
         .manage(AiRequestManager::new())
+        .manage(SkillProcessManager::default())
         // 系统级插件
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
@@ -76,6 +82,10 @@ fn main() {
             import_app_data,
             import_app_data_from_file,
             import_skill_zip,
+            run_skill_script,
+            cancel_skill_script,
+            inspect_skill_python,
+            install_skill_python_dependencies,
             start_mcp_stdio_server,
             stop_mcp_server,
             send_mcp_message,

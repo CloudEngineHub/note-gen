@@ -11,6 +11,7 @@ mod mcp;
 mod mcp_runtime;
 mod mobile_system_bars;
 mod ocr_packages;
+mod skill_runtime;
 mod skills;
 
 use ai::{
@@ -25,6 +26,10 @@ use mcp_runtime::{
     cancel_mcp_runtime_install, inspect_mcp_runtime, install_mcp_runtime, RuntimeInstallManager,
 };
 use ocr_packages::{list_ocr_providers, run_ocr_provider};
+use skill_runtime::{
+    cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
+    SkillProcessManager,
+};
 use skills::import_skill_zip;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,7 +44,8 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(McpServerManager::new())
         .manage(RuntimeInstallManager::new())
-        .manage(AiRequestManager::new());
+        .manage(AiRequestManager::new())
+        .manage(SkillProcessManager::default());
 
     #[cfg(target_os = "android")]
     let builder = builder.plugin(android_ocr::init());
@@ -63,6 +69,10 @@ pub fn run() {
             import_app_data,
             import_app_data_from_file,
             import_skill_zip,
+            run_skill_script,
+            cancel_skill_script,
+            inspect_skill_python,
+            install_skill_python_dependencies,
             ai_json_request,
             ai_binary_request,
             ai_multipart_request,

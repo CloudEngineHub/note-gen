@@ -1,14 +1,15 @@
 import { mcpServerManager } from '@/lib/mcp/server-manager'
 import type { MCPToolAnnotations } from '@/lib/mcp/types'
 import type { AgentPermissionMode, AgentTool, AgentToolRisk } from './types'
+import { getSkillScriptPermissionKey } from '@/lib/skills/runtime'
 
 export interface PermissionDecision {
   allowed: boolean
   requiresApproval: boolean
   reason?: string
   canApproveForSession?: boolean
-  sessionApprovalType?: 'runtime-script-skill'
-  sessionApprovalSkillId?: string
+  sessionApprovalType?: 'runtime-script'
+  sessionApprovalKey?: string
 }
 
 const LOCAL_WRITE_RISKS = new Set<AgentToolRisk>([
@@ -80,18 +81,23 @@ export class AgentPermissionEngine {
     }
 
     if (tool.risk === 'script') {
-      const skillId = typeof input.skill_id === 'string'
-        ? input.skill_id
-        : typeof input.skillId === 'string'
-          ? input.skillId
-          : undefined
+      const skillId = typeof input.skill_id === 'string' ? input.skill_id : ''
+      const scriptId = typeof input.script_id === 'string' ? input.script_id : ''
+      const args = Array.isArray(input.args)
+        ? input.args.map(String)
+        : Array.isArray(input.arguments)
+          ? input.arguments.map(String)
+          : []
+      const permissionKey = skillId && scriptId
+        ? getSkillScriptPermissionKey(skillId, scriptId, args)
+        : null
 
       return {
         allowed: true,
         requiresApproval: true,
-        canApproveForSession: Boolean(skillId),
-        sessionApprovalType: skillId ? 'runtime-script-skill' : undefined,
-        sessionApprovalSkillId: skillId,
+        canApproveForSession: Boolean(permissionKey),
+        sessionApprovalType: permissionKey ? 'runtime-script' : undefined,
+        sessionApprovalKey: permissionKey || undefined,
       }
     }
 

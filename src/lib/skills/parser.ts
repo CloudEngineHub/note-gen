@@ -156,16 +156,16 @@ function parseYamlMetadata(yamlContent: string): SkillYamlMetadata {
 
     switch (key) {
       case 'name':
-        metadata.name = value
+        metadata.name = parseValue(value)
         break
       case 'description':
-        metadata.description = value
+        metadata.description = parseValue(value)
         break
       case 'license':
-        metadata.license = value
+        metadata.license = parseValue(value)
         break
       case 'compatibility':
-        metadata.compatibility = value
+        metadata.compatibility = parseValue(value)
         break
       case 'metadata':
         // metadata: 开始标记，将在下一次迭代处理
@@ -179,23 +179,23 @@ function parseYamlMetadata(yamlContent: string): SkillYamlMetadata {
         metadata.allowedTools = parseAllowedTools(value)
         break
       case 'version':
-        metadata.version = value
+        metadata.version = parseValue(value)
         // 同时存入 metadata 中（向后兼容）
         if (!metadata.metadata) {
           metadata.metadata = {}
         }
-        metadata.metadata.version = value
+        metadata.metadata.version = parseValue(value)
         break
       case 'author':
-        metadata.author = value
+        metadata.author = parseValue(value)
         // 同时存入 metadata 中（向后兼容）
         if (!metadata.metadata) {
           metadata.metadata = {}
         }
-        metadata.metadata.author = value
+        metadata.metadata.author = parseValue(value)
         break
       case 'model':
-        metadata.model = value
+        metadata.model = parseValue(value)
         break
       case 'userInvocable':
         metadata.userInvocable = parseBoolean(value)
