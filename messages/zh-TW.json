@@ -2020,7 +2020,10 @@
         "closeTrash": "關閉回收站"
       },
       "list": {
-        "title": "記錄"
+        "title": "記錄",
+        "pullToRefresh": "下拉拉取遠端記錄",
+        "releaseToRefresh": "放開拉取遠端記錄",
+        "refreshing": "正在拉取遠端記錄"
       },
       "imageGallery": {
         "expand": "展开",

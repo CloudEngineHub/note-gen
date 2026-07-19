@@ -113,6 +113,17 @@ async function readEditorMarkdown() {
   return typeof data.markdown === 'string' ? data.markdown : undefined
 }
 
+async function readEditorMarkdownAfterWrite(before: string | undefined) {
+  let after = await readEditorMarkdown()
+
+  for (let attempt = 0; attempt < 4 && before !== undefined && after === before; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
+    after = await readEditorMarkdown()
+  }
+
+  return after
+}
+
 function normalizeFilePathForCompare(filePath: string) {
   return filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/').trim()
 }
@@ -369,7 +380,7 @@ async function executeEditorLegacyWrite(input: Record<string, unknown>, legacy: 
     return normalized
   }
 
-  const after = await readEditorMarkdown()
+  const after = await readEditorMarkdownAfterWrite(before)
   if (before === after && before !== undefined) {
     return {
       ...normalized,

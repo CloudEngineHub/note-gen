@@ -2041,6 +2041,9 @@
       },
       "list": {
         "title": "Records",
+        "pullToRefresh": "Pull down to fetch remote records",
+        "releaseToRefresh": "Release to fetch remote records",
+        "refreshing": "Fetching remote records",
         "emptyFiltered": "No matching records",
         "emptyFilteredHint": "Try adjusting the search or filters",
         "filteredLabel": "{count} filtered",

@@ -3,6 +3,7 @@ import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react";
 import { convertImage } from '@/lib/utils'
 import { getRecordImageThumbnailPath } from "@/lib/record-image-thumbnail";
+import emitter from '@/lib/emitter'
 
 const BLANK_IMAGE_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
 
@@ -33,7 +34,25 @@ export function LocalImage({
 }: LocalImageProps) {
   const [localSrc, setLocalSrc] = useState<string>('')
   const [shouldResolve, setShouldResolve] = useState(loading === 'eager')
+  const [resolveVersion, setResolveVersion] = useState(0)
   const imageRef = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    const sourcePath = getImageSrcString(src).trim().replace(/^\/+/, '')
+    const handleAssetsDownloaded = ({ paths }: { paths: string[] }) => {
+      if (!paths.includes(sourcePath)) {
+        return
+      }
+
+      setLocalSrc('')
+      setResolveVersion(version => version + 1)
+    }
+
+    emitter.on('record-assets-downloaded', handleAssetsDownloaded)
+    return () => {
+      emitter.off('record-assets-downloaded', handleAssetsDownloaded)
+    }
+  }, [src])
 
   useEffect(() => {
     if (loading === 'eager') {
@@ -120,7 +139,7 @@ export function LocalImage({
     return () => {
       cancelled = true
     }
-  }, [onResolvedSrc, shouldResolve, src, useThumbnail])
+  }, [onResolvedSrc, resolveVersion, shouldResolve, src, useThumbnail])
 
   return (
     <Image

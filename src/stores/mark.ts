@@ -18,6 +18,7 @@ import useArticleStore from './article'
 
 interface RecordDataDownloadOptions {
   allowMissingRemote?: boolean
+  deferRefresh?: boolean
 }
 
 export interface MarkQueue {
@@ -574,7 +575,9 @@ const useMarkStore = create<MarkState>((set, get) => ({
       try {
         await deleteAllMarks()
         await insertMarks(result)
-        await get().fetchMarks()
+        if (!options.deferRefresh) {
+          await get().fetchMarks()
+        }
       } finally {
         setAutoDataSyncApplyingRemote(false)
       }

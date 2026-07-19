@@ -2015,7 +2015,10 @@
         "closeTrash": "ゴミ箱を閉じる"
       },
       "list": {
-        "title": "記録"
+        "title": "記録",
+        "pullToRefresh": "下に引いてリモート記録を取得",
+        "releaseToRefresh": "離してリモート記録を取得",
+        "refreshing": "リモート記録を取得中"
       },
       "note": {
         "organizeAs": "整理先",

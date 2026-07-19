@@ -552,19 +552,21 @@ const useSettingStore = create<SettingState>((set, get) => ({
       console.debug('NoteGen API service unavailable, skipping limited models:', error)
     }
 
+    const hydratedSettings: Record<string, unknown> = {}
+
     await Promise.all(Object.entries(get()).map(async ([key, value]) => {
       const res = await store.get(key)
 
       if (typeof value === 'function') return
       if (res !== undefined && key !== 'version') {
         if (key === 'templateList') {
-          set({ [key]: [] })
+          hydratedSettings[key] = []
           setTimeout(() => {
             set({ [key]: res as GenTemplate[] })
           }, 0);
         } else if (key === 'aiModelList' && hasNoteGenModels) {
           // 如果已经有NoteGen模型，使用存储的配置
-          set({ [key]: res as AiConfig[] })
+          hydratedSettings[key] = res as AiConfig[]
         } else if (key === 'recordToolbarConfig') {
           // 确保包含所有工具，如果缺少新工具则自动添加
           const storedConfig = res as RecordToolbarItem[]
@@ -585,9 +587,9 @@ const useSettingStore = create<SettingState>((set, get) => ({
             })
 
             await store.set(key, mergedConfig)
-            set({ [key]: mergedConfig })
+            hydratedSettings[key] = mergedConfig
           } else {
-            set({ [key]: res as RecordToolbarItem[] })
+            hydratedSettings[key] = res as RecordToolbarItem[]
           }
         } else if (key === 'chatToolbarConfigPc' || key === 'chatToolbarConfigMobile') {
           // 确保聊天工具栏包含所有工具，如果缺少新工具则自动添加
@@ -609,17 +611,19 @@ const useSettingStore = create<SettingState>((set, get) => ({
             })
 
             await store.set(key, mergedConfig)
-            set({ [key]: mergedConfig })
+            hydratedSettings[key] = mergedConfig
           } else {
-            set({ [key]: res as ChatToolbarItem[] })
+            hydratedSettings[key] = res as ChatToolbarItem[]
           }
         } else if (key !== 'aiModelList') {
-          set({ [key]: res })
+          hydratedSettings[key] = res
         }
       } else {
         await store.set(key, value)
       }
     }))
+
+    set(hydratedSettings as Partial<SettingState>)
 
     initSettingAutoSyncSubscription()
     settingAutoSyncReady = true

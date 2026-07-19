@@ -2004,7 +2004,10 @@
         "closeTrash": "Fechar lixeira"
       },
       "list": {
-        "title": "Registros"
+        "title": "Registros",
+        "pullToRefresh": "Puxe para baixo para buscar registros remotos",
+        "releaseToRefresh": "Solte para buscar registros remotos",
+        "refreshing": "Buscando registros remotos"
       },
       "note": {
         "organizeAs": "Organizar como",

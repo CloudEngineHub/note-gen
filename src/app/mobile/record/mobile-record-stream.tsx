@@ -12,7 +12,7 @@ import { LocalImage } from '@/components/local-image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
-import { Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle } from 'lucide-react'
+import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
 import useMarkStore, { RecordTimePreset } from '@/stores/mark'
@@ -21,8 +21,12 @@ import { clearTrash, delMark, deleteMarks, delMarkForever, initMarksDb, Mark, re
 import { insertTag } from '@/db/tags'
 import { cn, isHttpUrl } from '@/lib/utils'
 import { RecordSyncStatusBanner } from '@/components/record-sync-status-banner'
+import { Spinner } from '@/components/ui/spinner'
+import { refreshRemoteRecordsNow } from '@/lib/sync/auto-data-sync-queue'
 
 const TIME_OPTIONS: RecordTimePreset[] = ['all', 'today', 'last7Days', 'last30Days']
+const PULL_REFRESH_THRESHOLD = 72
+const PULL_REFRESH_MAX_DISTANCE = 112
 
 function getMarkPreview(mark: Mark): string {
   if (mark.type === 'text') return mark.content?.trim() || mark.desc?.trim() || ''
@@ -79,6 +83,13 @@ export function MobileRecordStream() {
   const swipingMarkIdRef = useRef<number | null>(null)
   const [swipedMarkId, setSwipedMarkId] = useState<number | null>(null)
   const [swipeDeltaX, setSwipeDeltaX] = useState(0)
+  const [pullDistance, setPullDistance] = useState(0)
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const pullStartXRef = useRef(0)
+  const pullStartYRef = useRef(0)
+  const pullDistanceRef = useRef(0)
+  const isPullGestureRef = useRef(false)
 
   useEffect(() => {
     initMarksDb()
@@ -191,6 +202,88 @@ export function MobileRecordStream() {
     } else {
       await fetchMarks()
     }
+  }
+
+  function updatePullDistance(distance: number) {
+    pullDistanceRef.current = distance
+    setPullDistance(distance)
+  }
+
+  function handlePullTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    const container = scrollContainerRef.current
+    if (
+      trashState ||
+      multiMode ||
+      isPullRefreshing ||
+      !container ||
+      container.scrollTop > 0 ||
+      event.touches.length !== 1
+    ) {
+      isPullGestureRef.current = false
+      return
+    }
+
+    const touch = event.touches[0]
+    pullStartXRef.current = touch.clientX
+    pullStartYRef.current = touch.clientY
+    isPullGestureRef.current = true
+  }
+
+  function handlePullTouchMove(event: React.TouchEvent<HTMLDivElement>) {
+    if (!isPullGestureRef.current || isPullRefreshing) {
+      return
+    }
+
+    const container = scrollContainerRef.current
+    const touch = event.touches[0]
+    const deltaX = touch.clientX - pullStartXRef.current
+    const deltaY = touch.clientY - pullStartYRef.current
+
+    if (!container || container.scrollTop > 0 || deltaY <= 0 || Math.abs(deltaX) > deltaY) {
+      isPullGestureRef.current = false
+      updatePullDistance(0)
+      return
+    }
+
+    event.preventDefault()
+    updatePullDistance(Math.min(PULL_REFRESH_MAX_DISTANCE, deltaY * 0.45))
+  }
+
+  async function pullRemoteRecords() {
+    setIsPullRefreshing(true)
+    updatePullDistance(56)
+
+    try {
+      const refreshed = await refreshRemoteRecordsNow()
+      if (refreshed) {
+        await Promise.all([
+          fetchTags(),
+          refreshRecords(),
+        ])
+      }
+    } finally {
+      setIsPullRefreshing(false)
+      updatePullDistance(0)
+    }
+  }
+
+  function handlePullTouchEnd() {
+    if (!isPullGestureRef.current) {
+      return
+    }
+
+    isPullGestureRef.current = false
+    if (pullDistanceRef.current >= PULL_REFRESH_THRESHOLD) {
+      void pullRemoteRecords()
+      return
+    }
+
+    updatePullDistance(0)
+  }
+
+  function handlePullTouchCancel() {
+    isPullGestureRef.current = false
+    updatePullDistance(0)
   }
 
   function toggleSelect(id: number) {
@@ -467,7 +560,39 @@ export function MobileRecordStream() {
 
       <RecordSyncStatusBanner settingsHref="/mobile/setting/pages/sync" compact />
 
-      <div className="mobile-under-dock-scroll flex-1 min-h-0 overflow-y-auto px-3 py-2">
+      <div
+        ref={scrollContainerRef}
+        className="mobile-under-dock-scroll min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-3 py-2"
+        onTouchStart={handlePullTouchStart}
+        onTouchMove={handlePullTouchMove}
+        onTouchEnd={handlePullTouchEnd}
+        onTouchCancel={handlePullTouchCancel}
+      >
+        {(pullDistance > 0 || isPullRefreshing) ? (
+          <div
+            className="flex items-center justify-center gap-2 overflow-hidden text-xs text-muted-foreground transition-[height] duration-150"
+            style={{ height: pullDistance }}
+            role="status"
+          >
+            {isPullRefreshing ? (
+              <Spinner />
+            ) : (
+              <ArrowDown
+                className={cn(
+                  'size-4 transition-transform',
+                  pullDistance >= PULL_REFRESH_THRESHOLD && 'rotate-180'
+                )}
+              />
+            )}
+            <span>
+              {isPullRefreshing
+                ? t('record.mark.list.refreshing')
+                : pullDistance >= PULL_REFRESH_THRESHOLD
+                  ? t('record.mark.list.releaseToRefresh')
+                  : t('record.mark.list.pullToRefresh')}
+            </span>
+          </div>
+        ) : null}
         {!trashState && queues.length > 0 && (
           <div className="mb-3 space-y-2">
             {queues.map((queue) => (

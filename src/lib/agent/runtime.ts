@@ -321,16 +321,6 @@ function preserveOriginalMarkdownPrefix(
     : content
 }
 
-function requestsDocumentEndInsertion(userInput: string) {
-  return /(?:末尾|文末|结尾|最后(?:一行|面)|底部|末端|追加|append|at\s+the\s+end|end\s+of\s+(?:the\s+)?(?:file|document|note)|bottom)/i
-    .test(userInput)
-}
-
-function requestsDocumentStartInsertion(userInput: string) {
-  return /(?:开头|文首|最前(?:面)?|顶部|起始|beginning|at\s+the\s+start|start\s+of\s+(?:the\s+)?(?:file|document|note)|top)/i
-    .test(userInput)
-}
-
 function repairEditorWriteArgs(
   toolName: string,
   args: Record<string, unknown>,
@@ -401,8 +391,7 @@ function repairEditorWriteArgs(
     if (
       operation.type === 'insert_after_line' &&
       !Number.isInteger(operation.line) &&
-      Number.isInteger(context.currentEditorState?.totalLines) &&
-      requestsDocumentEndInsertion(context.userInput)
+      Number.isInteger(context.currentEditorState?.totalLines)
     ) {
       repaired = true
       return {
@@ -413,8 +402,7 @@ function repairEditorWriteArgs(
 
     if (
       operation.type === 'insert_before_line' &&
-      !Number.isInteger(operation.line) &&
-      requestsDocumentStartInsertion(context.userInput)
+      !Number.isInteger(operation.line)
     ) {
       repaired = true
       return {
@@ -728,6 +716,7 @@ export class AgentRuntime {
       result: string
       repeatCount: number
     }>()
+    const successfulMutationCalls = new Set<string>()
     const successfulToolEvidence = new Set<string>()
     let consecutiveNoProgressRounds = 0
     let latestEditorStateResult: AgentToolResult | undefined
@@ -778,6 +767,7 @@ export class AgentRuntime {
       editorSelectionReadLocked = hasInlineCurrentEditorSelection(context)
       invalidQuotedWriteRepairCount = 0
       consecutiveNoProgressRounds = 0
+      successfulMutationCalls.clear()
       systemPrompt = this.promptAssembler.assemble(context, tools, customSystemPrompt)
       messages[0] = { role: 'system', content: systemPrompt }
 
@@ -1504,14 +1494,27 @@ export class AgentRuntime {
             ? latestEditorStateResult
             : undefined
           const reusedLockedEditorState = reusableEditorStateResult !== undefined
+          const mutationCallSignature = isMutatingTool(tool)
+            ? `${tool.name}:${JSON.stringify(args)}`
+            : undefined
+          const repeatedSuccessfulMutation = Boolean(
+            mutationCallSignature && successfulMutationCalls.has(mutationCallSignature)
+          )
           agentDebugLog('tool_execute_start', {
             runId,
             iteration,
             toolName,
             args,
             reusedLockedEditorState,
+            repeatedSuccessfulMutation,
           })
-          const result: AgentToolResult = reusableEditorStateResult
+          const result: AgentToolResult = repeatedSuccessfulMutation
+            ? {
+                ok: true,
+                message: '相同的写入操作已在本次任务中成功执行，本次重复调用已忽略。请直接完成回答。',
+                data: { deduplicated: true },
+              }
+            : reusableEditorStateResult
             ? {
                 ...reusableEditorStateResult,
                 message: [
@@ -1617,6 +1620,10 @@ export class AgentRuntime {
               JSON.stringify(args),
               stringifyToolResult(result),
             ].join(':'))
+          }
+
+          if (result.ok && mutationCallSignature && !repeatedSuccessfulMutation) {
+            successfulMutationCalls.add(mutationCallSignature)
           }
 
           if (!result.ok) {
@@ -1736,17 +1743,23 @@ export class AgentRuntime {
         })
 
         if (consecutiveNoProgressRounds >= MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS) {
-          finalContent = [
-            `连续 ${MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS} 轮没有获得新的成功工具结果，已停止执行以避免无效循环。`,
-            changes.length > 0 ? `此前已有 ${changes.length} 项改动成功执行，请以改动记录为准。` : '本次任务尚未确认完成。',
-          ].join('\n')
+          const completedWrite = writeActionCompleted || changes.length > 0
+          finalContent = completedWrite
+            ? [
+                '修改已成功执行；模型后续没有产生新的操作，已停止重复调用。',
+                changes.length > 0 ? `本轮共记录 ${changes.length} 项成功改动。` : '重复写入已被忽略。',
+              ].join('\n')
+            : [
+                `连续 ${MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS} 轮没有获得新的成功工具结果，已停止执行以避免无效循环。`,
+                '本次任务尚未确认完成。',
+              ].join('\n')
           callbacks.onCandidateAnswerClear?.()
           callbacks.onStatus?.('completed')
           callbacks.onFinalAnswerRender?.(finalContent)
           const finalTrace = recorder.add({
             type: 'final',
-            title: '停止无进展循环',
-            status: 'error',
+            title: completedWrite ? '修改完成' : '停止无进展循环',
+            status: completedWrite ? 'success' : 'error',
             message: finalContent,
           })
           callbacks.onTrace?.(finalTrace)

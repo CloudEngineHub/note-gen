@@ -1,5 +1,6 @@
 import { BaseDirectory, exists, mkdir, readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
+import emitter from '@/lib/emitter'
 import {
   deleteRemoteFile,
   downloadRemoteBytes,
@@ -112,6 +113,8 @@ export async function downloadRecordAssets(marks: RecordAssetMark[]) {
     marks.map(getMarkLocalAssetPath).filter((path): path is string => Boolean(path))
   ))
 
+  const downloadedPaths: string[] = []
+
   for (const localPath of localPaths) {
     if (await exists(localPath, { baseDir: BaseDirectory.AppData })) continue
     const remotePath = getRemoteAssetPath(localPath)
@@ -120,5 +123,10 @@ export async function downloadRecordAssets(marks: RecordAssetMark[]) {
     const content = await downloadRemoteBytes(remotePath)
     await ensureLocalAssetDirectory(localPath)
     await writeFile(localPath, content, { baseDir: BaseDirectory.AppData })
+    downloadedPaths.push(localPath)
+  }
+
+  if (downloadedPaths.length > 0) {
+    emitter.emit('record-assets-downloaded', { paths: downloadedPaths })
   }
 }

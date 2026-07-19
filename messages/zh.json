@@ -2050,6 +2050,9 @@
       },
       "list": {
         "title": "记录",
+        "pullToRefresh": "下拉拉取远程记录",
+        "releaseToRefresh": "松开拉取远程记录",
+        "refreshing": "正在拉取远程记录",
         "emptyFiltered": "没有符合条件的记录",
         "emptyFilteredHint": "试试调整搜索词或筛选条件",
         "filteredLabel": "已筛选 {count} 条",
