@@ -321,38 +321,108 @@ function preserveOriginalMarkdownPrefix(
     : content
 }
 
+function requestsDocumentEndInsertion(userInput: string) {
+  return /(?:末尾|文末|结尾|最后(?:一行|面)|底部|末端|追加|append|at\s+the\s+end|end\s+of\s+(?:the\s+)?(?:file|document|note)|bottom)/i
+    .test(userInput)
+}
+
+function requestsDocumentStartInsertion(userInput: string) {
+  return /(?:开头|文首|最前(?:面)?|顶部|起始|beginning|at\s+the\s+start|start\s+of\s+(?:the\s+)?(?:file|document|note)|top)/i
+    .test(userInput)
+}
+
 function repairEditorWriteArgs(
   toolName: string,
   args: Record<string, unknown>,
   context: AgentContextSnapshot
 ): Record<string, unknown> {
+  const editorToolsWithTarget = new Set([
+    'editor_insert_at_cursor',
+    'editor_replace_range',
+    'editor_replace_lines',
+    'editor_apply_transaction',
+  ])
+  const editorToolsWithVersion = new Set([
+    'editor_replace_range',
+    'editor_replace_lines',
+    'editor_apply_transaction',
+  ])
+  let repairedArgs = args
+
+  if (
+    editorToolsWithTarget.has(toolName) &&
+    (typeof repairedArgs.filePath !== 'string' || !repairedArgs.filePath.trim()) &&
+    context.activeFilePath
+  ) {
+    repairedArgs = {
+      ...repairedArgs,
+      filePath: context.activeFilePath,
+    }
+  }
+
+  if (
+    editorToolsWithVersion.has(toolName) &&
+    typeof repairedArgs.version !== 'number' &&
+    typeof context.currentEditorState?.version === 'number'
+  ) {
+    repairedArgs = {
+      ...repairedArgs,
+      version: context.currentEditorState.version,
+    }
+  }
+
   if (
     toolName === 'editor_replace_lines' &&
-    Number.isInteger(args.startLine) &&
-    args.startLine === args.endLine &&
-    typeof args.replaceContent === 'string'
+    Number.isInteger(repairedArgs.startLine) &&
+    repairedArgs.startLine === repairedArgs.endLine &&
+    typeof repairedArgs.replaceContent === 'string'
   ) {
     const replaceContent = preserveOriginalMarkdownPrefix(
       context,
-      args.startLine as number,
-      args.replaceContent
+      repairedArgs.startLine as number,
+      repairedArgs.replaceContent
     )
-    return replaceContent === args.replaceContent
-      ? args
-      : { ...args, replaceContent }
+    if (replaceContent !== repairedArgs.replaceContent) {
+      repairedArgs = { ...repairedArgs, replaceContent }
+    }
   }
 
-  if (toolName !== 'editor_apply_transaction' || !Array.isArray(args.operations)) {
-    return args
+  if (toolName !== 'editor_apply_transaction' || !Array.isArray(repairedArgs.operations)) {
+    return repairedArgs
   }
 
   let repaired = false
-  const operations = args.operations.map((rawOperation) => {
+  const operations = repairedArgs.operations.map((rawOperation) => {
     if (!rawOperation || typeof rawOperation !== 'object' || Array.isArray(rawOperation)) {
       return rawOperation
     }
 
     const operation = rawOperation as Record<string, unknown>
+    if (
+      operation.type === 'insert_after_line' &&
+      !Number.isInteger(operation.line) &&
+      Number.isInteger(context.currentEditorState?.totalLines) &&
+      requestsDocumentEndInsertion(context.userInput)
+    ) {
+      repaired = true
+      return {
+        ...operation,
+        line: context.currentEditorState?.totalLines,
+      }
+    }
+
+    if (
+      operation.type === 'insert_before_line' &&
+      !Number.isInteger(operation.line) &&
+      requestsDocumentStartInsertion(context.userInput)
+    ) {
+      repaired = true
+      return {
+        ...operation,
+        line: 1,
+      }
+    }
+
     if (
       operation.type === 'replace_lines' &&
       Number.isInteger(operation.startLine) &&
@@ -402,7 +472,7 @@ function repairEditorWriteArgs(
     }
   })
 
-  return repaired ? { ...args, operations } : args
+  return repaired ? { ...repairedArgs, operations } : repairedArgs
 }
 
 function extractSingleLineReplacement(content: string) {

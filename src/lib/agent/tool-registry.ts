@@ -113,6 +113,19 @@ async function readEditorMarkdown() {
   return typeof data.markdown === 'string' ? data.markdown : undefined
 }
 
+function normalizeFilePathForCompare(filePath: string) {
+  return filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/').trim()
+}
+
+function targetsActiveEditor(filePath: string) {
+  const activeFilePath = useArticleStore.getState().activeFilePath
+  return Boolean(
+    filePath &&
+    activeFilePath &&
+    normalizeFilePathForCompare(filePath) === normalizeFilePathForCompare(activeFilePath)
+  )
+}
+
 function legacyInputSchema(tool: Tool): JsonSchema {
   const properties: Record<string, JsonSchema> = {}
   const required: string[] = []
@@ -168,23 +181,6 @@ function adaptLegacyTool(config: {
 
       return resultFromLegacy(await config.legacy.execute(input as Record<string, any>))
     },
-  }
-}
-
-function currentOpenFileGuard(input: Record<string, unknown>, mode: 'read' | 'write') {
-  const filePath = typeof input.filePath === 'string' ? input.filePath : ''
-  const activeFilePath = useArticleStore.getState().activeFilePath
-
-  if (!filePath || !activeFilePath || filePath !== activeFilePath) {
-    return undefined
-  }
-
-  return {
-    ok: false,
-    message: mode === 'read'
-      ? '当前文件已在编辑器中打开，请改用 editor_get_state 读取实时编辑器内容。'
-      : '当前文件已在编辑器中打开，请改用 editor_apply_transaction 或 editor_replace_lines 修改实时编辑器内容。',
-    error: 'OPEN_FILE_REQUIRES_EDITOR_TOOL',
   }
 }
 
@@ -414,6 +410,46 @@ async function readNoteContentForChange(filePath: string) {
   return typeof data.content === 'string' ? data.content : undefined
 }
 
+async function executeReadFileFromEditor(input: Record<string, unknown>): Promise<AgentToolResult> {
+  const filePath = asString(input.filePath)
+  if (!targetsActiveEditor(filePath)) {
+    return resultFromLegacy(await readMarkdownFileTool.execute(input as Record<string, any>))
+  }
+
+  const editorResult = await getEditorContentTool.execute({})
+  const normalized = resultFromLegacy(editorResult)
+  if (!normalized.ok || !editorResult.data || typeof editorResult.data !== 'object') {
+    return normalized
+  }
+
+  const editorState = editorResult.data as {
+    markdown?: unknown
+    version?: unknown
+    totalLines?: unknown
+    charCount?: unknown
+  }
+  if (typeof editorState.markdown !== 'string') {
+    return {
+      ok: false,
+      message: '当前编辑器没有返回可读取的 Markdown 内容。',
+      error: 'EDITOR_CONTENT_UNAVAILABLE',
+    }
+  }
+
+  return {
+    ok: true,
+    message: `已从实时编辑器读取当前文件: ${filePath}`,
+    data: {
+      filePath,
+      content: editorState.markdown,
+      source: 'editor',
+      version: editorState.version,
+      totalLines: editorState.totalLines,
+      charCount: editorState.charCount,
+    },
+  }
+}
+
 function filePathFromCreateResult(input: Record<string, unknown>, result: AgentToolResult) {
   if (result.data && typeof result.data === 'object') {
     const data = result.data as { filePath?: unknown }
@@ -453,6 +489,63 @@ async function executeCreateFileWithChange(input: Record<string, unknown>): Prom
 
 async function executeUpdateFileWithChange(input: Record<string, unknown>): Promise<AgentToolResult> {
   const filePath = asString(input.filePath)
+  if (targetsActiveEditor(filePath)) {
+    const stateResult = await getEditorContentTool.execute({})
+    if (!stateResult.success || !stateResult.data || typeof stateResult.data !== 'object') {
+      return resultFromLegacy(stateResult)
+    }
+
+    const state = stateResult.data as {
+      markdown?: unknown
+      totalLines?: unknown
+      version?: unknown
+    }
+    if (
+      typeof state.markdown !== 'string' ||
+      typeof state.totalLines !== 'number' ||
+      typeof state.version !== 'number'
+    ) {
+      return {
+        ok: false,
+        message: '当前编辑器状态不完整，无法安全更新文件。',
+        error: 'EDITOR_STATE_INCOMPLETE',
+      }
+    }
+
+    const before = state.markdown
+    const after = asString(input.content)
+    if (before === after) {
+      return {
+        ok: true,
+        message: `当前编辑器内容已是目标状态，无需重复更新: ${filePath}`,
+        data: { filePath, source: 'editor', unchanged: true },
+      }
+    }
+
+    const replaceResult = resultFromLegacy(await replaceEditorContentTool.execute({
+      startLine: 1,
+      endLine: state.totalLines,
+      replaceContent: after,
+      version: state.version,
+    }))
+    if (!replaceResult.ok) {
+      return replaceResult
+    }
+
+    return {
+      ...replaceResult,
+      message: `已通过实时编辑器更新当前文件: ${filePath}`,
+      data: {
+        ...(replaceResult.data && typeof replaceResult.data === 'object' ? replaceResult.data : {}),
+        filePath,
+        source: 'editor',
+      },
+      changes: [
+        buildEditorChange(filePath, before, after),
+      ],
+    }
+  }
+
   const before = await readNoteContentForChange(filePath)
   const normalized = resultFromLegacy(await updateMarkdownFileTool.execute(input as Record<string, any>))
 
@@ -682,7 +775,7 @@ async function executeStructuralToolWithChange(
 const editorApplyTransactionTool: AgentTool = {
   name: 'editor_apply_transaction',
   title: '应用编辑器事务',
-  description: 'Atomically apply multiple non-overlapping line edits to the current Markdown editor in one approval. Operations accept only replace_lines, insert_before_line, or insert_after_line. Never use replace_range inside operations. Use editor_replace_lines for one contiguous block and editor_replace_range only for an exact quoted selection.',
+  description: 'Apply line insertion or multiple non-overlapping line edits to the current Markdown editor in one approval. Operations accept only replace_lines, insert_before_line, or insert_after_line. Every insertion operation must include an integer line; use insert_after_line with line=totalLines to append at the end. Never use replace_range inside operations. Use editor_replace_lines for one contiguous replacement and editor_replace_range only for an exact quoted selection.',
   category: 'editor',
   risk: 'editor-write',
   inputSchema: {
@@ -692,7 +785,7 @@ const editorApplyTransactionTool: AgentTool = {
       version: { type: 'number', description: 'Required editor version from the run-start snapshot or editor_get_state.' },
       operations: {
         type: 'array',
-        description: 'Multiple non-overlapping edits whose line numbers all refer to the original editor snapshot. Allowed operation types: replace_lines, insert_before_line, insert_after_line.',
+        description: 'One or more non-overlapping edits whose line numbers all refer to the original editor snapshot. Allowed operation types: replace_lines, insert_before_line, insert_after_line. Insertion operations require line; for end-of-document append use line=totalLines.',
         items: {
           type: 'object',
           properties: {
@@ -702,7 +795,7 @@ const editorApplyTransactionTool: AgentTool = {
             },
             startLine: { type: 'number' },
             endLine: { type: 'number' },
-            line: { type: 'number' },
+            line: { type: 'number', description: 'Required integer for insert_before_line/insert_after_line. Use totalLines to append after the document end.' },
             content: { type: 'string' },
           },
           required: ['type', 'content'],
@@ -969,7 +1062,7 @@ function buildTools(): AgentTool[] {
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFileTool,
-      beforeExecute: (input) => currentOpenFileGuard(input, 'read'),
+      execute: executeReadFileFromEditor,
     }),
     adaptLegacyTool({
       name: 'note_open_file',
@@ -1006,7 +1099,6 @@ function buildTools(): AgentTool[] {
       category: 'note',
       risk: 'file-update',
       legacy: updateMarkdownFileTool,
-      beforeExecute: (input) => currentOpenFileGuard(input, 'write'),
       execute: executeUpdateFileWithChange,
     }),
     adaptLegacyTool({

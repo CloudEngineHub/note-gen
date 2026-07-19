@@ -53,7 +53,7 @@ const ChatContent = React.memo(function ChatContent() {
   }, [loading, agentState.isRunning, chats])
 
   return (
-    <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+    <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor" scrollPreviousItemPeek={8}>
       <MessageScroller className="flex-1">
         <MessageScrollerViewport id="chats-wrapper" className="overflow-x-hidden p-4">
           <MessageScrollerContent

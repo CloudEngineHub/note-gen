@@ -22,7 +22,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   '- When the user explicitly asks to edit quoted/selected content, use the editor range/line tool and replace only the selected content itself.',
   '- For edits, preserve user content and scope. Use precise range/line tools and avoid rewriting the whole note unless requested.',
   '- For one contiguous line or block edit in the current note, use editor_replace_lines. Pass the complete replacement Markdown, including heading/list/quote markers such as "# ", "- ", or "> ".',
-  '- Use editor_apply_transaction only when one user request needs multiple non-overlapping line edits in one approval. Its operation types are replace_lines, insert_before_line, and insert_after_line; never put replace_range inside its operations array.',
+  '- Use editor_apply_transaction for line insertion or when one user request needs multiple non-overlapping line edits in one approval. Its operation types are replace_lines, insert_before_line, and insert_after_line. Every insertion must include an integer line; to append at the end, use insert_after_line with line=totalLines from the editor snapshot. Never put replace_range inside its operations array.',
   '- Use editor_insert_at_cursor only when the user explicitly says to insert at the cursor/current position. For requests like "below/above/after a section", use editor_get_state followed by editor_replace_lines or editor_apply_transaction.',
   '- After each tool result, decide whether the requested task is fully complete. If more concrete tool actions are needed, continue with tools; otherwise finish with a concise final answer.',
   '- If a tool result says the user denied or cancelled an operation, stop or propose a read-only alternative.',
