@@ -28,7 +28,6 @@ const ABSOLUTE_MAX_MODEL_ROUNDS = 30
 const MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS = 2
 const MAX_INVALID_QUOTED_WRITE_REPAIRS = 2
 const MAX_IDENTICAL_READ_RESULT_REPEATS = 2
-const MAX_IDENTICAL_FAILED_TOOL_RESULT_REPEATS = 1
 const MUTATING_TOOL_RISKS = new Set(['editor-write', 'file-create', 'file-update', 'delete', 'medium'])
 
 export function isRequestAbortError(error: unknown) {
@@ -44,6 +43,29 @@ export function isRequestAbortError(error: unknown) {
   return errorWithCode.name === 'AbortError'
     || errorWithCode.code === 'ABORT_ERR'
     || /(?:request (?:was )?aborted|operation (?:was )?aborted|aborterror)/i.test(errorWithCode.message || '')
+}
+
+async function executeAgentTool(
+  tool: AgentTool,
+  args: Record<string, unknown>,
+  runId: string,
+  signal: AbortSignal | undefined,
+  context: AgentContextSnapshot
+): Promise<AgentToolResult> {
+  try {
+    return await tool.execute(args, { runId, signal, context })
+  } catch (error) {
+    if (isRequestAbortError(error)) {
+      throw error
+    }
+
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      ok: false,
+      message: `${tool.title}执行时出现异常：${message}`,
+      error: message,
+    }
+  }
 }
 
 function parseToolArguments(rawArguments: string | undefined): Record<string, unknown> {
@@ -717,8 +739,26 @@ export class AgentRuntime {
       repeatCount: number
     }>()
     const successfulMutationCalls = new Set<string>()
-    const successfulToolEvidence = new Set<string>()
+    const toolResultEvidence = new Set<string>()
+    const appendToolResult = (
+      toolCallId: string,
+      toolName: string,
+      args: Record<string, unknown>,
+      result: AgentToolResult
+    ) => {
+      messages.push({
+        role: 'tool',
+        tool_call_id: toolCallId,
+        content: stringifyToolResult(result),
+      })
+      toolResultEvidence.add([
+        toolName,
+        JSON.stringify(args),
+        stringifyToolResult(result),
+      ].join(':'))
+    }
     let consecutiveNoProgressRounds = 0
+    let forceFinalResponseReason: string | undefined
     let latestEditorStateResult: AgentToolResult | undefined
     let activeModelTraceId: string | undefined
     let activeModelStartedAt = 0
@@ -735,6 +775,20 @@ export class AgentRuntime {
       }
 
       return activeModelContent || finalContent
+    }
+
+    const prepareFinalResponse = (reason: string) => {
+      callbacks.onCandidateAnswerClear?.()
+      forceFinalResponseReason = reason
+      consecutiveNoProgressRounds = 0
+      messages.push({
+        role: 'user',
+        content: [
+          '## App Context',
+          `工具执行阶段已停止：${reason}`,
+          '请基于用户原始请求和已有工具结果，直接生成自然、完整的最终答复。说明已经完成的内容、未完成的内容及原因；不要再调用任何工具。',
+        ].join('\n'),
+      })
     }
 
     const drainSteering = async () => {
@@ -767,6 +821,7 @@ export class AgentRuntime {
       editorSelectionReadLocked = hasInlineCurrentEditorSelection(context)
       invalidQuotedWriteRepairCount = 0
       consecutiveNoProgressRounds = 0
+      forceFinalResponseReason = undefined
       successfulMutationCalls.clear()
       systemPrompt = this.promptAssembler.assemble(context, tools, customSystemPrompt)
       messages[0] = { role: 'system', content: systemPrompt }
@@ -805,7 +860,10 @@ export class AgentRuntime {
     }
 
     try {
-      for (let iteration = 1; iteration <= ABSOLUTE_MAX_MODEL_ROUNDS; iteration += 1) {
+      agentLoop: for (let iteration = 1; iteration <= ABSOLUTE_MAX_MODEL_ROUNDS + 1; iteration += 1) {
+        if (iteration > ABSOLUTE_MAX_MODEL_ROUNDS && !forceFinalResponseReason) {
+          break
+        }
         if (this.stopped) {
           callbacks.onStatus?.('stopped')
           const stoppedContent = getSafeStoppedContent()
@@ -824,7 +882,7 @@ export class AgentRuntime {
         }
 
         await drainSteering()
-        const evidenceCountAtRoundStart = successfulToolEvidence.size
+        const evidenceCountAtRoundStart = toolResultEvidence.size
 
         callbacks.onStatus?.('thinking')
         await agentEventBus.emit('before-model-call', { runId })
@@ -849,7 +907,7 @@ export class AgentRuntime {
         activeModelStreamedTokenCount = 0
         callbacks.onTrace?.(modelTrace)
 
-        const offeredTools = tools.filter((tool) => {
+        const offeredTools = forceFinalResponseReason ? [] : tools.filter((tool) => {
           if (editorStateReadLocked && tool.name === 'editor_get_state') {
             return false
           }
@@ -860,15 +918,17 @@ export class AgentRuntime {
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
         const openAITools = agentToolRegistry.toOpenAITools(offeredTools)
+        const toolParams = openAITools.length > 0
+          ? { tools: openAITools, tool_choice: 'auto' as const }
+          : {}
         const stream = await this.recoveryManager.withRetry(() =>
           createChatCompletionStreamWithToolChoiceFallback(client, withFastAiRequestOptions({
             model: aiConfig?.model || '',
             messages,
             temperature: aiConfig?.temperature,
             top_p: aiConfig?.topP,
-            tools: openAITools,
-            tool_choice: 'auto',
             stream: true,
+            ...toolParams,
             ...getChatTokenLimitParams(aiConfig),
           }, aiConfig), {
             signal: this.abortController?.signal,
@@ -1065,24 +1125,31 @@ export class AgentRuntime {
           tool_calls: toolUses,
         })
 
-        for (const toolUse of toolUses) {
+        const cancelRemainingToolCalls = (afterIndex: number, reason: string) => {
+          for (const pendingToolUse of toolUses.slice(afterIndex + 1)) {
+            appendToolResult(pendingToolUse.id, pendingToolUse.function.name, {}, {
+              ok: false,
+              message: `运行保护已停止后续工具调用：${reason}`,
+              error: 'CANCELLED_BY_RUNTIME_GUARD',
+            })
+          }
+        }
+
+        for (let toolIndex = 0; toolIndex < toolUses.length; toolIndex += 1) {
+          const toolUse = toolUses[toolIndex]
           if (this.stopped) {
             throw new Error('USER_STOPPED')
           }
+          const toolName = toolUse.function.name
           if (this.steeringRequested) {
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult({
-                ok: false,
-                message: '用户追加了新的引导信息，本次尚未开始的工具调用已取消。',
-                error: 'SUPERSEDED_BY_STEERING',
-              }),
+            appendToolResult(toolUse.id, toolName, {}, {
+              ok: false,
+              message: '用户追加了新的引导信息，本次尚未开始的工具调用已取消。',
+              error: 'SUPERSEDED_BY_STEERING',
             })
             continue
           }
 
-          const toolName = toolUse.function.name
           const tool = agentToolRegistry.getTool(toolName)
           let args: Record<string, unknown>
           try {
@@ -1110,11 +1177,7 @@ export class AgentRuntime {
               rawArguments: toolUse.function.arguments || '',
               error: parseErrorResult.message,
             })
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(parseErrorResult),
-            })
+            appendToolResult(toolUse.id, toolName, {}, parseErrorResult)
             continue
           }
 
@@ -1147,11 +1210,7 @@ export class AgentRuntime {
               runId,
               toolName,
             })
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(missingResult),
-            })
+            appendToolResult(toolUse.id, toolName, args, missingResult)
             continue
           }
 
@@ -1181,11 +1240,7 @@ export class AgentRuntime {
             toolCall.status = 'error'
             toolCall.result = toolResultToLegacy(blockedResult)
             callbacks.onToolCall?.(toolCall)
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(blockedResult),
-            })
+            appendToolResult(toolUse.id, toolName, args, blockedResult)
             continue
           }
 
@@ -1194,11 +1249,7 @@ export class AgentRuntime {
             toolCall.status = 'error'
             toolCall.result = toolResultToLegacy(invalidToolInput)
             callbacks.onToolCall?.(toolCall)
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(invalidToolInput),
-            })
+            appendToolResult(toolUse.id, toolName, args, invalidToolInput)
             continue
           }
 
@@ -1214,11 +1265,7 @@ export class AgentRuntime {
             toolCall.status = 'error'
             toolCall.result = toolResultToLegacy(invalidEditorTarget)
             callbacks.onToolCall?.(toolCall)
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(invalidEditorTarget),
-            })
+            appendToolResult(toolUse.id, toolName, args, invalidEditorTarget)
             continue
           }
 
@@ -1250,39 +1297,19 @@ export class AgentRuntime {
               toolCall.status = 'error'
               toolCall.result = toolResultToLegacy(invalidQuotedWrite)
               callbacks.onToolCall?.(toolCall)
-              messages.push({
-                role: 'tool',
-                tool_call_id: toolUse.id,
-                content: stringifyToolResult(invalidQuotedWrite),
-              })
+              appendToolResult(toolUse.id, toolName, args, invalidQuotedWrite)
 
               if (invalidQuotedWriteRepairCount >= MAX_INVALID_QUOTED_WRITE_REPAIRS) {
-                finalContent = '模型连续返回了超出选区范围的替换内容，已停止执行，未修改笔记。'
+                const reason = '模型连续返回了超出选区范围的替换内容，已停止工具执行，未应用该项修改。'
                 agentDebugLog('invalid_tool_args_final', {
                   runId,
                   toolName,
                   retryCount: invalidQuotedWriteRepairCount,
-                  content: finalContent,
+                  content: reason,
                 })
-                callbacks.onStatus?.('completed')
-                callbacks.onFinalAnswerRender?.(finalContent)
-                const finalTrace = recorder.add({
-                  type: 'final',
-                  title: '停止执行',
-                  status: 'error',
-                  message: finalContent,
-                })
-                callbacks.onTrace?.(finalTrace)
-
-                return {
-                  runId,
-                  content: finalContent,
-                  stopped: false,
-                  steps,
-                  toolCalls,
-                  changes,
-                  trace: recorder.all(),
-                }
+                cancelRemainingToolCalls(toolIndex, reason)
+                prepareFinalResponse(reason)
+                continue agentLoop
               }
 
               continue
@@ -1309,11 +1336,7 @@ export class AgentRuntime {
             toolCall.status = 'error'
             toolCall.result = toolResultToLegacy(blockedResult)
             callbacks.onToolCall?.(toolCall)
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(blockedResult),
-            })
+            appendToolResult(toolUse.id, toolName, args, blockedResult)
             continue
           }
 
@@ -1343,11 +1366,7 @@ export class AgentRuntime {
             toolCall.status = 'error'
             toolCall.result = toolResultToLegacy(deniedResult)
             callbacks.onToolCall?.(toolCall)
-            messages.push({
-              role: 'tool',
-              tool_call_id: toolUse.id,
-              content: stringifyToolResult(deniedResult),
-            })
+            appendToolResult(toolUse.id, toolName, args, deniedResult)
             continue
           }
 
@@ -1408,11 +1427,7 @@ export class AgentRuntime {
                 output: supersededResult,
               })
               if (updatedApprovalTrace) callbacks.onTrace?.(updatedApprovalTrace)
-              messages.push({
-                role: 'tool',
-                tool_call_id: toolUse.id,
-                content: stringifyToolResult(supersededResult),
-              })
+              appendToolResult(toolUse.id, toolName, args, supersededResult)
               continue
             }
 
@@ -1431,11 +1446,7 @@ export class AgentRuntime {
                 output: deniedResult,
               })
               if (updatedApprovalTrace) callbacks.onTrace?.(updatedApprovalTrace)
-              messages.push({
-                role: 'tool',
-                tool_call_id: toolUse.id,
-                content: stringifyToolResult(deniedResult),
-              })
+              appendToolResult(toolUse.id, toolName, args, deniedResult)
               finalContent = changes.length > 0
                 ? `已取消当前待确认操作；此前已有 ${changes.length} 项改动成功执行，请以改动记录为准。`
                 : '已取消当前待确认操作，未执行该项改动。'
@@ -1497,6 +1508,9 @@ export class AgentRuntime {
           const mutationCallSignature = isMutatingTool(tool)
             ? `${tool.name}:${JSON.stringify(args)}`
             : undefined
+          const repeatedFailedMutation = Boolean(
+            mutationCallSignature && failedToolResultHistory.has(mutationCallSignature)
+          )
           const repeatedSuccessfulMutation = Boolean(
             mutationCallSignature && successfulMutationCalls.has(mutationCallSignature)
           )
@@ -1506,6 +1520,7 @@ export class AgentRuntime {
             toolName,
             args,
             reusedLockedEditorState,
+            repeatedFailedMutation,
             repeatedSuccessfulMutation,
           })
           const result: AgentToolResult = repeatedSuccessfulMutation
@@ -1513,6 +1528,12 @@ export class AgentRuntime {
                 ok: true,
                 message: '相同的写入操作已在本次任务中成功执行，本次重复调用已忽略。请直接完成回答。',
                 data: { deduplicated: true },
+              }
+            : repeatedFailedMutation
+            ? {
+                ok: false,
+                message: '相同的写入操作此前已经失败，本次重复执行已被阻止。请调整参数、改用其他工具，或向用户说明失败原因。',
+                error: 'REPEATED_FAILED_MUTATION_BLOCKED',
               }
             : reusableEditorStateResult
             ? {
@@ -1522,11 +1543,13 @@ export class AgentRuntime {
                   '本轮已经读取过相同的编辑器状态，请直接使用此前返回的内容，不要再次读取。',
                 ].join('\n\n'),
               }
-            : await tool.execute(args, {
+            : await executeAgentTool(
+                tool,
+                args,
                 runId,
-                signal: this.abortController?.signal,
-                context,
-              })
+                this.abortController?.signal,
+                context
+              )
           const duration = Date.now() - startedAt
           agentDebugLog('tool_execute_end', {
             runId,
@@ -1608,18 +1631,35 @@ export class AgentRuntime {
             }
           }
 
-          messages.push({
-            role: 'tool',
-            tool_call_id: toolUse.id,
-            content: stringifyToolResult(modelFacingResult),
-          })
+          if (result.ok && isMutatingTool(tool) && !repeatedSuccessfulMutation) {
+            modelFacingResult = {
+              ...result,
+              message: [
+                result.message || '操作已成功完成。',
+                '该操作已经成功，不要再次使用相同参数调用同一工具。如果用户请求已经完成，请直接给出最终答复。',
+              ].join('\n\n'),
+            }
+          } else if (!result.ok) {
+            modelFacingResult = {
+              ...result,
+              message: [
+                result.message || result.error || '工具未返回可确认的成功结果。',
+                isMutatingTool(tool)
+                  ? '该操作未确认成功。不要用相同参数重复执行；请调整方案、改用其他工具，或向用户说明情况。'
+                  : '请根据该结果调整参数、改用其他工具，或直接向用户说明情况；不要无视错误结束对话。',
+              ].join('\n\n'),
+            }
+          }
 
-          if (result.ok) {
-            successfulToolEvidence.add([
-              tool.name,
-              JSON.stringify(args),
-              stringifyToolResult(result),
-            ].join(':'))
+          appendToolResult(toolUse.id, tool.name, args, modelFacingResult)
+
+          if (repeatedSuccessfulMutation || repeatedFailedMutation) {
+            const reason = repeatedSuccessfulMutation
+              ? `相同的 ${tool.title} 操作此前已经成功，本次重复调用未再次执行。`
+              : `相同的 ${tool.title} 操作此前已经失败，本次重复调用已被阻止。`
+            cancelRemainingToolCalls(toolIndex, reason)
+            prepareFinalResponse(reason)
+            continue agentLoop
           }
 
           if (result.ok && mutationCallSignature && !repeatedSuccessfulMutation) {
@@ -1637,66 +1677,18 @@ export class AgentRuntime {
               result: serializedResult,
               repeatCount,
             })
-
-            const mustStopWithoutRetry = tool.risk !== 'read'
-            if (mustStopWithoutRetry || repeatCount >= MAX_IDENTICAL_FAILED_TOOL_RESULT_REPEATS) {
-              callbacks.onCandidateAnswerClear?.()
-              finalContent = [
-                mustStopWithoutRetry
-                  ? `${tool.title}执行失败。为避免重复副作用，已禁止自动重试。`
-                  : `${tool.title}以相同参数连续失败，已停止重复调用。`,
-                result.message || result.error || '工具未返回可确认的成功结果。',
-                changes.length > 0 ? `此前已有 ${changes.length} 项改动成功执行，请以改动记录为准。` : '本次操作未确认完成。',
-              ].join('\n')
-              callbacks.onStatus?.('completed')
-              callbacks.onFinalAnswerRender?.(finalContent)
-              const finalTrace = recorder.add({
-                type: 'final',
-                title: '停止重复执行',
-                status: 'error',
-                message: finalContent,
-              })
-              callbacks.onTrace?.(finalTrace)
-
-              return {
-                runId,
-                content: finalContent,
-                stopped: false,
-                steps,
-                toolCalls,
-                changes,
-                trace: recorder.all(),
-              }
-            }
           } else {
             failedToolResultHistory.delete(`${tool.name}:${JSON.stringify(args)}`)
           }
 
           if (identicalReadResultRepeatCount >= MAX_IDENTICAL_READ_RESULT_REPEATS) {
-            callbacks.onCandidateAnswerClear?.()
-            finalContent = [
+            const reason = [
               `模型连续重复调用 ${toolName}，且读取结果始终未变，已停止执行以避免循环。`,
               writeActionCompleted ? '已保留此前完成的修改。' : '本次修改尚未完成。',
             ].join('\n')
-            callbacks.onStatus?.('completed')
-            callbacks.onFinalAnswerRender?.(finalContent)
-            const finalTrace = recorder.add({
-              type: 'final',
-              title: '停止重复执行',
-              status: 'error',
-              message: finalContent,
-            })
-            callbacks.onTrace?.(finalTrace)
-
-            return {
-              runId,
-              content: finalContent,
-              stopped: false,
-              steps,
-              toolCalls,
-              changes,
-              trace: recorder.all(),
-            }
+            cancelRemainingToolCalls(toolIndex, reason)
+            prepareFinalResponse(reason)
+            continue agentLoop
           }
 
           if (result.ok && isMutatingTool(tool)) {
@@ -1730,7 +1722,7 @@ export class AgentRuntime {
 
         }
 
-        const madeProgress = successfulToolEvidence.size > evidenceCountAtRoundStart
+        const madeProgress = toolResultEvidence.size > evidenceCountAtRoundStart
         consecutiveNoProgressRounds = madeProgress
           ? 0
           : consecutiveNoProgressRounds + 1
@@ -1738,40 +1730,27 @@ export class AgentRuntime {
           runId,
           iteration,
           madeProgress,
-          newEvidenceCount: successfulToolEvidence.size - evidenceCountAtRoundStart,
+          newEvidenceCount: toolResultEvidence.size - evidenceCountAtRoundStart,
           consecutiveNoProgressRounds,
         })
 
         if (consecutiveNoProgressRounds >= MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS) {
           const completedWrite = writeActionCompleted || changes.length > 0
-          finalContent = completedWrite
+          const reason = completedWrite
             ? [
-                '修改已成功执行；模型后续没有产生新的操作，已停止重复调用。',
+                '修改已成功执行；模型后续没有产生新的工具结果，已停止重复调用。',
                 changes.length > 0 ? `本轮共记录 ${changes.length} 项成功改动。` : '重复写入已被忽略。',
               ].join('\n')
             : [
-                `连续 ${MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS} 轮没有获得新的成功工具结果，已停止执行以避免无效循环。`,
+                `连续 ${MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS} 轮没有获得新的工具结果，已停止执行以避免无效循环。`,
                 '本次任务尚未确认完成。',
               ].join('\n')
-          callbacks.onCandidateAnswerClear?.()
-          callbacks.onStatus?.('completed')
-          callbacks.onFinalAnswerRender?.(finalContent)
-          const finalTrace = recorder.add({
-            type: 'final',
-            title: completedWrite ? '修改完成' : '停止无进展循环',
-            status: completedWrite ? 'success' : 'error',
-            message: finalContent,
-          })
-          callbacks.onTrace?.(finalTrace)
-          return {
-            runId,
-            content: finalContent,
-            stopped: false,
-            steps,
-            toolCalls,
-            changes,
-            trace: recorder.all(),
-          }
+          prepareFinalResponse(reason)
+          continue
+        }
+
+        if (iteration >= ABSOLUTE_MAX_MODEL_ROUNDS && !forceFinalResponseReason) {
+          prepareFinalResponse(`已达到 ${ABSOLUTE_MAX_MODEL_ROUNDS} 轮工具执行安全上限。`)
         }
 
       }

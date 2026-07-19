@@ -63,6 +63,21 @@ function joinRelativePath(folderPath: string | undefined, fileName: string): str
   return folderPath ? `${folderPath}/${fileName}` : fileName
 }
 
+function isFileNotFoundError(error: unknown): boolean {
+  return /no such file or directory|os error 2|path not found/i.test(String(error))
+}
+
+function missingFileReadResult(filePath: string): ToolResult {
+  return {
+    success: true,
+    data: {
+      filePath,
+      exists: false,
+    },
+    message: `文件不存在: ${filePath}。请直接告知用户或继续完成无需该文件的回答，不要用相同参数重复读取。`,
+  }
+}
+
 async function mirrorVectorDocuments(sourcePath: string, targetPath: string): Promise<number | null> {
   const { getVectorDocumentsByFilename, upsertVectorDocument } = await import('@/db/vector')
   const sourceKey = getVectorDocumentKey(sourcePath)
@@ -190,6 +205,13 @@ export const readMarkdownFileTool: Tool = {
       // 统一使用 getFilePathOptions 来处理路径，无论是自定义工作区还是默认工作区
       const { path, baseDir } = await getFilePathOptions(normalizedFilePath)
 
+      const fileExists = baseDir
+        ? await exists(path, { baseDir })
+        : await exists(path)
+      if (!fileExists) {
+        return missingFileReadResult(normalizedFilePath)
+      }
+
       if (baseDir) {
         content = await readTextFile(path, { baseDir })
       } else {
@@ -202,6 +224,10 @@ export const readMarkdownFileTool: Tool = {
         message: `成功读取文件: ${normalizedFilePath}`,
       }
     } catch (error) {
+      if (isFileNotFoundError(error)) {
+        return missingFileReadResult(String(params.filePath || ''))
+      }
+
       console.error('[read_markdown_file] 读取失败', {
         filePath: params.filePath,
         error: String(error),
