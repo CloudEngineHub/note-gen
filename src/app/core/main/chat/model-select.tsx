@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 import { ModelConfig } from "../../setting/config"
 import { Store } from "@tauri-apps/plugin-store"
 import useSettingStore from "@/stores/setting"
-import { BotMessageSquare, BotOff } from "lucide-react"
+import { BotMessageSquare, BotOff, ChevronRight } from "lucide-react"
 import {
   Popover,
   PopoverContent,
@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/command"
 import { useTranslations } from "next-intl"
 import { TooltipButton } from "@/components/tooltip-button"
+import { Button } from "@/components/ui/button"
+import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
 
 interface GroupedModel {
   configKey: string
@@ -26,7 +28,12 @@ interface GroupedModel {
   model: ModelConfig
 }
 
-export function ModelSelect() {
+interface ModelSelectProps {
+  display?: 'icon' | 'status' | 'panel'
+  disabled?: boolean
+}
+
+export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectProps) {
   const [groupedModels, setGroupedModels] = useState<GroupedModel[]>([])
   const { primaryModel, setPrimaryModel, aiModelList } = useSettingStore()
   const [open, setOpen] = React.useState(false)
@@ -97,18 +104,56 @@ export function ModelSelect() {
     return acc
   }, {} as Record<string, GroupedModel[]>)
 
+  const selectedModel = groupedModels.find((item) => item.model.id === primaryModel)
+
   return (
     <Popover open={open} onOpenChange={handleSetOpen}>
       <PopoverTrigger asChild>
-        <div className="hidden md:block">
-          <TooltipButton
-            icon={groupedModels.length > 0 ? <BotMessageSquare className="size-4" /> : <BotOff className="size-4" />}
-            tooltipText={t('tooltip')}
-            size="icon"
-          />
-        </div>
+        {display === 'status' ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={disabled}
+            className="h-5 min-w-0 max-w-[55%] gap-1 px-1 text-xs font-normal text-muted-foreground"
+            aria-label={t('tooltip')}
+          >
+            {selectedModel ? <BotMessageSquare data-icon="inline-start" /> : <BotOff data-icon="inline-start" />}
+            <span className="truncate">
+              {selectedModel ? selectedModel.model.model : t('noModel')}
+            </span>
+          </Button>
+        ) : display === 'panel' ? (
+          <Item asChild size="sm" className="h-12 flex-nowrap py-0 cursor-pointer hover:bg-muted">
+            <button type="button" disabled={disabled}>
+              <ItemMedia variant="icon">
+                {selectedModel ? <BotMessageSquare /> : <BotOff />}
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle>{t('tooltip')}</ItemTitle>
+              </ItemContent>
+              <ItemActions className="shrink-0">
+                <span className="max-w-40 truncate text-xs text-muted-foreground">
+                  {selectedModel ? selectedModel.model.model : t('noModel')}
+                </span>
+                <ChevronRight />
+              </ItemActions>
+            </button>
+          </Item>
+        ) : (
+          <div className="hidden md:block">
+            <TooltipButton
+              icon={groupedModels.length > 0 ? <BotMessageSquare className="size-4" /> : <BotOff className="size-4" />}
+              tooltipText={t('tooltip')}
+              size="icon"
+            />
+          </div>
+        )}
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
+      <PopoverContent
+        align={display === 'icon' ? 'center' : 'start'}
+        side={display === 'panel' ? 'right' : undefined}
+        className="w-[400px] p-0"
+      >
         <Command>
           <CommandInput placeholder={t('placeholder')} className="h-9" />
           <CommandList>

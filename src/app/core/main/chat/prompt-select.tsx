@@ -1,13 +1,20 @@
 import * as React from "react"
 import { useEffect } from "react"
 import { useTranslations } from "next-intl"
-import { Drama } from "lucide-react"
+import { ChevronRight, Drama } from "lucide-react"
 import usePromptStore from "@/stores/prompt"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { TooltipButton } from "@/components/tooltip-button"
+import { Button } from "@/components/ui/button"
+import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
 
-export function PromptSelect() {
+interface PromptSelectProps {
+  display?: 'icon' | 'status' | 'panel'
+  disabled?: boolean
+}
+
+export function PromptSelect({ display = 'icon', disabled = false }: PromptSelectProps) {
   const { promptList, currentPrompt, initPromptData, setCurrentPrompt } = usePromptStore()
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('record.chat.input.promptSelect')
@@ -27,15 +34,49 @@ export function PromptSelect() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <div className="hidden md:block">
-          <TooltipButton
-            icon={<Drama />}
-            tooltipText={t('tooltip')}
-            size="icon"
-          />
-        </div>
+        {display === 'status' ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            disabled={disabled}
+            className="h-5 min-w-0 max-w-[45%] gap-1 px-1 text-xs font-normal text-muted-foreground"
+            aria-label={t('tooltip')}
+          >
+            <Drama data-icon="inline-start" />
+            <span className="truncate">{currentPrompt?.title || '-'}</span>
+          </Button>
+        ) : display === 'panel' ? (
+          <Item asChild size="sm" className="h-12 flex-nowrap py-0 cursor-pointer hover:bg-muted">
+            <button type="button" disabled={disabled}>
+              <ItemMedia variant="icon">
+                <Drama />
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle>{t('tooltip')}</ItemTitle>
+              </ItemContent>
+              <ItemActions className="shrink-0">
+                <span className="max-w-40 truncate text-xs text-muted-foreground">
+                  {currentPrompt?.title || '-'}
+                </span>
+                <ChevronRight />
+              </ItemActions>
+            </button>
+          </Item>
+        ) : (
+          <div className="hidden md:block">
+            <TooltipButton
+              icon={<Drama />}
+              tooltipText={t('tooltip')}
+              size="icon"
+            />
+          </div>
+        )}
       </PopoverTrigger>
-      <PopoverContent className="w-[180px] p-0">
+      <PopoverContent
+        align={display === 'icon' ? 'center' : display === 'status' ? 'end' : 'start'}
+        side={display === 'panel' ? 'right' : undefined}
+        className="w-[220px] p-0"
+      >
         <Command>
           <CommandInput placeholder={t('tooltip')} className="h-9" />
           <CommandList>

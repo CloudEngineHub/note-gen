@@ -1,6 +1,6 @@
 "use client"
 import * as React from "react"
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import useSettingStore from "@/stores/setting"
 import { Textarea } from "@/components/ui/textarea"
 import useChatStore from "@/stores/chat"
@@ -9,15 +9,10 @@ import useArticleStore from "@/stores/article"
 import { fetchAiQuickPrompts } from "@/lib/ai/placeholder"
 import { useTranslations } from 'next-intl'
 import { useLocalStorage } from 'react-use';
-import { ModelSelect } from "./model-select"
 import { getWorkspacePath } from "@/lib/workspace"
-import { PromptSelect } from "./prompt-select"
 import { ChatSend } from "./chat-send"
 import { LinkedFileDisplay } from "./file-link"
 import { LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
-import { McpButton } from "./mcp-button"
-import { RagSwitch } from "./rag-switch"
-import { ClipboardMonitor } from "./clipboard-monitor"
 import emitter from "@/lib/emitter"
 import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -35,22 +30,8 @@ import { readTextFile, writeFile, BaseDirectory, exists, mkdir, stat } from "@ta
 import { ShineBorder } from "@/components/ui/shine-border"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  horizontalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { buildTypingFrames } from './onboarding-typing'
+import { ChatToolsPopover } from './chat-tools-popover'
 
 const MAX_IMAGE_ATTACHMENTS = 6
 const MAX_IMAGE_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
@@ -102,63 +83,9 @@ function createImageAttachmentId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-// 可排序的工具栏项组件 - 定义在外部以避免每次 ChatInput re-render 时重新创建
-interface SortableToolbarItemProps {
-  id: string
-}
-
-const SortableToolbarItem = React.memo(function SortableToolbarItem({ id }: SortableToolbarItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  // 渲染对应的工具栏组件
-  const renderToolbarItem = () => {
-    switch (id) {
-      case 'modelSelect':
-        return <ModelSelect />
-      case 'promptSelect':
-        return <PromptSelect />
-      case 'mcpButton':
-        return <McpButton />
-      case 'ragSwitch':
-        return <RagSwitch />
-      case 'clipboardMonitor':
-        return <ClipboardMonitor />
-      default:
-        return null
-    }
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing"
-    >
-      {renderToolbarItem()}
-    </div>
-  )
-})
-SortableToolbarItem.displayName = 'SortableToolbarItem'
-
-
 export const ChatInput = React.memo(function ChatInput() {
   const [text, setText] = useState("")
-  const { primaryModel, chatToolbarConfigPc, setChatToolbarConfigPc } = useSettingStore()
+  const { primaryModel } = useSettingStore()
   const {
     chats,
     loading,
@@ -213,16 +140,6 @@ export const ChatInput = React.memo(function ChatInput() {
       textarea.style.height = `${newHeight}px`
     })
   }, [])
-
-  // 拖拽传感器配置（仅桌面端）
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 移动8px后才开始拖拽，避免误触
-      },
-    })
-  )
-
 
   // 添加输入到历史记录
   function addToHistory(input: string) {
@@ -745,36 +662,6 @@ export const ChatInput = React.memo(function ChatInput() {
     }
   }
 
-  // 处理拖拽结束（底部工具栏）
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-
-    if (over && active.id !== over.id) {
-      const enabledItems = chatToolbarConfigPc.filter(item => item.enabled)
-      const oldIndex = enabledItems.findIndex((item) => item.id === active.id)
-      const newIndex = enabledItems.findIndex((item) => item.id === over.id)
-
-      const reorderedItems = arrayMove(enabledItems, oldIndex, newIndex)
-      const allItems = [...chatToolbarConfigPc]
-
-      reorderedItems.forEach((item, index) => {
-        const globalIndex = allItems.findIndex(i => i.id === item.id)
-        if (globalIndex !== -1) {
-          allItems[globalIndex] = { ...item, order: enabledItems[0].order + index }
-        }
-      })
-
-      setChatToolbarConfigPc(allItems)
-    }
-  }, [chatToolbarConfigPc, setChatToolbarConfigPc])
-
-  // 使用 useMemo 优化工具栏项过滤 - 显示底部工具栏（排除 newChat）
-  const bottomToolbarItems = useMemo(() => {
-    return chatToolbarConfigPc
-      .filter(item => item.enabled && item.id !== 'newChat')
-      .sort((a, b) => a.order - b.order)
-  }, [chatToolbarConfigPc])
-
   useEffect(() => {
     // 如果有 marks，生成 AI 提示词作为 placeholder
     if (marks.length > 0) {
@@ -1180,27 +1067,8 @@ ${previewLines.join('\n')}
         
         <div className="flex justify-between items-center w-full">
           <div className="flex-1">
-            {/* 可拖拽排序的按钮容器（桌面端）或普通容器（移动端） */}
             {!isMobile ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={bottomToolbarItems.map(item => item.id)}
-                  strategy={horizontalListSortingStrategy}
-                >
-                  <div className="flex overflow-x-auto scrollbar-hide md:overflow-visible">
-                    {bottomToolbarItems.map(item => (
-                      <SortableToolbarItem
-                        key={item.id}
-                        id={item.id}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+              <ChatToolsPopover />
             ) : (
               <div className="flex overflow-x-auto scrollbar-hide md:overflow-visible gap-1">
                 <ChatToolsDrawer />

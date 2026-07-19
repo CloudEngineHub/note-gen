@@ -11,6 +11,7 @@ import {
 import {
   Command,
   CommandEmpty,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -21,80 +22,65 @@ import { Switch } from '@/components/ui/switch'
 import { useMcpStore } from '@/stores/mcp'
 import { useTranslations } from 'next-intl'
 
-export function McpButton() {
-  const t = useTranslations('mcp')
-  const [open, setOpen] = useState(false)
-  const { servers, selectedServerIds, toggleServerSelection, initMcpData, serverStates } = useMcpStore()
-  
-  function handleSetOpen(isOpen: boolean) {
-    setOpen(isOpen)
-    if (isOpen) {
-      initMcpData()
-    }
-  }
+interface McpServerListProps {
+  onInitialize?: boolean
+  searchable?: boolean
+}
 
-  const enabledServers = servers.filter(s => s.enabled)
-  
+export function McpServerList({ onInitialize = false, searchable = true }: McpServerListProps) {
+  const t = useTranslations('mcp')
+  const { servers, selectedServerIds, toggleServerSelection, initMcpData, serverStates } = useMcpStore()
+
+  React.useEffect(() => {
+    if (onInitialize) {
+      void initMcpData()
+    }
+  }, [initMcpData, onInitialize])
+
+  const enabledServers = servers.filter((server) => server.enabled)
+
   return (
-    <Popover open={open} onOpenChange={handleSetOpen}>
-      <PopoverTrigger asChild>
-        <div className="hidden md:block relative">
-          <TooltipButton
-            icon={selectedServerIds.length ? <ServerCrash className="size-4" /> : <Server className="size-4" />}
-            tooltipText={t('selectServers')}
-            size="icon"
-            side="bottom"
-          />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0">
-        <Command>
-          <CommandInput placeholder={t('searchServers')} className="h-9" />
-          <CommandList>
-            <CommandEmpty>{t('noServersFound')}</CommandEmpty>
+    <Command>
+      {searchable && <CommandInput placeholder={t('searchServers')} className="h-9" />}
+      <div className="max-h-72 overflow-y-auto pr-1">
+        <CommandList className="max-h-none overflow-visible">
+          <CommandEmpty>{t('noServersFound')}</CommandEmpty>
+          <CommandGroup>
             {enabledServers.map((server) => {
               const state = serverStates.get(server.id)
               const status = state?.status || 'disconnected'
               const toolCount = state?.tools?.length || 0
-              
+
               return (
                 <CommandItem
                   key={server.id}
                   value={server.name}
-                  onSelect={() => {
-                    toggleServerSelection(server.id)
-                  }}
+                  onSelect={() => toggleServerSelection(server.id)}
                 >
-                  <div className="flex flex-col flex-1 gap-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-medium truncate">{server.name}</span>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{server.name}</span>
+                      <Badge variant="outline" className="h-4 px-1 py-0 text-[10px]">
                         {server.type}
                       </Badge>
                       {status === 'connected' ? (
-                        <div className="flex items-center gap-1">
-                          <PlugZap className="size-3 text-green-500" />
-                          <span className="text-[10px] text-green-600 dark:text-green-400">
-                            {toolCount} {t('tools')}
-                          </span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <PlugZap className="size-3" />
+                          <span className="text-[10px]">{toolCount} {t('tools')}</span>
                         </div>
                       ) : status === 'connecting' ? (
-                        <div className="flex items-center gap-1">
-                          <Plug className="size-3 text-yellow-500 animate-pulse" />
-                          <span className="text-[10px] text-yellow-600 dark:text-yellow-400">
-                            {t('connecting')}
-                          </span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Plug className="size-3 animate-pulse" />
+                          <span className="text-[10px]">{t('connecting')}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <Plug className="size-3 text-muted-foreground" />
-                          <span className="text-[10px] text-muted-foreground">
-                            {t('disconnected')}
-                          </span>
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Plug className="size-3" />
+                          <span className="text-[10px]">{t('disconnected')}</span>
                         </div>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground truncate">
+                    <span className="truncate text-xs text-muted-foreground">
                       {server.type === 'stdio' ? `${server.command} ${server.args?.join(' ') || ''}` : `${server.url}`}
                     </span>
                   </div>
@@ -112,8 +98,39 @@ export function McpButton() {
                 </CommandItem>
               )
             })}
-          </CommandList>
-        </Command>
+          </CommandGroup>
+        </CommandList>
+      </div>
+    </Command>
+  )
+}
+
+export function McpButton() {
+  const t = useTranslations('mcp')
+  const [open, setOpen] = useState(false)
+  const { selectedServerIds, initMcpData } = useMcpStore()
+
+  function handleSetOpen(isOpen: boolean) {
+    setOpen(isOpen)
+    if (isOpen) {
+      initMcpData()
+    }
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleSetOpen}>
+      <PopoverTrigger asChild>
+        <div className="hidden md:block relative">
+          <TooltipButton
+            icon={selectedServerIds.length ? <ServerCrash className="size-4" /> : <Server className="size-4" />}
+            tooltipText={t('selectServers')}
+            size="icon"
+            side="bottom"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0">
+        <McpServerList />
       </PopoverContent>
     </Popover>
   )
