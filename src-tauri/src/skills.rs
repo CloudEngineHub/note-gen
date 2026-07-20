@@ -10,6 +10,43 @@ const MAX_UNCOMPRESSED_BYTES: u64 = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES: usize = 1_000;
 const MAX_PATH_DEPTH: usize = 20;
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SkillImportSourceKind {
+    Zip,
+    Directory,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SkillImportScope {
+    Global,
+    Project,
+}
+
+#[command]
+pub async fn import_skill(
+    app_handle: AppHandle,
+    source_path: String,
+    source_kind: SkillImportSourceKind,
+    scope: SkillImportScope,
+    workspace_root: Option<String>,
+) -> Result<String, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to get app data directory: {error}"))?;
+    let skills_dir = match scope {
+        SkillImportScope::Global => app_data_dir.join("skills"),
+        SkillImportScope::Project => match workspace_root {
+            Some(root) if !root.trim().is_empty() => PathBuf::from(root).join("skills"),
+            _ => app_data_dir.join("article").join("skills"),
+        },
+    };
+
+    import_skill_source(&app_data_dir, &skills_dir, &source_path, source_kind)
+}
+
 #[command]
 pub async fn import_skill_zip(app_handle: AppHandle, zip_path: String) -> Result<String, String> {
     let app_data_dir = app_handle
@@ -17,17 +54,22 @@ pub async fn import_skill_zip(app_handle: AppHandle, zip_path: String) -> Result
         .app_data_dir()
         .map_err(|error| format!("Failed to get app data directory: {error}"))?;
     let skills_dir = app_data_dir.join("skills");
+    import_skill_source(
+        &app_data_dir,
+        &skills_dir,
+        &zip_path,
+        SkillImportSourceKind::Zip,
+    )
+}
+
+fn import_skill_source(
+    app_data_dir: &Path,
+    skills_dir: &Path,
+    source_path: &str,
+    source_kind: SkillImportSourceKind,
+) -> Result<String, String> {
     fs::create_dir_all(&skills_dir)
         .map_err(|error| format!("Failed to create skills directory: {error}"))?;
-
-    let archive_metadata =
-        fs::metadata(&zip_path).map_err(|error| format!("Failed to inspect zip file: {error}"))?;
-    if archive_metadata.len() > MAX_ZIP_BYTES {
-        return Err(format!(
-            "Skill archive exceeds the {} MB limit",
-            MAX_ZIP_BYTES / 1024 / 1024
-        ));
-    }
 
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -41,11 +83,47 @@ pub async fn import_skill_zip(app_handle: AppHandle, zip_path: String) -> Result
     fs::create_dir_all(&temp_dir)
         .map_err(|error| format!("Failed to create temporary import directory: {error}"))?;
 
-    let import_result = import_skill_zip_inner(&zip_path, &temp_dir, &skills_dir, nonce);
+    let import_result = match source_kind {
+        SkillImportSourceKind::Zip => {
+            let archive_metadata = fs::metadata(source_path)
+                .map_err(|error| format!("Failed to inspect zip file: {error}"))?;
+            if archive_metadata.len() > MAX_ZIP_BYTES {
+                Err(format!(
+                    "Skill archive exceeds the {} MB limit",
+                    MAX_ZIP_BYTES / 1024 / 1024
+                ))
+            } else {
+                import_skill_zip_inner(source_path, &temp_dir, skills_dir, nonce)
+            }
+        }
+        SkillImportSourceKind::Directory => {
+            import_skill_directory_inner(source_path, skills_dir, nonce)
+        }
+    };
     if let Err(error) = fs::remove_dir_all(&temp_dir) {
         eprintln!("Failed to clean Skill import temporary directory: {error}");
     }
     import_result
+}
+
+fn import_skill_directory_inner(
+    source_path: &str,
+    skills_dir: &Path,
+    nonce: u128,
+) -> Result<String, String> {
+    let source = Path::new(source_path);
+    let metadata = fs::symlink_metadata(source)
+        .map_err(|error| format!("Failed to inspect Skill folder: {error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("The selected Skill source must be a regular folder".to_string());
+    }
+    let mut entry_count = 0;
+    let mut total_bytes = 0;
+    validate_directory_tree(source, 0, &mut entry_count, &mut total_bytes)?;
+
+    let mut roots = Vec::new();
+    collect_skill_roots(source, 0, &mut roots)?;
+    install_discovered_skill(roots, source, source_path, skills_dir, nonce)
 }
 
 fn import_skill_zip_inner(
@@ -123,21 +201,31 @@ fn import_skill_zip_inner(
 
     let mut roots = Vec::new();
     collect_skill_roots(temp_dir, 0, &mut roots)?;
+    install_discovered_skill(roots, temp_dir, zip_path, skills_dir, nonce)
+}
+
+fn install_discovered_skill(
+    mut roots: Vec<PathBuf>,
+    discovery_root: &Path,
+    source_path: &str,
+    skills_dir: &Path,
+    nonce: u128,
+) -> Result<String, String> {
     if roots.is_empty() {
         return Err(
-            "No valid Skill found. A Skill archive must contain exactly one SKILL.md root."
+            "No valid Skill found. The selected source must contain exactly one SKILL.md root."
                 .to_string(),
         );
     }
     if roots.len() != 1 {
         return Err(
-            "Skill archive contains multiple SKILL.md roots; import each Skill separately."
+            "The selected source contains multiple SKILL.md roots; import each Skill separately."
                 .to_string(),
         );
     }
     let skill_root = roots.remove(0);
-    let skill_name = if skill_root == temp_dir {
-        Path::new(zip_path)
+    let skill_name = if skill_root == discovery_root {
+        Path::new(source_path)
             .file_stem()
             .and_then(|name| name.to_str())
             .ok_or("Failed to determine Skill directory name")?
@@ -184,6 +272,58 @@ fn import_skill_zip_inner(
     }
 
     Ok(skill_name)
+}
+
+fn validate_directory_tree(
+    root: &Path,
+    depth: usize,
+    entry_count: &mut usize,
+    total_bytes: &mut u64,
+) -> Result<(), String> {
+    if depth > MAX_PATH_DEPTH {
+        return Err("Skill folder nesting exceeds the allowed depth".to_string());
+    }
+
+    for entry in
+        fs::read_dir(root).map_err(|error| format!("Failed to read Skill folder: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("Failed to read Skill folder entry: {error}"))?;
+        *entry_count += 1;
+        if *entry_count > MAX_ARCHIVE_ENTRIES {
+            return Err(format!(
+                "Skill folder contains more than {MAX_ARCHIVE_ENTRIES} entries"
+            ));
+        }
+
+        let metadata = fs::symlink_metadata(entry.path())
+            .map_err(|error| format!("Failed to inspect Skill folder entry: {error}"))?;
+        if metadata.file_type().is_symlink() {
+            return Err(format!(
+                "Symbolic links are not allowed: {}",
+                entry.path().display()
+            ));
+        }
+        if metadata.is_file() {
+            if metadata.len() > MAX_ENTRY_BYTES {
+                return Err(format!(
+                    "Skill file exceeds the size limit: {}",
+                    entry.path().display()
+                ));
+            }
+            *total_bytes = total_bytes
+                .checked_add(metadata.len())
+                .ok_or("Skill folder size overflow")?;
+            if *total_bytes > MAX_UNCOMPRESSED_BYTES {
+                return Err(format!(
+                    "Skill folder exceeds the {} MB limit",
+                    MAX_UNCOMPRESSED_BYTES / 1024 / 1024
+                ));
+            }
+        } else if metadata.is_dir() {
+            validate_directory_tree(&entry.path(), depth + 1, entry_count, total_bytes)?;
+        }
+    }
+    Ok(())
 }
 
 fn is_symlink<R: std::io::Read>(entry: &zip::read::ZipFile<'_, R>) -> bool {
@@ -341,6 +481,30 @@ mod tests {
         assert_eq!(imported, "secure-skill");
         assert!(skills_dir.join("secure-skill/scripts/ok.py").is_file());
         assert!(!skills_dir.join("secure-skill/old.txt").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn imports_skill_from_directory() {
+        let root = test_directory("directory-import");
+        let source = root.join("folder-skill");
+        let skills_dir = root.join("skills");
+        fs::create_dir_all(source.join("references")).unwrap();
+        fs::write(
+            source.join("SKILL.md"),
+            "---\nname: folder-skill\ndescription: test\n---\n",
+        )
+        .unwrap();
+        fs::write(source.join("references/guide.md"), "guide").unwrap();
+
+        let imported =
+            import_skill_directory_inner(source.to_str().unwrap(), &skills_dir, 1).unwrap();
+
+        assert_eq!(imported, "folder-skill");
+        assert!(skills_dir.join("folder-skill/SKILL.md").is_file());
+        assert!(skills_dir
+            .join("folder-skill/references/guide.md")
+            .is_file());
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -36,7 +36,7 @@ use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
     SkillProcessManager,
 };
-use skills::import_skill_zip;
+use skills::{import_skill, import_skill_zip};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -77,6 +77,7 @@ pub fn run() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            import_skill,
             import_skill_zip,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             run_skill_script,

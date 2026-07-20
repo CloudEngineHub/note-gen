@@ -44,7 +44,7 @@ use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
     SkillProcessManager,
 };
-use skills::import_skill_zip;
+use skills::{import_skill, import_skill_zip};
 use tray::update_tray_record_toolbar_config;
 
 fn main() {
@@ -85,6 +85,7 @@ fn main() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            import_skill,
             import_skill_zip,
             run_skill_script,
             cancel_skill_script,

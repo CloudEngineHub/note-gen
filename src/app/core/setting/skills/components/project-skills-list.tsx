@@ -1,8 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Button } from '@/components/ui/button'
-import { RefreshCw, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { useSkillsStore } from '@/stores/skills'
 import { SkillCard } from './skill-card'
 import { SettingSection } from '../../components/setting-base'
@@ -14,10 +13,10 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { ItemGroup } from '@/components/ui/item'
+import { SkillInstallActions } from './skill-install-actions'
 
-export function ProjectSkillsList() {
+export function ProjectSkillsList({ showFileActions = true }: { showFileActions?: boolean }) {
   const t = useTranslations('settings.skills')
-  const tc = useTranslations('common')
   const { projectSkills, refreshSkills } = useSkillsStore()
 
   const handleRefresh = async () => {
@@ -27,11 +26,13 @@ export function ProjectSkillsList() {
   return (
     <SettingSection
       title={`${t('project')} (${projectSkills.length})`}
+      desc={t('workspaceInstallHelp')}
       actions={(
-        <Button variant="outline" size="sm" onClick={handleRefresh}>
-          <RefreshCw data-icon="inline-start" />
-          {tc('refresh')}
-        </Button>
+        <SkillInstallActions
+          scope="project"
+          onInstalled={handleRefresh}
+          showFileActions={showFileActions}
+        />
       )}
     >
       {projectSkills.length > 0 ? (

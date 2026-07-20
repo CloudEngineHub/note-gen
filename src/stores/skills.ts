@@ -31,7 +31,6 @@ interface SkillsState {
 
   // Skill 管理方法
   toggleSkill: (id: string) => Promise<void>
-  updateSkillInstructions: (id: string, instructions: string) => Promise<void>
   deleteSkill: (id: string) => Promise<void>
   refreshSkills: () => Promise<void>
 
@@ -179,52 +178,6 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     enabledSkills[id] = skill.metadata.enabled
     await store.set('skills.enabledSkills', enabledSkills)
     await store.save()
-
-    // 更新状态
-    await get().refreshSkills()
-  },
-
-  // 更新 Skill 指令
-  updateSkillInstructions: async (id: string, instructions: string) => {
-    const skill = skillManager.getSkill(id)
-    if (!skill) return
-
-    // 更新内存中的指令内容
-    skill.instructions = instructions
-    skill.metadata.updatedAt = Date.now()
-
-    // 获取 Skill 文件信息
-    const fileInfo = skillManager.getSkillFileInfo(id)
-    if (!fileInfo) return
-
-    // 构建完整的 Skill 文件内容
-    const metadata = skill.metadata
-    const yamlMetadata = `---
-name: ${metadata.name}
-description: ${metadata.description}
-version: ${metadata.version}
-${metadata.author ? `author: ${metadata.author}` : ''}
-${metadata.allowedTools ? `allowedTools:\n${metadata.allowedTools.map(t => `  - ${t}`).join('\n')}` : ''}
-${metadata.userInvocable !== undefined ? `userInvocable: ${metadata.userInvocable}` : ''}
----
-
-${instructions}
-`
-
-    // 写入文件
-    const { writeTextFile, BaseDirectory } = await import('@tauri-apps/plugin-fs')
-
-    if (metadata.scope === 'global') {
-      await writeTextFile(fileInfo.mainFile, yamlMetadata, { baseDir: BaseDirectory.AppData })
-    } else {
-      const { getFilePathOptions } = await import('@/lib/workspace')
-      const options = await getFilePathOptions(fileInfo.mainFile)
-      if (options.baseDir) {
-        await writeTextFile(options.path, yamlMetadata, { baseDir: options.baseDir })
-      } else {
-        await writeTextFile(options.path, yamlMetadata)
-      }
-    }
 
     // 更新状态
     await get().refreshSkills()
