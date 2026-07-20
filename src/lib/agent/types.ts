@@ -1,4 +1,5 @@
 import type OpenAI from 'openai'
+import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
 
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[]
@@ -51,6 +52,7 @@ export type AgentToolCategory =
   | 'skill'
   | 'mcp'
   | 'system'
+  | 'attachment'
 
 export type AgentToolRisk =
   | 'read'
@@ -72,6 +74,7 @@ export interface AgentContextSnapshot {
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
   selectedMcpServerIds?: string[]
+  attachments?: RuntimeChatAttachment[]
 }
 
 export interface AgentEditorStateSnapshot {
@@ -213,6 +216,7 @@ export interface AgentRuntimeInput {
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
   selectedMcpServerIds?: string[]
+  attachments?: RuntimeChatAttachment[]
   permissionMode?: AgentPermissionMode
 }
 
@@ -222,6 +226,7 @@ export interface AgentSteeringPayload {
   imageUrls?: string[]
   additionalContext?: string
   currentQuote?: AgentQuoteSnapshot
+  attachments?: RuntimeChatAttachment[]
 }
 
 export type AgentApprovalDecision = 'approved' | 'denied' | 'steered'

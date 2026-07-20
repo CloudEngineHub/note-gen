@@ -15,6 +15,15 @@ export const agentStatusText: Record<AgentRunStatus, string> = {
 }
 
 export function formatAgentToolName(name: string) {
+  const attachmentToolNames: Record<string, string> = {
+    attachment_list: "附件 · 查看文件夹",
+    attachment_read: "附件 · 读取文件",
+  }
+
+  if (attachmentToolNames[name]) {
+    return attachmentToolNames[name]
+  }
+
   return name
     .replace(/^editor_/, "编辑器 · ")
     .replace(/^note_/, "笔记 · ")

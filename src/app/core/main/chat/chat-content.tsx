@@ -21,6 +21,8 @@ import { AgentPanelWithRag } from './agent-panel-with-rag'
 import { ChatImages } from "./chat-images"
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { parsePersistedChatAttachments } from '@/lib/chat-attachments'
+import { ChatAttachmentSummary } from './chat-file-attachments'
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -211,6 +213,11 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
     }
   }, [chat.images])
 
+  const attachments = useMemo(
+    () => parsePersistedChatAttachments(chat.attachments),
+    [chat.attachments]
+  )
+
   // 解析引用数据
   const quoteData = useMemo(() => {
     if (!chat.quoteData) return null
@@ -336,6 +343,7 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
           <div className="w-full space-y-3 text-primary">
             {/* 显示用户消息中的图片 */}
             {images.length > 0 && <ChatImages images={images} />}
+            <ChatAttachmentSummary attachments={attachments} />
             {/* 显示用户消息中的引用 */}
             {quoteData && (
               <div className="flex flex-col gap-1 text-[11px]">

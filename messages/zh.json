@@ -2186,6 +2186,18 @@
           "agentDescription": "智能助手，可执行操作"
         },
         "attachImage": "附加图片",
+        "addAttachment": {
+          "title": "添加",
+          "image": { "title": "图片" },
+          "file": { "title": "文件" },
+          "folder": { "title": "文件夹" },
+          "entryCount": "{count} 项",
+          "remove": "移除 {name}",
+          "metadataOnly": "仅元数据",
+          "readFailed": "{count} 个附件读取失败",
+          "selectFailed": "选择附件失败，请重试",
+          "attachmentOnlyPrompt": "请查看并分析我添加的附件。"
+        },
         "imageAttachment": {
           "selectSuccess": "已附加 {count} 张图片",
           "pasteSuccess": "已粘贴 {count} 张图片",

@@ -18,7 +18,6 @@ import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
 import { useIsMobile } from '@/hooks/use-mobile'
 import { ImageAttachments, ImageAttachment } from "./image-attachments"
 import { ImageIcon } from "lucide-react"
-import { TooltipButton } from "@/components/tooltip-button"
 import { isMobileDevice } from '@/lib/check'
 import { QuoteDisplay } from "./quote-display"
 import type { PendingQuote } from "@/stores/chat"
@@ -32,6 +31,13 @@ import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { buildTypingFrames } from './onboarding-typing'
 import { ChatToolsPopover } from './chat-tools-popover'
+import { AttachmentAddMenu } from './attachment-add-menu'
+import { PendingFileAttachments } from './chat-file-attachments'
+import {
+  createFileAttachment,
+  createFolderAttachment,
+  type RuntimeChatAttachment,
+} from '@/lib/chat-attachments'
 
 const MAX_IMAGE_ATTACHMENTS = 6
 const MAX_IMAGE_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
@@ -113,6 +119,7 @@ export const ChatInput = React.memo(function ChatInput() {
   const [tempInput, setTempInput] = useState('')
   const [linkedResource, setLinkedResource] = useState<LinkedResource | null>(null)
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([])
+  const [fileAttachments, setFileAttachments] = useState<RuntimeChatAttachment[]>([])
   const [isImageDragOver, setIsImageDragOver] = useState(false)
   const chatSendRef = useRef<{ sendChat: () => void } | null>(null)
   const isMobile = useIsMobile()
@@ -190,6 +197,24 @@ export const ChatInput = React.memo(function ChatInput() {
 
   function removeImage(id: string) {
     setAttachedImages(prev => prev.filter(img => img.id !== id))
+  }
+
+  function removeFileAttachment(id: string) {
+    setFileAttachments(prev => prev.filter(attachment => attachment.id !== id))
+  }
+
+  function appendFileAttachments(attachments: RuntimeChatAttachment[]) {
+    setFileAttachments(prev => {
+      const existingPaths = new Set(prev.map(attachment => attachment.path.replace(/\\/g, '/').toLowerCase()))
+      const next = [...prev]
+      for (const attachment of attachments) {
+        const normalizedPath = attachment.path.replace(/\\/g, '/').toLowerCase()
+        if (existingPaths.has(normalizedPath)) continue
+        existingPaths.add(normalizedPath)
+        next.push(attachment)
+      }
+      return next
+    })
   }
 
   function removeQuote() {
@@ -423,6 +448,42 @@ export const ChatInput = React.memo(function ChatInput() {
     }
   }
 
+  async function handleSelectLocalFiles() {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: true, directory: false })
+      if (!selected) return
+      const paths = Array.isArray(selected) ? selected : [selected]
+      const results = await Promise.allSettled(paths.map(createFileAttachment))
+      appendFileAttachments(results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []))
+      const failed = results.filter(result => result.status === 'rejected').length
+      if (failed > 0) {
+        showImageFailureToast(t('record.chat.input.addAttachment.readFailed', { count: failed }))
+      }
+    } catch (error) {
+      console.error('Failed to select file attachments:', error)
+      showImageFailureToast(t('record.chat.input.addAttachment.selectFailed'))
+    }
+  }
+
+  async function handleSelectLocalFolders() {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog')
+      const selected = await open({ multiple: true, directory: true })
+      if (!selected) return
+      const paths = Array.isArray(selected) ? selected : [selected]
+      const results = await Promise.allSettled(paths.map(createFolderAttachment))
+      appendFileAttachments(results.flatMap(result => result.status === 'fulfilled' ? [result.value] : []))
+      const failed = results.filter(result => result.status === 'rejected').length
+      if (failed > 0) {
+        showImageFailureToast(t('record.chat.input.addAttachment.readFailed', { count: failed }))
+      }
+    } catch (error) {
+      console.error('Failed to select folder attachments:', error)
+      showImageFailureToast(t('record.chat.input.addAttachment.selectFailed'))
+    }
+  }
+
   // 移动端图片选择，交给系统决定从相册还是相机获取
   async function handleSelectFromGallery() {
     if (attachedImages.length >= MAX_IMAGE_ATTACHMENTS) {
@@ -580,6 +641,7 @@ export const ChatInput = React.memo(function ChatInput() {
     setText('')
     setHistoryIndex(-1)
     setAttachedImages([])
+    setFileAttachments([])
     clearPendingQuote()
     if (isMobileDevice_) {
       clearEditorSelectionQuote()
@@ -997,6 +1059,7 @@ ${previewLines.join('\n')}
           <QuoteDisplay quoteData={activeQuote} onRemove={removeQuote} />
         )}
         <ImageAttachments images={attachedImages} onRemove={removeImage} />
+        <PendingFileAttachments attachments={fileAttachments} onRemove={removeFileAttachment} />
         <div className="relative w-full flex items-start">
           <Textarea
             ref={textareaRef}
@@ -1066,7 +1129,14 @@ ${previewLines.join('\n')}
         </div>
         
         <div className="flex justify-between items-center w-full">
-          <div className="flex-1">
+          <div className="flex flex-1 items-center gap-1">
+            <AttachmentAddMenu
+              mobile={isMobile}
+              disabled={!primaryModel}
+              onSelectImages={isMobile ? handleSelectFromGallery : handleSelectLocalImages}
+              onSelectFiles={handleSelectLocalFiles}
+              onSelectFolders={handleSelectLocalFolders}
+            />
             {!isMobile ? (
               <ChatToolsPopover />
             ) : (
@@ -1077,16 +1147,7 @@ ${previewLines.join('\n')}
           </div>
           <div className="flex items-center justify-end gap-2 pr-1">
             <AgentPermissionModeSelect />
-            <TooltipButton
-              variant={isMobile ? "ghost" : "link"}
-              size="sm"
-              icon={<ImageIcon className="size-4" />}
-              tooltipText={t('record.chat.input.attachImage')}
-              onClick={isMobile ? handleSelectFromGallery : handleSelectLocalImages}
-              disabled={!primaryModel}
-              buttonClassName={isMobile ? "rounded-2xl text-[hsl(var(--component-inactive-color))] hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground" : undefined}
-            />
-            <ChatSend inputValue={text} onSent={handleSent} linkedResource={linkedResource} attachedImages={attachedImages} quoteData={activeQuote} dockStyle={isMobile} ref={chatSendRef} />
+            <ChatSend inputValue={text} onSent={handleSent} linkedResource={linkedResource} attachedImages={attachedImages} fileAttachments={fileAttachments} quoteData={activeQuote} dockStyle={isMobile} ref={chatSendRef} />
           </div>
         </div>
 

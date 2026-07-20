@@ -2221,6 +2221,18 @@
           "agentDescription": "Assistente inteligente, pode executar ações"
         },
         "attachImage": "Anexar imagens",
+        "addAttachment": {
+          "title": "Adicionar",
+          "image": { "title": "Imagem" },
+          "file": { "title": "Arquivo" },
+          "folder": { "title": "Pasta" },
+          "entryCount": "{count} itens",
+          "remove": "Remover {name}",
+          "metadataOnly": "somente metadados",
+          "readFailed": "Falha ao ler {count} anexos",
+          "selectFailed": "Falha ao selecionar anexos. Tente novamente",
+          "attachmentOnlyPrompt": "Revise e analise os anexos que adicionei."
+        },
         "imageAttachment": {
           "selectSuccess": "{count, plural, one {# imagem anexada} other {# imagens anexadas}}",
           "pasteSuccess": "{count, plural, one {# imagem colada} other {# imagens coladas}}",

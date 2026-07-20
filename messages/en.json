@@ -2272,6 +2272,18 @@
           "agentDescription": "Smart assistant, can execute actions"
         },
         "attachImage": "Attach images",
+        "addAttachment": {
+          "title": "Add",
+          "image": { "title": "Image" },
+          "file": { "title": "File" },
+          "folder": { "title": "Folder" },
+          "entryCount": "{count} items",
+          "remove": "Remove {name}",
+          "metadataOnly": "metadata only",
+          "readFailed": "Failed to read {count} attachments",
+          "selectFailed": "Failed to select attachments. Please try again",
+          "attachmentOnlyPrompt": "Please review and analyze the attachments I added."
+        },
         "imageAttachment": {
           "selectSuccess": "{count, plural, one {Attached # image} other {Attached # images}}",
           "pasteSuccess": "{count, plural, one {Pasted # image} other {Pasted # images}}",

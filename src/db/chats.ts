@@ -14,6 +14,7 @@ export interface Chat {
   type: ChatType
   image?: string
   images?: string // 多张图片，JSON字符串数组
+  attachments?: string // 不含本地绝对路径的附件展示信息，JSON 字符串数组
   inserted: boolean // 是否插入到 mark 中
   createdAt: number
   ragSources?: string // RAG引用的文件名，JSON字符串数组
@@ -38,6 +39,7 @@ export async function initChatsDb() {
       type text not null,
       image text default null,
       images text default null,
+      attachments text default null,
       inserted boolean default false,
       createdAt integer not null,
       ragSources text default null,
@@ -70,6 +72,15 @@ export async function initChatsDb() {
   try {
     await db.execute(`
       alter table chats add column images text default null
+    `)
+  } catch {
+    // 如果列已存在，忽略错误
+  }
+
+  // 迁移：附件历史只保存可同步的展示信息，不保存本地路径
+  try {
+    await db.execute(`
+      alter table chats add column attachments text default null
     `)
   } catch {
     // 如果列已存在，忽略错误
@@ -164,8 +175,8 @@ export async function insertChat(chat: Omit<Chat, 'id' | 'createdAt'>) {
   const db = await getDb()
   const createdAt = Date.now();
   const result = await db.execute(
-    "insert into chats (tagId, conversationId, content, role, type, image, images, inserted, createdAt, ragSources, ragSourceDetails, agentHistory, thinking, quoteData, condensedContent, condensedAt) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
-    [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.inserted ? 1 : 0, createdAt, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt]
+    "insert into chats (tagId, conversationId, content, role, type, image, images, attachments, inserted, createdAt, ragSources, ragSourceDetails, agentHistory, thinking, quoteData, condensedContent, condensedAt) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+    [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.attachments, chat.inserted ? 1 : 0, createdAt, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt]
   )
 
   if (chat.role === 'user' && chat.content?.trim()) {
@@ -220,8 +231,8 @@ export async function insertChats(chats: Chat[]) {
   try {
     for (const chat of chats) {
       await db.execute(
-        "insert into chats (tagId, content, role, type, image, images, inserted, createdAt, ragSources) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        [chat.tagId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.inserted ? 1 : 0, chat.createdAt, chat.ragSources]
+        "insert into chats (tagId, conversationId, content, role, type, image, images, attachments, inserted, createdAt, ragSources, ragSourceDetails, agentHistory, thinking, quoteData, condensedContent, condensedAt) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)",
+        [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.attachments, chat.inserted ? 1 : 0, chat.createdAt, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt]
       )
     }
     await db.execute('COMMIT')
@@ -244,8 +255,8 @@ export async function deleteAllChats() {
 export async function updateChat(chat: Chat) {
   const db = await getDb()
   return await db.execute(
-    "update chats set tagId = $1, conversationId = $2, content = $3, role = $4, type = $5, image = $6, images = $7, inserted = $8, ragSources = $9, ragSourceDetails = $10, agentHistory = $11, thinking = $12, quoteData = $13, condensedContent = $14, condensedAt = $15 where id = $16",
-    [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.inserted ? 1 : 0, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt, chat.id])
+    "update chats set tagId = $1, conversationId = $2, content = $3, role = $4, type = $5, image = $6, images = $7, attachments = $8, inserted = $9, ragSources = $10, ragSourceDetails = $11, agentHistory = $12, thinking = $13, quoteData = $14, condensedContent = $15, condensedAt = $16 where id = $17",
+    [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.attachments, chat.inserted ? 1 : 0, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt, chat.id])
 }
 
 // 清空 tagId 下的所有 chats
@@ -277,8 +288,8 @@ export async function updateChats(chats: Chat[]) {
   try {
     for (const chat of chats) {
       await db.execute(
-        "update chats set tagId = $1, conversationId = $2, content = $3, role = $4, type = $5, image = $6, images = $7, inserted = $8, ragSources = $9, ragSourceDetails = $10, agentHistory = $11, thinking = $12, quoteData = $13, condensedContent = $14, condensedAt = $15 where id = $16",
-        [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.inserted ? 1 : 0, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt, chat.id]
+        "update chats set tagId = $1, conversationId = $2, content = $3, role = $4, type = $5, image = $6, images = $7, attachments = $8, inserted = $9, ragSources = $10, ragSourceDetails = $11, agentHistory = $12, thinking = $13, quoteData = $14, condensedContent = $15, condensedAt = $16 where id = $17",
+        [chat.tagId, chat.conversationId, chat.content, chat.role, chat.type, chat.image, chat.images, chat.attachments, chat.inserted ? 1 : 0, chat.ragSources, chat.ragSourceDetails, chat.agentHistory, chat.thinking, chat.quoteData, chat.condensedContent, chat.condensedAt, chat.id]
       )
     }
   } catch (error) {

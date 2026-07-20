@@ -6,6 +6,8 @@ import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
 import { readCurrentEditorState } from './tools/editor-tools'
 import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
+import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
+import { retainCompletedAgentTraceEvents } from './trace-retention'
 
 export interface AgentHandlerConfig {
   activeChatId?: number
@@ -38,6 +40,7 @@ export interface AgentHandlerConfig {
     to: number
     fullContent?: string
   }
+  attachments?: RuntimeChatAttachment[]
 }
 
 export class AgentHandler {
@@ -110,6 +113,7 @@ export class AgentHandler {
         currentQuote: this.config.currentQuote,
         availableSkills: skillsInfo,
         selectedMcpServerIds,
+        attachments: this.config.attachments,
         permissionMode: this.config.permissionMode,
       }, {
         onStatus: (status) => {
@@ -370,7 +374,7 @@ export class AgentHandler {
       completedSteps: result.steps,
       toolCalls: result.toolCalls,
       changes: result.changes,
-      traceEvents: result.trace,
+      traceEvents: retainCompletedAgentTraceEvents(result.trace),
       currentAction: undefined,
       currentObservation: undefined,
     })

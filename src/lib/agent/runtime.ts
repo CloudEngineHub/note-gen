@@ -176,6 +176,113 @@ function normalizeFilePathForCompare(filePath: string) {
   return filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/').trim()
 }
 
+function rewriteWorkspaceReadAsAttachmentRead(
+  toolCall: OpenAI.Chat.ChatCompletionMessageToolCall,
+  context: AgentContextSnapshot
+) {
+  const folderAttachments = (context.attachments || []).filter((attachment) => attachment.kind === 'folder')
+  if (toolCall.function.name === 'note_list_files' && folderAttachments.length === 1) {
+    return {
+      ...toolCall,
+      function: {
+        name: 'attachment_list',
+        arguments: JSON.stringify({ attachmentId: folderAttachments[0].id }),
+      },
+    } satisfies OpenAI.Chat.ChatCompletionMessageToolCall
+  }
+
+  if (toolCall.function.name !== 'note_open_file' && toolCall.function.name !== 'note_read_file') {
+    return toolCall
+  }
+
+  let args: Record<string, unknown>
+  try {
+    args = parseToolArguments(toolCall.function.arguments)
+  } catch {
+    return toolCall
+  }
+
+  const requestedPath = typeof args.filePath === 'string'
+    ? normalizeFilePathForCompare(args.filePath)
+    : ''
+  const requestedName = requestedPath.split('/').pop()?.toLocaleLowerCase() || ''
+  if (!requestedName) return toolCall
+
+  const matches = (context.attachments || []).filter((attachment) =>
+    attachment.kind === 'file'
+    && attachment.name.toLocaleLowerCase() === requestedName
+  )
+  if (matches.length === 1) {
+    return {
+      ...toolCall,
+      function: {
+        name: 'attachment_read',
+        arguments: JSON.stringify({ attachmentId: matches[0].id }),
+      },
+    } satisfies OpenAI.Chat.ChatCompletionMessageToolCall
+  }
+
+  if (folderAttachments.length === 1) {
+    const folder = folderAttachments[0]
+    const folderPrefix = `${folder.name.toLocaleLowerCase()}/`
+    const relativePath = requestedPath.toLocaleLowerCase().startsWith(folderPrefix)
+      ? requestedPath.slice(folder.name.length + 1)
+      : requestedPath
+    return {
+      ...toolCall,
+      function: {
+        name: 'attachment_read',
+        arguments: JSON.stringify({ attachmentId: folder.id, relativePath }),
+      },
+    } satisfies OpenAI.Chat.ChatCompletionMessageToolCall
+  }
+
+  return toolCall
+}
+
+function repairAttachmentToolArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+  context: AgentContextSnapshot
+) {
+  if (toolName !== 'attachment_list' && toolName !== 'attachment_read') {
+    return args
+  }
+
+  const attachments = context.attachments || []
+  const requestedAttachmentId = typeof args.attachmentId === 'string' ? args.attachmentId : ''
+  if (attachments.some((attachment) => attachment.id === requestedAttachmentId)) {
+    return args
+  }
+
+  const relativePath = typeof args.relativePath === 'string' ? args.relativePath : ''
+  const hasRelativePaths = Array.isArray(args.relativePaths) && args.relativePaths.length > 0
+  const candidates = toolName === 'attachment_list' || relativePath || hasRelativePaths
+    ? attachments.filter((attachment) => attachment.kind === 'folder')
+    : attachments.filter((attachment) => attachment.kind === 'file')
+
+  if (candidates.length !== 1) {
+    return args
+  }
+
+  return {
+    ...args,
+    attachmentId: candidates[0].id,
+  }
+}
+
+function getRequiredAttachmentReadIds(context: AgentContextSnapshot) {
+  return (context.attachments || [])
+    .filter((attachment) => attachment.kind === 'file' && attachment.readable)
+    .map((attachment) => attachment.id)
+}
+
+function getRequiredAttachmentListIds(context: AgentContextSnapshot) {
+  return (context.attachments || [])
+    .filter((attachment) => attachment.kind === 'folder')
+    .map((attachment) => attachment.id)
+}
+
 function getStringArg(args: Record<string, unknown>, key: string) {
   const value = args[key]
   return typeof value === 'string' ? value : ''
@@ -572,6 +679,10 @@ function selectToolsForContext(
     selectedTools = selectedTools.filter((tool) => tool.category !== 'editor')
   }
 
+  if (!context.attachments?.length) {
+    selectedTools = selectedTools.filter((tool) => tool.category !== 'attachment')
+  }
+
   // The complete catalog is already present in the system prompt. Exposing a
   // second listing tool encourages models to enumerate it repeatedly instead
   // of loading the one matching Skill.
@@ -669,6 +780,7 @@ export class AgentRuntime {
       currentQuote: input.currentQuote,
       availableSkills: input.availableSkills,
       selectedMcpServerIds: input.selectedMcpServerIds,
+      attachments: input.attachments,
     }
 
     const mcpToolCatalog = buildMcpAgentToolCatalog(input.selectedMcpServerIds)
@@ -782,6 +894,89 @@ export class AgentRuntime {
     let activeModelReasoning = ''
     let activeModelContent = ''
     let activeModelStreamedTokenCount = 0
+    let requiredAttachmentReadIds = getRequiredAttachmentReadIds(context)
+    let requiredAttachmentReadId = requiredAttachmentReadIds.shift()
+    let requiredAttachmentListIds = getRequiredAttachmentListIds(context)
+    let requiredAttachmentListId = requiredAttachmentListIds.shift()
+    const discoveredFolderFiles = new Map<string, Set<string>>()
+    const readFolderFiles = new Map<string, Set<string>>()
+
+    const getFolderAttachmentProgress = (
+      toolName: string,
+      args: Record<string, unknown>,
+      result: AgentToolResult
+    ) => {
+      if (!result.ok || (toolName !== 'attachment_list' && toolName !== 'attachment_read')) {
+        return undefined
+      }
+
+      const attachmentId = typeof args.attachmentId === 'string' ? args.attachmentId : ''
+      const attachment = context.attachments?.find((item) => item.id === attachmentId)
+      if (!attachment || attachment.kind !== 'folder') {
+        return undefined
+      }
+
+      if (toolName === 'attachment_list') {
+        const data = result.data && typeof result.data === 'object'
+          ? result.data as { relativePath?: unknown; entries?: unknown }
+          : undefined
+        const relativePath = typeof data?.relativePath === 'string' ? data.relativePath : ''
+        const entries = Array.isArray(data?.entries) ? data.entries : []
+        const discovered = discoveredFolderFiles.get(attachmentId) || new Set<string>()
+
+        for (const value of entries) {
+          if (!value || typeof value !== 'object') continue
+          const entry = value as { name?: unknown; kind?: unknown; readable?: unknown }
+          if (entry.kind !== 'file' || entry.readable !== true || typeof entry.name !== 'string') continue
+          discovered.add(relativePath ? `${relativePath}/${entry.name}` : entry.name)
+        }
+
+        discoveredFolderFiles.set(attachmentId, discovered)
+        return `本次列出了 ${entries.length} 项，其中当前累计发现 ${discovered.size} 个可读取文件。`
+      }
+
+      const relativePath = typeof args.relativePath === 'string' ? args.relativePath : ''
+      const relativePaths = Array.isArray(args.relativePaths)
+        ? args.relativePaths.filter((path): path is string => typeof path === 'string')
+        : []
+      const resultData = result.data && typeof result.data === 'object'
+        ? result.data as { files?: unknown }
+        : undefined
+      const successfulBatchPaths = Array.isArray(resultData?.files)
+        ? resultData.files.flatMap((value) => {
+            if (!value || typeof value !== 'object') return []
+            const file = value as { path?: unknown; ok?: unknown }
+            return file.ok === true && typeof file.path === 'string' ? [file.path] : []
+          })
+        : []
+      const readPaths = successfulBatchPaths.length > 0
+        ? successfulBatchPaths
+        : relativePaths.length === 0 && relativePath
+          ? [relativePath]
+          : []
+      if (readPaths.length === 0) return undefined
+      const read = readFolderFiles.get(attachmentId) || new Set<string>()
+      for (const path of readPaths) {
+        read.add(path)
+      }
+      readFolderFiles.set(attachmentId, read)
+
+      const discovered = discoveredFolderFiles.get(attachmentId)
+      if (!discovered || discovered.size === 0) {
+        return undefined
+      }
+
+      const readCount = [...discovered].filter((path) => read.has(path)).length
+      const unread = [...discovered].filter((path) => !read.has(path))
+      const unreadPreview = unread.slice(0, 20).join('、')
+      const omittedCount = Math.max(0, unread.length - 20)
+      return [
+        `当前已读取 ${readCount}/${discovered.size} 个已发现的可读文件。`,
+        unread.length > 0
+          ? `尚未读取：${unreadPreview}${omittedCount > 0 ? `，另有 ${omittedCount} 个` : ''}。请结合用户请求判断是否需要继续读取。`
+          : '当前已发现的可读文件均已读取。',
+      ].join('\n')
+    }
 
     const getSafeStoppedContent = () => {
       if (toolCalls.length > 0 && !finalContent) {
@@ -832,6 +1027,11 @@ export class AgentRuntime {
       const latest = payloads[payloads.length - 1]
       context.userInput = latest.text
       context.currentQuote = latest.currentQuote
+      context.attachments = latest.attachments ?? context.attachments
+      requiredAttachmentReadIds = getRequiredAttachmentReadIds(context)
+      requiredAttachmentReadId = requiredAttachmentReadIds.shift()
+      requiredAttachmentListIds = getRequiredAttachmentListIds(context)
+      requiredAttachmentListId = requiredAttachmentListIds.shift()
       context.currentEditorState = undefined
       tools = selectToolsForContext(context, allTools, input.permissionMode)
       editorStateReadLocked = false
@@ -935,8 +1135,21 @@ export class AgentRuntime {
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
         const openAITools = agentToolRegistry.toOpenAITools(offeredTools, loadedSkillIds)
+        const requiredAttachmentToolName = requiredAttachmentReadId
+          ? 'attachment_read'
+          : requiredAttachmentListId
+            ? 'attachment_list'
+            : undefined
+        const shouldRequireAttachmentTool = Boolean(
+          requiredAttachmentToolName && offeredToolNames.has(requiredAttachmentToolName)
+        )
         const toolParams = openAITools.length > 0
-          ? { tools: openAITools, tool_choice: 'auto' as const }
+          ? {
+              tools: openAITools,
+              tool_choice: shouldRequireAttachmentTool
+                ? { type: 'function' as const, function: { name: requiredAttachmentToolName! } }
+                : 'auto' as const,
+            }
           : {}
         const stream = await this.recoveryManager.withRetry(() =>
           createChatCompletionStreamWithToolChoiceFallback(client, withFastAiRequestOptions({
@@ -1051,7 +1264,42 @@ export class AgentRuntime {
         streamedTokenCount = estimateTokens(streamedText)
         activeModelStreamedTokenCount = streamedTokenCount
         assistantContent = assistantContent.trim() ? assistantContent : ''
-        const toolUses = toToolCallList(streamedToolCalls)
+        const rawToolUses = toToolCallList(streamedToolCalls)
+        const toolUses = rawToolUses.map((toolCall) => {
+          const rewritten = rewriteWorkspaceReadAsAttachmentRead(toolCall, context)
+          if (rewritten.function.name !== toolCall.function.name) {
+            agentDebugLog('tool_call_auto_routed_to_attachment', {
+              runId,
+              toolCallId: toolCall.id,
+              originalToolName: toolCall.function.name,
+              originalArguments: toolCall.function.arguments,
+              rewrittenToolName: rewritten.function.name,
+              rewrittenArguments: rewritten.function.arguments,
+            })
+          }
+          return rewritten
+        })
+        if (toolUses.length === 0 && requiredAttachmentToolName) {
+          const ignoredContent = assistantContent
+          const attachmentId = requiredAttachmentReadId || requiredAttachmentListId!
+          const syntheticToolCall = {
+            id: createAgentId('tool-call'),
+            type: 'function' as const,
+            function: {
+              name: requiredAttachmentToolName,
+              arguments: JSON.stringify({ attachmentId }),
+            },
+          }
+          toolUses.push(syntheticToolCall)
+          assistantContent = ''
+          agentDebugLog('attachment_tool_forced_after_missing_tool_call', {
+            runId,
+            toolCallId: syntheticToolCall.id,
+            ignoredContent,
+            toolName: requiredAttachmentToolName,
+            attachmentId,
+          })
+        }
         if (steeringInterrupted) {
           finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导')
           if (assistantContent) {
@@ -1208,6 +1456,42 @@ export class AgentRuntime {
               reason: 'Normalized editor line replacement arguments and preserved Markdown structure.',
             })
             args = repairedEditorArgs
+          }
+
+          if (toolName === 'attachment_read' && requiredAttachmentReadId) {
+            const originalArgs = args
+            args = { attachmentId: requiredAttachmentReadId }
+            requiredAttachmentReadId = requiredAttachmentReadIds.shift()
+            agentDebugLog('attachment_read_args_auto_repaired', {
+              runId,
+              toolCallId: toolUse.id,
+              originalArgs,
+              repairedArgs: args,
+            })
+          }
+
+          if (toolName === 'attachment_list' && requiredAttachmentListId) {
+            const originalArgs = args
+            args = { attachmentId: requiredAttachmentListId }
+            requiredAttachmentListId = requiredAttachmentListIds.shift()
+            agentDebugLog('attachment_list_args_auto_repaired', {
+              runId,
+              toolCallId: toolUse.id,
+              originalArgs,
+              repairedArgs: args,
+            })
+          }
+
+          const repairedAttachmentArgs = repairAttachmentToolArgs(toolName, args, context)
+          if (repairedAttachmentArgs !== args) {
+            agentDebugLog('attachment_args_auto_repaired', {
+              runId,
+              toolCallId: toolUse.id,
+              toolName,
+              originalArgs: args,
+              repairedArgs: repairedAttachmentArgs,
+            })
+            args = repairedAttachmentArgs
           }
 
           agentDebugLog('tool_call_received', {
@@ -1617,6 +1901,7 @@ export class AgentRuntime {
                 this.abortController?.signal,
                 context
               )
+          const folderAttachmentProgress = getFolderAttachmentProgress(tool.name, args, result)
           const duration = Date.now() - startedAt
           agentDebugLog('tool_execute_end', {
             runId,
@@ -1657,7 +1942,7 @@ export class AgentRuntime {
             status: result.ok ? 'success' : 'error',
             duration,
             output: result,
-            message: result.message,
+            message: [result.message, folderAttachmentProgress].filter(Boolean).join('\n\n'),
           })
           if (updatedTrace) callbacks.onTrace?.(updatedTrace)
 
@@ -1715,6 +2000,13 @@ export class AgentRuntime {
                   ? '该操作未确认成功。不要用相同参数重复执行；请调整方案、改用其他工具，或向用户说明情况。'
                   : '请根据该结果调整参数、改用其他工具，或直接向用户说明情况；不要无视错误结束对话。',
               ].join('\n\n'),
+            }
+          }
+
+          if (folderAttachmentProgress) {
+            modelFacingResult = {
+              ...modelFacingResult,
+              message: [modelFacingResult.message, folderAttachmentProgress].filter(Boolean).join('\n\n'),
             }
           }
 

@@ -2144,6 +2144,18 @@
           "agentDescription": "智能助手，可執行操作"
         },
         "attachImage": "附加圖片",
+        "addAttachment": {
+          "title": "新增",
+          "image": { "title": "圖片" },
+          "file": { "title": "檔案" },
+          "folder": { "title": "資料夾" },
+          "entryCount": "{count} 項",
+          "remove": "移除 {name}",
+          "metadataOnly": "僅中繼資料",
+          "readFailed": "{count} 個附件讀取失敗",
+          "selectFailed": "選擇附件失敗，請重試",
+          "attachmentOnlyPrompt": "請查看並分析我新增的附件。"
+        },
         "imageAttachment": {
           "selectSuccess": "已附加 {count} 張圖片",
           "pasteSuccess": "已貼上 {count} 張圖片",

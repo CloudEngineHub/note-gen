@@ -22,6 +22,8 @@ import type { RagSource } from "@/lib/rag"
 import { cn } from "@/lib/utils"
 import type { AgentTraceEvent } from "@/lib/agent/types"
 import type { AgentApprovalDecision, AgentSteeringPayload } from "@/lib/agent/types"
+import { serializeChatAttachments, type RuntimeChatAttachment } from '@/lib/chat-attachments'
+import { retainCompletedAgentTraceEvents } from '@/lib/agent/trace-retention'
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -66,11 +68,12 @@ interface ChatSendProps {
   onSent?: () => void;
   linkedResource?: LinkedResource | null;
   attachedImages?: ImageAttachment[];
+  fileAttachments?: RuntimeChatAttachment[];
   quoteData?: QuoteData | null;
   dockStyle?: boolean;
 }
 
-export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ inputValue, onSent, linkedResource, attachedImages = [], quoteData = null, dockStyle = false }, ref) => {
+export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ inputValue, onSent, linkedResource, attachedImages = [], fileAttachments = [], quoteData = null, dockStyle = false }, ref) => {
   const { primaryModel, agentPermissionMode } = useSettingStore()
   const { currentTagId } = useTagStore()
   const {
@@ -92,6 +95,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
   const activeRunRef = useRef(false)
   const repeatedScriptApprovalRef = useRef<{ signature: string; count: number }>({ signature: '', count: 0 })
   const t = useTranslations()
+  const requestText = inputValue.trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt')
 
   // 跟踪上一次的 loading 状态
   const wasLoadingRef = useRef(false)
@@ -386,6 +390,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
             fullContent: quoteData.fullContent,
           }
         : undefined,
+      attachments: fileAttachments,
       onFinalAnswerRender: (markdownContent) => {
         // 检测到 Final Answer 时触发渲染
         setAgentState({
@@ -402,7 +407,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           || manualStopRequestedRef.current
           || isRequestAbortError(result)
         const completedAt = Date.now()
-        const traceEvents = (agentState.traceEvents || []).map(event => {
+        const completedTraceEvents = (agentState.traceEvents || []).map(event => {
           if (event.status !== 'running') {
             return event
           }
@@ -413,6 +418,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
             duration: event.duration ?? Math.max(0, completedAt - event.timestamp),
           }
         })
+        const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
         // 使用 agentState.completedSteps 而不是 steps 参数，因为 completedSteps 包含 duration 信息
         const agentHistory = {
           steps: agentState.completedSteps || [],
@@ -429,7 +435,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         if (effectivelyStopped) {
           const lastDisplayableContent = getLastDisplayableAgentContent(
             agentState.finalAnswerContent,
-            traceEvents
+            completedTraceEvents
           )
           if (lastDisplayableContent) {
             finalContent = lastDisplayableContent
@@ -476,7 +482,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         setAgentState({
           activeChatId: undefined,
           isFinalAnswerMode: false,
-          finalAnswerContent: undefined
+          finalAnswerContent: undefined,
+          traceEvents,
         })
 
         // 清空 ref
@@ -492,7 +499,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           currentState.agentState.traceEvents || []
         )
         const stoppedAt = Date.now()
-        const traceEvents = (currentState.agentState.traceEvents || []).map(event => {
+        const completedTraceEvents = (currentState.agentState.traceEvents || []).map(event => {
           if (event.status !== 'running') {
             return event
           }
@@ -503,6 +510,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
             duration: event.duration ?? Math.max(0, stoppedAt - event.timestamp),
           }
         })
+        const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
         const agentHistory = {
           steps: currentState.agentState.completedSteps || [],
           toolCalls: currentState.agentState.toolCalls,
@@ -541,6 +549,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           status: aborted ? 'stopped' : 'failed',
           isRunning: false,
           isThinking: false,
+          traceEvents,
         })
 
         // 清空 ref
@@ -575,7 +584,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       if (isRagEnabled) {
         try {
           // 基于 TextRank 算法提取前 15 个关键词（增加数量以提高召回率）
-          let keywords = await invoke<{text: string, weight: number}[]>('rank_keywords', { text: inputValue, topK: 15 })
+          let keywords = await invoke<{text: string, weight: number}[]>('rank_keywords', { text: requestText, topK: 15 })
 
           // 过滤掉停用词（如"是"、"的"等没有检索意义的虚词）
           keywords = filterRAGKeywords(keywords)
@@ -802,7 +811,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       )
 
       agentDebugLog('chat_messages_built', {
-        userInput: inputValue,
+        userInput: requestText,
         contextLength: context.length,
         messageCount: messages.length,
         messages: messages.map((message, index) => ({
@@ -813,7 +822,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         })),
       })
 
-      await agentHandler.execute(inputValue, messages, imageUrls)
+      await agentHandler.execute(requestText, messages, imageUrls)
     } catch (error) {
       console.error('Agent execution error:', error)
     } finally {
@@ -824,11 +833,11 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 
   // 对话（Agent 模式）
   async function handleSubmit() {
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() && attachedImages.length === 0 && fileAttachments.length === 0) return
 
     if (activeRunRef.current) {
       const sequence = ++steeringSequenceRef.current
-      const text = inputValue
+      const text = requestText
       const imageUrls = attachedImages.map(img => img.url)
       const steeringQuote = quoteData ? {
         fileName: quoteData.fileName,
@@ -856,6 +865,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
           imageUrls,
           additionalContext,
           currentQuote: steeringQuote,
+          attachments: fileAttachments,
         }
         if (agentHandlerRef.current) {
           agentHandlerRef.current.steer(payload)
@@ -881,6 +891,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         type: 'chat',
         inserted: false,
         images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
+        attachments: fileAttachments.length > 0 ? serializeChatAttachments(fileAttachments) : undefined,
         quoteData: quoteData ? JSON.stringify(quoteData) : undefined,
       })
       await handleAgentMode(imageUrls)
@@ -911,7 +922,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     setLoading(false)
   }
 
-  const hasInput = Boolean(inputValue.trim())
+  const hasInput = Boolean(inputValue.trim() || attachedImages.length > 0 || fileAttachments.length > 0)
   const showStop = loading && !hasInput
 
   return <TooltipButton

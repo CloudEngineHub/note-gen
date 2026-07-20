@@ -2147,6 +2147,18 @@
           "agentDescription": "スマートアシスタント、アクション実行可能"
         },
         "attachImage": "画像を添付",
+        "addAttachment": {
+          "title": "追加",
+          "image": { "title": "画像" },
+          "file": { "title": "ファイル" },
+          "folder": { "title": "フォルダ" },
+          "entryCount": "{count} 件",
+          "remove": "{name} を削除",
+          "metadataOnly": "メタデータのみ",
+          "readFailed": "{count} 件の添付ファイルを読み取れませんでした",
+          "selectFailed": "添付ファイルを選択できませんでした。もう一度お試しください",
+          "attachmentOnlyPrompt": "追加した添付ファイルを確認して分析してください。"
+        },
         "imageAttachment": {
           "selectSuccess": "{count} 枚の画像を添付しました",
           "pasteSuccess": "{count} 枚の画像を貼り付けました",

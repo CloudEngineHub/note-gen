@@ -33,7 +33,7 @@ interface AgentRunTimelineProps {
 
 function eventIcon(event: AgentTraceEvent) {
   if (event.status === "error") {
-    return <AlertTriangle className="text-destructive" />
+    return <AlertTriangle />
   }
 
   if (event.status === "running") {
@@ -75,6 +75,10 @@ function hasMeaningfulTraceDetail(value: unknown) {
 }
 
 function shouldShowTraceEvent(event: AgentTraceEvent) {
+  if (event.type === "model_call" || event.type === "model_response") {
+    return event.status === "running"
+  }
+
   if (event.type === "final") {
     return false
   }
@@ -84,15 +88,6 @@ function shouldShowTraceEvent(event: AgentTraceEvent) {
   }
 
   if (event.type === "approval") {
-    return false
-  }
-
-  if (
-    (event.type === "model_call" || event.type === "model_response") &&
-    event.status === "success" &&
-    !hasMeaningfulTraceDetail(event.output) &&
-    event.duration === undefined
-  ) {
     return false
   }
 
@@ -173,7 +168,20 @@ function formatTraceDetail(value: unknown) {
   }
 }
 
-function compactTraceInput(value: unknown) {
+function compactTraceInput(event: AgentTraceEvent) {
+  const value = event.input
+
+  if (
+    (event.toolName === "attachment_list" || event.toolName === "attachment_read") &&
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    const visibleInput = { ...value as Record<string, unknown> }
+    delete visibleInput.attachmentId
+    return hasMeaningfulTraceDetail(visibleInput) ? visibleInput : undefined
+  }
+
   return hasMeaningfulTraceDetail(value) ? value : undefined
 }
 
@@ -239,7 +247,7 @@ function statusIcon(status: AgentRunStatus, isRunning: boolean) {
   }
 
   if (status === "failed") {
-    return <AlertTriangle className="text-destructive" />
+    return <AlertTriangle />
   }
 
   return <CheckCircle2 />
@@ -351,7 +359,7 @@ export function AgentRunTimeline({
             const visibleMessage = shouldShowEventMessage(event) ? event.message : undefined
             const modelResponseContent = getModelResponseContent(event)
             const modelReasoningContent = getModelReasoningContent(event)
-            const inputDetail = compactTraceInput(event.input)
+            const inputDetail = compactTraceInput(event)
             const outputDetail = modelResponseContent ? undefined : compactTraceOutput(event, visibleMessage)
             const hasTraceDetails = Boolean(
               visibleMessage || inputDetail !== undefined || outputDetail !== undefined
