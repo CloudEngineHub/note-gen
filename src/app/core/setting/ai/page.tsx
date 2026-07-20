@@ -15,12 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Accordion,
-} from "@/components/ui/accordion"
 import Image from "next/image";
 
-import { SettingType, FormItem } from "../components/setting-base";
+import { SettingType } from "../components/setting-base";
 import { AiConfig, ModelConfig, ProxyMode, builtinProviderTemplates } from "../config";
 import useSettingStore from "@/stores/setting";
 import { noteGenModelKeys } from "@/app/model-config";
@@ -31,6 +28,8 @@ import ModelCard from "./model-card";
 import CreateConfig from "./create";
 import { getCachedProviderTemplates, getProviderTemplateMatch, loadProviderTemplates } from "@/lib/ai/provider-templates-runtime";
 import { isValidProxyURL } from "@/lib/ai/tauri-client";
+import { Field, FieldDescription, FieldError, FieldTitle } from "@/components/ui/field";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 
 export default function AiPage() {
@@ -313,9 +312,10 @@ export default function AiPage() {
       />
       
       {userCustomModels.length > 0 && (
-        <div className="space-y-8">
+        <div className="flex flex-col gap-8">
           {/* AI配置选择 */}
-          <FormItem title={t('modelConfigTitle')} desc={t('modelConfigDesc')}>
+          <Field>
+            <FieldTitle>{t('modelConfigTitle')}</FieldTitle>
               <div className="flex items-center gap-2 md:flex-row flex-col">
                 <Select value={selectedAiConfig} onValueChange={setSelectedAiConfig}>
                   <SelectTrigger className="w-full">
@@ -350,43 +350,48 @@ export default function AiPage() {
                   </Button>
                 </div>
               </div>
-          </FormItem>
+            <FieldDescription>{t('modelConfigDesc')}</FieldDescription>
+          </Field>
 
           {/* 当前配置的基础设置 */}
           {currentConfig && (
             <>
               {/* 供应商模板配置信息显示 */}
               {currentProviderTemplate && (
-                <FormItem title={t('providerInfo')}>
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                <Field>
+                  <FieldTitle>{t('providerInfo')}</FieldTitle>
+                    <Item variant="muted">
                       {currentProviderTemplate.icon && (
-                        <Image 
-                          src={currentProviderTemplate.icon || ''} 
-                          alt={currentConfig.title}
-                          width={32}
-                          height={32}
-                          className="w-8 h-8 rounded"
-                        />
+                        <ItemMedia variant="image">
+                          <Image
+                            src={currentProviderTemplate.icon || ''}
+                            alt={currentConfig.title}
+                            width={40}
+                            height={40}
+                          />
+                        </ItemMedia>
                       )}
-                      <div>
-                        <div className="font-medium">{currentConfig.title}</div>
-                        <div className="text-sm text-muted-foreground">{currentConfig.baseURL}</div>
-                      </div>
-                    </div>
-                </FormItem>
+                      <ItemContent>
+                        <ItemTitle>{currentConfig.title}</ItemTitle>
+                        <ItemDescription>{currentConfig.baseURL}</ItemDescription>
+                      </ItemContent>
+                    </Item>
+                </Field>
               )}
               {loadingTemplates && currentConfig?.templateSource === 'remote' && !currentProviderTemplate && (
-                <FormItem title={t('providerInfo')}>
+                <Field>
+                  <FieldTitle>{t('providerInfo')}</FieldTitle>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <LoaderCircle className="size-4 animate-spin" />
                     <span>正在获取供应商模板信息...</span>
                   </div>
-                </FormItem>
+                </Field>
               )}
 
               {/* 配置名称 - 只有非供应商模板配置才显示 */}
               {!currentProviderTemplate && (
-                <FormItem title={t('modelTitle')} desc={t('modelTitleDesc')}>
+                <Field>
+                  <FieldTitle>{t('modelTitle')}</FieldTitle>
                     <Input 
                       key={currentConfig.key}
                       defaultValue={currentConfig.title}
@@ -405,21 +410,25 @@ export default function AiPage() {
                         }, 0)
                       }}
                     />
-                </FormItem>
+                  <FieldDescription>{t('modelTitleDesc')}</FieldDescription>
+                </Field>
               )}
 
               {/* BaseURL - 只有非供应商模板配置才显示 */}
               {!currentProviderTemplate && (
-                <FormItem title="BaseURL" desc={t('modelBaseUrlDesc')}>
+                <Field>
+                  <FieldTitle>BaseURL</FieldTitle>
                     <Input 
                       value={currentConfig.baseURL || ''} 
                       onChange={(e) => updateAiConfig({...currentConfig, baseURL: e.target.value})} 
                     />
-                </FormItem>
+                  <FieldDescription>{t('modelBaseUrlDesc')}</FieldDescription>
+                </Field>
               )}
 
               {/* API Key */}
-              <FormItem title="API Key">
+              <Field>
+                  <FieldTitle>API Key</FieldTitle>
                   <div className="flex gap-2">
                     <Input 
                       className="flex-1" 
@@ -438,9 +447,10 @@ export default function AiPage() {
                       />
                     )}
                   </div>
-              </FormItem>
+              </Field>
 
-              <FormItem title={t('proxyModeTitle')} desc={t('proxyModeDesc')}>
+              <Field>
+                <FieldTitle>{t('proxyModeTitle')}</FieldTitle>
                 <div className="flex w-full flex-col gap-2" data-invalid={proxyURLInvalid || undefined}>
                   <Select
                     value={currentConfig.proxyMode || 'inherit'}
@@ -474,17 +484,19 @@ export default function AiPage() {
                     />
                   )}
                   {proxyURLInvalid && (
-                    <p id="ai-provider-proxy-url-error" role="alert" className="text-sm text-destructive">
+                    <FieldError id="ai-provider-proxy-url-error">
                       {t('proxyURLInvalid')}
-                    </p>
+                    </FieldError>
                   )}
                 </div>
-              </FormItem>
+                <FieldDescription>{t('proxyModeDesc')}</FieldDescription>
+              </Field>
 
               {/* 自定义Headers */}
               {!currentProviderTemplate && (
-                <FormItem title={t('customHeaders')} desc={t('customHeadersDesc')}>
-                    <div className="space-y-2">
+                <Field>
+                  <FieldTitle>{t('customHeaders')}</FieldTitle>
+                    <div className="flex flex-col gap-2">
                       {headerPairs.map((pair, index) => (
                         <div key={pair.id} className="flex gap-2 items-center">
                           <Input
@@ -539,36 +551,42 @@ export default function AiPage() {
                         {t('addHeader')}
                       </Button>
                     </div>
-                </FormItem>
+                  <FieldDescription>{t('customHeadersDesc')}</FieldDescription>
+                </Field>
               )}
 
               {/* 模型配置区域 */}
-              <FormItem title={t('models')}>
-                  <div className="space-y-4">
+              <Field>
+                  <FieldTitle>{t('models')}</FieldTitle>
+                  <div className="flex flex-col gap-4">
                     {/* 模型卡片列表 */}
-                    <Accordion 
-                      type="multiple" 
-                      className="space-y-2"
-                      value={expandedModels}
-                      onValueChange={setExpandedModels}
-                    >
+                    <div className="flex flex-col gap-2">
                       {(currentConfig.models || []).map((modelConfig) => (
                         <ModelCard
                           key={modelConfig.id}
                           modelConfig={modelConfig}
                           aiConfig={currentConfig}
+                          open={expandedModels.includes(modelConfig.id)}
+                          onOpenChange={(open) => {
+                            setExpandedModels((current) => open
+                              ? current.includes(modelConfig.id)
+                                ? current
+                                : [...current, modelConfig.id]
+                              : current.filter((id) => id !== modelConfig.id)
+                            )
+                          }}
                           onUpdate={updateModelConfig}
                           onDelete={deleteModel}
                         />
                       ))}
-                    </Accordion>
+                    </div>
                     {/* 添加模型按钮 */}
                     <Button onClick={addNewModel} className="w-full">
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus data-icon="inline-start" />
                       {t('addModel')}
                     </Button>
                   </div>
-              </FormItem>
+              </Field>
             </>
           )}
         </div>

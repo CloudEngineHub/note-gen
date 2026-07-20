@@ -5,7 +5,6 @@ import { SettingType } from '../components/setting-base'
 import { MessageSquare } from 'lucide-react'
 import { CondenseSettings } from './condense-settings'
 import { DefaultModelsSettings } from '../components/default-models-settings'
-import { ToolbarSettings } from './toolbar-settings'
 
 export default function ChatSettingsPage() {
   const t = useTranslations('settings.chat')
@@ -17,9 +16,8 @@ export default function ChatSettingsPage() {
       desc={t('desc')}
       icon={<MessageSquare className="size-4 lg:size-6" />}
     >
-      <div className="space-y-4">
+      <div className="flex flex-col gap-6">
         <DefaultModelsSettings type="chat" />
-        <ToolbarSettings />
         <CondenseSettings />
       </div>
     </SettingType>

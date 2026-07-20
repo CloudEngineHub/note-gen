@@ -13,7 +13,6 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { builtinProviderTemplates } from "../config";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -23,6 +22,15 @@ import { AiConfig } from "../config";
 import * as React from "react"
 import { v4 } from 'uuid';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
 import useSettingStore from "@/stores/setting";
 import { useLocalStorage } from "react-use";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -116,7 +124,9 @@ function CreateConfigDialog({ open, setOpen, onConfigCreated }: { open: boolean;
 
   const content = (
     <>
-      <ProviderItem item={customModel} onClick={() => addCustomModelHandler(customModel)}/>
+      <ItemGroup>
+        <ProviderItem item={customModel} onClick={() => addCustomModelHandler(customModel)}/>
+      </ItemGroup>
       {loadingTemplates && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
           <LoaderCircle className="size-4 animate-spin" />
@@ -126,11 +136,11 @@ function CreateConfigDialog({ open, setOpen, onConfigCreated }: { open: boolean;
       {!loadingTemplates && providerTemplates.length > 0 && (
         <>
           <p className="text-xs text-muted-foreground">供应商模板</p>
-          <div className="overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">
+          <ItemGroup className="grid grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
             {providerTemplates.map((item, index) => (
               <ProviderItem key={index} item={item} onClick={() => addCustomModelHandler(item)}/>
             ))}
-          </div>
+          </ItemGroup>
         </>
       )}
     </>
@@ -146,7 +156,7 @@ function CreateConfigDialog({ open, setOpen, onConfigCreated }: { open: boolean;
               {t('createDesc')}
             </DrawerDescription>
           </DrawerHeader>
-          <div className="space-y-3 px-4 pb-6 overflow-y-auto">
+          <div className="flex flex-col gap-3 overflow-y-auto px-4 pb-6">
             {content}
           </div>
         </DrawerContent>
@@ -178,39 +188,36 @@ export default function CreateConfig({ hasCustomModels = false, onConfigCreated 
     return (
       <div className="mb-6">
         <Button onClick={() => setOpen(true)}>
-          <Plus />{t('create')}
+          <Plus data-icon="inline-start" />{t('create')}
         </Button>
         <CreateConfigDialog open={open} setOpen={setOpen} onConfigCreated={onConfigCreated} />
       </div>
     )
   }
 
-  // 没有自定义模型时，显示完整的Card
+  // 没有自定义模型时，显示完整的创建入口
   return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          {t('createSection.title')}
-        </CardTitle>
-        <CardDescription>
-          {t('createSection.descWithoutModels')}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Item variant="outline" className="mb-6">
+      <ItemMedia variant="icon"><Settings /></ItemMedia>
+      <ItemContent>
+        <ItemTitle>{t('createSection.title')}</ItemTitle>
+        <ItemDescription>{t('createSection.descWithoutModels')}</ItemDescription>
+      </ItemContent>
+      <ItemActions>
         <Button onClick={() => setOpen(true)}>
-          <Plus />{t('create')}
+          <Plus data-icon="inline-start" />{t('create')}
         </Button>
         <CreateConfigDialog open={open} setOpen={setOpen} onConfigCreated={onConfigCreated} />
-      </CardContent>
-    </Card>
+      </ItemActions>
+    </Item>
   )
 }
 
 function ProviderItem({item, onClick}: {item: AiConfig, onClick: (model: AiConfig) => void}) {
   return (
-    <div onClick={() => onClick(item)} className="h-12 flex items-center rounded-md gap-2 justify-between p-2 border hover:text-third hover:bg-third-foreground cursor-pointer">
-        <div className="flex items-center gap-2">
+    <Item asChild variant="outline" size="sm" className="hover:bg-muted">
+      <button type="button" onClick={() => onClick(item)}>
+        <ItemMedia variant={item.icon ? "default" : "icon"}>
           {item.icon ? (
             <Avatar size="sm" className="bg-white">
               <AvatarImage className="object-contain p-1" src={item.icon} alt={item.title} />
@@ -219,13 +226,16 @@ function ProviderItem({item, onClick}: {item: AiConfig, onClick: (model: AiConfi
               </AvatarFallback>
             </Avatar>
           ) : (
-            <div className="flex size-6 items-center justify-center rounded bg-white">
-              <BotMessageSquare className="size-4 text-primary" />
-            </div>
+            <BotMessageSquare className="text-muted-foreground" />
           )}
-          <p className="text-sm font-bold">{item.title}</p>
-        </div>
-        <ChevronRight className="size-4" />
-      </div>
+        </ItemMedia>
+        <ItemContent>
+          <ItemTitle>{item.title}</ItemTitle>
+        </ItemContent>
+        <ItemActions>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </ItemActions>
+      </button>
+    </Item>
     )
 }

@@ -1,7 +1,6 @@
 import { useTranslations } from 'next-intl';
 import { RefreshCw, Trash, FileText, Layers, Hash, Target } from "lucide-react";
 import useRagSettingsStore from "@/stores/ragSettings";
-import { FormItem } from "../components/setting-base";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
@@ -9,6 +8,7 @@ import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemActions, ItemDe
 import { clearVectorDb, initVectorDb } from "@/db/vector";
 import { toast } from "@/hooks/use-toast";
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { Field, FieldTitle } from "@/components/ui/field";
 
 export function Settings() {
   const t = useTranslations('settings.rag');
@@ -85,7 +85,8 @@ export function Settings() {
 
   return (
     <>
-      <FormItem title={t('settingsTitle')}>
+      <Field>
+        <FieldTitle>{t('settingsTitle')}</FieldTitle>
         <ItemGroup className="gap-4">
           {settings.map((setting) => {
             const Icon = setting.icon
@@ -119,7 +120,7 @@ export function Settings() {
           )
           })}
         </ItemGroup>
-      </FormItem>
+      </Field>
       <div className="flex gap-2 mt-4">
         <Button variant="outline" onClick={resetToDefaults}>
           <RefreshCw className="size-4 mr-2" /> {t('resetToDefaults')}

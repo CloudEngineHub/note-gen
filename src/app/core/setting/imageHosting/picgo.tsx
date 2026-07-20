@@ -6,6 +6,8 @@ import useImageStore from "@/stores/imageHosting";
 import { checkPicgoState, type PicgoImageHostingSetting } from "@/lib/imageHosting/picgo";
 import { CheckCircle, LoaderCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
 
 const DEFAULT_URL = 'http://127.0.0.1:36677'
 
@@ -76,37 +78,30 @@ export default function PicgoImageHosting() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>PicGo 图床</CardTitle>
-            <CardDescription>
-              使用 PicGo 客户端作为图片上传工具
-            </CardDescription>
-          </div>
-        </div>
+        <CardTitle>PicGo 图床</CardTitle>
+        <CardDescription>使用 PicGo 客户端作为图片上传工具</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 状态显示 */}
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">连接状态</span>
-          <div className="flex items-center gap-2">
-            {getStatusIcon()}
-            <span className="text-sm">{getStatusText()}</span>
-          </div>
-        </div>
-
-
-        {/* URL 配置 */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">PicGo Server</label>
-          <Input
-            type="text"
-            value={url}
-            onChange={(e) => handleSaveUrl(e.target.value)}
-            placeholder="http://127.0.0.1:36677"
-          />
-        </div>
-
+      <CardContent>
+        <FieldGroup>
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>连接状态</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              {getStatusIcon()}
+              <span className="text-sm">{getStatusText()}</span>
+            </ItemActions>
+          </Item>
+          <Field>
+            <FieldLabel htmlFor="picgo-server">PicGo Server</FieldLabel>
+            <Input
+              id="picgo-server"
+              value={url}
+              onChange={(e) => handleSaveUrl(e.target.value)}
+              placeholder="http://127.0.0.1:36677"
+            />
+          </Field>
+        </FieldGroup>
       </CardContent>
     </Card>
   )

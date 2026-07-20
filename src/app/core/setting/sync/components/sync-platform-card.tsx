@@ -10,6 +10,27 @@ import { SyncStateEnum } from "@/lib/sync/github.types"
 import { SyncPlatform } from "@/types/sync"
 import { RefreshCcw, Loader2, AlertCircle, CheckCircle2, XCircle } from "lucide-react"
 import { TokenInputControl } from "./token-input-control"
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
+import { Separator } from "@/components/ui/separator"
 
 export interface SyncPlatformConfig {
   platform: SyncPlatform
@@ -94,44 +115,57 @@ export function SyncPlatformCard({
   const isLoading = syncRepoState === SyncStateEnum.checking || syncRepoState === SyncStateEnum.creating
 
   return (
-    <div className="rounded-md border p-4">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex gap-2 items-center">
-          <span className="font-semibold">
-            {config.platform.charAt(0).toUpperCase() + config.platform.slice(1)} {t('settings.sync.settings')}
-          </span>
-        </div>
-        <StatusBadge state={syncRepoState} />
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">{t('settings.sync.platformDesc')}</p>
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {config.platform.charAt(0).toUpperCase() + config.platform.slice(1)} {t('settings.sync.settings')}
+        </CardTitle>
+        <CardDescription>{t('settings.sync.platformDesc')}</CardDescription>
+        <CardAction><StatusBadge state={syncRepoState} /></CardAction>
+      </CardHeader>
 
-      {/* Token 输入 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium">{config.tokenLabel}</label>
-        <TokenInputControl
-          value={accessToken}
-          onChange={handleTokenChange}
-          visible={tokenVisible}
-          onVisibleChange={setTokenVisible}
-          tokenUrl={config.tokenUrl}
-          placeholder={t('settings.sync.enterToken')}
-          disabled={isInitializing}
-        />
-      </div>
+      <CardContent className="flex flex-col gap-4">
+        <FieldGroup>
+          <Field>
+            <FieldLabel>{config.tokenLabel}</FieldLabel>
+            <TokenInputControl
+              value={accessToken}
+              onChange={handleTokenChange}
+              visible={tokenVisible}
+              onVisibleChange={setTokenVisible}
+              tokenUrl={config.tokenUrl}
+              placeholder={t('settings.sync.enterToken')}
+              disabled={isInitializing}
+            />
+          </Field>
+          <Field>
+            <FieldLabel>{t('settings.sync.customSyncRepo')}</FieldLabel>
+            <Input
+              value={customRepo}
+              onChange={(e) => setCustomRepo(e.target.value)}
+              placeholder={defaultRepoName}
+            />
+            <FieldDescription>{t('settings.sync.customSyncRepoDesc')}</FieldDescription>
+          </Field>
+        </FieldGroup>
 
-      {/* 自定义仓库 */}
-      <div className="mt-4 space-y-2">
-        <label className="text-sm font-medium">{t('settings.sync.customSyncRepo')}</label>
-        <Input
-          value={customRepo}
-          onChange={(e) => setCustomRepo(e.target.value)}
-          placeholder={defaultRepoName}
-        />
-        <p className="text-xs text-muted-foreground">{t('settings.sync.customSyncRepoDesc')}</p>
-      </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle />
+            <AlertTitle>{t('settings.sync.settings')}</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {/* 操作按钮 */}
-      <div className="mt-4 flex gap-2 flex-wrap">
+        {syncRepoInfo && (
+          <>
+            <Separator />
+            {children}
+          </>
+        )}
+      </CardContent>
+
+      <CardFooter className="flex-wrap gap-2">
         {accessToken ? (
           <>
             <Button
@@ -142,48 +176,33 @@ export function SyncPlatformCard({
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="size-4 mr-1 animate-spin" />
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
                   {syncRepoState === SyncStateEnum.checking
                     ? t('settings.sync.checking')
                     : t('settings.sync.creating')}
                 </>
               ) : (
                 <>
-                  <RefreshCcw className="size-4 mr-1" />
+                  <RefreshCcw data-icon="inline-start" />
                   {t('settings.sync.checkRepo')}
                 </>
               )}
             </Button>
             {syncRepoState === SyncStateEnum.fail && (
               <Button variant="outline" size="sm" onClick={onCreateRepo} disabled={isLoading}>
-                <Loader2 className={`size-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                <Loader2 data-icon="inline-start" className={isLoading ? 'animate-spin' : undefined} />
                 {t('settings.sync.createRepo')}
               </Button>
             )}
           </>
         ) : (
-          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-            <AlertCircle className="size-4" />
-            {t('settings.sync.enterTokenHint')}
-          </div>
+          <Alert>
+            <AlertCircle />
+            <AlertDescription>{t('settings.sync.enterTokenHint')}</AlertDescription>
+          </Alert>
         )}
-      </div>
-
-      {/* 错误提示 */}
-      {error && (
-        <div className="mt-3 flex items-center gap-2 text-sm text-red-500">
-          <AlertCircle className="size-4" />
-          {error}
-        </div>
-      )}
-
-      {/* 仓库信息 */}
-      {syncRepoInfo && (
-        <div className="border-t mt-4 pt-4">
-          {children}
-        </div>
-      )}
-    </div>
+      </CardFooter>
+    </Card>
   )
 }
 
@@ -191,8 +210,8 @@ export function SyncPlatformCard({
 function StatusBadge({ state }: { state: SyncStateEnum }) {
   if (state === SyncStateEnum.success) {
     return (
-      <Badge className="bg-green-600">
-        <CheckCircle2 className="size-3 mr-1" />
+      <Badge>
+        <CheckCircle2 data-icon="inline-start" />
         Connected
       </Badge>
     )
@@ -200,8 +219,8 @@ function StatusBadge({ state }: { state: SyncStateEnum }) {
 
   if (state === SyncStateEnum.checking || state === SyncStateEnum.creating) {
     return (
-      <Badge className="bg-blue-600">
-        <Loader2 className="size-3 mr-1 animate-spin" />
+      <Badge variant="secondary">
+        <Loader2 data-icon="inline-start" className="animate-spin" />
         {state === SyncStateEnum.checking ? 'Checking' : 'Creating'}
       </Badge>
     )
@@ -209,8 +228,8 @@ function StatusBadge({ state }: { state: SyncStateEnum }) {
 
   if (state === SyncStateEnum.fail) {
     return (
-      <Badge className="bg-zinc-500">
-        <XCircle className="size-3 mr-1" />
+      <Badge variant="outline">
+        <XCircle data-icon="inline-start" />
         Not Connected
       </Badge>
     )

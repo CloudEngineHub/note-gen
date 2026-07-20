@@ -15,6 +15,7 @@ import {
 } from '@/config/editor-shortcuts'
 import useEditorShortcutStore from '@/stores/editor-shortcut'
 import { EditorShortcutInput } from './editor-shortcut-input'
+import { SettingSection } from '../components/setting-base'
 
 const editorShortcutGroups: EditorShortcutGroup[] = [
   'basic',
@@ -29,11 +30,7 @@ export function EditorShortcutsSection() {
   const shortcuts = useEditorShortcutStore((state) => state.shortcuts)
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-base font-semibold">{t('editorShortcuts.title')}</h3>
-        <p className="text-sm text-muted-foreground">{t('editorShortcuts.desc')}</p>
-      </div>
+    <SettingSection title={t('editorShortcuts.title')} desc={t('editorShortcuts.desc')}>
       {editorShortcutGroups.map((group) => (
         <div key={group} className="flex flex-col gap-2">
           <h4 className="text-sm font-medium text-muted-foreground">
@@ -67,7 +64,7 @@ export function EditorShortcutsSection() {
           </ItemGroup>
         </div>
       ))}
-    </div>
+    </SettingSection>
   )
 }
 

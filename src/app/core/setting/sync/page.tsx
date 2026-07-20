@@ -7,7 +7,7 @@ import { GitlabSync } from "./gitlab-sync";
 import { GiteaSync } from "./gitea-sync";
 import { S3Sync } from "./s3-sync";
 import { WebDAVSync } from "./webdav-sync";
-import { SettingType } from '../components/setting-base';
+import { SettingSection, SettingType } from '../components/setting-base';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, RefreshCcw } from "lucide-react"
 import useSettingStore from "@/stores/setting";
@@ -15,7 +15,7 @@ import { useState, useEffect } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { SYNC_PLATFORMS, SyncPlatform } from "@/types/sync";
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemMedia } from "@/components/ui/item";
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup, ItemMedia } from "@/components/ui/item";
 import useSyncStore from "@/stores/sync";
 import { SyncStateEnum } from "@/lib/sync/github.types";
 import { Switch } from "@/components/ui/switch";
@@ -219,9 +219,7 @@ export default function SyncPage() {
 
   return (
     <SettingType id="sync" icon={<FileUp />} title={t('settings.sync.title')} desc={t('settings.sync.desc')}>
-      {/* 平台选择器 */}
-      <div className="mb-6">
-        <h3 className="text-sm mb-2 font-bold">{t('settings.sync.platformSettings')}</h3>
+      <SettingSection title={t('settings.sync.platformSettings')}>
         <Select value={tab} onValueChange={handleTabChange}>
           <SelectTrigger className="w-50">
             <SelectValue placeholder={t('settings.sync.selectPlatform')} />
@@ -234,14 +232,11 @@ export default function SyncPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
+        {renderSyncContent()}
+      </SettingSection>
 
-      {/* 同步平台内容 */}
-      {renderSyncContent()}
-
-      {/* 笔记设置 */}
-      <div className="mt-4">
-        <h3 className="text-sm mb-2 font-bold">{t('settings.sync.noteSettings')}</h3>
+      <SettingSection title={t('settings.sync.noteSettings')}>
+        <ItemGroup>
         <Item variant="outline">
           <ItemMedia variant="icon"><RefreshCcw className="size-4" /></ItemMedia>
           <ItemContent>
@@ -273,7 +268,7 @@ export default function SyncPage() {
         </Item>
 
         {/* 打开文件时自动拉取 */}
-        <Item variant="outline" className="mt-2">
+        <Item variant="outline">
           <ItemMedia variant="icon"><FileDown className="size-4" /></ItemMedia>
           <ItemContent>
             <ItemTitle>{t('settings.sync.autoPullOnOpen')}</ItemTitle>
@@ -289,7 +284,7 @@ export default function SyncPage() {
         </Item>
 
         {/* 切换文件时自动拉取 */}
-        <Item variant="outline" className="mt-2">
+        <Item variant="outline">
           <ItemMedia variant="icon"><Files className="size-4" /></ItemMedia>
           <ItemContent>
             <ItemTitle>{t('settings.sync.autoPullOnSwitch')}</ItemTitle>
@@ -303,13 +298,11 @@ export default function SyncPage() {
             />
           </ItemActions>
         </Item>
-      </div>
+        </ItemGroup>
+      </SettingSection>
 
-      {/* 记录与配置设置 */}
-      <div className="mt-4">
-        <h3 className="text-sm mb-2 font-bold">{t('settings.sync.recordConfigSettings')}</h3>
-
-        {/* 记录和配置自动同步 */}
+      <SettingSection title={t('settings.sync.recordConfigSettings')}>
+        <ItemGroup>
         <Item variant="outline">
           <ItemMedia variant="icon"><UploadCloud className="size-4" /></ItemMedia>
           <ItemContent>
@@ -325,7 +318,7 @@ export default function SyncPage() {
         </Item>
 
         {shouldShowInitialSyncChoice && (
-          <Alert className="mt-2">
+          <Alert>
             <ShieldCheck />
             <AlertTitle>{t('settings.sync.autoDataSyncInitialTitle')}</AlertTitle>
             <AlertDescription>
@@ -349,7 +342,7 @@ export default function SyncPage() {
           </Alert>
         )}
 
-        <Item variant="outline" className="mt-2">
+        <Item variant="outline">
           <ItemMedia variant="icon"><ShieldCheck className="size-4" /></ItemMedia>
           <ItemContent>
             <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
@@ -362,7 +355,8 @@ export default function SyncPage() {
             />
           </ItemActions>
         </Item>
-      </div>
+        </ItemGroup>
+      </SettingSection>
     </SettingType>
   )
 }

@@ -61,6 +61,7 @@ import { getTemplateRangeLabel } from "@/lib/template-range-utils"
 import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, FolderOpen, Home, ListChecks, Pencil, Search, Settings2, X, Zap } from "lucide-react"
 import type { Mark } from "@/db/marks"
 import { MarkItem } from "./mark-item"
+import { useSettingsDialogStore } from "@/stores/settings-dialog"
 
 function shouldAutoSyncOnInitialRead(options?: { isNewFile?: boolean }) {
   return options?.isNewFile !== true
@@ -326,11 +327,16 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     t,
   ])
   const activeStepItem = stepItems[organizeStepIndex] ?? stepItems[0]
+  const { openSettings } = useSettingsDialogStore()
 
   const handleManageTemplate = useCallback(() => {
     setOpen(false)
-    router.push(isMobile ? '/mobile/setting/pages/template' : '/core/setting/template')
-  }, [isMobile, router])
+    if (isMobile) {
+      router.push('/mobile/setting/pages/template')
+    } else {
+      openSettings('template')
+    }
+  }, [isMobile, openSettings, router])
 
   const getMarkTypeLabel = useCallback((type: Mark['type']) => {
     return tGlobal(`record.mark.type.${type}`)

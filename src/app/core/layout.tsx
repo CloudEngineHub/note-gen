@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { initAllDatabases } from "@/db"
 import dayjs from "dayjs"
 import zh from "dayjs/locale/zh-cn";
@@ -14,7 +14,7 @@ import useShortcutStore from "@/stores/shortcut"
 import useEditorShortcutStore from "@/stores/editor-shortcut"
 import useUpdateStore from "@/stores/update"
 import initQuickRecordText from "@/lib/shortcut/quick-record-text"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import initShowWindow from "@/lib/shortcut/show-window"
 import { initMcp } from "@/lib/mcp/init"
 import { SearchDialog } from "@/components/search-dialog"
@@ -37,6 +37,8 @@ import { useToast } from "@/hooks/use-toast"
 import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
 import { useSidebarStore } from "@/stores/sidebar"
 import { useTranslations } from "next-intl"
+import { SettingsDialog } from "./setting/components/settings-dialog"
+import { settingSections, type SettingSection, useSettingsDialogStore } from "@/stores/settings-dialog"
 
 export default function RootLayout({
   children,
@@ -52,6 +54,9 @@ export default function RootLayout({
   const { initUpdateStore, checkForUpdates } = useUpdateStore()
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const lastContentPathRef = useRef('/core/main')
+  const { openSettings } = useSettingsDialogStore()
   const t = useTranslations()
   const { toast } = useToast()
   const [searchOpen, setSearchOpen] = useState(false)
@@ -250,11 +255,8 @@ export default function RootLayout({
       const trayActionUnlisten = await window.listen<string>('tray-action', (event) => {
         void handleTrayAction(event.payload)
       })
-      const openSettingsUnlisten = await window.listen<string>('open-settings', async () => {
-        const store = await Store.load('store.json')
-        await store.set('currentPage', '/core/setting')
-        await store.save()
-        router.replace('/core/setting')
+      const openSettingsUnlisten = await window.listen<string>('open-settings', () => {
+        openSettings()
       })
 
       if (cancelled) {
@@ -274,7 +276,25 @@ export default function RootLayout({
       unlistenTrayAction?.()
       unlistenOpenSettings?.()
     }
-  }, [pathname, router])
+  }, [openSettings, pathname, router])
+
+  useEffect(() => {
+    if (pathname.startsWith('/core/setting')) {
+      const pathSection = pathname.split('/')[3]
+      const querySection = searchParams.get('anchor')
+      const requestedSection = pathSection || querySection
+      const normalizedSection = requestedSection === 'dev' ? 'general' : requestedSection
+      const section = settingSections.includes(normalizedSection as SettingSection)
+        ? normalizedSection as SettingSection
+        : undefined
+
+      openSettings(section)
+      router.replace(lastContentPathRef.current)
+      return
+    }
+
+    lastContentPathRef.current = pathname
+  }, [openSettings, pathname, router, searchParams])
 
   // 重定向旧路径到新的 /core/main
   useEffect(() => {
@@ -422,6 +442,7 @@ export default function RootLayout({
         </main>
         <ActivityDrawer open={activityOpen} onOpenChange={setActivityOpen} />
         <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+        <SettingsDialog />
         <SyncConfirmDialog />
         <AutoDataSyncConflictDialog />
       </TextSizeProvider>

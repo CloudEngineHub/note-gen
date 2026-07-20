@@ -5,7 +5,7 @@ import { platform } from '@tauri-apps/plugin-os'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isMobileDevice } from '@/lib/check'
 import { Search, Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog, CalendarDays } from 'lucide-react'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
@@ -39,6 +39,7 @@ import {
 } from '@dnd-kit/sortable'
 import { DraggableToolbarItem } from './draggable-toolbar-item'
 import { useToolbarShortcuts } from '@/hooks/use-toolbar-shortcuts'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -52,7 +53,7 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isMobile, setIsMobile] = useState(true)
   const pathname = usePathname()
-  const router = useRouter()
+  const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
   const { leftSidebarVisible, centerPanelVisible, rightSidebarVisible, toggleLeftSidebar, toggleCenterPanel, toggleRightSidebar } = useSidebarStore()
   
   // 检查关闭面板后是否会导致"仅左"状态或无面板状态
@@ -345,27 +346,21 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 relative ${pathname.includes('/core/setting') ? 'bg-primary/50 hover:bg-primary/60' : ''}`}
-                onClick={() => {
-                  if (pathname.includes('/core/setting')) {
-                    router.push('/core/main')
-                  } else {
-                    router.push('/core/setting')
-                  }
-                }}
+                className={`h-8 w-8 relative ${settingsOpen ? 'bg-primary/50 hover:bg-primary/60' : ''}`}
+                onClick={() => settingsOpen ? closeSettings() : openSettings()}
               >
-                {pathname.includes('/core/setting') ? (
+                {settingsOpen ? (
                   <Cog className="h-4 w-4" />
                 ) : (
                   <Settings className="h-4 w-4" />
                 )}
-                {hasUpdate && !pathname.includes('/core/setting') && (
+                {hasUpdate && !settingsOpen && (
                   <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
                 )}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>{pathname.includes('/core/setting') ? t('common.back') : t('common.settings')}</p>
+              <p>{settingsOpen ? t('common.back') : t('common.settings')}</p>
             </TooltipContent>
           </Tooltip>
           

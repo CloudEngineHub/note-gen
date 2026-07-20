@@ -3,7 +3,6 @@ import {
   LayoutTemplate,
   ScanText,
   Store,
-  UserRoundCog,
   Drama,
   FolderOpen,
   DatabaseBackup,
@@ -22,84 +21,79 @@ import {
 
 const baseConfig = [
   {
-    icon: <Store className="size-4 md:size-6" />,
+    icon: <Store className="size-4" />,
     anchor: 'about',
   },
   {
-    icon: <Settings className="size-4 md:size-6" />,
+    icon: <Settings className="size-4" />,
     anchor: 'general',
   },
   {
-    icon: <MessageSquare className="size-4 md:size-6" />,
+    icon: <MessageSquare className="size-4" />,
     anchor: 'chat',
   },
   {
-    icon: <FileCog className="size-4 md:size-6" />,
+    icon: <FileCog className="size-4" />,
     anchor: 'editor',
   },
   {
-    icon: <PenTool className="size-4 md:size-6" />,
+    icon: <PenTool className="size-4" />,
     anchor: 'record',
   },
   '-',
   {
-    icon: <DatabaseBackup className="size-4 md:size-6" />,
+    icon: <DatabaseBackup className="size-4" />,
     anchor: 'sync',
   },
   {
-    icon: <ImageUp className="size-4 md:size-6" />,
+    icon: <ImageUp className="size-4" />,
     anchor: 'imageHosting',
   },
   '-',
   {
-    icon: <BotMessageSquare className="size-4 md:size-6" />,
+    icon: <BotMessageSquare className="size-4" />,
     anchor: 'ai',
   },
   {
-    icon: <Book className="size-4 md:size-6" />,
+    icon: <Book className="size-4" />,
     anchor: 'rag',
   },
   {
-    icon: <Puzzle className="size-4 md:size-6" />,
+    icon: <Puzzle className="size-4" />,
     anchor: 'mcp',
   },
   {
-    icon: <Sparkles className="size-4 md:size-6" />,
+    icon: <Sparkles className="size-4" />,
     anchor: 'skills',
   },
   {
-    icon: <Drama className="size-4 md:size-6" />,
+    icon: <Drama className="size-4" />,
     anchor: 'prompt',
   },
   {
-    icon: <Brain className="size-4 md:size-6" />,
+    icon: <Brain className="size-4" />,
     anchor: 'memories',
   },
   {
-    icon: <LayoutTemplate className="size-4 md:size-6" />,
+    icon: <LayoutTemplate className="size-4" />,
     anchor: 'template',
   },
   '-',
   {
-    icon: <FolderOpen className="size-4 md:size-6" />,
+    icon: <FolderOpen className="size-4" />,
     anchor: 'file',
   },
   {
-    icon: <KeyboardIcon className="size-4 md:size-6" />,
+    icon: <KeyboardIcon className="size-4" />,
     anchor: 'shortcuts',
   },
   {
-    icon: <ScanText className="size-4 md:size-6" />,
+    icon: <ScanText className="size-4" />,
     anchor: 'imageMethod',
   },
   {
-    icon: <Volume2 className="size-4 md:size-6" />,
+    icon: <Volume2 className="size-4" />,
     anchor: 'audio',
-  },
-  '-',
-  {
-    icon: <UserRoundCog className="size-4 md:size-6" />,
-    anchor: 'dev',
   }
 ]
 

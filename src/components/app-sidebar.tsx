@@ -18,6 +18,7 @@ import { PinToggle } from "./pin-toggle"
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from "react"
 import useImageStore from "@/stores/imageHosting"
+import { useSettingsDialogStore } from "@/stores/settings-dialog"
  
 interface AppSidebarProps {
   onSearchClick?: () => void
@@ -28,6 +29,7 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
   const router = useRouter()
   const t = useTranslations()
   const { imageRepoUserInfo } = useImageStore()
+  const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
   const [items, setItems] = useState([
     {
       title: t('navigation.write'),
@@ -112,22 +114,16 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
       <SidebarFooter>
         <PinToggle />
         <SidebarMenuButton 
-          isActive={pathname.includes('/core/setting')} 
+          isActive={settingsOpen}
           className="md:h-8 md:p-0"
           tooltip={{
-            children: pathname.includes('/core/setting') ? t('common.back') : t('common.settings'),
+            children: settingsOpen ? t('common.back') : t('common.settings'),
             hidden: false,
           }}
-          onClick={() => {
-            if (pathname.includes('/core/setting')) {
-              router.push('/core/main')
-            } else {
-              router.push('/core/setting')
-            }
-          }}
+          onClick={() => settingsOpen ? closeSettings() : openSettings()}
         >
           <div className="flex size-8 items-center justify-center rounded-lg">
-            {pathname.includes('/core/setting') ? (
+            {settingsOpen ? (
               <X className="size-4" />
             ) : (
               <Settings className="size-4" />

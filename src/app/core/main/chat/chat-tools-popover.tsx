@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
-import useSettingStore from "@/stores/setting"
 import { useMcpStore } from "@/stores/mcp"
 import { ClipboardMonitor } from "./clipboard-monitor"
 import { McpServerList } from "./mcp-button"
@@ -20,19 +19,11 @@ import { ModelSelect } from "./model-select"
 import { PromptSelect } from "./prompt-select"
 import { RagSwitch } from "./rag-switch"
 
-const TOOL_IDS = new Set(['modelSelect', 'promptSelect', 'mcpButton', 'ragSwitch', 'clipboardMonitor'])
+const TOOL_IDS = ['modelSelect', 'promptSelect', 'mcpButton', 'ragSwitch', 'clipboardMonitor'] as const
 
 export function ChatToolsPopover() {
   const t = useTranslations()
-  const { chatToolbarConfigPc } = useSettingStore()
   const selectedServerCount = useMcpStore((state) => state.selectedServerIds.length)
-  const enabledTools = chatToolbarConfigPc
-    .filter((item) => item.enabled && TOOL_IDS.has(item.id))
-    .sort((a, b) => a.order - b.order)
-
-  if (enabledTools.length === 0) {
-    return null
-  }
 
   return (
     <Popover>
@@ -50,11 +41,11 @@ export function ChatToolsPopover() {
       </PopoverTrigger>
       <PopoverContent align="start" side="top" className="w-96 p-0">
         <div className="flex max-h-96 flex-col overflow-y-auto px-3 py-3">
-          {enabledTools.map((item) => (
-            <div key={item.id}>
-              {item.id === 'modelSelect' && <ModelSelect display="panel" />}
-              {item.id === 'promptSelect' && <PromptSelect display="panel" />}
-              {item.id === 'mcpButton' && (
+          {TOOL_IDS.map((toolId) => (
+            <div key={toolId}>
+              {toolId === 'modelSelect' && <ModelSelect display="panel" />}
+              {toolId === 'promptSelect' && <PromptSelect display="panel" />}
+              {toolId === 'mcpButton' && (
                 <Popover>
                   <PopoverTrigger asChild>
                     <Item asChild size="sm" className="h-12 flex-nowrap py-0 cursor-pointer hover:bg-muted">
@@ -82,8 +73,8 @@ export function ChatToolsPopover() {
                   </PopoverContent>
                 </Popover>
               )}
-              {item.id === 'ragSwitch' && <RagSwitch display="panel" />}
-              {item.id === 'clipboardMonitor' && <ClipboardMonitor display="panel" />}
+              {toolId === 'ragSwitch' && <RagSwitch display="panel" />}
+              {toolId === 'clipboardMonitor' && <ClipboardMonitor display="panel" />}
             </div>
           ))}
         </div>

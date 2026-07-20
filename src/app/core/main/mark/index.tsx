@@ -12,11 +12,13 @@ import { clearTrash } from "@/db/marks"
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { filterMarks, getTrashRecordFilters } from "./mark-filters";
 import { RecordSyncStatusBanner } from "@/components/record-sync-status-banner"
+import { useSettingsDialogStore } from "@/stores/settings-dialog"
 
 export function NoteSidebar() {
   const t = useTranslations();
   const { trashState, marks, setMarks, initRecordViewMode } = useMarkStore()
   const visibleTrashMarks = React.useMemo(() => filterMarks(marks, getTrashRecordFilters()), [marks])
+  const { openSettings } = useSettingsDialogStore()
 
   useEffect(() => {
     initRecordViewMode()
@@ -35,7 +37,7 @@ export function NoteSidebar() {
 
   return (
     <div id="record-sidebar" className="w-full h-full hidden md:flex flex-col">
-      <RecordSyncStatusBanner settingsHref="/core/setting/sync" />
+      <RecordSyncStatusBanner onSettingsClick={() => openSettings('sync')} />
       {trashState ? (
         <>
           <div className="flex p-2 border-b items-center justify-between">

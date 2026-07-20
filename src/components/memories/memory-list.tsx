@@ -53,16 +53,29 @@ export function MemoryList() {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+    <Tabs
+      orientation="horizontal"
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as TabValue)}
+    >
       <div className="flex items-center justify-between gap-4">
-        <TabsList>
-          <TabsTrigger value="all">
+        <TabsList className="group-data-vertical/tabs:h-8 group-data-vertical/tabs:flex-row">
+          <TabsTrigger
+            value="all"
+            className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+          >
             {t('tabs.all')} ({memories.length})
           </TabsTrigger>
-          <TabsTrigger value="preference">
+          <TabsTrigger
+            value="preference"
+            className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+          >
             {t('tabs.preference')} ({preferences.length})
           </TabsTrigger>
-          <TabsTrigger value="memory">
+          <TabsTrigger
+            value="memory"
+            className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+          >
             {t('tabs.memory')} ({memoryList.length})
           </TabsTrigger>
         </TabsList>
@@ -70,7 +83,7 @@ export function MemoryList() {
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button variant="default" size="sm">
-              <Plus className="size-4 mr-2" />
+              <Plus data-icon="inline-start" />
               {t('addMemory')}
             </Button>
           </DialogTrigger>

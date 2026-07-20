@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { InterfaceSettings } from '@/app/core/setting/general/interface-settings'
 import { ToolSettings } from '@/app/core/setting/general/tool-settings'
+import { AdvancedSettings } from '@/app/core/setting/general/advanced-settings'
 
 export default function GeneralSettingsPage() {
   const t = useTranslations('settings.general')
@@ -15,6 +16,7 @@ export default function GeneralSettingsPage() {
       </div>
       <InterfaceSettings />
       <ToolSettings />
+      <AdvancedSettings />
     </div>
   )
 }

@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import useImageStore from '@/stores/imageHosting';
 import { SyncStateEnum } from '@/lib/sync/github.types';
 import { testS3Connection } from '@/lib/imageHosting/s3';
 import { Store } from '@tauri-apps/plugin-store';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
+import { Item, ItemActions, ItemContent, ItemTitle } from '@/components/ui/item';
 
 interface S3Config {
   accessKeyId: string
@@ -123,117 +124,74 @@ export function S3ImageHosting() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{t('settings.imageHosting.s3.title')}</CardTitle>
-            <CardDescription>
-              {t('settings.imageHosting.s3.description')}
-            </CardDescription>
-          </div>
-        </div>
+        <CardTitle>{t('settings.imageHosting.s3.title')}</CardTitle>
+        <CardDescription>{t('settings.imageHosting.s3.description')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 状态显示 */}
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">{t('settings.imageHosting.s3.status')}</span>
-          <div className="flex items-center gap-2">
-            {getStatusIcon()}
-            <span className="text-sm">{getStatusText()}</span>
-          </div>
-        </div>
+      <CardContent>
+        <FieldGroup>
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>{t('settings.imageHosting.s3.status')}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              {getStatusIcon()}
+              <span className="text-sm">{getStatusText()}</span>
+            </ItemActions>
+          </Item>
 
-        {/* 基本配置 */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="accessKeyId">{t('settings.imageHosting.s3.accessKeyId')}</Label>
-            <Input
-              id="accessKeyId"
-              type="text"
-              value={config.accessKeyId}
-              onChange={(e) => handleConfigChange({ ...config, accessKeyId: e.target.value })}
-              placeholder={t('settings.imageHosting.s3.accessKeyIdPlaceholder')}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="secretAccessKey">{t('settings.imageHosting.s3.secretAccessKey')}</Label>
-            <div className="relative">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="accessKeyId">{t('settings.imageHosting.s3.accessKeyId')}</FieldLabel>
               <Input
-                id="secretAccessKey"
-                type={showSecretKey ? "text" : "password"}
-                value={config.secretAccessKey}
-                onChange={(e) => handleConfigChange({ ...config, secretAccessKey: e.target.value })}
-                placeholder={t('settings.imageHosting.s3.secretAccessKeyPlaceholder')}
-                className="pr-10"
+                id="accessKeyId"
+                type="text"
+                value={config.accessKeyId}
+                onChange={(e) => handleConfigChange({ ...config, accessKeyId: e.target.value })}
+                placeholder={t('settings.imageHosting.s3.accessKeyIdPlaceholder')}
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowSecretKey(!showSecretKey)}
-              >
-                {showSecretKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="region">{t('settings.imageHosting.s3.region')}</Label>
-            <Input
-              id="region"
-              type="text"
-              value={config.region}
-              onChange={(e) => handleConfigChange({ ...config, region: e.target.value })}
-              placeholder="us-east-1"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="bucket">{t('settings.imageHosting.s3.bucket')}</Label>
-            <Input
-              id="bucket"
-              type="text"
-              value={config.bucket}
-              onChange={(e) => handleConfigChange({ ...config, bucket: e.target.value })}
-              placeholder={t('settings.imageHosting.s3.bucketPlaceholder')}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="endpoint">{t('settings.imageHosting.s3.endpoint')}</Label>
-            <Input
-              id="endpoint"
-              type="text"
-              value={config.endpoint || ''}
-              onChange={(e) => handleConfigChange({ ...config, endpoint: e.target.value })}
-              placeholder="https://s3.amazonaws.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="customDomain">{t('settings.imageHosting.s3.customDomain')}</Label>
-            <Input
-              id="customDomain"
-              type="text"
-              value={config.customDomain || ''}
-              onChange={(e) => handleConfigChange({ ...config, customDomain: e.target.value })}
-              placeholder="https://cdn.example.com"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pathPrefix">{t('settings.imageHosting.s3.pathPrefix')}</Label>
-            <Input
-              id="pathPrefix"
-              type="text"
-              value={config.pathPrefix || ''}
-              onChange={(e) => handleConfigChange({ ...config, pathPrefix: e.target.value })}
-              placeholder="images/"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t('settings.imageHosting.s3.pathPrefixDesc')}
-            </p>
-          </div>
-        </div>
-
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="secretAccessKey">{t('settings.imageHosting.s3.secretAccessKey')}</FieldLabel>
+              <InputGroup>
+                <InputGroupInput
+                  id="secretAccessKey"
+                  type={showSecretKey ? "text" : "password"}
+                  value={config.secretAccessKey}
+                  onChange={(e) => handleConfigChange({ ...config, secretAccessKey: e.target.value })}
+                  placeholder={t('settings.imageHosting.s3.secretAccessKeyPlaceholder')}
+                />
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={showSecretKey ? 'Hide secret key' : 'Show secret key'}
+                  onClick={() => setShowSecretKey(!showSecretKey)}
+                >
+                  {showSecretKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </InputGroupButton>
+              </InputGroup>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="region">{t('settings.imageHosting.s3.region')}</FieldLabel>
+              <Input id="region" value={config.region} onChange={(e) => handleConfigChange({ ...config, region: e.target.value })} placeholder="us-east-1" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="bucket">{t('settings.imageHosting.s3.bucket')}</FieldLabel>
+              <Input id="bucket" value={config.bucket} onChange={(e) => handleConfigChange({ ...config, bucket: e.target.value })} placeholder={t('settings.imageHosting.s3.bucketPlaceholder')} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="endpoint">{t('settings.imageHosting.s3.endpoint')}</FieldLabel>
+              <Input id="endpoint" value={config.endpoint || ''} onChange={(e) => handleConfigChange({ ...config, endpoint: e.target.value })} placeholder="https://s3.amazonaws.com" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="customDomain">{t('settings.imageHosting.s3.customDomain')}</FieldLabel>
+              <Input id="customDomain" value={config.customDomain || ''} onChange={(e) => handleConfigChange({ ...config, customDomain: e.target.value })} placeholder="https://cdn.example.com" />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="pathPrefix">{t('settings.imageHosting.s3.pathPrefix')}</FieldLabel>
+              <Input id="pathPrefix" value={config.pathPrefix || ''} onChange={(e) => handleConfigChange({ ...config, pathPrefix: e.target.value })} placeholder="images/" />
+              <FieldDescription>{t('settings.imageHosting.s3.pathPrefixDesc')}</FieldDescription>
+            </Field>
+          </FieldGroup>
+        </FieldGroup>
       </CardContent>
     </Card>
   );

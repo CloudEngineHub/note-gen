@@ -1,22 +1,27 @@
 'use client'
-import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslations } from 'next-intl';
 import useSettingStore from "@/stores/setting";
-import { Store } from "@tauri-apps/plugin-store";
 import useSyncStore from "@/stores/sync";
-import { Badge } from "@/components/ui/badge";
 import { OpenBroswer } from "@/components/open-broswer";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { checkSyncRepoState, createSyncRepo, getUserInfo } from "@/lib/sync/gitee";
-import { Button } from "@/components/ui/button";
 import { RepoNames, SyncStateEnum } from "@/lib/sync/github.types";
-import { Plus, RefreshCcw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TokenInputControl } from "./components/token-input-control";
+import { SyncPlatformCard } from "./components/sync-platform-card";
+import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 dayjs.extend(relativeTime)
+
+const GITEE_CONFIG = {
+  platform: 'gitee' as const,
+  tokenKey: 'giteeAccessToken',
+  tokenLabel: 'Gitee 私人令牌',
+  tokenDesc: '',
+  tokenUrl: 'https://gitee.com/profile/personal_access_tokens/new',
+  tokenUrlText: '',
+}
 
 export function GiteeSync() {
   const t = useTranslations();
@@ -33,8 +38,6 @@ export function GiteeSync() {
     giteeSyncRepoInfo,
     setGiteeSyncRepoInfo
   } = useSyncStore()
-
-  const [giteeAccessTokenVisible, setGiteeAccessTokenVisible] = useState<boolean>(false)
 
   // 获取实际使用的仓库名称
   const getRepoName = () => {
@@ -127,29 +130,7 @@ export function GiteeSync() {
     }
   }
 
-  async function tokenChangeHandler(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    if (value === '') {
-      setGiteeSyncRepoState(SyncStateEnum.fail)
-      setGiteeSyncRepoInfo(undefined)
-    }
-    setGiteeAccessToken(value)
-    const store = await Store.load('store.json');
-    await store.set('giteeAccessToken', value)
-  }
-
   useEffect(() => {
-    async function init() {
-      const store = await Store.load('store.json');
-      const token = await store.get<string>('giteeAccessToken')
-      if (token) {
-        setGiteeAccessToken(token)
-      } else {
-        setGiteeAccessToken('')
-      }
-    }
-    init()
-
     // 添加网络状态监听
     const handleOnline = () => {
       // Network connected
@@ -172,97 +153,42 @@ export function GiteeSync() {
 
 
   return (
-    <div className="rounded-md border p-4">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex gap-2 items-center">
-          <span className="font-semibold">Gitee {t('settings.sync.settings')}</span>
-        </div>
-        <Badge className={`${giteeSyncRepoState === SyncStateEnum.success ? 'bg-green-600' : 'bg-zinc-500'}`}>
-          {giteeSyncRepoState === SyncStateEnum.success ? 'Connected' : giteeSyncRepoState === SyncStateEnum.checking ? 'Checking' : giteeSyncRepoState === SyncStateEnum.creating ? 'Creating' : 'Not Connected'}
-        </Badge>
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">{t('settings.sync.platformDesc')}</p>
-
-      {/* Token 输入 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Gitee 私人令牌</label>
-        <TokenInputControl
-          value={giteeAccessToken}
-          onChange={tokenChangeHandler}
-          visible={giteeAccessTokenVisible}
-          onVisibleChange={setGiteeAccessTokenVisible}
-          tokenUrl="https://gitee.com/profile/personal_access_tokens/new"
-          placeholder={t('settings.sync.enterToken')}
-        />
-      </div>
-
-      {/* 自定义仓库 */}
-      <div className="mt-4 space-y-2">
-        <label className="text-sm font-medium">{t('settings.sync.customSyncRepo')}</label>
-        <Input
-          value={giteeCustomSyncRepo}
-          onChange={(e) => setGiteeCustomSyncRepo(e.target.value)}
-          placeholder={RepoNames.sync}
-        />
-        <p className="text-xs text-muted-foreground">{t('settings.sync.customSyncRepoDesc')}</p>
-      </div>
-
-      {/* 操作按钮 */}
-      <div className="mt-4 flex gap-2 flex-wrap">
-        {giteeAccessToken ? (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={checkRepoState}
-              disabled={giteeSyncRepoState === SyncStateEnum.checking || giteeSyncRepoState === SyncStateEnum.creating}
-            >
-              {giteeSyncRepoState === SyncStateEnum.checking || giteeSyncRepoState === SyncStateEnum.creating ? (
-                <>
-                  <RefreshCcw className="size-4 mr-1 animate-spin" />
-                  {giteeSyncRepoState === SyncStateEnum.checking ? t('settings.sync.checking') : t('settings.sync.creating')}
-                </>
-              ) : (
-                <>
-                  <RefreshCcw className="size-4 mr-1" />
-                  {t('settings.sync.checkRepo')}
-                </>
-              )}
-            </Button>
-            {giteeSyncRepoState === SyncStateEnum.fail && (
-              <Button variant="outline" size="sm" onClick={createGiteeRepo}>
-                <Plus className="size-4 mr-1" />
-                {t('settings.sync.createRepo')}
-              </Button>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-            <RefreshCcw className="size-4" />
-            {t('settings.sync.enterTokenHint')}
-          </div>
-        )}
-      </div>
-
-      {/* 仓库信息 */}
+    <SyncPlatformCard
+      config={GITEE_CONFIG}
+      accessToken={giteeAccessToken}
+      setAccessToken={(token) => {
+        setGiteeAccessToken(token)
+        if (!token) {
+          setGiteeSyncRepoState(SyncStateEnum.fail)
+          setGiteeSyncRepoInfo(undefined)
+        }
+      }}
+      syncRepoState={giteeSyncRepoState}
+      syncRepoInfo={giteeSyncRepoInfo}
+      customRepo={giteeCustomSyncRepo}
+      setCustomRepo={setGiteeCustomSyncRepo}
+      defaultRepoName={RepoNames.sync}
+      onCheckRepo={checkRepoState}
+      onCreateRepo={createGiteeRepo}
+    >
       {giteeSyncRepoInfo && (
-        <div className="border-t mt-4 pt-4">
-          <div className="flex items-center gap-4">
+          <Item>
+            <ItemMedia>
             <Avatar className="size-10">
               <AvatarImage src={giteeSyncRepoInfo?.owner?.avatar_url || ''} alt={giteeSyncRepoInfo?.owner?.login || 'Gitee'} />
               <AvatarFallback>GT</AvatarFallback>
             </Avatar>
-            <div>
-              <h3 className="text-xl font-bold mb-1">
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>
                 <OpenBroswer title={giteeSyncRepoInfo?.full_name || ''} url={giteeSyncRepoInfo?.html_url || ''} />
-              </h3>
-              <p className="text-sm text-zinc-500">
+              </ItemTitle>
+              <ItemDescription>
                 {giteeSyncRepoInfo?.private ? t('settings.sync.private') : t('settings.sync.public')} · {t('settings.sync.createdAt', { time: dayjs(giteeSyncRepoInfo?.created_at).fromNow() })} · {t('settings.sync.updatedAt', { time: dayjs(giteeSyncRepoInfo?.updated_at).fromNow() })}
-              </p>
-            </div>
-          </div>
-        </div>
+              </ItemDescription>
+            </ItemContent>
+          </Item>
       )}
-    </div>
+    </SyncPlatformCard>
   )
 }

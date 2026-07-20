@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl'
 import { MessageSquare } from 'lucide-react'
 import { DefaultModelsSettings } from '@/app/core/setting/components/default-models-settings'
-import { ToolbarSettings } from '@/app/core/setting/chat/toolbar-settings'
 import { CondenseSettings } from '@/app/core/setting/chat/condense-settings'
 
 export default function ChatSettingsPage() {
@@ -19,7 +18,6 @@ export default function ChatSettingsPage() {
         <p className="text-sm text-muted-foreground">{t('desc')}</p>
       </div>
       <DefaultModelsSettings type="chat" />
-      <ToolbarSettings />
       <CondenseSettings />
     </div>
   )

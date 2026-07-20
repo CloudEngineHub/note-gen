@@ -8,11 +8,13 @@ import {
   ItemTitle,
   ItemDescription,
   ItemActions,
+  ItemGroup,
 } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Shield, AlignLeft, MessageSquare } from 'lucide-react'
 import useSettingStore from '@/stores/setting'
+import { SettingSection } from '../components/setting-base'
 
 export function CondenseSettings() {
   const t = useTranslations('settings.chat.condense')
@@ -26,10 +28,9 @@ export function CondenseSettings() {
   } = useSettingStore()
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold mb-4">{t('title')}</h3>
-
-      {/* 启用摘要 */}
+    <SettingSection title={t('title')}>
+      <ItemGroup>
+        {/* 启用摘要 */}
       <Item variant="outline">
         <ItemMedia variant="icon">
           <MessageSquare className="size-4" />
@@ -105,6 +106,7 @@ export function CondenseSettings() {
           </Item>
         </>
       )}
-    </div>
+      </ItemGroup>
+    </SettingSection>
   )
 }

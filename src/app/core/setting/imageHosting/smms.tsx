@@ -1,5 +1,3 @@
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, LoaderCircle, CheckCircle, XCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Store } from "@tauri-apps/plugin-store";
@@ -9,6 +7,9 @@ import { getUserInfo } from "@/lib/imageHosting/smms";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OpenBroswer } from "@/components/open-broswer";
 import { useTranslations } from "next-intl";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
 
 const CREATE_TOKEN_URL = 'https://s.ee/user/developers'
 
@@ -83,43 +84,43 @@ export default function SMMSImageHosting() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{t('title')}</CardTitle>
-            <CardDescription>
-              {t('description')}
-            </CardDescription>
-          </div>
-        </div>
+        <CardTitle>{t('title')}</CardTitle>
+        <CardDescription>{t('description')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 状态显示 */}
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">{t('status')}</span>
-          <div className="flex items-center gap-2">
-            {getStatusIcon()}
-            <span className="text-sm">{getStatusText()}</span>
-          </div>
-        </div>
+      <CardContent>
+        <FieldGroup>
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>{t('status')}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              {getStatusIcon()}
+              <span className="text-sm">{getStatusText()}</span>
+            </ItemActions>
+          </Item>
 
-        {/* Token 配置 */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">API Token</label>
-          <p className="text-xs text-muted-foreground">{t('token.helper')}</p>
-          <div className="flex items-center gap-2">
-            <Input
-              className="flex-1"
-              type={tokenVisible ? 'text' : 'password'}
-              value={token}
-              onChange={(e) => handleSetToken(e.target.value)}
-              placeholder={t('token.placeholder')}
-            />
-            <Button variant="outline" size="icon" onClick={() => setTokenVisible(!tokenVisible)}>
-              {tokenVisible ? <Eye /> : <EyeOff />}
-            </Button>
-          </div>
-          <OpenBroswer url={CREATE_TOKEN_URL} title={t('token.createToken')} className="text-sm text-blue-500 hover:underline" />
-        </div>
+          <Field>
+            <FieldLabel htmlFor="smms-api-token">API Token</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="smms-api-token"
+                type={tokenVisible ? 'text' : 'password'}
+                value={token}
+                onChange={(e) => handleSetToken(e.target.value)}
+                placeholder={t('token.placeholder')}
+              />
+              <InputGroupButton
+                size="icon-xs"
+                aria-label={tokenVisible ? 'Hide token' : 'Show token'}
+                onClick={() => setTokenVisible(!tokenVisible)}
+              >
+                {tokenVisible ? <Eye /> : <EyeOff />}
+              </InputGroupButton>
+            </InputGroup>
+            <FieldDescription>{t('token.helper')}</FieldDescription>
+            <OpenBroswer url={CREATE_TOKEN_URL} title={t('token.createToken')} className="w-fit text-sm" />
+          </Field>
+        </FieldGroup>
       </CardContent>
     </Card>
   )

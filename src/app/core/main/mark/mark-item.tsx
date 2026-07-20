@@ -45,6 +45,7 @@ import { useSidebarStore } from "@/stores/sidebar";
 import useArticleStore from "@/stores/article";
 import { createRecordTab } from "./mark-record-tab";
 import { getImageRecordDisplayText, getImageRecordStatus, type ImageRecordStatusLabels, isImageRecord } from "./image-record-status";
+import { useSettingsDialogStore } from "@/stores/settings-dialog";
 
 dayjs.extend(relativeTime)
 
@@ -312,7 +313,11 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
 
   const handleRecordingAction = useCallback(async () => {
     if (!sttModel) {
-      router.push(isMobile ? '/mobile/setting/pages/audio' : '/core/setting/audio')
+      if (isMobile) {
+        router.push('/mobile/setting/pages/audio')
+      } else {
+        useSettingsDialogStore.getState().openSettings('audio')
+      }
       return
     }
 

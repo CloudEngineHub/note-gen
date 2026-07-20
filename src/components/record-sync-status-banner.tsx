@@ -23,7 +23,8 @@ import {
 } from '@/lib/sync/auto-data-sync-queue'
 
 interface RecordSyncStatusBannerProps {
-  settingsHref: string
+  settingsHref?: string
+  onSettingsClick?: () => void
   compact?: boolean
   className?: string
 }
@@ -119,6 +120,7 @@ function getBannerTitle(
 
 export function RecordSyncStatusBanner({
   settingsHref,
+  onSettingsClick,
   compact = false,
   className,
 }: RecordSyncStatusBannerProps) {
@@ -215,7 +217,7 @@ export function RecordSyncStatusBanner({
             variant="ghost"
             size="xs"
             className="shrink-0"
-            onClick={() => router.push(settingsHref)}
+            onClick={() => onSettingsClick ? onSettingsClick() : settingsHref && router.push(settingsHref)}
           >
             <Settings data-icon="inline-start" />
             {t('settings')}

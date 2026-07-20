@@ -16,7 +16,7 @@ export default function RecordSettingPage() {
       title={t('title')}
       desc={t('desc')}
     >
-      <div className="space-y-8">
+      <div className="flex flex-col gap-6">
         <DefaultModelsSettings type="record" />
         <ToolbarSettings />
       </div>

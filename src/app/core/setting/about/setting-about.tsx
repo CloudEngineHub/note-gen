@@ -1,13 +1,14 @@
 'use client';
-import { SettingType } from "../components/setting-base";
+import { SettingSection, SettingType } from "../components/setting-base";
 import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@/components/ui/item";
-import { Separator } from "@/components/ui/separator";
 import { useTranslations } from 'next-intl';
 import Updater from "./updater";
 import { BriefcaseBusiness, Bug, ExternalLink, GitFork, HandHeart, HomeIcon, MessageSquare } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
+import { ShineBorder } from '@/components/ui/shine-border'
 import type { ReactNode } from "react";
+import { cn } from '@/lib/utils'
 import { checkIsTauri } from "@/lib/check";
 
 interface AboutResource {
@@ -16,6 +17,7 @@ interface AboutResource {
   desc: string
   icon: ReactNode
   buttonName: string
+  shine?: boolean
 }
 
 interface AboutResourceSection {
@@ -65,7 +67,8 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
       title: t('items.donate.title'),
       desc: t('items.donate.desc'),
       icon: <HandHeart />,
-      buttonName: t('items.donate.buttonName')
+      buttonName: t('items.donate.buttonName'),
+      shine: true
     },
     {
       url: "https://notegen.top/business",
@@ -94,10 +97,9 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
   return (
     <SettingType id={id} icon={icon} title={t('title')}>
       <div className="flex w-full flex-col gap-6">
-        <section className="flex flex-col gap-3">
-          <SectionHeading title={t('sections.appInfo.title')} desc={t('sections.appInfo.desc')} />
+        <SettingSection title={t('sections.appInfo.title')} desc={t('sections.appInfo.desc')}>
           <Updater />
-        </section>
+        </SettingSection>
 
         {sections.map(section => (
           <ResourceSection key={section.id} section={section} />
@@ -111,26 +113,15 @@ export function SettingAbout({id, icon}: {id: string, icon?: React.ReactNode}) {
 
 function ResourceSection({ section }: { section: AboutResourceSection }) {
   return (
-    <section className="flex flex-col gap-3">
-      <Separator />
-      <SectionHeading title={section.title} desc={section.desc} />
+    <SettingSection title={section.title} desc={section.desc}>
       <ItemGroup className="grid gap-3 lg:grid-cols-2">
         {section.items.map(item => <AboutItem key={item.url} {...item} />)}
       </ItemGroup>
-    </section>
+    </SettingSection>
   )
 }
 
-function SectionHeading({ title, desc }: { title: string, desc: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{desc}</p>
-    </div>
-  )
-}
-
-function AboutItem({url, title, desc, icon, buttonName}: AboutResource) {
+function AboutItem({url, title, desc, icon, buttonName, shine}: AboutResource) {
   const openInBrowser = () => {
     if (checkIsTauri()) {
       open(url);
@@ -139,16 +130,25 @@ function AboutItem({url, title, desc, icon, buttonName}: AboutResource) {
 
     window.open(url, '_blank', 'noopener,noreferrer');
   }
-  return <Item variant="outline" className="min-h-20 flex-nowrap bg-card/60 transition-colors hover:bg-accent/40">
-    <ItemMedia variant="icon">{icon}</ItemMedia>
-    <ItemContent>
-      <ItemTitle>{title}</ItemTitle>
-      <ItemDescription className="line-clamp-1 max-md:line-clamp-1">{desc}</ItemDescription>
-    </ItemContent>
-    <ItemActions className="ml-auto shrink-0">
-      <Button variant="ghost" size="icon" title={buttonName} aria-label={buttonName} onClick={openInBrowser}>
-        <ExternalLink />
-      </Button>
-    </ItemActions>
-  </Item>
+  return (
+    <Item variant="outline" className={cn(shine && 'relative')}>
+      {shine ? (
+        <ShineBorder
+          borderWidth={1}
+          duration={5}
+          shineColor={["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A"]}
+        />
+      ) : null}
+      <ItemMedia variant="icon">{icon}</ItemMedia>
+      <ItemContent>
+        <ItemTitle>{title}</ItemTitle>
+        <ItemDescription>{desc}</ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <Button variant="ghost" size="icon" title={buttonName} aria-label={buttonName} onClick={openInBrowser}>
+          <ExternalLink />
+        </Button>
+      </ItemActions>
+    </Item>
+  )
 }

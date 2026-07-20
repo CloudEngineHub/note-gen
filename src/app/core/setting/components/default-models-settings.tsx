@@ -8,9 +8,11 @@ import {
   ItemTitle,
   ItemDescription,
   ItemActions,
+  ItemGroup,
 } from '@/components/ui/item'
 import { BotMessageSquare, PenTool, Zap, GitCommit, FileText, Lightbulb } from 'lucide-react'
 import { ModelSelect } from './model-select'
+import { SettingSection } from './setting-base'
 
 interface DefaultModelsSettingsProps {
   type: 'chat' | 'editor' | 'record'
@@ -20,9 +22,8 @@ export function DefaultModelsSettings({ type }: DefaultModelsSettingsProps) {
   const t = useTranslations('settings')
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">{t('defaultModels.title')}</h3>
-
+    <SettingSection title={t('defaultModels.title')}>
+      <ItemGroup>
       {/* Chat - Primary Model */}
       {type === 'chat' && (
         <>
@@ -112,6 +113,7 @@ export function DefaultModelsSettings({ type }: DefaultModelsSettingsProps) {
           </Item>
         </>
       )}
-    </div>
+      </ItemGroup>
+    </SettingSection>
   )
 }

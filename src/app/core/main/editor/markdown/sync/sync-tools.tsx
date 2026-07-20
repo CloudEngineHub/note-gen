@@ -4,9 +4,9 @@ import { useTranslations } from 'next-intl'
 import { SyncButton } from './sync-button'
 import { PullButton } from './pull-button'
 import { HistorySheet } from './history-sheet'
-import { useRouter } from 'next/navigation'
 import { isSyncConfigured } from '@/lib/sync/sync-manager'
 import { useEffect, useState } from 'react'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 interface SyncToolsProps {
   editor: Editor
@@ -14,7 +14,7 @@ interface SyncToolsProps {
 
 export function SyncTools({ editor }: SyncToolsProps) {
   const t = useTranslations('common')
-  const router = useRouter()
+  const { openSettings } = useSettingsDialogStore()
   const [configured, setConfigured] = useState(false)
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function SyncTools({ editor }: SyncToolsProps) {
   }, [])
 
   const handleConfigureSync = () => {
-    router.push('/core/setting/sync')
+    openSettings('sync')
   }
 
   if (configured) {

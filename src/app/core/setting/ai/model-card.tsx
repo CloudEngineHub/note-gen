@@ -1,18 +1,41 @@
 'use client'
-import { 
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { ButtonGroup } from "@/components/ui/button-group"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Trash2, CircleCheck, CircleX, LoaderCircle, ChevronDown } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  ChartScatter,
+  ChevronDown,
+  CircleCheck,
+  CircleX,
+  ListOrdered,
+  LoaderCircle,
+  MessageSquare,
+  Mic,
+  Trash2,
+  Volume2,
+  type LucideIcon,
+} from "lucide-react"
 import { ModelConfig, ModelType, AiConfig } from "../config"
 import { useTranslations } from 'next-intl'
 import ModelSelect from "./modelSelect"
@@ -24,12 +47,33 @@ import { blobToBytes, invokeAiBinary, invokeAiJson, invokeAiMultipart, resolveAi
 interface ModelCardProps {
   modelConfig: ModelConfig
   aiConfig: AiConfig
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onUpdate: (modelId: string, field: keyof ModelConfig, value: any) => void
   onDelete: (modelId: string) => void
 }
 
-export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }: ModelCardProps) {
+const modelTypeOptions: Array<{
+  value: ModelType
+  icon: LucideIcon
+}> = [
+  { value: 'chat', icon: MessageSquare },
+  { value: 'tts', icon: Volume2 },
+  { value: 'stt', icon: Mic },
+  { value: 'embedding', icon: ChartScatter },
+  { value: 'rerank', icon: ListOrdered },
+]
+
+export default function ModelCard({
+  modelConfig,
+  aiConfig,
+  open,
+  onOpenChange,
+  onUpdate,
+  onDelete,
+}: ModelCardProps) {
   const t = useTranslations('settings.ai')
+  const tc = useTranslations('common')
   const [checkState, setCheckState] = useState<'ok' | 'error' | 'checking' | 'init'>('init')
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -176,202 +220,232 @@ export default function ModelCard({ modelConfig, aiConfig, onUpdate, onDelete }:
   const renderCheckIcon = () => {
     switch (checkState) {
       case 'ok':
-        return <CircleCheck className="text-green-500 size-4" />
+        return <CircleCheck data-icon="inline-start" className="text-green-500" />
       case 'error':
-        return <CircleX className="text-red-500 size-4" />
+        return <CircleX data-icon="inline-start" className="text-red-500" />
       case 'checking':
-        return <LoaderCircle className="animate-spin size-4" />
+        return <LoaderCircle data-icon="inline-start" className="animate-spin" />
       default:
         return null
     }
   }
 
   return (
-    <AccordionItem value={modelConfig.id} className="border rounded-lg">
-      <div className="flex items-center justify-between flex-wrap">
-        <div className="flex-1">
-          <AccordionTrigger className="w-full px-4 py-4 hover:no-underline">
-            <div className="flex items-center">
-              <span className="text-base font-semibold">
-                {modelConfig.model || t('newModel')}
-              </span>
-              <Badge variant="secondary" className="ml-2">
-                {t(`modelType.${modelConfig.modelType}`)}
-              </Badge>
-            </div>
-          </AccordionTrigger>
-        </div>
-        <div className="flex items-center justify-end gap-2 p-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCheck}
-            disabled={!modelConfig.model || checkState === 'checking'}
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <Card size="sm">
+        <CardHeader
+          className="cursor-pointer items-center"
+          onClick={() => onOpenChange(!open)}
+        >
+          <CardTitle className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{modelConfig.model || t('newModel')}</span>
+            <Badge variant="secondary">
+              {t(`modelType.${modelConfig.modelType}`)}
+            </Badge>
+          </CardTitle>
+          <CardAction
+            className="row-span-1 flex items-center gap-2 self-center"
+            onClick={(event) => event.stopPropagation()}
           >
-            {renderCheckIcon()}
-            {t('checkConnection')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onDelete(modelConfig.id)}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </div>
-      </div>      
-      <AccordionContent className="px-4 pb-4 space-y-4">
-        {/* 模型选择 */}
-        <div className="grid gap-3">
-          <Label>{t('model')}</Label>
-          <ModelSelect
-            model={modelConfig.model}
-            setModel={(model) => onUpdate(modelConfig.id, 'model', model)}
-            aiConfig={aiConfig}
-          />
-        </div>
-
-        {/* 模型类型 */}
-        <div className="grid gap-3">
-          <Label>{t('modelType.title')}</Label>
-          <RadioGroup
-            value={modelConfig.modelType}
-            onValueChange={(value) => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
-            className="flex flex-wrap gap-4"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="chat" id={`chat-${modelConfig.id}`} />
-              <Label htmlFor={`chat-${modelConfig.id}`}>{t('modelType.chat')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="tts" id={`tts-${modelConfig.id}`} />
-              <Label htmlFor={`tts-${modelConfig.id}`}>{t('modelType.tts')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="stt" id={`stt-${modelConfig.id}`} />
-              <Label htmlFor={`stt-${modelConfig.id}`}>{t('modelType.stt')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="embedding" id={`embedding-${modelConfig.id}`} />
-              <Label htmlFor={`embedding-${modelConfig.id}`}>{t('modelType.embedding')}</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="rerank" id={`rerank-${modelConfig.id}`} />
-              <Label htmlFor={`rerank-${modelConfig.id}`}>{t('modelType.rerank')}</Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Chat模型的特殊配置 */}
-        {modelConfig.modelType === 'chat' && (
-          <Collapsible className="rounded-lg border bg-muted/30 px-4 py-2">
+            <ButtonGroup>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheck}
+                disabled={!modelConfig.model || checkState === 'checking'}
+              >
+                {renderCheckIcon()}
+                {t('checkConnection')}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label={tc('delete')}
+                onClick={() => onDelete(modelConfig.id)}
+              >
+                <Trash2 />
+              </Button>
+            </ButtonGroup>
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="group h-auto w-full justify-between px-0 py-2 font-semibold hover:bg-transparent">
-                <span className="text-sm">{t('advancedParameters')}</span>
-                <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="group"
+                aria-label={t('models')}
+              >
+                <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-4 border-t pt-4 pb-2">
-              <div className="grid gap-3">
-              <Label>{t('maxTokens')}</Label>
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                value={modelConfig.maxTokens ?? ''}
-                placeholder={t('maxTokensPlaceholder')}
-                onChange={(event) => {
-                  const value = event.target.value
-                  onUpdate(modelConfig.id, 'maxTokens', value === '' ? undefined : Number(value))
-                }}
-              />
-              <p className="text-sm text-muted-foreground">{t('maxTokensDesc')}</p>
-              </div>
+          </CardAction>
+        </CardHeader>
 
-              <div className="grid gap-3">
-              <Label>{t('tokenLimitParam')}</Label>
-              <RadioGroup
-                value={modelConfig.tokenLimitParam || 'max_completion_tokens'}
-                onValueChange={(value) => onUpdate(
-                  modelConfig.id,
-                  'tokenLimitParam',
-                  value as ModelConfig['tokenLimitParam']
-                )}
-                className="flex flex-wrap gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="max_completion_tokens" id={`max-completion-tokens-${modelConfig.id}`} />
-                  <Label htmlFor={`max-completion-tokens-${modelConfig.id}`}>max_completion_tokens</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="max_tokens" id={`max-tokens-${modelConfig.id}`} />
-                  <Label htmlFor={`max-tokens-${modelConfig.id}`}>max_tokens</Label>
-                </div>
-              </RadioGroup>
-              <p className="text-sm text-muted-foreground">{t('tokenLimitParamDesc')}</p>
-              </div>
-
-              <div className="grid gap-3">
-              <Label>Temperature</Label>
-              <div className="flex gap-2 items-center">
-                <Slider
-                  className="flex-1"
-                  value={[modelConfig.temperature || 0.7]}
-                  max={2}
-                  step={0.01}
-                  onValueChange={(value) => onUpdate(modelConfig.id, 'temperature', value[0])}
+        <CollapsibleContent>
+          <CardContent>
+            <FieldGroup>
+              <Field>
+                <FieldLabel>{t('model')}</FieldLabel>
+                <ModelSelect
+                  model={modelConfig.model}
+                  setModel={(model) => onUpdate(modelConfig.id, 'model', model)}
+                  aiConfig={aiConfig}
                 />
-                <span className="text-sm text-muted-foreground w-12">
-                  {(modelConfig.temperature || 0.7).toFixed(2)}
-                </span>
-              </div>
-              </div>
+              </Field>
 
-              <div className="grid gap-3">
-              <Label>Top P</Label>
-              <div className="flex gap-2 items-center">
-                <Slider
-                  className="flex-1"
-                  value={[modelConfig.topP || 1.0]}
-                  max={1}
-                  min={0}
-                  step={0.01}
-                  onValueChange={(value) => onUpdate(modelConfig.id, 'topP', value[0])}
-                />
-                <span className="text-sm text-muted-foreground w-12">
-                  {(modelConfig.topP || 1.0).toFixed(2)}
-                </span>
-              </div>
-              </div>
+              <Field>
+                <FieldLabel>{t('modelType.title')}</FieldLabel>
+                <Tabs
+                  orientation="horizontal"
+                  value={modelConfig.modelType}
+                  onValueChange={(value) => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
+                >
+                  <TabsList className="group-data-vertical/tabs:h-8 group-data-vertical/tabs:flex-row">
+                    {modelTypeOptions.map(({ value, icon: Icon }) => (
+                      <TabsTrigger
+                        key={value}
+                        value={value}
+                        className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+                      >
+                        <Icon data-icon="inline-start" />
+                        {t(`modelType.${value}`)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </Field>
 
-              <div className="flex items-center justify-between">
-                <div className="grid gap-1.5">
-                  <Label>{t('enableStream')}</Label>
-                  <div className="text-sm text-muted-foreground">
-                    {t('enableStreamDesc')}
-                  </div>
-                </div>
-                <Switch
-                  checked={modelConfig.enableStream !== false}
-                  onCheckedChange={(checked) => onUpdate(modelConfig.id, 'enableStream', checked)}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+              {modelConfig.modelType === 'chat' && (
+                <Collapsible>
+                  <Card size="sm">
+                    <CardHeader className="items-center">
+                      <CardTitle>{t('advancedParameters')}</CardTitle>
+                      <CardAction className="row-span-1 self-center">
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="group"
+                            aria-label={t('advancedParameters')}
+                          >
+                            <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+                          </Button>
+                        </CollapsibleTrigger>
+                      </CardAction>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent>
+                        <FieldGroup>
+                          <Field>
+                            <FieldLabel>{t('maxTokens')}</FieldLabel>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={modelConfig.maxTokens ?? ''}
+                              placeholder={t('maxTokensPlaceholder')}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                onUpdate(modelConfig.id, 'maxTokens', value === '' ? undefined : Number(value))
+                              }}
+                            />
+                            <FieldDescription>{t('maxTokensDesc')}</FieldDescription>
+                          </Field>
 
-        {/* TTS模型的特殊配置 */}
-        {modelConfig.modelType === 'tts' && (
-          <div className="grid gap-3">
-            <Label>{t('voice')}</Label>
-            <Input
-              value={modelConfig.voice || ''}
-              onChange={(e) => onUpdate(modelConfig.id, 'voice', e.target.value)}
-              placeholder={t('voicePlaceholder')}
-            />
-          </div>
-        )}
-      </AccordionContent>
-    </AccordionItem>
+                          <Field>
+                            <FieldLabel>{t('tokenLimitParam')}</FieldLabel>
+                            <RadioGroup
+                              value={modelConfig.tokenLimitParam || 'max_completion_tokens'}
+                              onValueChange={(value) => onUpdate(
+                                modelConfig.id,
+                                'tokenLimitParam',
+                                value as ModelConfig['tokenLimitParam']
+                              )}
+                            >
+                              <Field orientation="horizontal">
+                                <RadioGroupItem
+                                  value="max_completion_tokens"
+                                  id={`max-completion-tokens-${modelConfig.id}`}
+                                />
+                                <FieldLabel htmlFor={`max-completion-tokens-${modelConfig.id}`}>
+                                  max_completion_tokens
+                                </FieldLabel>
+                              </Field>
+                              <Field orientation="horizontal">
+                                <RadioGroupItem
+                                  value="max_tokens"
+                                  id={`max-tokens-${modelConfig.id}`}
+                                />
+                                <FieldLabel htmlFor={`max-tokens-${modelConfig.id}`}>
+                                  max_tokens
+                                </FieldLabel>
+                              </Field>
+                            </RadioGroup>
+                            <FieldDescription>{t('tokenLimitParamDesc')}</FieldDescription>
+                          </Field>
+
+                          <Field>
+                            <FieldLabel>Temperature</FieldLabel>
+                            <div className="flex items-center gap-3">
+                              <Slider
+                                className="flex-1"
+                                value={[modelConfig.temperature || 0.7]}
+                                max={2}
+                                step={0.01}
+                                onValueChange={(value) => onUpdate(modelConfig.id, 'temperature', value[0])}
+                              />
+                              <Badge variant="outline">
+                                {(modelConfig.temperature || 0.7).toFixed(2)}
+                              </Badge>
+                            </div>
+                          </Field>
+
+                          <Field>
+                            <FieldLabel>Top P</FieldLabel>
+                            <div className="flex items-center gap-3">
+                              <Slider
+                                className="flex-1"
+                                value={[modelConfig.topP || 1.0]}
+                                max={1}
+                                min={0}
+                                step={0.01}
+                                onValueChange={(value) => onUpdate(modelConfig.id, 'topP', value[0])}
+                              />
+                              <Badge variant="outline">
+                                {(modelConfig.topP || 1.0).toFixed(2)}
+                              </Badge>
+                            </div>
+                          </Field>
+
+                          <Field orientation="horizontal">
+                            <FieldContent>
+                              <FieldTitle>{t('enableStream')}</FieldTitle>
+                              <FieldDescription>{t('enableStreamDesc')}</FieldDescription>
+                            </FieldContent>
+                            <Switch
+                              checked={modelConfig.enableStream !== false}
+                              onCheckedChange={(checked) => onUpdate(modelConfig.id, 'enableStream', checked)}
+                            />
+                          </Field>
+                        </FieldGroup>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {modelConfig.modelType === 'tts' && (
+                <Field>
+                  <FieldLabel>{t('voice')}</FieldLabel>
+                  <Input
+                    value={modelConfig.voice || ''}
+                    onChange={(event) => onUpdate(modelConfig.id, 'voice', event.target.value)}
+                    placeholder={t('voicePlaceholder')}
+                  />
+                </Field>
+              )}
+            </FieldGroup>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   )
 }

@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff, CheckCircle, XCircle, Loader2, Save } from 'lucide-react';
 import { testWebDAVConnection } from '@/lib/sync/webdav';
 import { WebDAVConfig } from '@/types/sync';
 import { Store } from '@tauri-apps/plugin-store';
 import useSyncStore from '@/stores/sync';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
+import { Item, ItemActions, ItemContent, ItemTitle } from '@/components/ui/item';
 
 export function WebDAVSync() {
   const t = useTranslations();
@@ -106,29 +108,23 @@ export function WebDAVSync() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{t('settings.sync.webdav.title')}</CardTitle>
-            <CardDescription>
-              {t('settings.sync.webdav.description')}
-            </CardDescription>
-          </div>
-        </div>
+        <CardTitle>{t('settings.sync.webdav.title')}</CardTitle>
+        <CardDescription>{t('settings.sync.webdav.description')}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* 状态显示 */}
-        <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-          <span className="text-sm font-medium">{t('settings.sync.webdav.status')}</span>
-          <div className="flex items-center gap-2">
-            {getStatusIcon()}
-            <span className="text-sm">{getStatusText()}</span>
-          </div>
-        </div>
+      <CardContent>
+        <FieldGroup>
+          <Item variant="muted">
+            <ItemContent>
+              <ItemTitle>{t('settings.sync.webdav.status')}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              {getStatusIcon()}
+              <span className="text-sm">{getStatusText()}</span>
+            </ItemActions>
+          </Item>
 
-        {/* 基本配置 */}
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="url">{t('settings.sync.webdav.url')}</Label>
+          <Field>
+            <FieldLabel htmlFor="url">{t('settings.sync.webdav.url')}</FieldLabel>
             <Input
               id="url"
               type="text"
@@ -136,12 +132,10 @@ export function WebDAVSync() {
               onChange={(e) => handleConfigChange('url', e.target.value)}
               placeholder={t('settings.sync.webdav.urlPlaceholder')}
             />
-            <p className="text-xs text-muted-foreground">
-              {t('settings.sync.webdav.urlDesc')}
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="username">{t('settings.sync.webdav.username')}</Label>
+            <FieldDescription>{t('settings.sync.webdav.urlDesc')}</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="username">{t('settings.sync.webdav.username')}</FieldLabel>
             <Input
               id="username"
               type="text"
@@ -149,31 +143,28 @@ export function WebDAVSync() {
               onChange={(e) => handleConfigChange('username', e.target.value)}
               placeholder={t('settings.sync.webdav.usernamePlaceholder')}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">{t('settings.sync.webdav.password')}</Label>
-            <div className="relative">
-              <Input
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="password">{t('settings.sync.webdav.password')}</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
                 id="password"
                 type={showPassword ? "text" : "password"}
                 value={config.password}
                 onChange={(e) => handleConfigChange('password', e.target.value)}
                 placeholder={t('settings.sync.webdav.passwordPlaceholder')}
-                className="pr-10"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+              <InputGroupButton
+                size="icon-xs"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pathPrefix">{t('settings.sync.webdav.pathPrefix')}</Label>
+              </InputGroupButton>
+            </InputGroup>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="pathPrefix">{t('settings.sync.webdav.pathPrefix')}</FieldLabel>
             <Input
               id="pathPrefix"
               type="text"
@@ -181,14 +172,11 @@ export function WebDAVSync() {
               onChange={(e) => handleConfigChange('pathPrefix', e.target.value)}
               placeholder={t('settings.sync.webdav.pathPrefixPlaceholder')}
             />
-            <p className="text-xs text-muted-foreground">
-              {t('settings.sync.webdav.pathPrefixDesc')}
-            </p>
-          </div>
-        </div>
-
-        {/* 操作按钮 */}
-        <div className="flex gap-2 pt-2">
+            <FieldDescription>{t('settings.sync.webdav.pathPrefixDesc')}</FieldDescription>
+          </Field>
+        </FieldGroup>
+      </CardContent>
+      <CardFooter className="gap-2">
           <Button
             variant="outline"
             onClick={() => testConnection()}
@@ -196,7 +184,7 @@ export function WebDAVSync() {
           >
             {isConnecting ? (
               <>
-                <Loader2 className="size-4 mr-2 animate-spin" />
+                <Loader2 data-icon="inline-start" className="animate-spin" />
                 {t('settings.sync.webdav.testing')}
               </>
             ) : (
@@ -209,19 +197,17 @@ export function WebDAVSync() {
           >
             {isSaving ? (
               <>
-                <Loader2 className="size-4 mr-2 animate-spin" />
+                <Loader2 data-icon="inline-start" className="animate-spin" />
                 {t('settings.sync.webdav.saving')}
               </>
             ) : (
               <>
-                <Save className="size-4 mr-2" />
+                <Save data-icon="inline-start" />
                 {t('settings.sync.webdav.saveConfig')}
               </>
             )}
           </Button>
-        </div>
-
-      </CardContent>
+      </CardFooter>
     </Card>
   );
 }

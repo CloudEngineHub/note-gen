@@ -1,7 +1,6 @@
 'use client'
 
 import { Button } from "@/components/ui/button"
-import { FormItem } from "../components/setting-base"
 import useSettingStore from "@/stores/setting"
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs"
@@ -12,6 +11,7 @@ import { X, FolderOpen, History, Trash2, ChevronDown } from "lucide-react"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useState } from "react"
+import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
 
 export function SettingWorkspace() {
   const {
@@ -84,11 +84,9 @@ export function SettingWorkspace() {
   }
 
   return (
-    <FormItem 
-        title={t('workspace.current')} 
-        desc={t('workspace.desc')}
-      >
-        <div className="space-y-3">
+    <Field>
+      <FieldTitle>{t('workspace.current')}</FieldTitle>
+        <div className="flex flex-col gap-3">
           {/* 当前工作区路径显示和选择 */}
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
@@ -192,6 +190,7 @@ export function SettingWorkspace() {
           </Popover>
           
         </div>
-    </FormItem>
+      <FieldDescription>{t('workspace.desc')}</FieldDescription>
+    </Field>
   )
 }

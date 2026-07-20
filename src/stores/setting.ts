@@ -249,14 +249,6 @@ interface SettingState {
   setCustomThemeColors: (colors: CustomThemeColors) => Promise<void>
   resetCustomThemeColors: () => Promise<void>
 
-  // 聊天工具栏配置 - PC 端
-  chatToolbarConfigPc: ChatToolbarItem[]
-  setChatToolbarConfigPc: (config: ChatToolbarItem[]) => Promise<void>
-
-  // 聊天工具栏配置 - 移动端
-  chatToolbarConfigMobile: ChatToolbarItem[]
-  setChatToolbarConfigMobile: (config: ChatToolbarItem[]) => Promise<void>
-
   // 记录工具栏配置
   recordToolbarConfig: RecordToolbarItem[]
   setRecordToolbarConfig: (config: RecordToolbarItem[]) => Promise<void>
@@ -272,12 +264,6 @@ interface SettingState {
   setKeepLatestCount: (count: number) => Promise<void>
   condenseMaxLength: number
   setCondenseMaxLength: (length: number) => Promise<void>
-}
-
-export interface ChatToolbarItem {
-  id: string
-  enabled: boolean
-  order: number
 }
 
 export interface RecordToolbarItem {
@@ -590,30 +576,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
             hydratedSettings[key] = mergedConfig
           } else {
             hydratedSettings[key] = res as RecordToolbarItem[]
-          }
-        } else if (key === 'chatToolbarConfigPc' || key === 'chatToolbarConfigMobile') {
-          // 确保聊天工具栏包含所有工具，如果缺少新工具则自动添加
-          const storedConfig = res as ChatToolbarItem[]
-          const defaultConfig = value as ChatToolbarItem[]
-
-          // 检查是否有缺失的工具
-          const missingTools = defaultConfig.filter(
-            defaultItem => !storedConfig.some(stored => stored.id === defaultItem.id)
-          )
-
-          if (missingTools.length > 0) {
-            // 合并配置：保留用户的顺序和启用状态，添加新工具
-            const mergedConfig = [...storedConfig]
-            let maxOrder = Math.max(...storedConfig.map(item => item.order), 0)
-
-            missingTools.forEach(tool => {
-              mergedConfig.push({ ...tool, order: ++maxOrder })
-            })
-
-            await store.set(key, mergedConfig)
-            hydratedSettings[key] = mergedConfig
-          } else {
-            hydratedSettings[key] = res as ChatToolbarItem[]
           }
         } else if (key !== 'aiModelList') {
           hydratedSettings[key] = res
@@ -1242,40 +1204,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ githubCustomImageRepo: repo })
     const store = await Store.load('store.json');
     await store.set('githubCustomImageRepo', repo)
-    await store.save()
-  },
-
-  // 聊天工具栏配置 - PC 端
-  chatToolbarConfigPc: [
-    // 底部工具栏（可排序）
-    { id: 'modelSelect', enabled: true, order: 0 },
-    { id: 'promptSelect', enabled: true, order: 1 },
-    { id: 'mcpButton', enabled: true, order: 2 },
-    { id: 'ragSwitch', enabled: true, order: 3 },
-    { id: 'clipboardMonitor', enabled: true, order: 4 },
-    // 顶部工具栏 - 右侧（不参与排序）
-    { id: 'newChat', enabled: true, order: 5 },
-  ],
-  setChatToolbarConfigPc: async (config: ChatToolbarItem[]) => {
-    set({ chatToolbarConfigPc: config })
-    const store = await Store.load('store.json');
-    await store.set('chatToolbarConfigPc', config)
-    await store.save()
-  },
-
-  // 聊天工具栏配置 - 移动端
-  chatToolbarConfigMobile: [
-    { id: 'modelSelect', enabled: true, order: 0 },
-    { id: 'promptSelect', enabled: true, order: 1 },
-    { id: 'mcpButton', enabled: true, order: 2 },
-    { id: 'ragSwitch', enabled: true, order: 3 },
-    { id: 'clipboardMonitor', enabled: true, order: 4 },
-    { id: 'newChat', enabled: true, order: 5 },
-  ],
-  setChatToolbarConfigMobile: async (config: ChatToolbarItem[]) => {
-    set({ chatToolbarConfigMobile: config })
-    const store = await Store.load('store.json');
-    await store.set('chatToolbarConfigMobile', config)
     await store.save()
   },
 

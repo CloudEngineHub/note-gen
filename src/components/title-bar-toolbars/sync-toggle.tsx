@@ -42,6 +42,7 @@ import { getRemoteFileContent } from "@/lib/sync/remote-file"
 import { getSyncRepoName } from "@/lib/sync/repo-utils"
 import { getGiteaApiBaseUrl } from "@/lib/sync/gitea"
 import { fetch } from '@tauri-apps/plugin-http'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 // GitLab 实例类型
 enum GitlabInstanceType {
@@ -323,6 +324,7 @@ interface SyncToggleProps {
 export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
   const t = useTranslations()
   const router = useRouter()
+  const { openSettings } = useSettingsDialogStore()
   const [syncing, setSyncing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -580,9 +582,12 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
   }
 
   function openSyncSettings() {
-    const settingPath = isMobile ? '/mobile/setting/pages/sync' : '/core/setting?anchor=sync'
     setOpen(false)
-    router.push(settingPath)
+    if (isMobile) {
+      router.push('/mobile/setting/pages/sync')
+    } else {
+      openSettings('sync')
+    }
   }
 
   // 获取状态图标
@@ -604,9 +609,11 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
     // 如果选择了未配置的方案，跳转到设置页面
     if (selectedProvider?.status === 'unconfigured') {
       await setPrimaryBackupMethod(value as SyncPlatform)
-      // 跳转到同步设置页面，区分移动端和 PC 端
-      const settingPath = isMobile ? '/mobile/setting/pages/sync' : '/core/setting?anchor=sync'
-      router.push(settingPath)
+      if (isMobile) {
+        router.push('/mobile/setting/pages/sync')
+      } else {
+        openSettings('sync')
+      }
       return
     }
 

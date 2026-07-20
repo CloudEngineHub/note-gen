@@ -8,6 +8,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import useSettingStore from "@/stores/setting";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SpeechMode } from '@/lib/speech/types';
+import { SettingSection } from '../components/setting-base'
 
 export function Setting() {
   const t = useTranslations('settings.audio');
@@ -96,14 +97,9 @@ export function Setting() {
   };
 
   return (
-    <ItemGroup className="gap-6">
-      {/* TTS朗读设置部分 */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-foreground">{t('tts.title')}</h3>
-        <p className="text-xs text-muted-foreground">{t('tts.desc')}</p>
-      </div>
-
-      <ItemGroup className="gap-4">
+    <div className="flex flex-col gap-6">
+      <SettingSection title={t('tts.title')} desc={t('tts.desc')}>
+        <ItemGroup>
         <Item variant="outline">
           <ItemMedia variant="icon"><Volume2 className="size-4" /></ItemMedia>
           <ItemContent>
@@ -157,15 +153,11 @@ export function Setting() {
             </ItemActions>
           </Item>
         )}
-      </ItemGroup>
+        </ItemGroup>
+      </SettingSection>
 
-      {/* STT语音识别设置部分 */}
-      <div className="space-y-2 mt-8">
-        <h3 className="text-sm font-medium text-foreground">{t('stt.title')}</h3>
-        <p className="text-xs text-muted-foreground">{t('stt.desc')}</p>
-      </div>
-
-      <ItemGroup className="gap-4">
+      <SettingSection title={t('stt.title')} desc={t('stt.desc')}>
+        <ItemGroup>
         <Item variant="outline">
           <ItemMedia variant="icon"><Mic className="size-4" /></ItemMedia>
           <ItemContent>
@@ -176,7 +168,8 @@ export function Setting() {
             <ModelSelect modelKey="stt" />
           </ItemActions>
         </Item>
-      </ItemGroup>
-    </ItemGroup>
+        </ItemGroup>
+      </SettingSection>
+    </div>
   )
 }

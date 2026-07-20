@@ -4,6 +4,15 @@ import { useRouter } from "next/navigation";
 import baseConfig from '@/app/core/setting/config'
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from "lucide-react";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+  ItemSeparator,
+  ItemTitle,
+} from '@/components/ui/item'
 
 const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
 
@@ -34,33 +43,31 @@ export function SettingTab() {
   }
 
   return (
-    <ul className="flex w-full flex-col p-1">
+    <ItemGroup className="gap-0 p-1">
       {
         config.map((item, index) => {
           // 如果是分隔符字符串，渲染分隔线
           if (typeof item === 'string') {
             return (
-              <li key={`separator-${index}`}>
-                <div className="mx-3 my-1 h-px bg-border/60" />
-              </li>
+              <ItemSeparator key={`separator-${index}`} className="mx-3 my-1 w-auto" />
             )
           }
           
           return (
-            <li
-              className="flex w-full items-center justify-between gap-2 rounded-2xl px-3 py-3 text-[hsl(var(--component-inactive-color))] transition-[background-color,color] duration-200 active:bg-[hsl(var(--component-active-bg))] active:text-foreground"
-              key={item.anchor}
-              onClick={() => handleNavigation(item.anchor)}
-            >
-              <div className="flex items-center gap-4">
-                {item.icon}
-                <span className="text-sm">{item.title}</span>
-              </div>
-              <ChevronRight className="size-4" />
-            </li>
+            <Item key={item.anchor} asChild className="rounded-2xl active:bg-muted">
+              <button type="button" onClick={() => handleNavigation(item.anchor)}>
+                <ItemMedia variant="icon">{item.icon}</ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{item.title}</ItemTitle>
+                </ItemContent>
+                <ItemActions>
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </ItemActions>
+              </button>
+            </Item>
           )
         })
       }
-    </ul>
+    </ItemGroup>
   )
 }

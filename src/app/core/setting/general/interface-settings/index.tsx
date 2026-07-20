@@ -1,4 +1,6 @@
 'use client'
+import { useTranslations } from 'next-intl'
+import { SettingSection } from '../../components/setting-base'
 import { ThemeSettings } from './theme'
 import { LanguageSettings } from './language'
 import { FontFamilySettings } from './font-family'
@@ -9,17 +11,20 @@ import { RecordTextSizeSettings } from './record-text-size'
 import { CustomThemeSettings } from './custom-theme'
 
 export function InterfaceSettings() {
+  const t = useTranslations('settings.general.interface')
 
   return (
-    <div className="flex flex-col gap-4">
-      <ThemeSettings />
-      <LanguageSettings />
-      <FontFamilySettings />
-      <ScaleSettings />
-      <ContentTextScaleSettings />
-      <FileManagerTextSizeSettings />
-      <RecordTextSizeSettings />
-      <CustomThemeSettings />
-    </div>
+    <SettingSection title={t('title')}>
+      <div className="flex flex-col gap-4">
+        <ThemeSettings />
+        <LanguageSettings />
+        <FontFamilySettings />
+        <ScaleSettings />
+        <ContentTextScaleSettings />
+        <FileManagerTextSizeSettings />
+        <RecordTextSizeSettings />
+        <CustomThemeSettings />
+      </div>
+    </SettingSection>
   )
 }
