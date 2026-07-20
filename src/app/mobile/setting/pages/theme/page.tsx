@@ -557,6 +557,7 @@ export default function ThemeSettingsPage() {
                 placeholder="点击生成按钮导出当前配色"
                 className="font-mono text-xs"
                 rows={6}
+                maxRows={14}
                 readOnly
               />
             </div>
@@ -575,6 +576,7 @@ export default function ThemeSettingsPage() {
                 placeholder="粘贴配色代码..."
                 className="font-mono text-xs"
                 rows={6}
+                maxRows={14}
               />
             </div>
           </TabsContent>

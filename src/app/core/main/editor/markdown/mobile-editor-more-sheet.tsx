@@ -137,6 +137,7 @@ export function MobileEditorMoreSheet({
                 onChange={(event) => onCustomAiInstructionChange(event.target.value)}
                 placeholder="输入自定义 AI 指令，例如：整理成会议纪要"
                 rows={3}
+                maxRows={8}
               />
               <Button onClick={onSubmitCustomAiInstruction}>执行自定义指令</Button>
             </>
@@ -149,6 +150,7 @@ export function MobileEditorMoreSheet({
                 onChange={(event) => onCustomAiInstructionChange(event.target.value)}
                 placeholder="输入自定义 AI 指令，例如：整理成会议纪要"
                 rows={3}
+                maxRows={8}
               />
               <Button onClick={onSubmitCustomAiInstruction}>执行自定义指令</Button>
             </>

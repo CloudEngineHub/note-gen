@@ -340,6 +340,7 @@ export function ServerConfigDialog({
                       onChange={(e) => setEnv(e.target.value)}
                       placeholder='{"KEY": "value"}'
                       rows={3}
+                      maxRows={10}
                     />
                     <p className="text-xs text-muted-foreground">{t('envDesc')}</p>
                   </div>
@@ -367,6 +368,7 @@ export function ServerConfigDialog({
                       onChange={(e) => setHeaders(e.target.value)}
                       placeholder='{"Authorization": "Bearer token"}'
                       rows={3}
+                      maxRows={10}
                     />
                     <p className="text-xs text-muted-foreground">{t('headersDesc')}</p>
                   </div>
@@ -480,6 +482,7 @@ export function ServerConfigDialog({
                       onChange={(e) => setEnv(e.target.value)}
                       placeholder='{"KEY": "value"}'
                       rows={3}
+                      maxRows={10}
                     />
                     <p className="text-xs text-muted-foreground">{t('envDesc')}</p>
                   </div>
@@ -507,6 +510,7 @@ export function ServerConfigDialog({
                       onChange={(e) => setHeaders(e.target.value)}
                       placeholder='{"Authorization": "Bearer token"}'
                       rows={3}
+                      maxRows={10}
                     />
                     <p className="text-xs text-muted-foreground">{t('headersDesc')}</p>
                   </div>

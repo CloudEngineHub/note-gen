@@ -1027,6 +1027,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                   <Textarea
                     id="organize-template-content"
                     className={cn("min-h-40 resize-y", isMobile && "rounded-xl")}
+                    rows={10}
+                    maxRows={24}
                     value={templateContent}
                     onChange={(event) => setTemplateContent(event.target.value)}
                     placeholder={tGlobal('settings.template.noContent')}
@@ -1210,6 +1212,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                       <Textarea
                         className={cn("resize-none", isMobile ? "min-h-32 rounded-xl" : "min-h-28")}
                         id="organize-additional-requirement"
+                        rows={5}
+                        maxRows={12}
                         value={additionalRequirement}
                         onChange={(event) => setAdditionalRequirement(event.target.value)}
                         placeholder={t('additionalRequirementPlaceholder')}

@@ -93,6 +93,7 @@ export function TodoForm({
         <Textarea
           id={`todo-description-${mode}`}
           rows={3}
+          maxRows={8}
           value={data.description}
           onChange={(e) => onChange({ ...data, description: e.target.value })}
           placeholder={t('record.mark.todo.descriptionPlaceholder')}

@@ -212,6 +212,7 @@ ${newContent}`
                     onChange={(e) => setSystemPromptDraft(e.target.value)}
                     placeholder={t('prompt.systemPrompt.placeholder')}
                     rows={16}
+                    maxRows={30}
                   />
                 </div>
                 <DialogFooter className="gap-2">
@@ -281,6 +282,7 @@ ${newContent}`
                         onChange={(e) => setNewContent(e.target.value)}
                         placeholder={t('prompt.promptContentPlaceholder')}
                         rows={5}
+                        maxRows={14}
                       />
                       <Button
                         type="button"
@@ -338,6 +340,7 @@ ${newContent}`
                         onChange={(e) => setNewContent(e.target.value)}
                         placeholder={t('prompt.promptContentPlaceholder')}
                         rows={5}
+                        maxRows={16}
                       />
                       <Button
                         type="button"
@@ -380,6 +383,7 @@ ${newContent}`
                       onChange={(e) => setNewContent(e.target.value)}
                       placeholder={t('prompt.promptContentPlaceholder')}
                       rows={5}
+                      maxRows={16}
                     />
                   </ItemContent>
                   <ItemFooter className="justify-end">

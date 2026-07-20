@@ -104,6 +104,7 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
             <Textarea
               id="edit-todo-description"
               rows={3}
+              maxRows={8}
               value={todoData.description}
               onChange={(e) => void persistTodoData({ ...todoData, description: e.target.value })}
               placeholder={t('record.mark.todo.descriptionPlaceholder')}

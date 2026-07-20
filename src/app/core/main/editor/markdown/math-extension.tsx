@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { normalizeLatexForKatex } from '@/lib/latex'
+import { Textarea } from '@/components/ui/textarea'
 
 // Inline Math Component
 function InlineMathView({ node, updateAttributes }: ReactNodeViewProps) {
@@ -111,12 +112,14 @@ function BlockMathView({ node, updateAttributes }: ReactNodeViewProps) {
   if (isEditing) {
     return (
       <NodeViewWrapper className="block-math-wrapper my-4">
-        <textarea
+        <Textarea
           value={latex}
           onChange={(e) => setLatex(e.target.value)}
           onBlur={handleUpdate}
           onKeyDown={handleKeyDown}
-          className="block-math-input w-full px-3 py-2 border rounded bg-background text-foreground min-h-15 focus:outline-none focus:ring-2 focus:ring-primary font-mono"
+          rows={3}
+          maxRows={12}
+          className="block-math-input min-h-15 font-mono"
           autoFocus
         />
         {error && <span className="text-red-500 text-xs mt-1">{error}</span>}

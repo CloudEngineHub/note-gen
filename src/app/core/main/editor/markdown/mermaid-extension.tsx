@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 
 // Initialize mermaid
 mermaid.initialize({
@@ -188,11 +189,13 @@ function MermaidDiagramView({ node, updateAttributes }: ReactNodeViewProps) {
             </Button>
           </div>
 
-          <textarea
+          <Textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full h-48 p-3 font-mono text-sm bg-background resize-y focus:outline-none"
+            rows={8}
+            maxRows={20}
+            className="min-h-48 rounded-none border-0 font-mono shadow-none focus-visible:ring-0"
             placeholder={t('placeholder')}
             spellCheck={false}
           />

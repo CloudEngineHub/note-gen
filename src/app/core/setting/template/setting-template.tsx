@@ -177,6 +177,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                     <Textarea
                       id="content"
                       rows={5}
+                      maxRows={14}
                       value={templateContent}
                       onChange={(e) => setTemplateContent(e.target.value)}
                       placeholder={t('settings.template.content')}
@@ -249,6 +250,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                     <Textarea
                       id="content"
                       rows={5}
+                      maxRows={14}
                       value={templateContent}
                       onChange={(e) => setTemplateContent(e.target.value)}
                       placeholder={t('settings.template.content')}
@@ -317,6 +319,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                   <Textarea
                     id="edit-content"
                     rows={5}
+                    maxRows={14}
                     value={templateContent}
                     onChange={(e) => setTemplateContent(e.target.value)}
                     placeholder={t('settings.template.content')}
@@ -381,6 +384,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                   <Textarea
                     id="edit-content"
                     rows={5}
+                    maxRows={14}
                     value={templateContent}
                     onChange={(e) => setTemplateContent(e.target.value)}
                     placeholder={t('settings.template.content')}

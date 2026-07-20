@@ -467,6 +467,8 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
                     onChange={(event) => setDraft({ ...draft, todoDescription: event.target.value })}
                     placeholder={t('record.mark.todo.descriptionPlaceholder')}
                     disabled={isReadOnly}
+                    rows={5}
+                    maxRows={10}
                     className="min-h-36 resize-none"
                   />
                 </DetailField>
@@ -490,6 +492,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
                     value={draft.content}
                     onChange={(event) => setDraft({ ...draft, content: event.target.value })}
                     disabled={isReadOnly}
+                    maxRows={30}
                     className={cn('resize-none leading-7', mark.type === 'text' ? 'min-h-[48vh]' : 'min-h-56')}
                   />
                 </DetailField>

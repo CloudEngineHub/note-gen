@@ -254,6 +254,7 @@ export function CustomThemeSettings() {
                   placeholder={t('export.placeholder')}
                   className="font-mono text-xs"
                   rows={8}
+                  maxRows={16}
                   readOnly
                 />
               </div>
@@ -273,6 +274,7 @@ export function CustomThemeSettings() {
                   placeholder={t('import.placeholder')}
                   className="font-mono text-xs"
                   rows={8}
+                  maxRows={16}
                 />
               </div>
             </TabsContent>

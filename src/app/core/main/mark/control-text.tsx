@@ -247,6 +247,7 @@ export function ControlText() {
                 ref={textAreaRef}
                 id="username"
                 rows={10}
+                maxRows={24}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
@@ -293,6 +294,7 @@ export function ControlText() {
               ref={textAreaRef}
               id="username"
               rows={10}
+              maxRows={30}
               value={text}
               onChange={(e) => setText(e.target.value)}
               autoFocus

@@ -282,6 +282,7 @@ export function JsonImportDialog({ open, onOpenChange }: JsonImportDialogProps) 
   }
 }`}
                   rows={12}
+                  maxRows={18}
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">{t('jsonInputHelp')}</p>
@@ -330,6 +331,7 @@ export function JsonImportDialog({ open, onOpenChange }: JsonImportDialogProps) 
   }
 }`}
                   rows={12}
+                  maxRows={24}
                   className="font-mono text-sm"
                 />
                 <p className="text-xs text-muted-foreground">{t('jsonInputHelp')}</p>

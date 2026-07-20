@@ -69,6 +69,7 @@ export function MemoryForm({ onSuccess }: MemoryFormProps) {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={3}
+          maxRows={8}
         />
       </div>
 
