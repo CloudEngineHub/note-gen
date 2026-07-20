@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 const KEYBOARD_OPEN_THRESHOLD = 80
 const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
 const KEYBOARD_KEEPALIVE_SELECTOR = '.mobile-writing-toolbar'
+const DRAWER_CONTENT_SELECTOR = '[data-slot="drawer-content"]'
 const KEYBOARD_VIEWPORT_CHECK_DELAYS = [0, 80, 160, 320, 600, 900]
 const EDITABLE_POINTER_WINDOW = 700
 const STABLE_VIEWPORT_FALLBACK_WINDOW = 1200
@@ -69,6 +70,12 @@ export function MobileViewport() {
 
       const activeElement = document.activeElement
       if (!(activeElement instanceof HTMLElement) || !isEditableElement(activeElement)) {
+        return
+      }
+
+      // Drawer inputs use their own scroll container and the browser's native
+      // keyboard handling. Scrolling the page here would move the fixed drawer.
+      if (activeElement.closest(DRAWER_CONTENT_SELECTOR)) {
         return
       }
 
