@@ -45,7 +45,7 @@ export function ControlText() {
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
   const completeRecord = useRecordCompletion()
 
-  const { currentTagId, tags } = useTagStore()
+  const { currentTagId, tags, fetchTags, initTags } = useTagStore()
   const [selectedTagId, setSelectedTagId] = useState<number>(currentTagId)
 
   // 初始化时从 store 读取设置
@@ -170,10 +170,24 @@ export function ControlText() {
   }, [checkClipboard])
 
   useEffect(() => {
-    if (open) {
-      setSelectedTagId(currentTagId)
+    if (!open) {
+      return
     }
-  }, [currentTagId, open])
+
+    let cancelled = false
+    const prepareTags = async () => {
+      await initTags()
+      if (!cancelled) {
+        setSelectedTagId(useTagStore.getState().currentTagId)
+      }
+      await fetchTags()
+    }
+
+    void prepareTags()
+    return () => {
+      cancelled = true
+    }
+  }, [fetchTags, initTags, open])
 
   useEffect(() => {
     if (!open || isMobile) return

@@ -41,7 +41,7 @@ export function ControlTodo() {
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const completeRecord = useRecordCompletion()
 
-  const { currentTagId, tags } = useTagStore()
+  const { currentTagId, tags, fetchTags, initTags } = useTagStore()
   const [selectedTagId, setSelectedTagId] = useState<number>(currentTagId)
 
   async function handleSuccess() {
@@ -95,10 +95,24 @@ export function ControlTodo() {
 
   // Sync selectedTagId with currentTagId when dialog opens
   useEffect(() => {
-    if (open) {
-      setSelectedTagId(currentTagId)
+    if (!open) {
+      return
     }
-  }, [open, currentTagId])
+
+    let cancelled = false
+    const prepareTags = async () => {
+      await initTags()
+      if (!cancelled) {
+        setSelectedTagId(useTagStore.getState().currentTagId)
+      }
+      await fetchTags()
+    }
+
+    void prepareTags()
+    return () => {
+      cancelled = true
+    }
+  }, [fetchTags, initTags, open])
 
   const handleDrawerAnimationEnd = useCallback((drawerOpen: boolean) => {
     if (!drawerOpen) return

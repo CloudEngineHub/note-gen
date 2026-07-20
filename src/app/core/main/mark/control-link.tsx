@@ -47,7 +47,7 @@ export function ControlLink() {
   const isMobile = useIsMobile() || checkIsMobileDevice()
   const completeRecord = useRecordCompletion()
 
-  const { currentTagId, tags } = useTagStore()
+  const { currentTagId, tags, fetchTags, initTags } = useTagStore()
   const { addQueue, setQueue, removeQueue } = useMarkStore()
   const [selectedTagId, setSelectedTagId] = useState<number>(currentTagId)
 
@@ -132,10 +132,24 @@ export function ControlLink() {
   }, [handleOpen])
 
   useEffect(() => {
-    if (open) {
-      setSelectedTagId(currentTagId)
+    if (!open) {
+      return
     }
-  }, [currentTagId, open])
+
+    let cancelled = false
+    const prepareTags = async () => {
+      await initTags()
+      if (!cancelled) {
+        setSelectedTagId(useTagStore.getState().currentTagId)
+      }
+      await fetchTags()
+    }
+
+    void prepareTags()
+    return () => {
+      cancelled = true
+    }
+  }, [fetchTags, initTags, open])
 
   // 检查是否是有效的 URL
   function isValidUrl(text: string): boolean {

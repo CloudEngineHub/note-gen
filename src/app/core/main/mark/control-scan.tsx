@@ -114,7 +114,7 @@ export function ControlScan() {
   const openRef = useRef(open)
   const captureInFlightRef = useRef(false)
   const captureRequestIdRef = useRef(0)
-  const { currentTagId, tags } = useTagStore()
+  const { currentTagId, tags, fetchTags, initTags } = useTagStore()
   const { addQueue, removeQueue, setQueue, fetchMarks } = useMarkStore()
   const { primaryModel, enableImageRecognition } = useSettingStore()
   const completeRecord = useRecordCompletion()
@@ -406,6 +406,26 @@ export function ControlScan() {
       void cleanupTempScreenshots()
     }
   }, [cleanupTempScreenshots, cropEnd, open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    let cancelled = false
+    const prepareTags = async () => {
+      await initTags()
+      if (!cancelled) {
+        setSelectedSaveTagId(useTagStore.getState().currentTagId)
+      }
+      await fetchTags()
+    }
+
+    void prepareTags()
+    return () => {
+      cancelled = true
+    }
+  }, [fetchTags, initTags, open])
 
   useEffect(() => {
     if (!open || isCapturing) {
