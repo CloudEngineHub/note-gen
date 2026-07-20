@@ -29,6 +29,7 @@ import { validateSkillYamlMetadata } from './validator'
 import { readFile, readTextFile, readDir, BaseDirectory, DirEntry } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from '@/lib/workspace'
 import { exists } from '@tauri-apps/plugin-fs'
+import { Store } from '@tauri-apps/plugin-store'
 
 // ============================================================================
 // SkillManager 类
@@ -47,6 +48,7 @@ import { exists } from '@tauri-apps/plugin-fs'
 class SkillManager {
   private skills: Map<string, SkillContent> = new Map()
   private skillFiles: Map<string, SkillFileInfo> = new Map()
+  private enabledOverrides: Record<string, boolean> = {}
   private initialized = false
 
   private async hashFile(filePath: string, scope: SkillScope): Promise<string> {
@@ -75,6 +77,8 @@ class SkillManager {
       return
     }
 
+    const store = await Store.load('store.json')
+    this.enabledOverrides = await store.get<Record<string, boolean>>('skills.enabledSkills') || {}
     await this.discoverSkills()
     this.initialized = true
   }
@@ -97,11 +101,11 @@ class SkillManager {
    * 发现并加载所有 Skills
    */
   async discoverSkills(): Promise<void> {
-    // 加载工作区 Skills
-    await this.discoverProjectSkills()
-
     // 加载全局 Skills
     await this.discoverGlobalSkills()
+
+    // 工作区 Skill 与全局 Skill 同名时覆盖全局版本。
+    await this.discoverProjectSkills()
   }
 
   /**
@@ -308,7 +312,7 @@ class SkillManager {
             ? parsed.metadata.allowedTools.split(/\s+/).filter(v => v.length > 0)
             : undefined,
         userInvocable: parsed.metadata.userInvocable ?? DEFAULT_USER_INVOCABLE,
-        enabled: DEFAULT_SKILL_ENABLED,
+        enabled: this.enabledOverrides[skillId] ?? DEFAULT_SKILL_ENABLED,
         createdAt: now,
         updatedAt: now,
       },

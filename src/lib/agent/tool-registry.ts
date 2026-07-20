@@ -7,6 +7,13 @@ import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
 import { mcpServerManager } from '@/lib/mcp/server-manager'
 import { skillManager } from '@/lib/skills'
 import {
+  BUILTIN_SKILL_CREATOR,
+  installSkillPackage,
+  validateSkillPackage,
+  type SkillPackageInput,
+} from '@/lib/skills/creator'
+import { useSkillsStore } from '@/stores/skills'
+import {
   getEditorContentTool,
   getEditorSelectionTool,
   replaceEditorContentTool,
@@ -873,14 +880,26 @@ function buildSkillListTool(): AgentTool {
     inputSchema: EMPTY_SCHEMA,
     execute: async () => {
       const enabledSkills = await skillManager.getEnabledSkills()
+      const skills = [
+        {
+          id: BUILTIN_SKILL_CREATOR.id,
+          name: BUILTIN_SKILL_CREATOR.name,
+          description: BUILTIN_SKILL_CREATOR.description,
+          builtIn: true,
+        },
+        ...enabledSkills
+          .filter((skill) => skill.metadata.id !== BUILTIN_SKILL_CREATOR.id)
+          .map((skill) => ({
+            id: skill.metadata.id,
+            name: skill.metadata.name,
+            description: skill.metadata.description,
+            builtIn: false,
+          })),
+      ]
       return {
         ok: true,
-        message: `找到 ${enabledSkills.length} 个可用 Skills`,
-        data: enabledSkills.map((skill) => ({
-          id: skill.metadata.id,
-          name: skill.metadata.name,
-          description: skill.metadata.description,
-        })),
+        message: `找到 ${skills.length} 个可用 Skills`,
+        data: skills,
       }
     },
   }
@@ -903,6 +922,22 @@ function buildSkillLoadTool(): AgentTool {
     },
     execute: async (input) => {
       const skillId = asString(input.skill_id)
+      if (skillId === BUILTIN_SKILL_CREATOR.id) {
+        return {
+          ok: true,
+          message: `Loaded built-in Skill "${BUILTIN_SKILL_CREATOR.id}". Follow its workflow to validate and install the requested Skill package.`,
+          data: {
+            id: BUILTIN_SKILL_CREATOR.id,
+            name: BUILTIN_SKILL_CREATOR.name,
+            description: BUILTIN_SKILL_CREATOR.description,
+            base_uri: `builtin-skill://${BUILTIN_SKILL_CREATOR.id}/`,
+            instructions: BUILTIN_SKILL_CREATOR.instructions,
+            resources: [],
+            scripts: [],
+            builtIn: true,
+          },
+        }
+      }
       const skill = skillManager.getSkill(skillId)
       const fileInfo = skillManager.getSkillFileInfo(skillId)
       if (!skill || !fileInfo) {
@@ -974,6 +1009,121 @@ function buildSkillLoadTool(): AgentTool {
             sha256: script.sha256,
           })),
         },
+      }
+    },
+  }
+}
+
+function skillPackageInput(input: Record<string, unknown>): SkillPackageInput {
+  const files = Array.isArray(input.files)
+    ? input.files.map((file) => {
+        const value = asObject(file)
+        return {
+          path: asString(value.path),
+          content: asString(value.content),
+        }
+      })
+    : []
+  return {
+    name: asString(input.name),
+    description: asString(input.description),
+    instructions: asString(input.instructions),
+    files,
+    removeFiles: Array.isArray(input.removeFiles) ? input.removeFiles.map(String) : [],
+    scope: input.scope === 'project' ? 'project' : 'global',
+    replaceExisting: input.replaceExisting === true,
+  }
+}
+
+const SKILL_PACKAGE_SCHEMA: JsonSchema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', description: 'Short verb-led kebab-case Skill name. Must match the installed directory.' },
+    description: { type: 'string', description: 'Describe both what the Skill does and the user requests that should trigger it.' },
+    instructions: { type: 'string', description: 'Complete concise SKILL.md body in imperative form. Do not include YAML frontmatter.' },
+    files: {
+      type: 'array',
+      description: 'Optional text resources below scripts/, references/, assets/, or agents/. Do not include SKILL.md.',
+      items: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          content: { type: 'string' },
+        },
+        required: ['path', 'content'],
+        additionalProperties: false,
+      },
+    },
+    removeFiles: {
+      type: 'array',
+      description: 'Exact existing resource paths to delete during an explicit update. Omitted resources are preserved.',
+      items: { type: 'string' },
+    },
+    scope: { type: 'string', enum: ['global', 'project'], description: 'Use project for workspace-specific Skills and global for reusable personal Skills.' },
+    replaceExisting: { type: 'boolean', description: 'Set true only when the user explicitly asked to update an installed Skill with the same name.' },
+  },
+  required: ['name', 'description', 'instructions', 'scope'],
+  additionalProperties: false,
+}
+
+function buildSkillValidatePackageTool(): AgentTool {
+  return {
+    name: 'skill_validate_package',
+    title: '校验 Skill 包',
+    description: 'Validate a complete proposed Skill package without changing files. Always call this before skill_install_package and fix every returned error.',
+    category: 'skill',
+    risk: 'read',
+    inputSchema: SKILL_PACKAGE_SCHEMA,
+    execute: async (input) => {
+      try {
+        const validation = await validateSkillPackage(skillPackageInput(input))
+        return {
+          ok: validation.valid,
+          message: validation.valid
+            ? `Skill package is valid (${validation.fileCount} files, ${validation.totalBytes} bytes).${validation.warnings.length ? ` Warnings: ${validation.warnings.join('; ')}` : ''}`
+            : `Skill package validation failed: ${validation.errors.join('; ')}`,
+          data: validation,
+          error: validation.valid ? undefined : 'SKILL_PACKAGE_INVALID',
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'SKILL_PACKAGE_VALIDATION_FAILED',
+        }
+      }
+    },
+  }
+}
+
+function buildSkillInstallPackageTool(): AgentTool {
+  return {
+    name: 'skill_install_package',
+    title: '安装 Skill 包',
+    description: 'Atomically install a package that already passed skill_validate_package. This writes to NoteGen Skills, backs up an explicitly replaced version, reloads Skills, and requires write approval according to the current permission mode.',
+    category: 'skill',
+    risk: 'skill-install',
+    inputSchema: SKILL_PACKAGE_SCHEMA,
+    execute: async (input) => {
+      try {
+        const result = await installSkillPackage(skillPackageInput(input))
+        await useSkillsStore.getState().refreshSkills()
+        return {
+          ok: true,
+          message: `${result.replaced ? 'Updated' : 'Installed'} Skill "${result.name}" in ${result.scope} scope with ${result.fileCount} files${result.hasScripts ? ' and executable scripts' : ''}.`,
+          data: result,
+          changes: [buildStructuralChange({
+            type: 'folder',
+            target: `${result.scope}:skills/${result.name}`,
+            summary: `${result.replaced ? '更新' : '安装'} Skill ${result.name}`,
+          })],
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'SKILL_PACKAGE_INSTALL_FAILED',
+        }
       }
     },
   }
@@ -1599,6 +1749,8 @@ function buildTools(): AgentTool[] {
     buildSkillListTool(),
     buildSkillLoadTool(),
     buildSkillReadResourceTool(),
+    buildSkillValidatePackageTool(),
+    buildSkillInstallPackageTool(),
     adaptLegacyTool({
       name: 'skill_execute_script',
       title: '执行 Skill 脚本',

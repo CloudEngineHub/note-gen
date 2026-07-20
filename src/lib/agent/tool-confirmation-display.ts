@@ -82,6 +82,12 @@ const TOOL_CONFIRMATION_DISPLAY: Record<string, ToolConfirmationDisplayConfig> =
     descriptionKey: 'record.chat.input.agent.confirmation.tools.install_skill_python_dependencies.description',
     summaryFields: ['skill_id', 'packages'],
   },
+  skill_install_package: {
+    titleKey: 'record.chat.input.agent.confirmation.fallback.title',
+    descriptionKey: 'record.chat.input.agent.confirmation.fallback.description',
+    summaryFields: ['name', 'scope', 'description', 'replaceExisting', 'removeFiles', 'files', 'instructions'],
+    contentFields: ['files', 'instructions'],
+  },
   create_files_batch: {
     titleKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.title',
     descriptionKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.description',

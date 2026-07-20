@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import useChatStore from '@/stores/chat'
 import { skillManager } from '@/lib/skills'
+import { BUILTIN_SKILL_CREATOR } from '@/lib/skills/creator'
 import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
@@ -273,21 +274,33 @@ export class AgentHandler {
   private async getSkillsInfo(): Promise<AgentSkillSummary[]> {
     const skillsStore = useSkillsStore.getState()
 
-    if (!skillsStore.enabled || !skillsStore.autoMatch) {
+    if (!skillsStore.enabled) {
       return []
+    }
+
+    const creator = {
+      id: BUILTIN_SKILL_CREATOR.id,
+      name: BUILTIN_SKILL_CREATOR.name,
+      description: BUILTIN_SKILL_CREATOR.description,
+    }
+
+    if (!skillsStore.autoMatch) {
+      return [creator]
     }
 
     try {
       await skillsStore.initSkills()
       const enabledSkills = await skillManager.getEnabledSkills()
-      return enabledSkills.map((skill) => ({
-        id: skill.metadata.id,
-        name: skill.metadata.name,
-        description: skill.metadata.description,
-      }))
+      return [creator, ...enabledSkills
+        .filter((skill) => skill.metadata.id !== BUILTIN_SKILL_CREATOR.id)
+        .map((skill) => ({
+          id: skill.metadata.id,
+          name: skill.metadata.name,
+          description: skill.metadata.description,
+        }))]
     } catch (error) {
       console.error('[Agent Handler] Failed to load skills:', error)
-      return []
+      return [creator]
     }
   }
 
@@ -328,6 +341,7 @@ export class AgentHandler {
     }
 
     const skill = skillManager.getSkill(skillId)
+    const builtIn = skillId === BUILTIN_SKILL_CREATOR.id ? BUILTIN_SKILL_CREATOR : undefined
     const current = useChatStore.getState().agentState.loadedSkills || []
     if (current.some((item) => item.id === skillId)) {
       return
@@ -338,8 +352,8 @@ export class AgentHandler {
         ...current,
         {
           id: skillId,
-          name: skill?.metadata.name || skillId,
-          description: skill?.metadata.description,
+          name: skill?.metadata.name || builtIn?.name || skillId,
+          description: skill?.metadata.description || builtIn?.description,
         },
       ],
     })

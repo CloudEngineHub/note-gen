@@ -96,6 +96,13 @@ export class AgentPermissionEngine {
       }
     }
 
+    if (tool.risk === 'skill-install') {
+      return {
+        allowed: true,
+        requiresApproval: true,
+      }
+    }
+
     if (tool.risk === 'script') {
       const skillId = typeof input.skill_id === 'string' ? input.skill_id : ''
       const scriptId = typeof input.script_id === 'string' ? input.script_id : ''

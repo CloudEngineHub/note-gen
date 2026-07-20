@@ -61,6 +61,7 @@ export type AgentToolRisk =
   | 'file-update'
   | 'delete'
   | 'script'
+  | 'skill-install'
   | 'external'
   | 'medium'
 
