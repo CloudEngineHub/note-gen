@@ -984,7 +984,7 @@ function MarkDetailView({ mark, onClose }: { mark: Mark; onClose: () => void }) 
     <PhotoPreviewProvider>
       <div className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden bg-background">
         <MarkDetailToolbar mark={mark} onClose={onClose} />
-        <ScrollArea className="h-full w-full min-w-0 flex-1">
+        <ScrollArea className="min-h-0 w-full min-w-0 flex-1">
           <div className="min-w-full max-w-full overflow-hidden">
             <MarkDetailBody mark={mark} />
           </div>

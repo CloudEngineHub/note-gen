@@ -2284,6 +2284,7 @@
         "previewEmpty": "選択範囲にプレビューできる記録がありません",
         "previewMore": "最新 {count} 件を表示",
         "selectTemplate": "テンプレートを選択",
+        "noTemplate": "テンプレートを使用しない",
         "stepTemplate": "整理テンプレート",
         "templateStepDescription": "AI がノートをどう構成し、何を重視し、どの記録範囲を使うかを決めます。",
         "stepRecords": "記録を選択",

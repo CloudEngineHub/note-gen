@@ -2151,6 +2151,7 @@
         "previewEmpty": "No records to preview in the selected range",
         "previewMore": "Show latest {count}",
         "selectTemplate": "Select template",
+        "noTemplate": "No template",
         "stepTemplate": "Organize template",
         "templateStepDescription": "Controls how AI structures the note, what it emphasizes, and which record range it uses.",
         "stepRecords": "Select records",

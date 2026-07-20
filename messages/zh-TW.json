@@ -2284,6 +2284,7 @@
         "previewEmpty": "目前範圍內沒有可預覽的記錄",
         "previewMore": "查看最近 {count} 條",
         "selectTemplate": "選擇模板",
+        "noTemplate": "不使用模板",
         "stepTemplate": "整理模板",
         "templateStepDescription": "決定 AI 如何組織記錄、採用什麼結構，以及使用哪個時間範圍的內容。",
         "stepRecords": "選擇記錄",

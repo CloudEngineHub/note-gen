@@ -4,19 +4,14 @@ import useMarkStore from "@/stores/mark"
 import useArticleStore, { type DirTree } from "@/stores/article"
 import useTagStore from "@/stores/tag"
 import { fetchAiStream } from "@/lib/ai/chat"
-import { cn, convertImage } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useCallback, useEffect, useMemo, useImperativeHandle, forwardRef, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Store } from "@tauri-apps/plugin-store"
@@ -28,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { useTranslations } from "next-intl"
-import { writeTextFile, exists } from "@tauri-apps/plugin-fs"
+import { BaseDirectory, writeTextFile, exists, readFile } from "@tauri-apps/plugin-fs"
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { joinRelativePath } from "@/lib/path"
 import { toast } from "@/hooks/use-toast"
@@ -38,12 +33,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Select,
   SelectContent,
@@ -57,11 +46,28 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { getTemplateRangeLabel } from "@/lib/template-range-utils"
-import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, FolderOpen, Home, ListChecks, Pencil, Search, Settings2, X, Zap } from "lucide-react"
-import type { Mark } from "@/db/marks"
+import { getTemplateRangeLabel, getTemplateRangeOptions } from "@/lib/template-range-utils"
+import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, FolderOpen, Home, ListChecks, Pencil, Settings2, X, Zap } from "lucide-react"
+import { getMarkLocalAssetPath, type Mark } from "@/db/marks"
 import { MarkItem } from "./mark-item"
 import { useSettingsDialogStore } from "@/stores/settings-dialog"
+import { saveImageToWorkspace } from "@/lib/image-handler"
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
+import {
+  Item,
+  ItemContent,
+  ItemGroup,
+  ItemMedia,
+} from "@/components/ui/item"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Field, FieldLabel } from "@/components/ui/field"
+import { downloadRecordAssets } from "@/lib/sync/record-assets"
+import { getRecordImageThumbnailPath } from "@/lib/record-image-thumbnail"
 
 function shouldAutoSyncOnInitialRead(options?: { isNewFile?: boolean }) {
   return options?.isNewFile !== true
@@ -74,6 +80,7 @@ interface OrganizeNotesProps {
 type OrganizeStep = 'template' | 'records' | 'settings'
 
 const ROOT_FOLDER_VALUE = '__root__'
+const NO_TEMPLATE_VALUE = '__no_template__'
 const ORGANIZE_STEP_ORDER: OrganizeStep[] = ['template', 'records', 'settings']
 
 function sanitizeMarkdownTitle(title: string) {
@@ -118,23 +125,53 @@ async function getAvailableOutputPath(folder: string, rawTitle: string, isCustom
   return { fileName, filePath, pathOptions, sanitizedTitle }
 }
 
+async function readLocalRecordImage(mark: Mark, localAssetPath: string) {
+  try {
+    return {
+      bytes: await readFile(localAssetPath, { baseDir: BaseDirectory.AppData }),
+      fileName: localAssetPath.split('/').pop() || mark.url,
+    }
+  } catch (initialError) {
+    try {
+      await downloadRecordAssets([mark])
+      return {
+        bytes: await readFile(localAssetPath, { baseDir: BaseDirectory.AppData }),
+        fileName: localAssetPath.split('/').pop() || mark.url,
+      }
+    } catch {
+      // 远端没有原图时继续尝试使用本地缩略图。
+    }
+
+    const thumbnailPath = await getRecordImageThumbnailPath(localAssetPath)
+    if (thumbnailPath) {
+      const normalizedThumbnailPath = thumbnailPath.replace(/^\/+/, '')
+      return {
+        bytes: await readFile(normalizedThumbnailPath, { baseDir: BaseDirectory.AppData }),
+        fileName: normalizedThumbnailPath.split('/').pop() || 'record-image.webp',
+      }
+    }
+
+    throw initialError
+  }
+}
+
 export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNotesProps>(({ inputValue }, ref) => {
   const [open, setOpen] = useState(false)
-  const { primaryModel } = useSettingStore()
+  const { primaryModel, templateList } = useSettingStore()
   const { marks, fetchAllMarks, allMarks } = useMarkStore()
   const { currentTagId, tags, fetchTags } = useTagStore()
   const { activeFilePath, fileTree, setActiveFilePath, loadFileTree, readArticle, setCurrentArticle, setSkipSyncOnSave, setAiGeneratingFilePath, setAiTerminateFn } = useArticleStore()
   const { setLeftSidebarTab } = useSidebarStore()
   const router = useRouter()
   const isMobile = useIsMobile()
-  const [tab, setTab] = useState('0')
-  const [genTemplate, setGenTemplate] = useState<GenTemplate[]>([])
+  const [tab, setTab] = useState(NO_TEMPLATE_VALUE)
+  const [genTemplate, setGenTemplate] = useState<GenTemplate[]>(templateList)
   const [loading, setLoading] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const organizingRef = useRef(false)
   const [isRemoveThinking, setIsRemoveThinking] = useState(true)
-  const [isTemplatePreviewExpanded, setIsTemplatePreviewExpanded] = useState(false)
-  const [templateSearch, setTemplateSearch] = useState('')
+  const [templateRange, setTemplateRange] = useState<GenTemplateRange>(GenTemplateRange.All)
+  const [templateContent, setTemplateContent] = useState('')
   const [organizeStep, setOrganizeStep] = useState<OrganizeStep>('template')
   const [selectedRecordTagId, setSelectedRecordTagId] = useState<number | null>(currentTagId || null)
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<number>>(new Set())
@@ -150,15 +187,19 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
   async function initGenTemplates() {
     const store = await Store.load('store.json')
-    const template = await store.get<GenTemplate[]>('templateList') || []
+    const storedTemplates = await store.get<GenTemplate[]>('templateList')
+    const template = storedTemplates ?? useSettingStore.getState().templateList
     const enabledTemplates = template.filter(item => item.status !== false)
     const lastTemplateId = await store.get<string>('lastOrganizeTemplateId')
     setGenTemplate(template)
     setTab(() => {
+      if (lastTemplateId === NO_TEMPLATE_VALUE) {
+        return NO_TEMPLATE_VALUE
+      }
       if (lastTemplateId && enabledTemplates.some((item) => item.id === lastTemplateId)) {
         return lastTemplateId
       }
-      return enabledTemplates[0]?.id ?? template[0]?.id ?? '0'
+      return NO_TEMPLATE_VALUE
     })
   }
 
@@ -169,8 +210,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
   const handleTemplateChange = useCallback((templateId: string) => {
     setTab(templateId)
-    setTemplateSearch('')
-    setIsTemplatePreviewExpanded(false)
     setOrganizeStep('template')
     void persistLastTemplateId(templateId)
   }, [persistLastTemplateId])
@@ -178,31 +217,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   const availableTemplates = useMemo(() => {
     return genTemplate.filter(item => item.status !== false)
   }, [genTemplate])
-
-  const primaryTemplates = useMemo(() => {
-    const primaryTemplateIds = new Set<string>()
-    availableTemplates.slice(0, 6).forEach(item => primaryTemplateIds.add(item.id))
-    if (availableTemplates.some(item => item.id === tab)) {
-      primaryTemplateIds.add(tab)
-    }
-    return availableTemplates.filter(item => primaryTemplateIds.has(item.id))
-  }, [availableTemplates, tab])
-
-  const overflowTemplates = useMemo(() => {
-    const primaryTemplateIds = new Set(primaryTemplates.map(item => item.id))
-    return availableTemplates.filter(item => !primaryTemplateIds.has(item.id))
-  }, [availableTemplates, primaryTemplates])
-
-  const filteredOverflowTemplates = useMemo(() => {
-    const normalizedSearch = templateSearch.trim().toLowerCase()
-    if (!normalizedSearch) {
-      return overflowTemplates
-    }
-    return overflowTemplates.filter(item =>
-      item.title.toLowerCase().includes(normalizedSearch) ||
-      item.content.toLowerCase().includes(normalizedSearch)
-    )
-  }, [overflowTemplates, templateSearch])
 
   const recordSourceMarks = useMemo(() => {
     if (!selectedRecordTagId) return marks
@@ -217,9 +231,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
   // 使用 useMemo 优化过滤的记录
   const marksByRange = useMemo(() => {
-    const range = availableTemplates.find(item => item.id === tab)?.range
     let subtractDate: Dayjs
-    switch (range) {
+    switch (templateRange) {
       case GenTemplateRange.All:
         subtractDate = dayjs().subtract(99, 'year')
         break
@@ -243,7 +256,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
         break
     }
     return recordSourceMarks.filter(item => dayjs(item.createdAt).isAfter(subtractDate))
-  }, [recordSourceMarks, availableTemplates, tab])
+  }, [recordSourceMarks, templateRange])
 
   const recordPreviewMarks = useMemo(() => {
     return [...marksByRange]
@@ -255,7 +268,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   }, [marksByRange, selectedRecordIds])
 
   const recordTypeCounts = useMemo(() => {
-    return selectedMarksByRange.reduce<Record<Mark['type'], number>>((counts, item) => {
+    return marksByRange.reduce<Record<Mark['type'], number>>((counts, item) => {
       counts[item.type] += 1
       return counts
     }, {
@@ -267,7 +280,13 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       recording: 0,
       todo: 0,
     })
-  }, [selectedMarksByRange])
+  }, [marksByRange])
+
+  const selectedRecordTypes = useMemo(() => {
+    const types = new Set(selectedMarksByRange.map(item => item.type))
+    return (Object.keys(recordTypeCounts) as Mark['type'][])
+      .filter(type => recordTypeCounts[type] > 0 && types.has(type))
+  }, [recordTypeCounts, selectedMarksByRange])
 
   // 使用 useMemo 优化选中的模板
   const selectedTemplate = useMemo(() => {
@@ -275,23 +294,30 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   }, [availableTemplates, tab])
 
   const selectedTemplateRangeLabel = useMemo(() => {
-    return selectedTemplate ? getTemplateRangeLabel(selectedTemplate.range, tGlobal) : '-'
-  }, [selectedTemplate, tGlobal])
+    return getTemplateRangeLabel(templateRange, tGlobal)
+  }, [templateRange, tGlobal])
 
-  const shouldShowTemplateExpand = useMemo(() => {
-    const content = selectedTemplate?.content ?? ''
-    return content.length > 180 || content.split('\n').length > 5
-  }, [selectedTemplate])
+  useEffect(() => {
+    if (tab === NO_TEMPLATE_VALUE) {
+      setTemplateRange(GenTemplateRange.All)
+      setTemplateContent('')
+      return
+    }
+
+    if (selectedTemplate) {
+      setTemplateRange(selectedTemplate.range)
+      setTemplateContent(selectedTemplate.content)
+    }
+  }, [selectedTemplate, tab])
 
   const organizeDisabledReason = useMemo(() => {
     if (loading) return ''
     if (!primaryModel) return tGlobal('record.chat.input.placeholder.noPrimaryModel')
-    if (!selectedTemplate) return t('noTemplateAvailable')
     if (recordSourceMarks.length === 0) return t('noRecords')
     if (marksByRange.length === 0) return t('noRecordsInRange')
     if (selectedMarksByRange.length === 0) return t('noRecordsSelected')
     return ''
-  }, [loading, primaryModel, selectedTemplate, recordSourceMarks.length, marksByRange.length, selectedMarksByRange.length, t, tGlobal])
+  }, [loading, primaryModel, recordSourceMarks.length, marksByRange.length, selectedMarksByRange.length, t, tGlobal])
 
   const isOrganizeDisabled = Boolean(organizeDisabledReason) || loading
   const organizeStepIndex = ORGANIZE_STEP_ORDER.indexOf(organizeStep)
@@ -323,7 +349,6 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   ]), [
     marksByRange.length,
     selectedMarksByRange.length,
-    selectedTemplate,
     t,
   ])
   const activeStepItem = stepItems[organizeStepIndex] ?? stepItems[0]
@@ -414,6 +439,33 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     setSelectedRecordIds(new Set())
   }, [])
 
+  const handleRecordTypeSelectionChange = useCallback((types: string[]) => {
+    const nextTypes = new Set(types as Mark['type'][])
+
+    setSelectedRecordIds(current => {
+      const currentTypes = new Set(
+        marksByRange
+          .filter(item => current.has(item.id))
+          .map(item => item.type)
+      )
+      const next = new Set(current)
+
+      for (const mark of marksByRange) {
+        const wasSelected = currentTypes.has(mark.type)
+        const shouldSelect = nextTypes.has(mark.type)
+
+        if (wasSelected === shouldSelect) continue
+        if (shouldSelect) {
+          next.add(mark.id)
+        } else {
+          next.delete(mark.id)
+        }
+      }
+
+      return next
+    })
+  }, [marksByRange])
+
   const terminateGeneration = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -423,6 +475,15 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   }, [])
 
   const openOrganize = useCallback(() => {
+    const latestTemplates = useSettingStore.getState().templateList
+    const enabledTemplates = latestTemplates.filter(item => item.status !== false)
+    const nextTemplate = tab === NO_TEMPLATE_VALUE
+      ? undefined
+      : enabledTemplates.find(item => item.id === tab)
+    setGenTemplate(latestTemplates)
+    setTab(nextTemplate?.id ?? NO_TEMPLATE_VALUE)
+    setTemplateRange(nextTemplate?.range ?? GenTemplateRange.All)
+    setTemplateContent(nextTemplate?.content ?? '')
     setOpen(true)
     setOrganizeStep('template')
     setSelectedRecordTagId(currentTagId || null)
@@ -432,7 +493,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     void initGenTemplates()
     void fetchTags()
     void fetchAllMarks()
-  }, [activeFilePath, currentTagId, fetchAllMarks, fetchTags, inputValue])
+  }, [activeFilePath, currentTagId, fetchAllMarks, fetchTags, inputValue, tab])
 
   const handleOrganize = useCallback(async (options?: { quick?: boolean }) => {
     if (loading || organizingRef.current) {
@@ -442,7 +503,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     const quickMode = options?.quick === true
     const recordIdsToUse = new Set(quickMode ? marksByRange.map(item => item.id) : selectedRecordIds)
 
-    if (!primaryModel || !selectedTemplate || recordIdsToUse.size === 0) return
+    if (!primaryModel || recordIdsToUse.size === 0) return
 
     organizingRef.current = true
     setOpen(false)
@@ -485,9 +546,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
         .filter(item => !selectedRecordTagId || item.tagId === selectedRecordTagId)
 
       // Calculate marksByRange with latest marks
-      const range = selectedTemplate?.range
       let subtractDate: Dayjs
-      switch (range) {
+      switch (templateRange) {
         case GenTemplateRange.All:
           subtractDate = dayjs().subtract(99, 'year')
           break
@@ -528,15 +588,29 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       // Process image marks
       const processedImageMarks = includeImages ? await Promise.all(
         categorizedMarks.imageMarks.map(async (image) => {
-          if (image.url && !image.url.includes('http')) {
+          const localAssetPath = getMarkLocalAssetPath(image)
+          if (!localAssetPath) {
+            return image
+          }
+
+          try {
+            const localImage = await readLocalRecordImage(image, localAssetPath)
+            const savedImage = await saveImageToWorkspace(new File([localImage.bytes], localImage.fileName), filePath)
+
             return {
               ...image,
-              url: await convertImage(`/image/${image.url}`)
+              url: savedImage.relativePath,
+            }
+          } catch (error) {
+            console.error('[OrganizeNotes] Failed to copy local record image:', localAssetPath, error)
+            return {
+              ...image,
+              url: '',
             }
           }
-          return image
         })
       ) : categorizedMarks.imageMarks
+      const embeddableImageCount = processedImageMarks.filter(item => Boolean(item.url)).length
 
       const store = await Store.load('store.json')
       const locale = await store.get<string>('locale') || 'zh'
@@ -553,7 +627,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
         Here are image record descriptions:
         ${processedImageMarks.map(item => `
           Description: ${item.content},
-          ${includeImages ? `Image URL: ${item.url}` : 'Use the description only. Do not embed this image.'}
+          ${includeImages && item.url ? `Image URL: ${item.url}` : 'Use the description only. Do not embed this image.'}
         `).join(';\n\n')}.
         Here are link record contents:
         ${categorizedMarks.linkMarks.map((item, index) => `Link record ${index + 1}:
@@ -581,13 +655,13 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
           2. [Title2](Link2)` : '- Do not add a References section. Use link contents only when they are relevant to the note.'}
 
         ${
-          includeImages && processedImageMarks.length > 0 ?
+          includeImages && embeddableImageCount > 0 ?
           '- If there are image records, place the image links in appropriate positions in the note based on the image descriptions. The image URLs contain uuid, please return them completely, and add a brief description for each image.'
           : processedImageMarks.length > 0 ?
           '- Do not embed image links in the note. You may use image descriptions as source material if they are relevant.'
           : ''
         }
-        ${selectedTemplate?.content}
+        ${templateContent}
       `
 
       // Emit AI streaming start event with target file path
@@ -750,7 +824,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     marksByRange,
     selectedRecordIds,
     selectedRecordTagId,
-    selectedTemplate,
+    templateContent,
+    templateRange,
     setActiveFilePath,
     setAiGeneratingFilePath,
     setAiTerminateFn,
@@ -799,26 +874,27 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   }, [open, loading, terminateGeneration])
 
   return (
-    <AlertDialog onOpenChange={setOpen} open={open}>
-      <AlertDialogContent
+    <Dialog onOpenChange={setOpen} open={open}>
+      <DialogContent
         className={cn(
           "flex flex-col gap-0 overflow-hidden p-0",
           isMobile
             ? "left-0 top-0 h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 duration-0 data-[state=closed]:animate-none data-[state=open]:animate-none sm:rounded-none"
-            : "h-[calc(100vh-2rem)] max-h-[760px] w-[calc(100vw-2rem)] max-w-5xl"
+            : "h-[calc(100vh-2rem)] max-h-[760px] w-[calc(100vw-2rem)] sm:max-w-5xl"
         )}
         onKeyDown={handleDialogKeyDown}
+        showCloseButton={false}
         style={isMobile ? { animation: 'none' } : undefined}
       >
-        <AlertDialogHeader
+        <DialogHeader
           className={cn(
             "shrink-0 min-w-0 border-b",
             isMobile ? "px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]" : "px-6 py-4"
           )}
         >
-          <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
-              <AlertDialogTitle className={cn(isMobile ? "text-lg leading-6" : "text-xl")}>{t('organizeAs')}</AlertDialogTitle>
+              <DialogTitle className={cn(isMobile ? "text-lg leading-6" : "text-xl")}>{t('organizeAs')}</DialogTitle>
               {
                 isMobile ? (
                   <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -838,19 +914,19 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                 variant="ghost"
                 onClick={() => setOpen(false)}
               >
-                <X className="size-4" />
+                <X />
               </Button>
             </div>
           </div>
-        </AlertDialogHeader>
+        </DialogHeader>
         <div
           className={cn(
             "shrink-0 border-b",
             isMobile ? "bg-background px-3 py-2" : "bg-muted/20 px-5 py-4"
           )}
         >
-          <div className={cn("w-full min-w-0", !isMobile && "overflow-x-auto")}>
-            <div className={cn("grid grid-cols-3 gap-2", !isMobile && "min-w-[42rem]")}>
+          <div className="w-full min-w-0">
+            <div className="grid grid-cols-3 gap-2">
               {
                 stepItems.map((item, index) => {
                   const Icon = item.icon
@@ -885,7 +961,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                           <Icon className="size-4 shrink-0" />
                           <span className="truncate">{item.title}</span>
                         </span>
-                        <span className={cn("mt-0.5 truncate text-xs text-muted-foreground", isMobile ? "hidden" : "block")}>{item.meta}</span>
+                        <span className={cn("mt-0.5 truncate text-xs text-muted-foreground", isMobile ? "hidden" : "hidden lg:block")}>{item.meta}</span>
                       </span>
                     </div>
                   )
@@ -910,103 +986,52 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                       {t('manageTemplate')}
                     </Button>
                   </div>
-                  <Tabs className="min-w-0" value={tab} onValueChange={handleTemplateChange}>
-                    <div className="w-full min-w-0 overflow-x-auto pb-1">
-                    <TabsList className={cn(
-                      "min-w-full justify-start",
-                      isMobile && "h-auto min-w-max gap-1 bg-transparent p-0"
-                    )}>
-                      {
-                        primaryTemplates.map(item => (
-                          <TabsTrigger
-                            className={cn(
-                              "shrink-0",
-                              isMobile && "rounded-full border bg-background px-3 py-1.5 text-xs shadow-none data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-none"
-                            )}
-                            value={item.id}
-                            key={item.id}
-                            title={item.title}
-                          >
-                            <span className="max-w-32 truncate">{item.title}</span>
-                          </TabsTrigger>
-                        ))
-                      }
-                      {
-                        overflowTemplates.length > 0 ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button className={cn("h-7 shrink-0 gap-1 rounded-md px-2 text-sm", isMobile && "rounded-full border bg-background text-xs")} variant="ghost">
-                                {t('moreTemplates')}
-                                <ChevronDown className="size-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className={cn("w-72", isMobile && "w-[calc(100vw-2rem)]")}>
-                              <div className="flex items-center gap-2 px-2 py-1.5">
-                                <Search className="size-4 text-muted-foreground" />
-                                <Input
-                                  className="h-8"
-                                  value={templateSearch}
-                                  onChange={(event) => setTemplateSearch(event.target.value)}
-                                  onKeyDown={(event) => event.stopPropagation()}
-                                  placeholder={t('searchTemplates')}
-                                />
-                              </div>
-                              <ScrollArea className="h-64">
-                                <div className="p-1">
-                                  {
-                                    filteredOverflowTemplates.length > 0 ? (
-                                      filteredOverflowTemplates.map(item => (
-                                        <DropdownMenuItem key={item.id} onSelect={() => handleTemplateChange(item.id)}>
-                                          <Check className="size-4 opacity-0" />
-                                          <span className="truncate" title={item.title}>{item.title}</span>
-                                        </DropdownMenuItem>
-                                      ))
-                                    ) : (
-                                      <div className="px-2 py-3 text-center text-xs text-muted-foreground">{t('noTemplateAvailable')}</div>
-                                    )
-                                  }
-                                </div>
-                              </ScrollArea>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : null
-                      }
-                    </TabsList>
-                    </div>
-                  </Tabs>
-                  <div className="flex min-w-0 flex-wrap gap-2">
-                    <Badge className="gap-1" variant="outline">
-                      <span>{t('recordRange')}</span>
-                      <span className="font-normal">{selectedTemplateRangeLabel}</span>
-                    </Badge>
-                  </div>
+                  <Select value={tab} onValueChange={handleTemplateChange}>
+                    <SelectTrigger id="organize-template" className={cn("w-full", isMobile && "rounded-xl")}>
+                      <SelectValue placeholder={t('selectTemplate')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={NO_TEMPLATE_VALUE}>{t('noTemplate')}</SelectItem>
+                        {
+                          availableTemplates.map(item => (
+                            <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>
+                          ))
+                        }
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Field>
+                    <FieldLabel htmlFor="organize-template-range">{t('recordRange')}</FieldLabel>
+                    <Select
+                      value={templateRange}
+                      onValueChange={(value: GenTemplateRange) => setTemplateRange(value)}
+                    >
+                      <SelectTrigger id="organize-template-range" className={cn("w-full", isMobile && "rounded-xl")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {
+                            getTemplateRangeOptions(tGlobal).map(option => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))
+                          }
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
                 </div>
-                <div className={cn("flex min-w-0 flex-col gap-1", isMobile && "rounded-2xl border bg-background p-3")}>
-                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                    <Label htmlFor="name">{t('templateContent')}</Label>
-                    {
-                      shouldShowTemplateExpand ? (
-                        <Button
-                          className={cn("h-7 px-2 text-xs", isMobile && "rounded-full")}
-                          variant="ghost"
-                          onClick={() => setIsTemplatePreviewExpanded(current => !current)}
-                        >
-                          {isTemplatePreviewExpanded ? t('showLess') : t('showMore')}
-                        </Button>
-                      ) : null
-                    }
-                  </div>
-                  <ScrollArea
-                    className={cn(
-                      "w-full min-w-0 rounded-md border p-2",
-                      isTemplatePreviewExpanded ? (isMobile ? "h-72" : "h-64") : (isMobile ? "h-40" : "h-28")
-                    )}
-                  >
-                    <p className="whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                      { selectedTemplate?.content || tGlobal('settings.template.noContent') }
-                    </p>
-                  </ScrollArea>
-                </div>
+                <Field className={cn(isMobile && "rounded-2xl border bg-background p-3")}>
+                  <FieldLabel htmlFor="organize-template-content">{t('templateContent')}</FieldLabel>
+                  <Textarea
+                    id="organize-template-content"
+                    className={cn("min-h-40 resize-y", isMobile && "rounded-xl")}
+                    value={templateContent}
+                    onChange={(event) => setTemplateContent(event.target.value)}
+                    placeholder={tGlobal('settings.template.noContent')}
+                  />
+                </Field>
               </div>
             ) : organizeStep === 'records' ? (
               <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col gap-3">
@@ -1014,21 +1039,26 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                   "flex min-w-0 gap-2",
                   isMobile ? "flex-col rounded-2xl border bg-background p-3" : "flex-wrap items-center justify-between"
                 )}>
-                  <div className={cn(
-                    "flex min-w-0 gap-1.5",
-                    isMobile ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap"
-                  )}>
+                  <ToggleGroup
+                    className="max-w-full flex-wrap justify-start"
+                    type="multiple"
+                    size="sm"
+                    spacing={2}
+                    value={selectedRecordTypes}
+                    variant="outline"
+                    onValueChange={handleRecordTypeSelectionChange}
+                  >
                     {
                       Object.entries(recordTypeCounts)
                         .filter(([, count]) => count > 0)
                         .map(([type, count]) => (
-                          <Badge key={type} className="gap-1" variant="outline">
+                          <ToggleGroupItem key={type} value={type}>
                             <span>{getMarkTypeLabel(type as Mark['type'])}</span>
                             <span className="font-normal">{count}</span>
-                          </Badge>
+                          </ToggleGroupItem>
                         ))
                     }
-                  </div>
+                  </ToggleGroup>
                   <div className={cn(
                     "shrink-0 gap-2",
                     isMobile ? "grid grid-cols-2" : "flex flex-wrap items-center justify-end"
@@ -1056,36 +1086,44 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                     <Button className={cn("h-8 px-2", isMobile && "h-9 rounded-xl")} variant="outline" onClick={clearSelectedPreviewRecords}>{t('clearRecordSelection')}</Button>
                   </div>
                 </div>
-                <ScrollArea className={cn("min-h-0 flex-1 border bg-muted/20", isMobile ? "rounded-2xl" : "rounded-md")}>
-                  <div className={cn("flex flex-col gap-2", isMobile ? "p-2.5" : "p-2")}>
+                <ScrollArea className="min-h-0 flex-1">
+                  <ItemGroup className={isMobile ? "p-2.5" : "p-2"}>
                     {
                       recordPreviewMarks.length > 0 ? (
                         recordPreviewMarks.map(mark => (
-                          <div
+                          <Item
                             className={cn(
-                              "flex min-w-0 items-start gap-2",
-                              isMobile && "rounded-xl bg-background/80 p-2",
+                              "items-start bg-background",
                               !selectedRecordIds.has(mark.id) && 'opacity-60'
                             )}
                             key={mark.id}
+                            size="sm"
+                            variant="outline"
                           >
-                            <div className="flex shrink-0 items-center gap-2 pt-3">
+                            <ItemMedia className="pt-2">
                               <Checkbox
                                 checked={selectedRecordIds.has(mark.id)}
                                 id={`organize-record-${mark.id}`}
                                 onCheckedChange={() => toggleSelectedRecord(mark.id)}
                               />
-                            </div>
-                            <div className="min-w-0 flex-1">
+                            </ItemMedia>
+                            <ItemContent className="min-w-0">
                               <MarkItem mark={mark} variant="list" interactive={false} />
-                            </div>
-                          </div>
+                            </ItemContent>
+                          </Item>
                         ))
                       ) : (
-                        <div className="rounded-md bg-background p-3 text-center text-xs text-muted-foreground">{t('previewEmpty')}</div>
+                        <Empty className="min-h-32 border">
+                          <EmptyHeader>
+                            <EmptyMedia variant="icon">
+                              <ListChecks />
+                            </EmptyMedia>
+                            <EmptyTitle>{t('previewEmpty')}</EmptyTitle>
+                          </EmptyHeader>
+                        </Empty>
                       )
                     }
-                  </div>
+                  </ItemGroup>
                 </ScrollArea>
               </div>
             ) : (
@@ -1189,9 +1227,9 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
           }
             </div>
           </main>
-        <AlertDialogFooter
+        <DialogFooter
           className={cn(
-            "shrink-0 border-t",
+            "mx-0 mb-0 shrink-0 rounded-none border-t",
             isMobile
               ? "flex-row items-center justify-between gap-2 space-x-0 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3"
               : "px-6 py-4"
@@ -1216,8 +1254,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                 <Button
                   className={cn(isMobile && "h-10 flex-1 rounded-xl px-3")}
                   onClick={() => handleOrganize({ quick: true })}
-                  disabled={!primaryModel || !selectedTemplate || marksByRange.length === 0 || loading}
-                  title={!primaryModel ? tGlobal('record.chat.input.placeholder.noPrimaryModel') : !selectedTemplate ? t('noTemplateAvailable') : marksByRange.length === 0 ? t('noRecordsInRange') : t('quickOrganizeHelp')}
+                  disabled={!primaryModel || marksByRange.length === 0 || loading}
+                  title={!primaryModel ? tGlobal('record.chat.input.placeholder.noPrimaryModel') : marksByRange.length === 0 ? t('noRecordsInRange') : t('quickOrganizeHelp')}
                 >
                   <Zap className="size-4" />
                   {t('quickOrganize')}
@@ -1225,8 +1263,8 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                 <Button
                   className={cn(isMobile && "h-10 flex-1 rounded-xl px-3")}
                   onClick={() => setOrganizeStep('records')}
-                  disabled={!selectedTemplate || marksByRange.length === 0 || loading}
-                  title={!selectedTemplate ? t('noTemplateAvailable') : marksByRange.length === 0 ? t('noRecordsInRange') : undefined}
+                  disabled={marksByRange.length === 0 || loading}
+                  title={marksByRange.length === 0 ? t('noRecordsInRange') : undefined}
                 >
                   {t('nextStep')}
                   <ArrowRight className="size-4" />
@@ -1253,9 +1291,9 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
               </Button>
             )
           }
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 })
 

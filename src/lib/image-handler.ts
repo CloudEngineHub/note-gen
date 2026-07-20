@@ -21,6 +21,33 @@ export interface ImageUploadResult {
 }
 
 /**
+ * 将图片直接保存到笔记工作区，不经过图床。
+ * 适用于已经存在于本地的资源，例如记录整理时引用的图片。
+ */
+export async function saveImageToWorkspace(
+  file: File,
+  activeFilePath: string
+): Promise<ImageUploadResult> {
+  const { imageRelativePath, markdownRelativePath } = await saveImageLocally(file, activeFilePath)
+  const articleStore = useArticleStore.getState()
+
+  if (articleStore.syncStaticAssets) {
+    try {
+      const sha = await uploadLocalLibraryFile(imageRelativePath)
+      articleStore.markFileRemote(imageRelativePath, sha)
+    } catch (error) {
+      console.error('[ImageHandler] Failed to auto-upload local image:', error)
+    }
+  }
+
+  return {
+    src: await convertImageByWorkspace(imageRelativePath),
+    relativePath: markdownRelativePath,
+    useImageHosting: false,
+  }
+}
+
+/**
  * 处理图片文件：上传到图床或保存到本地
  * @param file 图片文件
  * @param activeFilePath 当前编辑的文件路径（用于确定本地保存位置）
@@ -57,23 +84,7 @@ export async function handleImageUpload(
   // 2. 如果没有配置图床，保存到本地
   if (activeFilePath) {
     try {
-      const { imageRelativePath, markdownRelativePath } = await saveImageLocally(file, activeFilePath)
-      const articleStore = useArticleStore.getState()
-      if (articleStore.syncStaticAssets) {
-        try {
-          const sha = await uploadLocalLibraryFile(imageRelativePath)
-          articleStore.markFileRemote(imageRelativePath, sha)
-        } catch (error) {
-          console.error('[ImageHandler] Failed to auto-upload local image:', error)
-        }
-      }
-      // 将本地路径转换为 Webview 可访问的 URL
-      const webviewUrl = await convertImageByWorkspace(imageRelativePath)
-      return {
-        src: webviewUrl,
-        relativePath: markdownRelativePath,
-        useImageHosting: false,
-      }
+      return await saveImageToWorkspace(file, activeFilePath)
     } catch (error) {
       console.error('Failed to save image locally:', error)
       throw error

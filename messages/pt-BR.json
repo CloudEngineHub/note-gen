@@ -2093,6 +2093,7 @@
         "previewEmpty": "Nenhum registro para pré-visualizar no intervalo selecionado",
         "previewMore": "Mostrar os {count} mais recentes",
         "selectTemplate": "Selecionar template",
+        "noTemplate": "Não usar template",
         "stepTemplate": "Template de organização",
         "templateStepDescription": "Define como a IA estrutura a nota, o que ela prioriza e qual intervalo de registros será usado.",
         "stepRecords": "Selecionar registros",
