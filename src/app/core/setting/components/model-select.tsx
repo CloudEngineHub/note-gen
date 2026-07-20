@@ -231,14 +231,14 @@ export function ModelSelect({
   
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className="flex gap-2">
+      <div className="flex w-full min-w-0 gap-2 sm:w-auto">
         <PopoverTrigger asChild>
-          <div className="flex-1 overflow-hidden">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <Button
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className="w-[280px] justify-between"
+              className="w-full min-w-0 justify-between sm:w-[280px]"
             >
               {model
                 ? findSelectedModelDisplay() || model

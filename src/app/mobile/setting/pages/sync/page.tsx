@@ -231,13 +231,13 @@ export default function SyncPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <FileUp className="size-6" />
           {t('settings.sync.title')}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">{t('settings.sync.desc')}</p>
-      </div>
+        <p className="text-sm text-muted-foreground">{t('settings.sync.desc')}</p>
+      </header>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">{t('settings.sync.platformSettings')}</h2>

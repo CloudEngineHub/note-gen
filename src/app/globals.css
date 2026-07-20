@@ -249,6 +249,84 @@ html, body {
   overflow: hidden;
 }
 
+@media (max-width: 639px) {
+  .mobile-setting-screen [data-slot="item"] {
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .mobile-setting-screen [data-slot="item-content"] {
+    min-width: 0;
+  }
+
+  .mobile-setting-screen [data-slot="item-actions"] {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 0 0 100%;
+    justify-content: stretch;
+  }
+
+  .mobile-setting-screen [data-slot="item-actions"] > [data-slot="tabs"],
+  .mobile-setting-screen [data-slot="item-actions"] > div,
+  .mobile-setting-screen [data-slot="item-actions"] > input,
+  .mobile-setting-screen [data-slot="item-actions"] > button:not([role="switch"]) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mobile-setting-screen [data-slot="item"]:has(> [data-slot="item-actions"] > [data-slot="switch"]),
+  .mobile-setting-screen [data-slot="item"]:has(> .mobile-setting-inline-action) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .mobile-setting-screen [data-slot="item-actions"]:has(> [data-slot="switch"]),
+  .mobile-setting-screen .mobile-setting-inline-action {
+    width: auto;
+    max-width: none;
+    flex: 0 0 auto;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .mobile-setting-screen [data-slot="tabs-list"] {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .mobile-setting-screen [data-setting-section-header] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mobile-setting-screen [data-slot="card-header"]:has([data-slot="card-action"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mobile-setting-screen [data-slot="card-action"] {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .mobile-setting-screen [data-slot="card-footer"] {
+    flex-wrap: wrap;
+  }
+
+  .mobile-setting-screen [data-slot="field"][data-orientation="horizontal"] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mobile-setting-screen [data-slot="field"][data-orientation="horizontal"] > [role="switch"] {
+    align-self: flex-end;
+  }
+}
+
 .file-manange-item {
   display: flex;
   align-items: center;

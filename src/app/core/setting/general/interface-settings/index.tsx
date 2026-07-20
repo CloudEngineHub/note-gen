@@ -10,7 +10,7 @@ import { FileManagerTextSizeSettings } from './file-manager-text-size'
 import { RecordTextSizeSettings } from './record-text-size'
 import { CustomThemeSettings } from './custom-theme'
 
-export function InterfaceSettings() {
+export function InterfaceSettings({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.general.interface')
 
   return (
@@ -19,10 +19,10 @@ export function InterfaceSettings() {
         <ThemeSettings />
         <LanguageSettings />
         <FontFamilySettings />
-        <ScaleSettings />
+        {!mobile && <ScaleSettings />}
         <ContentTextScaleSettings />
-        <FileManagerTextSizeSettings />
-        <RecordTextSizeSettings />
+        {!mobile && <FileManagerTextSizeSettings />}
+        {!mobile && <RecordTextSizeSettings />}
         <CustomThemeSettings />
       </div>
     </SettingSection>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { SwipeBack } from "@/components/ui/swipe-back";
+import { SettingLayoutProvider } from "@/app/core/setting/components/setting-base";
 
 export default function RootLayout({
   children,
@@ -19,8 +20,10 @@ export default function RootLayout({
             <ArrowLeft />
           </Button>
         </div>
-        <div className="mx-auto w-full max-w-5xl flex-1 p-3">
-          {children}
+        <div className="mx-auto w-full min-w-0 max-w-5xl flex-1 p-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <SettingLayoutProvider mobile>
+            {children}
+          </SettingLayoutProvider>
         </div>
       </div>
     </SwipeBack>

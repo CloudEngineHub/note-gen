@@ -112,11 +112,11 @@ function SortableItem({ item, config, onToggle, t }: SortableItemProps) {
         {...attributes}
         {...listeners}
         aria-label={`${t('common.sort')} ${config ? t(config.titleKey) : item.id}`}
-        className="absolute top-1/2 right-full mr-1 -translate-y-1/2 cursor-grab touch-none text-muted-foreground/40 hover:text-muted-foreground focus-visible:text-muted-foreground active:cursor-grabbing"
+        className="absolute top-1/2 left-1 -translate-y-1/2 cursor-grab touch-none text-muted-foreground/40 hover:text-muted-foreground focus-visible:text-muted-foreground active:cursor-grabbing sm:right-full sm:left-auto sm:mr-1"
       >
         <GripVertical />
       </Button>
-      <Item variant="outline">
+      <Item variant="outline" className="pl-11 sm:pl-3">
         <ItemMedia variant="icon" className="text-muted-foreground">
           {config?.icon}
         </ItemMedia>

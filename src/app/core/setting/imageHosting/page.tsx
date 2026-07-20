@@ -55,7 +55,7 @@ export default function ImageHostingPage() {
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium">{t('settings.imageHosting.type')}</label>
           <Select value={currentValue} onValueChange={handleValueChange}>
-            <SelectTrigger className="w-45">
+            <SelectTrigger className="w-full sm:w-45">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

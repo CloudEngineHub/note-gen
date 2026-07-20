@@ -30,7 +30,7 @@ export function FileManagerTextSizeSettings() {
       </ItemContent>
       <ItemActions>
         <Select value={fileManagerTextSize} onValueChange={handleSizeChange}>
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-full sm:w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

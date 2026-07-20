@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Download, Upload } from 'lucide-react'
+import { Download, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label'
 import useSettingStore from '@/stores/setting'
 import { HSLValue } from '@/types/theme'
 import { applyThemeColors, hslToHex } from '@/lib/theme-utils'
-import { useRouter } from 'next/navigation'
 import { Store } from '@tauri-apps/plugin-store'
 
 interface ColorScheme {
@@ -304,7 +303,6 @@ const presets: ColorScheme[] = [
 
 export default function ThemeSettingsPage() {
   const { customThemeColors } = useSettingStore()
-  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'custom' | 'presets' | 'import-export'>('custom')
   const [importCode, setImportCode] = useState('')
   const [exportCode, setExportCode] = useState('')
@@ -481,24 +479,11 @@ export default function ThemeSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 头部 */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border">
-        <div className="flex items-center px-4 py-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold ml-2">自定义主题色</h1>
-        </div>
-      </div>
-
-      {/* 内容 */}
-      <div className="p-4">
+    <div className="flex min-w-0 flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="text-xl font-semibold tracking-tight">自定义主题色</h1>
+      </header>
+      <div className="min-w-0">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'custom' | 'presets' | 'import-export')} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="custom">自定义</TabsTrigger>

@@ -19,10 +19,10 @@ const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
 export function SettingTab() {
   const router = useRouter()
   const t = useTranslations('settings')
-  const notMobilePages = ['about', 'file', 'shortcuts']
+  const notMobilePages = ['about', 'file', 'shortcuts', 'skills', 'memories', 'template']
   
   // Add translations to the config, keep separators
-  const config = baseConfig.map(item => {
+  const visibleConfig = baseConfig.map(item => {
     if (typeof item === 'string') return item
     return {
       ...item,
@@ -32,6 +32,12 @@ export function SettingTab() {
     // 过滤掉不支持的移动端页面，但保留分隔符
     if (typeof item === 'string') return true
     return !notMobilePages.includes(item.anchor)
+  })
+  const config = visibleConfig.filter((item, index, items) => {
+    if (typeof item !== 'string') return true
+    return index > 0
+      && index < items.length - 1
+      && typeof items[index - 1] !== 'string'
   })
 
   function handleNavigation(anchor: string) {
@@ -60,7 +66,7 @@ export function SettingTab() {
                 <ItemContent>
                   <ItemTitle>{item.title}</ItemTitle>
                 </ItemContent>
-                <ItemActions>
+                <ItemActions className="mobile-setting-inline-action">
                   <ChevronRight className="size-4 text-muted-foreground" />
                 </ItemActions>
               </button>

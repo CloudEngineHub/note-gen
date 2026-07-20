@@ -101,7 +101,7 @@ export function FontFamilySettings() {
       </ItemContent>
       <ItemActions>
         <Select value={appFontFamily} onValueChange={handleFontChange}>
-          <SelectTrigger className="w-[220px] max-w-full">
+          <SelectTrigger className="w-full sm:w-[220px]">
             <SelectValue placeholder={t('fontFamily.placeholder')} />
           </SelectTrigger>
           <SelectContent className="max-h-80">

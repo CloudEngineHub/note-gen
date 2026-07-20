@@ -14,16 +14,16 @@ export default function McpSettingPage() {
   }, [])
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">{t('title')}</h1>
+    <div className="flex min-w-0 flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="text-sm text-muted-foreground">{t('desc')}</p>
-      </div>
-      <div className="mb-4 rounded-lg border border-dashed p-4">
+      </header>
+      <div className="rounded-lg border border-dashed p-4">
         <p className="text-sm font-medium">{t('mobileHttpOnlyTitle')}</p>
         <p className="text-sm text-muted-foreground">{t('mobileHttpOnlyDesc')}</p>
       </div>
-      <div className="space-y-6">
+      <div className="flex flex-col gap-6">
         <ServerList />
       </div>
     </div>

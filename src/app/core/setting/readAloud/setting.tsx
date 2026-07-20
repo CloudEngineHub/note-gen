@@ -100,7 +100,7 @@ export function Setting() {
         </ItemContent>
         <ItemActions>
           <Select value={textToSpeechMode} onValueChange={(value) => setTextToSpeechMode(value as SpeechMode)}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -137,7 +137,7 @@ export function Setting() {
                 min={0.5}
                 max={2}
                 step={0.1}
-                className="w-[180px]"
+                className="w-full sm:w-[180px]"
               />
               <span className="text-zinc-500 w-10">{speed}x</span>
             </div>

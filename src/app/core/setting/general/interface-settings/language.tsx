@@ -42,7 +42,7 @@ export function LanguageSettings() {
       </ItemContent>
       <ItemActions>
         <Select value={currentLocale} onValueChange={changeLanguage}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue>
               <div className="flex items-center gap-2">
                 <span>{getLanguageDisplay(currentLocale)}</span>

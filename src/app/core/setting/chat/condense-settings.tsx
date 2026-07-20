@@ -59,7 +59,7 @@ export function CondenseSettings() {
               <ItemDescription>{t('keepLatest.desc')}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <div className="space-y-3 w-[180px]">
+              <div className="flex w-full flex-col gap-3 sm:w-[180px]">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">1</span>
                   <span className="text-xs font-medium">{keepLatestCount}</span>
@@ -87,7 +87,7 @@ export function CondenseSettings() {
               <ItemDescription>{t('maxLength.desc')}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <div className="space-y-3 w-[180px]">
+              <div className="flex w-full flex-col gap-3 sm:w-[180px]">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">50</span>
                   <span className="text-xs font-medium">{condenseMaxLength}</span>

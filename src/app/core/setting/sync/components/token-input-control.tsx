@@ -34,29 +34,36 @@ export function TokenInputControl({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <Input
-          className="flex-1"
-          value={value}
-          onChange={onChange}
-          type={visible ? 'text' : 'password'}
-          placeholder={placeholder}
-          disabled={disabled}
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => onVisibleChange(!visible)}
-          aria-label={t('settings.sync.toggleTokenVisibility')}
-          title={t('settings.sync.toggleTokenVisibility')}
-          disabled={disabled}
-        >
-          {visible ? <Eye /> : <EyeOff />}
-        </Button>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex min-w-0 flex-1 gap-2">
+          <Input
+            className="min-w-0 flex-1"
+            value={value}
+            onChange={onChange}
+            type={visible ? 'text' : 'password'}
+            placeholder={placeholder}
+            disabled={disabled}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => onVisibleChange(!visible)}
+            aria-label={t('settings.sync.toggleTokenVisibility')}
+            title={t('settings.sync.toggleTokenVisibility')}
+            disabled={disabled}
+          >
+            {visible ? <Eye /> : <EyeOff />}
+          </Button>
+        </div>
         {tokenUrl === '#' ? (
-          <Button disabled>{t('settings.sync.newToken')}</Button>
+          <Button className="w-full sm:w-auto" disabled>{t('settings.sync.newToken')}</Button>
         ) : (
-          <OpenBroswer type="button" url={tokenUrl} title={t('settings.sync.newToken')} />
+          <OpenBroswer
+            type="button"
+            url={tokenUrl}
+            title={t('settings.sync.newToken')}
+            className="w-full sm:w-auto"
+          />
         )}
       </div>
       <OpenBroswer

@@ -3,22 +3,20 @@
 import { useTranslations } from 'next-intl'
 import { PenTool } from 'lucide-react'
 import { DefaultModelsSettings } from '@/app/core/setting/components/default-models-settings'
-import { ToolbarSettings } from '@/app/core/setting/record/toolbar-settings'
 
 export default function RecordSettingsPage() {
   const t = useTranslations('settings.record')
 
   return (
-    <div className='space-y-6'>
-      <div>
-        <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
+    <div className="flex min-w-0 flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
           <PenTool className="size-6" />
           {t('title')}
         </h1>
         <p className="text-sm text-muted-foreground">{t('desc')}</p>
-      </div>
+      </header>
       <DefaultModelsSettings type="record" />
-      <ToolbarSettings />
     </div>
   )
 }
