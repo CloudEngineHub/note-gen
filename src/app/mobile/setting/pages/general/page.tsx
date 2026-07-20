@@ -14,7 +14,7 @@ export default function GeneralSettingsPage() {
         <p className="text-sm text-muted-foreground">{t('desc')}</p>
       </header>
       <InterfaceSettings mobile />
-      <AdvancedSettings />
+      <AdvancedSettings showConfigFileActions={false} />
     </div>
   )
 }

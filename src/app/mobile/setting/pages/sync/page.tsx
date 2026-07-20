@@ -242,7 +242,7 @@ export default function SyncPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">{t('settings.sync.platformSettings')}</h2>
         <Select value={tab} onValueChange={handleTabChange}>
-          <SelectTrigger>
+          <SelectTrigger className="w-full">
             <SelectValue placeholder={t('settings.sync.selectPlatform')} />
           </SelectTrigger>
           <SelectContent>

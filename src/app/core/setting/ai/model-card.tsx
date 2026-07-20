@@ -47,6 +47,7 @@ import { blobToBytes, invokeAiBinary, invokeAiJson, invokeAiMultipart, resolveAi
 interface ModelCardProps {
   modelConfig: ModelConfig
   aiConfig: AiConfig
+  mobile?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: (modelId: string, field: keyof ModelConfig, value: any) => void
@@ -67,6 +68,7 @@ const modelTypeOptions: Array<{
 export default function ModelCard({
   modelConfig,
   aiConfig,
+  mobile = false,
   open,
   onOpenChange,
   onUpdate,
@@ -233,51 +235,103 @@ export default function ModelCard({
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <Card size="sm">
-        <CardHeader
-          className="cursor-pointer items-center"
-          onClick={() => onOpenChange(!open)}
-        >
-          <CardTitle className="flex min-w-0 items-center gap-2">
-            <span className="truncate">{modelConfig.model || t('newModel')}</span>
-            <Badge variant="secondary">
-              {t(`modelType.${modelConfig.modelType}`)}
-            </Badge>
-          </CardTitle>
-          <CardAction
-            className="row-span-1 flex items-center gap-2 self-center"
-            onClick={(event) => event.stopPropagation()}
+        {mobile ? (
+          <CardHeader
+            className="cursor-pointer gap-3"
+            onClick={() => onOpenChange(!open)}
           >
-            <ButtonGroup>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCheck}
-                disabled={!modelConfig.model || checkState === 'checking'}
-              >
-                {renderCheckIcon()}
-                {t('checkConnection')}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label={tc('delete')}
-                onClick={() => onDelete(modelConfig.id)}
-              >
-                <Trash2 />
-              </Button>
-            </ButtonGroup>
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="group"
-                aria-label={t('models')}
-              >
-                <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
-              </Button>
-            </CollapsibleTrigger>
-          </CardAction>
-        </CardHeader>
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <CardTitle className="min-w-0 flex-1 break-words text-base font-semibold">
+                {modelConfig.model || t('newModel')}
+              </CardTitle>
+              <div onClick={(event) => event.stopPropagation()}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="group shrink-0"
+                    aria-label={t('models')}
+                  >
+                    <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+            </div>
+            <div
+              className="flex items-center justify-between gap-3 border-t border-border/60 pt-3"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Badge variant="secondary">
+                {t(`modelType.${modelConfig.modelType}`)}
+              </Badge>
+              <ButtonGroup>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheck}
+                  disabled={!modelConfig.model || checkState === 'checking'}
+                >
+                  {renderCheckIcon()}
+                  {t('checkConnection')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={tc('delete')}
+                  onClick={() => onDelete(modelConfig.id)}
+                >
+                  <Trash2 />
+                </Button>
+              </ButtonGroup>
+            </div>
+          </CardHeader>
+        ) : (
+          <CardHeader
+            className="cursor-pointer items-center"
+            onClick={() => onOpenChange(!open)}
+          >
+            <CardTitle className="flex min-w-0 items-center gap-2">
+              <span className="truncate">{modelConfig.model || t('newModel')}</span>
+              <Badge variant="secondary">
+                {t(`modelType.${modelConfig.modelType}`)}
+              </Badge>
+            </CardTitle>
+            <CardAction
+              className="row-span-1 flex items-center gap-2 self-center"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ButtonGroup>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCheck}
+                  disabled={!modelConfig.model || checkState === 'checking'}
+                >
+                  {renderCheckIcon()}
+                  {t('checkConnection')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={tc('delete')}
+                  onClick={() => onDelete(modelConfig.id)}
+                >
+                  <Trash2 />
+                </Button>
+              </ButtonGroup>
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="group"
+                  aria-label={t('models')}
+                >
+                  <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
+                </Button>
+              </CollapsibleTrigger>
+            </CardAction>
+          </CardHeader>
+        )}
 
         <CollapsibleContent>
           <CardContent>
@@ -305,7 +359,7 @@ export default function ModelCard({
                         value={value}
                         className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
                       >
-                        <Icon data-icon="inline-start" />
+                        {mobile ? null : <Icon data-icon="inline-start" />}
                         {t(`modelType.${value}`)}
                       </TabsTrigger>
                     ))}
@@ -316,9 +370,9 @@ export default function ModelCard({
               {modelConfig.modelType === 'chat' && (
                 <Collapsible>
                   <Card size="sm">
-                    <CardHeader className="items-center">
+                    <CardHeader className={mobile ? 'mobile-setting-inline-card-header items-center' : 'items-center'}>
                       <CardTitle>{t('advancedParameters')}</CardTitle>
-                      <CardAction className="row-span-1 self-center">
+                      <CardAction className={mobile ? 'mobile-setting-inline-card-action row-span-1 self-center' : 'row-span-1 self-center'}>
                         <CollapsibleTrigger asChild>
                           <Button
                             variant="ghost"
@@ -360,7 +414,7 @@ export default function ModelCard({
                                 value as ModelConfig['tokenLimitParam']
                               )}
                             >
-                              <Field orientation="horizontal">
+                              <Field orientation="horizontal" className={mobile ? 'mobile-setting-token-option' : undefined}>
                                 <RadioGroupItem
                                   value="max_completion_tokens"
                                   id={`max-completion-tokens-${modelConfig.id}`}
@@ -369,7 +423,7 @@ export default function ModelCard({
                                   max_completion_tokens
                                 </FieldLabel>
                               </Field>
-                              <Field orientation="horizontal">
+                              <Field orientation="horizontal" className={mobile ? 'mobile-setting-token-option' : undefined}>
                                 <RadioGroupItem
                                   value="max_tokens"
                                   id={`max-tokens-${modelConfig.id}`}
@@ -415,7 +469,7 @@ export default function ModelCard({
                             </div>
                           </Field>
 
-                          <Field orientation="horizontal">
+                          <Field orientation="horizontal" className={mobile ? 'mobile-setting-inline-switch-field' : undefined}>
                             <FieldContent>
                               <FieldTitle>{t('enableStream')}</FieldTitle>
                               <FieldDescription>{t('enableStreamDesc')}</FieldDescription>

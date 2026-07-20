@@ -22,7 +22,7 @@ import { ConfigFileActions } from './config-file-actions'
 import { Database, FolderX, Network } from 'lucide-react'
 import { SettingSection } from '../components/setting-base'
 
-export function AdvancedSettings() {
+export function AdvancedSettings({ showConfigFileActions = true }: { showConfigFileActions?: boolean }) {
   const t = useTranslations('settings.dev')
   const [proxy, setProxy] = useState('')
   const { toast } = useToast()
@@ -121,7 +121,7 @@ export function AdvancedSettings() {
             </Button>
           </ItemActions>
         </Item>
-        <ConfigFileActions />
+        {showConfigFileActions ? <ConfigFileActions /> : null}
       </ItemGroup>
     </SettingSection>
   )

@@ -32,7 +32,7 @@ import { Field, FieldDescription, FieldError, FieldTitle } from "@/components/ui
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item";
 
 
-export default function AiPage() {
+export default function AiPage({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.ai');
   const {
     aiModelList,
@@ -566,6 +566,7 @@ export default function AiPage() {
                           key={modelConfig.id}
                           modelConfig={modelConfig}
                           aiConfig={currentConfig}
+                          mobile={mobile}
                           open={expandedModels.includes(modelConfig.id)}
                           onOpenChange={(open) => {
                             setExpandedModels((current) => open

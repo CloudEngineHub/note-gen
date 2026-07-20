@@ -54,7 +54,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { SettingSection } from '../components/setting-base'
 
-export function ServerList() {
+export function ServerList({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.mcp')
   const { toast } = useToast()
   const { servers, updateServer, deleteServer, getServerState } = useMcpStore()
@@ -165,9 +165,9 @@ export function ServerList() {
     <div className="flex flex-col gap-4">
       <SettingSection
         title={t('servers')}
-        desc={t('serversDesc')}
+        desc={mobile ? undefined : t('serversDesc')}
         actions={(
-          <div className="flex flex-wrap items-center gap-2">
+          <div className={mobile ? 'grid w-full grid-cols-2 gap-2' : 'flex flex-wrap items-center gap-2'}>
             <Button onClick={handleAddServer}>
               <Plus data-icon="inline-start" />
               {t('addServer')}
@@ -178,6 +178,7 @@ export function ServerList() {
             </Button>
             {servers.filter(s => s.enabled).length > 0 && (
               <Button
+                className={mobile ? 'col-span-2' : undefined}
                 variant="outline"
                 onClick={handleTestAllConnections}
                 disabled={testingAll}
@@ -215,19 +216,108 @@ export function ServerList() {
                 ? server.command && `${server.command} ${server.args?.join(' ') || ''}`.trim()
                 : server.url
 
+              if (mobile) {
+                return (
+                  <Item key={server.id} variant="outline" className="gap-3 p-3">
+                    <div className="flex w-full min-w-0 items-start gap-3">
+                      <ItemMedia variant="icon" className="mt-0.5 text-muted-foreground">
+                        {server.type === 'stdio' ? <Terminal /> : <Globe />}
+                      </ItemMedia>
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="min-w-0 max-w-full flex-wrap">
+                          <span className="break-words">{server.name}</span>
+                          <Badge variant="outline">
+                            {server.type === 'stdio' ? t('stdio') : t('http')}
+                          </Badge>
+                        </ItemTitle>
+                        {endpoint && <ItemDescription className="break-all font-mono">{endpoint}</ItemDescription>}
+                      </ItemContent>
+                      <Switch
+                        className="shrink-0"
+                        checked={server.enabled}
+                        onCheckedChange={(enabled) => handleServerEnabledChange(server, enabled)}
+                        aria-label={`${t('serverEnabled')}: ${server.name}`}
+                      />
+                    </div>
+
+                    <div className="flex w-full items-center justify-between gap-3 border-t border-border/60 pt-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Badge
+                          variant={state?.status === 'error'
+                            ? 'destructive'
+                            : state?.status === 'connected'
+                              ? 'secondary'
+                              : 'outline'}
+                        >
+                          {getStatusText(server.id)}
+                        </Badge>
+                        {hasTools && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleServerExpanded(server.id)}
+                          >
+                            <Wrench data-icon="inline-start" />
+                            {toolCount} {t('tools')}
+                            {isExpanded ? <ChevronUp data-icon="inline-end" /> : <ChevronDown data-icon="inline-end" />}
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          aria-label={t('editServer')}
+                          onClick={() => handleEditServer(server)}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label={t('delete')}
+                          onClick={() => handleDeleteClick(server.id)}
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {hasTools && isExpanded && state && (
+                      <ItemGroup className="w-full gap-2 border-t border-border/60 pt-3">
+                        {state.tools.map((tool, index) => (
+                          <Item key={`${tool.name}-${index}`} variant="muted" size="xs">
+                            <ItemContent>
+                              <ItemTitle><code className="font-mono">{tool.name}</code></ItemTitle>
+                              {tool.description && <ItemDescription>{tool.description}</ItemDescription>}
+                              {tool.inputSchema.properties && (
+                                <ItemDescription>
+                                  {t('parameters')}: {Object.keys(tool.inputSchema.properties).join(', ')}
+                                </ItemDescription>
+                              )}
+                            </ItemContent>
+                          </Item>
+                        ))}
+                      </ItemGroup>
+                    )}
+                  </Item>
+                )
+              }
+
               return (
                 <Item key={server.id} variant="outline">
                   <ItemMedia variant="icon" className="text-muted-foreground">
                     {server.type === 'stdio' ? <Terminal /> : <Globe />}
                   </ItemMedia>
                   <ItemContent>
-                    <ItemTitle>
+                    <ItemTitle className="min-w-0 max-w-full flex-wrap">
                       {server.name}
                       <Badge variant="outline">
                         {server.type === 'stdio' ? t('stdio') : t('http')}
                       </Badge>
                     </ItemTitle>
-                    {endpoint && <ItemDescription className="font-mono">{endpoint}</ItemDescription>}
+                    {endpoint && <ItemDescription className="break-all font-mono">{endpoint}</ItemDescription>}
                   </ItemContent>
                   <ItemActions>
                     <Switch

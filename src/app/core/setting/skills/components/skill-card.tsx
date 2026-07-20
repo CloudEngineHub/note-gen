@@ -68,29 +68,31 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
   }
 
   return (
-    <Item variant="outline">
-      <ItemMedia variant="icon" className="text-muted-foreground">
-        <Sparkles />
-      </ItemMedia>
-      <ItemContent>
-        <ItemTitle>{skill.name}</ItemTitle>
-        {skill.description ? <ItemDescription>{skill.description}</ItemDescription> : null}
-        {hasPythonScripts && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>{t('pythonRuntime')}:</span>
-            {!pythonStatus ? (
-              <Spinner />
-            ) : pythonStatus.available ? (
-              <Badge variant="secondary">
-                Python {pythonStatus.version} · {pythonStatus.managed ? t('isolatedRuntime') : t('systemRuntime')}
-              </Badge>
-            ) : (
-              <Badge variant="destructive">{t('runtimeUnavailable')}</Badge>
-            )}
-          </div>
-        )}
-      </ItemContent>
-      <ItemActions>
+    <Item variant="outline" className="mobile-setting-skill-card">
+      <div className="mobile-setting-skill-summary">
+        <ItemMedia variant="icon" className="text-muted-foreground">
+          <Sparkles />
+        </ItemMedia>
+        <ItemContent className="w-0">
+          <ItemTitle className="w-full min-w-0">{skill.name}</ItemTitle>
+          {skill.description ? <ItemDescription>{skill.description}</ItemDescription> : null}
+          {hasPythonScripts && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{t('pythonRuntime')}:</span>
+              {!pythonStatus ? (
+                <Spinner />
+              ) : pythonStatus.available ? (
+                <Badge variant="secondary">
+                  Python {pythonStatus.version} · {pythonStatus.managed ? t('isolatedRuntime') : t('systemRuntime')}
+                </Badge>
+              ) : (
+                <Badge variant="destructive">{t('runtimeUnavailable')}</Badge>
+              )}
+            </div>
+          )}
+        </ItemContent>
+      </div>
+      <ItemActions className="mobile-setting-skill-controls">
         <Switch
           checked={skill.enabled !== false}
           onCheckedChange={() => toggleSkill(skill.id)}
@@ -98,7 +100,12 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
         />
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="icon-sm" aria-label={t('deleteSkill')}>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              aria-label={t('deleteSkill')}
+            >
               <Trash />
             </Button>
           </AlertDialogTrigger>

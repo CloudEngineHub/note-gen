@@ -7,14 +7,12 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
-  ItemFooter,
-  ItemHeader,
   ItemMedia,
   ItemTitle,
 } from '@/components/ui/item'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Trash, Pencil, Check, X, Sparkles, RotateCcw, FileText } from 'lucide-react'
+import { Plus, Trash, Pencil, Sparkles, FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import usePromptStore, { Prompt } from '@/stores/prompt'
 import useSettingStore from '@/stores/setting'
@@ -215,14 +213,13 @@ ${newContent}`
                     maxRows={30}
                   />
                 </div>
-                <DialogFooter className="gap-2">
+                <DialogFooter className="mobile-prompt-dialog-footer gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={handleResetSystemPrompt}
                     disabled={systemPromptDraft === DEFAULT_SYSTEM_PROMPT}
                   >
-                    <RotateCcw data-icon="inline-start" />
                     {t('prompt.systemPrompt.reset')}
                   </Button>
                   <Button
@@ -237,7 +234,6 @@ ${newContent}`
                     onClick={handleSaveSystemPrompt}
                     disabled={!systemPromptChanged}
                   >
-                    <Check data-icon="inline-start" />
                     {commonT('save')}
                   </Button>
                 </DialogFooter>
@@ -367,85 +363,92 @@ ${newContent}`
         </div>
         <div className="grid gap-4">
           {promptList.map((prompt) => (
-            <Item key={prompt.id} variant="outline">
-              {editingId === prompt.id ? (
-                <>
-                  <ItemHeader>
-                    <Input
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      placeholder={t('prompt.promptTitlePlaceholder')}
-                    />
-                  </ItemHeader>
-                  <ItemContent className="basis-full">
-                    <Textarea
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
-                      placeholder={t('prompt.promptContentPlaceholder')}
-                      rows={5}
-                      maxRows={16}
-                    />
-                  </ItemContent>
-                  <ItemFooter className="justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleOptimizePrompt}
-                      disabled={isOptimizing || !newContent.trim()}
-                    >
-                      <Sparkles data-icon="inline-start" />
-                      {isOptimizing ? t('prompt.optimizing') : t('prompt.optimizePrompt')}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleCancelEdit}
-                    >
-                      <X data-icon="inline-start" />
-                      {commonT('cancel')}
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleSaveEdit(prompt.id)}
-                    >
-                      <Check data-icon="inline-start" />
-                      {commonT('save')}
-                    </Button>
-                  </ItemFooter>
-                </>
-              ) : (
-                <>
-                  <ItemContent>
-                    <ItemTitle>{prompt.title}</ItemTitle>
-                    <ItemDescription className="whitespace-pre-wrap">
-                      {prompt.content || t('prompt.noContent')}
-                    </ItemDescription>
-                  </ItemContent>
-                  <ItemActions>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleStartEdit(prompt)}
-                    >
-                      <Pencil data-icon="inline-start" />
-                      {commonT('edit')}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeletePrompt(prompt.id)}
-                      disabled={prompt.isDefault}
-                    >
-                      <Trash data-icon="inline-start" />
-                      {commonT('delete')}
-                    </Button>
-                  </ItemActions>
-                </>
-              )}
+            <Item key={prompt.id} variant="outline" className="mobile-prompt-card">
+              <ItemContent>
+                <ItemTitle>{prompt.title}</ItemTitle>
+                <ItemDescription className="whitespace-pre-wrap">
+                  {prompt.content || t('prompt.noContent')}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions className="mobile-prompt-card-actions">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleStartEdit(prompt)}
+                >
+                  <Pencil data-icon="inline-start" />
+                  {commonT('edit')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => handleDeletePrompt(prompt.id)}
+                  disabled={prompt.isDefault}
+                >
+                  <Trash data-icon="inline-start" />
+                  {commonT('delete')}
+                </Button>
+              </ItemActions>
             </Item>
           ))}
         </div>
+
+        <Dialog
+          open={editingId !== null}
+          onOpenChange={(open) => {
+            if (!open) handleCancelEdit()
+          }}
+        >
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{commonT('edit')} Prompt</DialogTitle>
+              <DialogDescription>{t('prompt.addPromptDesc')}</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-prompt-title">{t('prompt.promptTitle')}</Label>
+                <Input
+                  id="edit-prompt-title"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder={t('prompt.promptTitlePlaceholder')}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-prompt-content">{t('prompt.promptContent')}</Label>
+                <Textarea
+                  id="edit-prompt-content"
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  placeholder={t('prompt.promptContentPlaceholder')}
+                  rows={8}
+                  maxRows={16}
+                />
+              </div>
+            </div>
+            <DialogFooter className="mobile-prompt-dialog-footer gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOptimizePrompt}
+                disabled={isOptimizing || !newContent.trim()}
+              >
+                {isOptimizing ? t('prompt.optimizing') : t('prompt.optimizePrompt')}
+              </Button>
+              <Button type="button" variant="outline" onClick={handleCancelEdit}>
+                {commonT('cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => editingId && handleSaveEdit(editingId)}
+                disabled={!newTitle.trim()}
+              >
+                {commonT('save')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </SettingType>
   )
