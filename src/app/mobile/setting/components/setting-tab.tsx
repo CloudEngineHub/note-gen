@@ -19,7 +19,7 @@ const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
 export function SettingTab() {
   const router = useRouter()
   const t = useTranslations('settings')
-  const notMobilePages = ['about', 'file', 'shortcuts', 'memories', 'template']
+  const notMobilePages = ['about', 'file', 'shortcuts']
   
   // Add translations to the config, keep separators
   const visibleConfig = baseConfig.map(item => {

@@ -326,7 +326,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                   />
                 </div>
               </div>
-              <DrawerFooter>
+              <DrawerFooter className="flex-row [&>*]:flex-1">
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>{t('common.cancel') || 'Cancel'}</Button>
                 <Button onClick={updateTemplateHandler}>{t('common.confirm') || 'Confirm'}</Button>
               </DrawerFooter>
