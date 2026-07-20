@@ -12,6 +12,7 @@ mod mcp_runtime;
 mod mobile_system_bars;
 mod ocr_packages;
 mod printing;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod skill_runtime;
 mod skills;
 
@@ -30,6 +31,7 @@ use mcp_runtime::{
     cancel_mcp_runtime_install, inspect_mcp_runtime, install_mcp_runtime, RuntimeInstallManager,
 };
 use ocr_packages::{list_ocr_providers, run_ocr_provider};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
     SkillProcessManager,
@@ -48,8 +50,10 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(McpServerManager::new())
         .manage(RuntimeInstallManager::new())
-        .manage(AiRequestManager::new())
-        .manage(SkillProcessManager::default());
+        .manage(AiRequestManager::new());
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.manage(SkillProcessManager::default());
 
     #[cfg(target_os = "android")]
     let builder = builder.plugin(android_ocr::init());
@@ -74,9 +78,13 @@ pub fn run() {
             import_app_data,
             import_app_data_from_file,
             import_skill_zip,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             run_skill_script,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             cancel_skill_script,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             inspect_skill_python,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
             install_skill_python_dependencies,
             ai_json_request,
             ai_binary_request,

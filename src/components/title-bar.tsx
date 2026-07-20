@@ -5,7 +5,6 @@ import { platform } from '@tauri-apps/plugin-os'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isMobileDevice } from '@/lib/check'
 import { Search, Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog, CalendarDays } from 'lucide-react'
-import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
@@ -52,7 +51,6 @@ interface TitleBarProps {
 export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false }: TitleBarProps) {
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isMobile, setIsMobile] = useState(true)
-  const pathname = usePathname()
   const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
   const { leftSidebarVisible, centerPanelVisible, rightSidebarVisible, toggleLeftSidebar, toggleCenterPanel, toggleRightSidebar } = useSidebarStore()
   
