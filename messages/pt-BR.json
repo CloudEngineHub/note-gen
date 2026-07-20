@@ -239,6 +239,8 @@
       "serverName": "Nome do Servidor",
       "serverNamePlaceholder": "Ex: Servidor de Sistema de Arquivos",
       "serverEnabled": "Habilitar Servidor",
+      "trustToolAnnotations": "Confiar nas dicas de permissão",
+      "trustToolAnnotationsDesc": "Ative apenas para servidores confiáveis. Dicas de somente leitura podem dispensar aprovação; ações destrutivas ainda exigem confirmação.",
       "serverEnabledDesc": "Quando habilitado, este servidor se conectará automaticamente e fornecerá ferramentas.",
       "serverType": "Tipo de Servidor",
       "stdio": "Comando Local",

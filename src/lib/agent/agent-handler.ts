@@ -76,6 +76,8 @@ export class AgentHandler {
     }
 
     await this.initializeMcp()
+    const { useMcpStore } = await import('@/stores/mcp')
+    const selectedMcpServerIds = [...useMcpStore.getState().selectedServerIds]
     const skillsInfo = await this.getSkillsInfo()
     const currentEditorState = this.config.activeFilePath
       ? await readCurrentEditorState().catch(() => undefined)
@@ -107,6 +109,7 @@ export class AgentHandler {
         currentEditorState,
         currentQuote: this.config.currentQuote,
         availableSkills: skillsInfo,
+        selectedMcpServerIds,
         permissionMode: this.config.permissionMode,
       }, {
         onStatus: (status) => {

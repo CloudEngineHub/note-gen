@@ -1,5 +1,6 @@
 import { mcpServerManager } from '@/lib/mcp/server-manager'
 import type { MCPToolAnnotations } from '@/lib/mcp/types'
+import { useMcpStore } from '@/stores/mcp'
 import type { AgentPermissionMode, AgentTool, AgentToolRisk } from './types'
 import { getSkillScriptPermissionKey } from '@/lib/skills/runtime'
 
@@ -19,15 +20,29 @@ const LOCAL_WRITE_RISKS = new Set<AgentToolRisk>([
   'medium',
 ])
 
-function getMcpToolAnnotations(input: Record<string, unknown>): MCPToolAnnotations | undefined {
+function getMcpPermissionMetadata(tool: AgentTool, input: Record<string, unknown>): {
+  annotations?: MCPToolAnnotations
+  trustToolAnnotations: boolean
+} {
+  if (tool.mcp) {
+    return {
+      annotations: tool.mcp.annotations,
+      trustToolAnnotations: tool.mcp.trustToolAnnotations,
+    }
+  }
+
   const serverId = typeof input.serverId === 'string' ? input.serverId : ''
   const toolName = typeof input.toolName === 'string' ? input.toolName : ''
 
   if (!serverId || !toolName) {
-    return undefined
+    return { trustToolAnnotations: false }
   }
 
-  return mcpServerManager.getServerTools(serverId).find(tool => tool.name === toolName)?.annotations
+  const server = useMcpStore.getState().servers.find(item => item.id === serverId)
+  return {
+    annotations: mcpServerManager.getServerTools(serverId).find(item => item.name === toolName)?.annotations,
+    trustToolAnnotations: server?.trustToolAnnotations === true,
+  }
 }
 
 /**
@@ -48,8 +63,9 @@ export class AgentPermissionEngine {
     }
 
     if (tool.risk === 'external') {
-      const annotations = getMcpToolAnnotations(input)
-      const isReadOnly = annotations?.readOnlyHint === true
+      const metadata = getMcpPermissionMetadata(tool, input)
+      const isReadOnly = metadata.trustToolAnnotations && metadata.annotations?.readOnlyHint === true
+      const isDestructive = metadata.annotations?.destructiveHint === true
 
       if (mode === 'read-only' && !isReadOnly) {
         return {
@@ -61,7 +77,7 @@ export class AgentPermissionEngine {
 
       return {
         allowed: true,
-        requiresApproval: !isReadOnly,
+        requiresApproval: isDestructive || !isReadOnly,
       }
     }
 

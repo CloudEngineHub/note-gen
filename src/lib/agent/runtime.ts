@@ -9,6 +9,7 @@ import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
 import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
 import { skillManager } from '@/lib/skills'
+import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
 import { agentDebugLog, previewText } from './debug-log'
 import type {
   AgentChange,
@@ -667,7 +668,10 @@ export class AgentRuntime {
       userInput: input.userInput,
       currentQuote: input.currentQuote,
       availableSkills: input.availableSkills,
+      selectedMcpServerIds: input.selectedMcpServerIds,
     }
+
+    const mcpToolCatalog = buildMcpAgentToolCatalog(input.selectedMcpServerIds)
 
     agentDebugLog('run_start', {
       runId,
@@ -678,9 +682,13 @@ export class AgentRuntime {
       hasQuote: Boolean(input.currentQuote),
       hasEditorState: Boolean(input.currentEditorState),
       availableSkillCount: input.availableSkills?.length || 0,
+      directMcpToolCount: mcpToolCatalog.directTools.length,
+      deferredMcpToolCount: mcpToolCatalog.deferredEntries.length,
+      mcpSchemaTokens: mcpToolCatalog.schemaTokens,
     })
 
-    const allTools = agentToolRegistry.listTools()
+    const allTools = [...agentToolRegistry.listTools(), ...mcpToolCatalog.directTools]
+    const toolMap = new Map(allTools.map((tool) => [tool.name, tool]))
     let tools = selectToolsForContext(context, allTools, input.permissionMode)
     const customSystemPrompt = await getSystemPromptContent()
     let systemPrompt = this.promptAssembler.assemble(
@@ -1159,7 +1167,7 @@ export class AgentRuntime {
             continue
           }
 
-          const tool = agentToolRegistry.getTool(toolName)
+          const tool = toolMap.get(toolName)
           let args: Record<string, unknown>
           try {
             args = parseToolArguments(toolUse.function.arguments)

@@ -241,6 +241,8 @@
       "serverName": "服务器名称",
       "serverNamePlaceholder": "例如：文件系统服务器",
       "serverEnabled": "启用服务器",
+      "trustToolAnnotations": "信任工具权限声明",
+      "trustToolAnnotationsDesc": "仅对可信服务器启用；允许根据只读声明减少确认，破坏性操作仍会确认。",
       "serverEnabledDesc": "启用后，此服务器将自动连接并提供工具。",
       "serverType": "服务器类型",
       "stdio": "本地命令",

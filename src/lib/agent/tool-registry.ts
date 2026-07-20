@@ -2,6 +2,8 @@ import type OpenAI from 'openai'
 import useArticleStore from '@/stores/article'
 import { useMcpStore } from '@/stores/mcp'
 import { callTool as callMcpTool } from '@/lib/mcp/tools'
+import { normalizeMcpToolResult } from '@/lib/mcp/result-normalizer'
+import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
 import { mcpServerManager } from '@/lib/mcp/server-manager'
 import { skillManager } from '@/lib/skills'
 import {
@@ -1034,7 +1036,7 @@ function buildMcpCallTool(): AgentTool {
       required: ['serverId', 'toolName'],
       additionalProperties: false,
     },
-    execute: async (input) => {
+    execute: async (input, context) => {
       const serverId = typeof input.serverId === 'string' ? input.serverId : ''
       const toolName = typeof input.toolName === 'string' ? input.toolName : ''
       const args = asObject(input.args)
@@ -1047,17 +1049,167 @@ function buildMcpCallTool(): AgentTool {
         }
       }
 
-      const result = await callMcpTool(serverId, toolName, args)
-      const text = result.content
-        .filter((part) => part.type === 'text')
-        .map((part) => part.text)
-        .join('\n')
+      const catalog = buildMcpAgentToolCatalog(context.context.selectedMcpServerIds)
+      const deferred = catalog.deferredEntries.some(entry => entry.server.id === serverId && entry.tool.name === toolName)
+      if (!deferred) {
+        return {
+          ok: false,
+          message: 'This MCP tool is not deferred or its server is not selected. Call its registered tool directly.',
+          error: 'MCP_TOOL_NOT_DEFERRED',
+        }
+      }
 
+      const result = await callMcpTool(serverId, toolName, args)
+      return normalizeMcpToolResult(result)
+    },
+  }
+}
+
+function buildMcpListResourcesTool(): AgentTool {
+  return {
+    name: 'mcp_list_resources',
+    title: '列出 MCP 资源',
+    description: 'List resources exposed by selected and connected MCP servers. This reads resource metadata only.',
+    category: 'mcp',
+    risk: 'read',
+    inputSchema: EMPTY_SCHEMA,
+    execute: async (_input, context) => {
+      const store = useMcpStore.getState()
+      const selected = new Set(context.context.selectedMcpServerIds || [])
+      const resources = store.servers
+        .filter(server => selected.has(server.id))
+        .flatMap(server => mcpServerManager.getServerResources(server.id).map(resource => ({
+          server: server.name,
+          ...resource,
+        })))
       return {
-        ok: !result.isError,
-        message: text || (result.isError ? 'MCP 工具执行失败' : 'MCP 工具执行成功'),
-        data: result.content,
-        error: result.isError ? text || 'MCP tool failed' : undefined,
+        ok: true,
+        message: resources.length ? JSON.stringify(resources, null, 2) : 'Selected MCP servers expose no resources.',
+        data: { resources },
+      }
+    },
+  }
+}
+
+function resolveSelectedMcpServer(
+  context: AgentToolExecutionContext,
+  reference: string,
+  uri?: string
+): { serverId: string; serverName: string } | { error: string } {
+  const store = useMcpStore.getState()
+  const selectedIds = context.context.selectedMcpServerIds || []
+  const selectedServers = selectedIds
+    .map(id => store.servers.find(server => server.id === id))
+    .filter((server): server is NonNullable<typeof server> => Boolean(server))
+
+  if (selectedServers.length === 0) {
+    return { error: 'No MCP server is selected. Select a server in the chat toolbar first.' }
+  }
+
+  if (selectedServers.length === 1) {
+    return { serverId: selectedServers[0].id, serverName: selectedServers[0].name }
+  }
+
+  const normalizedReference = reference.trim().toLocaleLowerCase()
+  if (normalizedReference) {
+    const exactMatches = selectedServers.filter(server =>
+      server.id === reference || server.name.toLocaleLowerCase() === normalizedReference
+    )
+    if (exactMatches.length === 1) {
+      return { serverId: exactMatches[0].id, serverName: exactMatches[0].name }
+    }
+
+    const partialMatches = selectedServers.filter(server =>
+      server.name.toLocaleLowerCase().includes(normalizedReference)
+    )
+    if (partialMatches.length === 1) {
+      return { serverId: partialMatches[0].id, serverName: partialMatches[0].name }
+    }
+  }
+
+  if (uri) {
+    const uriMatches = selectedServers.filter(server =>
+      mcpServerManager.getServerResources(server.id).some(resource => resource.uri === uri)
+    )
+    if (uriMatches.length === 1) {
+      return { serverId: uriMatches[0].id, serverName: uriMatches[0].name }
+    }
+  }
+
+  return {
+    error: `Multiple MCP servers are selected. Specify one by its display name: ${selectedServers.map(server => server.name).join(', ')}.`,
+  }
+}
+
+function buildMcpListResourceTemplatesTool(): AgentTool {
+  return {
+    name: 'mcp_list_resource_templates',
+    title: '列出 MCP 资源模板',
+    description: 'List parameterized resource templates from a selected MCP server. Omit server when only one server is selected.',
+    category: 'mcp',
+    risk: 'read',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        server: { type: 'string', description: 'Optional selected MCP server display name. Omit when only one server is selected.' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    execute: async (input, context) => {
+      const resolved = resolveSelectedMcpServer(context, asString(input.server))
+      if ('error' in resolved) {
+        return { ok: false, message: resolved.error, error: 'MCP_SERVER_AMBIGUOUS' }
+      }
+      try {
+        const resourceTemplates = await mcpServerManager.listResourceTemplates(resolved.serverId)
+        return {
+          ok: true,
+          message: JSON.stringify(resourceTemplates, null, 2),
+          data: { server: resolved.serverName, resourceTemplates },
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { ok: false, message, error: 'MCP_RESOURCE_TEMPLATES_FAILED' }
+      }
+    },
+  }
+}
+
+function buildMcpReadResourceTool(): AgentTool {
+  return {
+    name: 'mcp_read_resource',
+    title: '读取 MCP 资源',
+    description: 'Read one MCP resource by URI. Omit server when one selected server exposes the resource.',
+    category: 'mcp',
+    risk: 'read',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        server: { type: 'string', description: 'Optional selected MCP server display name. Omit when one selected server exposes the URI.' },
+        uri: { type: 'string', description: 'Exact resource URI returned by mcp_list_resources.' },
+      },
+      required: ['uri'],
+      additionalProperties: false,
+    },
+    execute: async (input, context) => {
+      const uri = asString(input.uri)
+      const resolved = resolveSelectedMcpServer(context, asString(input.server), uri)
+      if ('error' in resolved) {
+        return { ok: false, message: resolved.error, error: 'MCP_SERVER_AMBIGUOUS' }
+      }
+      try {
+        const result = await mcpServerManager.readResource(resolved.serverId, uri)
+        const content = result.contents.map(item => item.text || `[Binary resource omitted: ${item.uri} (${item.mimeType || 'application/octet-stream'})]`).join('\n\n')
+        const safeContents = result.contents.map(item => item.blob ? { uri: item.uri, mimeType: item.mimeType, blobOmitted: true } : item)
+        return {
+          ok: true,
+          message: content || 'MCP resource returned no content.',
+          data: { server: resolved.serverName, ...result, contents: safeContents },
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return { ok: false, message, error: 'MCP_RESOURCE_READ_FAILED' }
       }
     },
   }
@@ -1071,10 +1223,13 @@ function buildMcpListToolsTool(): AgentTool {
     category: 'mcp',
     risk: 'read',
     inputSchema: EMPTY_SCHEMA,
-    execute: async () => {
+    execute: async (_input, context) => {
       const store = useMcpStore.getState()
       await store.initMcpData()
       const latestStore = useMcpStore.getState()
+      const selectedServerIds = context.context.selectedMcpServerIds || []
+      const selectedServerIdSet = new Set(selectedServerIds)
+      const catalog = buildMcpAgentToolCatalog(selectedServerIds)
       const servers = latestStore.servers.map((server) => {
         const state = latestStore.serverStates.get(server.id)
         const tools = mcpServerManager.getServerTools(server.id)
@@ -1085,12 +1240,15 @@ function buildMcpListToolsTool(): AgentTool {
           name: server.name,
           type: server.type,
           enabled: server.enabled,
-          selected: latestStore.selectedServerIds.includes(server.id),
+          selected: selectedServerIdSet.has(server.id),
           status: state?.status || 'disconnected',
           error: state?.error,
           toolCount: tools.length,
           tools: tools.map((tool) => ({
             name: tool.name,
+            agentToolName: catalog.directEntries.find(entry => entry.server.id === server.id && entry.tool.name === tool.name)?.agentToolName,
+            mode: catalog.deferredEntries.some(entry => entry.server.id === server.id && entry.tool.name === tool.name) ? 'deferred' : 'direct',
+            deferredReason: catalog.deferredEntries.find(entry => entry.server.id === server.id && entry.tool.name === tool.name)?.deferredReason,
             description: tool.description || '',
             required: tool.inputSchema?.required || [],
             annotations: tool.annotations,
@@ -1112,7 +1270,7 @@ function buildMcpListToolsTool(): AgentTool {
           : '当前没有配置 MCP 服务。',
         data: {
           servers,
-          selectedServerIds: latestStore.selectedServerIds,
+          selectedServerIds,
         },
       }
     },
@@ -1461,6 +1619,9 @@ function buildTools(): AgentTool[] {
       ),
     }),
     buildMcpListToolsTool(),
+    buildMcpListResourcesTool(),
+    buildMcpListResourceTemplatesTool(),
+    buildMcpReadResourceTool(),
     buildMcpCallTool(),
   ]
 }

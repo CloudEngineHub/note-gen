@@ -1,16 +1,23 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
-use tauri::State;
+use tauri::{Emitter, State};
+use tokio::sync::oneshot;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
 /// MCP 服务器进程管理器
 pub struct McpServerManager {
-    processes: Mutex<HashMap<String, Arc<Mutex<Child>>>>,
+    processes: Mutex<HashMap<String, Arc<McpProcess>>>,
+}
+
+struct McpProcess {
+    child: Arc<Mutex<Child>>,
+    stdin: Arc<Mutex<ChildStdin>>,
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<Result<String, String>>>>>,
 }
 
 impl McpServerManager {
@@ -25,8 +32,17 @@ fn encode_mcp_message(message: &str) -> Vec<u8> {
     format!("{}\n", message).into_bytes()
 }
 
-fn read_mcp_message<R: Read>(reader: &mut R) -> Result<String, String> {
-    let mut reader = BufReader::new(reader);
+fn mcp_message_id(message: &str) -> Result<Option<String>, String> {
+    let value = serde_json::from_str::<serde_json::Value>(message)
+        .map_err(|e| format!("Invalid MCP JSON: {}", e))?;
+    Ok(value.get("id").map(|id| {
+        id.as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| id.to_string())
+    }))
+}
+
+fn read_mcp_message<R: BufRead>(reader: &mut R) -> Result<String, String> {
     let mut first_line = String::new();
     let bytes_read = reader
         .read_line(&mut first_line)
@@ -193,13 +209,14 @@ pub async fn start_mcp_stdio_server(
     command: String,
     args: Vec<String>,
     env: HashMap<String, String>,
+    app: tauri::AppHandle,
     manager: State<'_, McpServerManager>,
 ) -> Result<String, String> {
     // 检查是否已经启动，如果已启动则先停止
     {
         let mut processes = manager.processes.lock().unwrap();
-        if let Some(old_child) = processes.remove(&server_id) {
-            if let Ok(mut old_child) = old_child.lock() {
+        if let Some(old_process) = processes.remove(&server_id) {
+            if let Ok(mut old_child) = old_process.child.lock() {
                 let _ = old_child.kill();
             }
         }
@@ -278,15 +295,69 @@ pub async fn start_mcp_stdio_server(
         cmd.creation_flags(CREATE_NO_WINDOW.0);
     }
 
-    let child = cmd
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
-    let child = child;
+    let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
+    let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
+    let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+    let pending = Arc::new(Mutex::new(HashMap::<
+        String,
+        oneshot::Sender<Result<String, String>>,
+    >::new()));
+    let process = Arc::new(McpProcess {
+        child: Arc::new(Mutex::new(child)),
+        stdin: Arc::new(Mutex::new(stdin)),
+        pending: pending.clone(),
+    });
+
+    let reader_server_id = server_id.clone();
+    let reader_app = app.clone();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            match read_mcp_message(&mut reader) {
+                Ok(message) => {
+                    let parsed = serde_json::from_str::<serde_json::Value>(&message);
+                    let request_id = mcp_message_id(&message).ok().flatten();
+                    if let Some(request_id) = request_id {
+                        if let Some(sender) = pending.lock().unwrap().remove(&request_id) {
+                            let _ = sender.send(Ok(message));
+                        }
+                    } else {
+                        let _ = reader_app.emit(
+                            "mcp://notification",
+                            serde_json::json!({ "serverId": &reader_server_id, "message": parsed.ok() }),
+                        );
+                    }
+                }
+                Err(error) => {
+                    let mut waiting = pending.lock().unwrap();
+                    for (_, sender) in waiting.drain() {
+                        let _ = sender.send(Err(error.clone()));
+                    }
+                    let _ = reader_app.emit(
+                        "mcp://closed",
+                        serde_json::json!({ "serverId": &reader_server_id, "error": error }),
+                    );
+                    break;
+                }
+            }
+        }
+    });
+
+    let stderr_server_id = server_id.clone();
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines().map_while(Result::ok) {
+            eprintln!("[MCP {}] {}", stderr_server_id, line);
+        }
+    });
 
     // 存储进程
     {
         let mut processes = manager.processes.lock().unwrap();
-        processes.insert(server_id.clone(), Arc::new(Mutex::new(child)));
+        processes.insert(server_id.clone(), process);
     }
 
     Ok(format!("Server {} started", server_id))
@@ -303,8 +374,8 @@ pub async fn stop_mcp_server(
         processes.remove(&server_id)
     };
 
-    if let Some(child) = child {
-        let mut child = child.lock().unwrap();
+    if let Some(process) = child {
+        let mut child = process.child.lock().unwrap();
         child
             .kill()
             .map_err(|e| format!("Failed to kill process: {}", e))?;
@@ -320,6 +391,7 @@ pub async fn stop_mcp_server(
 pub async fn send_mcp_message(
     server_id: String,
     message: String,
+    timeout_ms: Option<u64>,
     manager: State<'_, McpServerManager>,
 ) -> Result<String, String> {
     let child = {
@@ -327,12 +399,17 @@ pub async fn send_mcp_message(
         processes.get(&server_id).cloned()
     };
 
-    if let Some(child) = child {
-        let mut child = child.lock().unwrap();
-        // 获取 stdin 和 stdout
+    if let Some(process) = child {
+        let request_id = mcp_message_id(&message)?.ok_or("MCP request is missing an id")?;
+        let (sender, receiver) = oneshot::channel();
+        process
+            .pending
+            .lock()
+            .unwrap()
+            .insert(request_id.clone(), sender);
         let payload = encode_mcp_message(&message);
         {
-            let stdin = child.stdin.as_mut().ok_or("Failed to get stdin")?;
+            let mut stdin = process.stdin.lock().unwrap();
             stdin
                 .write_all(&payload)
                 .map_err(|e| format!("Failed to write framed MCP message: {}", e))?;
@@ -342,8 +419,41 @@ pub async fn send_mcp_message(
                 .map_err(|e| format!("Failed to flush stdin: {}", e))?;
         }
 
-        let stdout = child.stdout.as_mut().ok_or("Failed to get stdout")?;
-        read_mcp_message(stdout)
+        let timeout_ms = timeout_ms.unwrap_or(30_000);
+        match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), receiver).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err("MCP response channel closed".to_string()),
+            Err(_) => {
+                process.pending.lock().unwrap().remove(&request_id);
+                Err(format!("MCP request timed out after {}ms", timeout_ms))
+            }
+        }
+    } else {
+        Err(format!("Server {} not found", server_id))
+    }
+}
+
+/// 向 stdio MCP 服务器发送无需响应的 JSON-RPC notification。
+#[tauri::command]
+pub async fn send_mcp_notification(
+    server_id: String,
+    message: String,
+    manager: State<'_, McpServerManager>,
+) -> Result<(), String> {
+    let child = {
+        let processes = manager.processes.lock().unwrap();
+        processes.get(&server_id).cloned()
+    };
+
+    if let Some(process) = child {
+        let mut stdin = process.stdin.lock().unwrap();
+        stdin
+            .write_all(&encode_mcp_message(&message))
+            .map_err(|e| format!("Failed to write MCP notification: {}", e))?;
+        stdin
+            .flush()
+            .map_err(|e| format!("Failed to flush MCP notification: {}", e))?;
+        Ok(())
     } else {
         Err(format!("Server {} not found", server_id))
     }
@@ -351,7 +461,7 @@ pub async fn send_mcp_message(
 
 #[cfg(test)]
 mod tests {
-    use super::{encode_mcp_message, read_mcp_message};
+    use super::{encode_mcp_message, mcp_message_id, read_mcp_message};
     use std::io::Cursor;
 
     #[test]
@@ -360,6 +470,19 @@ mod tests {
         let encoded = encode_mcp_message(body);
 
         assert_eq!(encoded, format!("{}\n", body).into_bytes());
+    }
+
+    #[test]
+    fn extracts_numeric_response_id() {
+        let id = mcp_message_id(r#"{"jsonrpc":"2.0","id":42,"result":{}}"#).expect("valid JSON");
+        assert_eq!(id.as_deref(), Some("42"));
+    }
+
+    #[test]
+    fn leaves_notification_without_response_id() {
+        let id = mcp_message_id(r#"{"jsonrpc":"2.0","method":"notifications/tools/list_changed"}"#)
+            .expect("valid JSON");
+        assert_eq!(id, None);
     }
 
     #[test]

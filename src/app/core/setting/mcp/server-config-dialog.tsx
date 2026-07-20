@@ -62,6 +62,7 @@ export function ServerConfigDialog({
   const [url, setUrl] = useState('')
   const [headers, setHeaders] = useState('')
   const [enabled, setEnabled] = useState(true)
+  const [trustToolAnnotations, setTrustToolAnnotations] = useState(false)
   const [testing, setTesting] = useState(false)
   
   useEffect(() => {
@@ -84,6 +85,7 @@ export function ServerConfigDialog({
         setUrl(editingServer.url || '')
         setHeaders(JSON.stringify(editingServer.headers || {}, null, 2))
         setEnabled(editingServer.enabled ?? true)
+        setTrustToolAnnotations(editingServer.trustToolAnnotations === true)
       } else {
         resetForm()
       }
@@ -99,6 +101,7 @@ export function ServerConfigDialog({
     setUrl('')
     setHeaders('')
     setEnabled(true)
+    setTrustToolAnnotations(false)
   }
 
   const isUnsupportedMobileStdio = isActualMobile && type === 'stdio'
@@ -113,12 +116,15 @@ export function ServerConfigDialog({
     try {
       // 使用临时 ID 进行测试
       const config = buildConfig(true)
-      const success = await mcpServerManager.testConnection(config)
+      const result = await mcpServerManager.testConnectionDetailed(config)
       
-      if (success) {
+      if (result.success) {
         toast({ description: t('testSuccess') })
       } else {
-        toast({ description: t('testFailed'), variant: 'destructive' })
+        toast({
+          description: `${t('testFailed')}: ${result.error || t('testFailed')}`,
+          variant: 'destructive',
+        })
       }
     } catch (error) {
       toast({ description: t('testFailed') + ': ' + error, variant: 'destructive' })
@@ -134,6 +140,7 @@ export function ServerConfigDialog({
       name,
       type,
       enabled,
+      trustToolAnnotations,
       createdAt: editingServer?.createdAt || Date.now(),
     }
     
@@ -273,6 +280,14 @@ export function ServerConfigDialog({
                 />
               </div>
 
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label>{t('trustToolAnnotations')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('trustToolAnnotationsDesc')}</p>
+                </div>
+                <Switch checked={trustToolAnnotations} onCheckedChange={setTrustToolAnnotations} />
+              </div>
+
               {/* 服务器类型 */}
               <div className="space-y-2">
                 <Label htmlFor="type">{t('serverType')}</Label>
@@ -403,6 +418,14 @@ export function ServerConfigDialog({
                   checked={enabled}
                   onCheckedChange={setEnabled}
                 />
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label>{t('trustToolAnnotations')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('trustToolAnnotationsDesc')}</p>
+                </div>
+                <Switch checked={trustToolAnnotations} onCheckedChange={setTrustToolAnnotations} />
               </div>
 
               {/* 服务器类型 */}

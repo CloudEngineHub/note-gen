@@ -241,6 +241,8 @@
       "serverName": "Server Name",
       "serverNamePlaceholder": "e.g., File System Server",
       "serverEnabled": "Enable Server",
+      "trustToolAnnotations": "Trust tool permission hints",
+      "trustToolAnnotationsDesc": "Enable only for trusted servers. Read-only hints may skip approval; destructive calls still require it.",
       "serverEnabledDesc": "When enabled, this server will automatically connect and provide tools.",
       "serverType": "Server Type",
       "stdio": "Local Command",

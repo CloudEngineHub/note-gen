@@ -1,10 +1,12 @@
 import { MCPClient } from './client'
-import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
+import { listen } from '@tauri-apps/api/event'
 import { useMcpStore } from '@/stores/mcp'
 import type {
   MCPServerConfig,
   MCPTool,
   MCPResource,
+  MCPResourceTemplate,
+  MCPReadResourceResult,
   CallToolResult,
 } from './types'
 
@@ -16,6 +18,11 @@ interface MCPBatchTestResult {
     serverId: string
     success: boolean
   }>
+}
+
+export interface MCPConnectionTestResult {
+  success: boolean
+  error?: string
 }
 
 function sanitizeMcpError(error: unknown) {
@@ -33,6 +40,7 @@ function sanitizeMcpError(error: unknown) {
 export class MCPServerManager {
   private static instance: MCPServerManager
   private clients: Map<string, MCPClient> = new Map()
+  private eventSetup?: Promise<void>
   
   private constructor() {}
   
@@ -42,11 +50,47 @@ export class MCPServerManager {
     }
     return MCPServerManager.instance
   }
+
+  private ensureEventListeners(): Promise<void> {
+    if (this.eventSetup) return this.eventSetup
+    this.eventSetup = Promise.all([
+      listen<{ serverId: string; message?: { method?: string } }>('mcp://notification', event => {
+        if (event.payload.message?.method === 'notifications/tools/list_changed') {
+          void this.refreshServerTools(event.payload.serverId)
+        }
+      }),
+      listen<{ serverId: string; error?: string }>('mcp://closed', event => {
+        if (!this.clients.has(event.payload.serverId)) return
+        this.clients.delete(event.payload.serverId)
+        useMcpStore.getState().setServerState(event.payload.serverId, {
+          id: event.payload.serverId,
+          status: 'error',
+          tools: [],
+          resources: [],
+          error: event.payload.error || 'MCP connection closed',
+        })
+      }),
+    ]).then(() => undefined)
+    return this.eventSetup
+  }
+
+  private async refreshServerTools(serverId: string): Promise<void> {
+    const client = this.clients.get(serverId)
+    const state = useMcpStore.getState().getServerState(serverId)
+    if (!client || state?.status !== 'connected') return
+    try {
+      const tools = await client.listTools()
+      useMcpStore.getState().setServerState(serverId, { ...state, tools })
+    } catch (error) {
+      console.error(`Failed to refresh MCP tools for ${serverId}:`, sanitizeMcpError(error))
+    }
+  }
   
   /**
    * 连接到服务器
    */
   async connectServer(config: MCPServerConfig): Promise<void> {
+    await this.ensureEventListeners()
     const store = useMcpStore.getState()
 
     if (this.clients.has(config.id)) {
@@ -66,7 +110,7 @@ export class MCPServerManager {
       await client.connect()
       
       // 初始化并获取工具列表
-      await client.initialize()
+      const initialized = await client.initialize()
       const tools = await client.listTools()
       
       // 尝试获取资源列表（某些服务器可能不支持）
@@ -86,6 +130,9 @@ export class MCPServerManager {
         tools,
         resources,
         connectedAt: Date.now(),
+        protocolVersion: initialized.protocolVersion,
+        capabilities: initialized.capabilities,
+        instructions: initialized.instructions,
       })
       
       // 更新最后连接时间
@@ -111,8 +158,8 @@ export class MCPServerManager {
   async disconnectServer(serverId: string): Promise<void> {
     const client = this.clients.get(serverId)
     if (client) {
-      await client.disconnect()
       this.clients.delete(serverId)
+      await client.disconnect()
     }
     
     const store = useMcpStore.getState()
@@ -180,14 +227,15 @@ export class MCPServerManager {
   async callTool(
     serverId: string,
     toolName: string,
-    args: any = {}
+    args: Record<string, unknown> = {},
+    signal?: AbortSignal
   ): Promise<CallToolResult> {
     const client = this.clients.get(serverId)
     if (!client) {
       throw new Error(`Server ${serverId} is not connected`)
     }
     
-    return await client.callTool(toolName, args)
+    return await client.callTool(toolName, args, signal)
   }
   
   /**
@@ -202,7 +250,13 @@ export class MCPServerManager {
   /**
    * 读取资源
    */
-  async readResource(serverId: string, uri: string): Promise<string> {
+  async listResourceTemplates(serverId: string): Promise<MCPResourceTemplate[]> {
+    const client = this.clients.get(serverId)
+    if (!client) throw new Error(`Server ${serverId} is not connected`)
+    return await client.listResourceTemplates()
+  }
+
+  async readResource(serverId: string, uri: string): Promise<MCPReadResourceResult> {
     const client = this.clients.get(serverId)
     if (!client) {
       throw new Error(`Server ${serverId} is not connected`)
@@ -225,52 +279,33 @@ export class MCPServerManager {
    * 测试服务器连接
    * 注意：测试时不会更新 store 中的服务器状态
    */
-  async testConnection(config: MCPServerConfig): Promise<boolean> {
-    try {
-      if (config.type === 'http') {
-        // 对于 HTTP 服务器，简单测试 URL 是否可访问
-        if (!config.url) {
-          throw new Error('HTTP server URL is required')
-        }
-        
-        // 发送一个简单的 OPTIONS 请求来测试连接
-        await tauriFetch(config.url, {
-          method: 'OPTIONS',
-          headers: {
-            'Accept': 'application/json, text/event-stream',
-          },
-        })
-        
-        // 只要服务器响应了（即使是错误），就认为连接成功
-        return true
-      } else {
-        // 对于 stdio 服务器，需要实际启动和初始化
-        const testConfig: MCPServerConfig = {
-          ...config,
-          id: `mcp-test-${config.id}-${Date.now()}`,
-        }
-        const client = new MCPClient(testConfig)
-        try {
-          await client.connect()
-          await client.initialize()
-          // 测试完成后立即断开连接并清理
-          await client.disconnect()
-          return true
-        } catch (error) {
-          console.error('测试连接失败:', error)
-          // 确保清理临时客户端
-          try {
-            await client.disconnect()
-          } catch {
-            // 静默处理清理错误
-          }
-          throw error
-        }
-      }
-    } catch {
-      // 静默处理测试失败
-      return false
+  async testConnectionDetailed(config: MCPServerConfig): Promise<MCPConnectionTestResult> {
+    const testConfig: MCPServerConfig = {
+      ...config,
+      id: `mcp-test-${config.id}-${Date.now()}`,
     }
+    const client = new MCPClient(testConfig)
+    try {
+      await client.connect()
+      const initialized = await client.initialize()
+      if (initialized.capabilities.tools) await client.listTools()
+      if (initialized.capabilities.resources) await client.listResources()
+      return { success: true }
+    } catch (error) {
+      const sanitizedError = sanitizeMcpError(error)
+      console.error('MCP connection test failed:', sanitizedError)
+      return { success: false, error: sanitizedError }
+    } finally {
+      try {
+        await client.disconnect()
+      } catch {
+        // The connection may have failed before a transport was created.
+      }
+    }
+  }
+
+  async testConnection(config: MCPServerConfig): Promise<boolean> {
+    return (await this.testConnectionDetailed(config)).success
   }
 
   async testConnections(configs: MCPServerConfig[]): Promise<MCPBatchTestResult> {

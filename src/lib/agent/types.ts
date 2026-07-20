@@ -7,16 +7,37 @@ export interface JsonObject {
 }
 
 export interface JsonSchema {
+  $schema?: string
+  $ref?: string
+  $defs?: Record<string, JsonSchema>
   type?: string | string[]
   description?: string
   enum?: JsonPrimitive[]
   const?: JsonPrimitive
   oneOf?: JsonSchema[]
+  anyOf?: JsonSchema[]
+  allOf?: JsonSchema[]
   properties?: Record<string, JsonSchema>
   required?: string[]
   items?: JsonSchema
   additionalProperties?: boolean | JsonSchema
   default?: JsonValue
+  [key: string]: unknown
+}
+
+export interface AgentMcpToolMetadata {
+  serverId: string
+  serverName: string
+  toolName: string
+  annotations?: {
+    title?: string
+    readOnlyHint?: boolean
+    destructiveHint?: boolean
+    idempotentHint?: boolean
+    openWorldHint?: boolean
+  }
+  trustToolAnnotations: boolean
+  deferred?: boolean
 }
 
 export type AgentToolCategory =
@@ -122,6 +143,7 @@ export interface AgentTool {
     context: AgentToolExecutionContext
   ) => Promise<AgentToolResult>
   legacyName?: string
+  mcp?: AgentMcpToolMetadata
 }
 
 export type AgentRunStatus =
@@ -190,6 +212,7 @@ export interface AgentRuntimeInput {
   currentEditorState?: AgentEditorStateSnapshot
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
+  selectedMcpServerIds?: string[]
   permissionMode?: AgentPermissionMode
 }
 

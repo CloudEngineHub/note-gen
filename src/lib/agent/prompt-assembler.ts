@@ -1,4 +1,4 @@
-import { getSelectedServerTools } from '@/lib/mcp/tools'
+import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 import type { AgentContextSnapshot, AgentTool } from './types'
 import { estimateTokens } from '@/lib/ai/token-counter'
@@ -60,18 +60,18 @@ function formatSkills(context: AgentContextSnapshot) {
   ].join('\n')
 }
 
-function formatMcpCatalog() {
+function formatMcpCatalog(context: AgentContextSnapshot) {
   try {
-    const selectedTools = getSelectedServerTools()
-    if (selectedTools.length === 0) {
+    const catalog = buildMcpAgentToolCatalog(context.selectedMcpServerIds)
+    if (catalog.deferredEntries.length === 0) {
       return ''
     }
 
     return [
-      '## MCP Tools',
-      'Use mcp_call_tool with serverId, toolName, and args when an external MCP capability is needed.',
-      ...selectedTools.map(({ serverId, serverName, tool }) =>
-        `- ${serverId}/${tool.name} (${serverName}): ${tool.description || tool.name}`
+      '## Deferred MCP Tools',
+      'Use mcp_call_tool only for these selected MCP tools that could not be registered directly because of schema or context limits.',
+      ...catalog.deferredEntries.map(({ server, tool, deferredReason }) =>
+        `- ${server.id}/${tool.name} (${server.name}, reason=${deferredReason}): ${tool.description || tool.name}`
       ),
     ].join('\n')
   } catch {
@@ -176,7 +176,7 @@ export class AgentPromptAssembler {
       formatEditorSelection(context),
       formatQuote(context),
       formatSkills(context),
-      formatMcpCatalog(),
+      formatMcpCatalog(context),
     ].filter((section) => section.trim().length > 0)
 
     return sections.join('\n\n')

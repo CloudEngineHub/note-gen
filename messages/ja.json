@@ -239,6 +239,8 @@
       "serverName": "サーバー名",
       "serverNamePlaceholder": "例：ファイルシステムサーバー",
       "serverEnabled": "サーバーを有効にする",
+      "trustToolAnnotations": "ツールの権限ヒントを信頼",
+      "trustToolAnnotationsDesc": "信頼できるサーバーでのみ有効にしてください。読み取り専用ヒントでは確認を省略できますが、破壊的操作は確認されます。",
       "serverEnabledDesc": "有効にすると、このサーバーは自動的に接続してツールを提供します。",
       "serverType": "サーバータイプ",
       "stdio": "ローカルコマンド",

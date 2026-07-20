@@ -127,7 +127,8 @@ export function validateToolArgs(tool: MCPTool, args: any): {
  */
 export function formatToolResult(result: CallToolResult): string {
   if (result.isError) {
-    return `❌ Error: ${result.content[0]?.text || 'Unknown error'}`
+    const errorText = result.content.find(content => content.type === 'text')?.text
+    return `❌ Error: ${errorText || 'Unknown error'}`
   }
   
   const textContent = result.content
