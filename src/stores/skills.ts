@@ -143,7 +143,17 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   refreshSkills: async () => {
     await skillManager.reload()
 
+    const store = await Store.load('store.json')
+    const enabledSkills = await store.get<Record<string, boolean>>('skills.enabledSkills') || {}
     const allSkills = skillManager.getAllSkills()
+
+    allSkills.forEach((skill) => {
+      const enabled = enabledSkills[skill.metadata.id]
+      if (enabled !== undefined) {
+        skill.metadata.enabled = enabled
+      }
+    })
+
     const globalSkills = skillManager.getSkillsByScope('global')
     const projectSkills = skillManager.getSkillsByScope('project')
 

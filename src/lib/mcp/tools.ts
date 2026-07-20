@@ -14,7 +14,7 @@ export function getSelectedServerTools(): Array<{
   const result: Array<{ serverId: string; serverName: string; tool: MCPTool }> = []
   
   for (const server of store.servers) {
-    if (store.selectedServerIds.includes(server.id)) {
+    if (server.enabled && store.selectedServerIds.includes(server.id)) {
       const tools = mcpServerManager.getServerTools(server.id)
       for (const tool of tools) {
         result.push({
@@ -151,4 +151,3 @@ export function toolToOpenAIFunction(tool: MCPTool) {
     },
   }
 }
-

@@ -17,10 +17,10 @@ export default function McpSettingPage() {
   useEffect(() => {
     initMcpData()
   }, [initMcpData])
-  
+
   return (
     <SettingType id="mcp" title={t('title')} desc={t('desc')} icon={<Puzzle />}>
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4">
         {!isMobile && <RuntimeEnvironmentCard />}
         <ServerList />
       </div>

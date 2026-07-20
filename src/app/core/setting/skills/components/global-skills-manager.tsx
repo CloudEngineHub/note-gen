@@ -3,12 +3,22 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Upload, Loader2, Info } from 'lucide-react'
+import { Sparkles, Upload } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
+import { ItemGroup } from '@/components/ui/item'
 import { useSkillsStore } from '@/stores/skills'
 import { SkillCard } from './skill-card'
 import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import { useToast } from '@/hooks/use-toast'
+import { SettingSection } from '../../components/setting-base'
 
 export function GlobalSkillsManager() {
   const t = useTranslations('settings.skills')
@@ -58,47 +68,39 @@ export function GlobalSkillsManager() {
   }
 
   return (
-    <div className="global-skills-manager">
-      {/* 操作栏 */}
-      <div className="flex max-md:flex-col max-md:items-start max-md:gap-4 justify-between items-center mb-4">
-        <div>
-          <h3 className="text-lg font-semibold">
-            {t('installedGlobalSkills')} ({globalSkills.length})
-          </h3>
-          {/* 导入说明 */}
-          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-            <Info className="size-4" />
-            <p>{t('importHelp')}</p>
-          </div>
-        </div>
+    <SettingSection
+      title={`${t('installedGlobalSkills')} (${globalSkills.length})`}
+      desc={t('importHelp')}
+      actions={(
         <Button variant="outline" size="sm" onClick={handleImport} disabled={isImporting}>
           {isImporting ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Spinner data-icon="inline-start" />
           ) : (
-            <Upload className="size-4" />
+            <Upload data-icon="inline-start" />
           )}
           {isImporting ? t('importing') : t('importSkill')}
         </Button>
-      </div>
-
-      {/* Skills 列表 */}
-      <div className="space-y-2">
-        {globalSkills.map((skill) => (
-          <SkillCard
-            key={skill.id}
-            skill={skill}
-            onRefresh={refreshSkills}
-          />
-        ))}
-
-        {globalSkills.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <Sparkles className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>{t('noSkillsGlobal')}</p>
-            <p className="text-sm">{t('noSkillsGlobalDesc')}</p>
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    >
+      {globalSkills.length > 0 ? (
+        <ItemGroup className="gap-2">
+          {globalSkills.map((skill) => (
+            <SkillCard
+              key={skill.id}
+              skill={skill}
+              onRefresh={refreshSkills}
+            />
+          ))}
+        </ItemGroup>
+      ) : (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><Sparkles /></EmptyMedia>
+            <EmptyTitle>{t('noSkillsGlobal')}</EmptyTitle>
+            <EmptyDescription>{t('noSkillsGlobalDesc')}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+    </SettingSection>
   )
 }

@@ -3,13 +3,23 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Sparkles, Trash, Loader2, Edit2 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Sparkles, Trash, Edit2 } from 'lucide-react'
 import { useSkillsStore } from '@/stores/skills'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { inspectSkillPython, type SkillPythonStatus } from '@/lib/skills/runtime'
 import { SkillMetadata } from '@/lib/skills/types'
+import { Spinner } from '@/components/ui/spinner'
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemMedia,
+  ItemTitle,
+} from '@/components/ui/item'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +40,7 @@ interface SkillCardProps {
 export function SkillCard({ skill, onRefresh }: SkillCardProps) {
   const t = useTranslations('settings.skills')
   const tc = useTranslations('common')
-  const { getSkill, updateSkillInstructions, deleteSkill } = useSkillsStore()
+  const { getSkill, toggleSkill, updateSkillInstructions, deleteSkill } = useSkillsStore()
 
   const [instructions, setInstructions] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -116,53 +126,18 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" />
-            <CardTitle className="text-lg">{skill.name}</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={handleToggleEdit}
-            >
-              <Edit2 className="size-4" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-                  <Trash className="size-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t('deleteSkillTitle')}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t('deleteSkillDesc')}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>
-                    {tc('delete')}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground mt-2 truncate">
-          {skill.description}
-        </p>
+    <Item variant="outline">
+      <ItemMedia variant="icon" className="text-muted-foreground">
+        <Sparkles />
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle>{skill.name}</ItemTitle>
+        {skill.description ? <ItemDescription>{skill.description}</ItemDescription> : null}
         {hasPythonScripts && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{t('pythonRuntime')}:</span>
             {!pythonStatus ? (
-              <Loader2 className="size-3 animate-spin" />
+              <Spinner />
             ) : pythonStatus.available ? (
               <Badge variant="secondary">
                 Python {pythonStatus.version} · {pythonStatus.managed ? t('isolatedRuntime') : t('systemRuntime')}
@@ -172,40 +147,73 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
             )}
           </div>
         )}
-      </CardHeader>
-      <CardContent>
-        {/* 指令编辑器 - 只在编辑模式下显示 */}
-        {skillContent && isEditing && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {t('instructions')}:
-              </p>
-              <div className="flex items-center gap-2">
-                {hasChanges && (
+      </ItemContent>
+      <ItemActions>
+        <Switch
+          checked={skill.enabled !== false}
+          onCheckedChange={() => toggleSkill(skill.id)}
+          aria-label={`${t('enable')}: ${skill.name}`}
+        />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('editSkill')}
+          onClick={handleToggleEdit}
+        >
+          <Edit2 />
+        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="icon-sm" aria-label={t('deleteSkill')}>
+              <Trash />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('deleteSkillTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('deleteSkillDesc')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{tc('cancel')}</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={handleDelete}>
+                {tc('delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </ItemActions>
+      {skillContent && isEditing && (
+        <ItemFooter className="flex-col items-stretch gap-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {t('instructions')}:
+            </p>
+            <div className="flex items-center gap-2">
+              {hasChanges && (
+                <span className="text-xs text-muted-foreground">
+                  {tc('unsaved')}
+                </span>
+              )}
+              {isSaving && (
+                <div className="flex items-center gap-1">
+                  <Spinner />
                   <span className="text-xs text-muted-foreground">
-                    {tc('unsaved')}
+                    {tc('saving')}
                   </span>
-                )}
-                {isSaving && (
-                  <div className="flex items-center gap-1">
-                    <Loader2 className="size-3 animate-spin" />
-                    <span className="text-xs text-muted-foreground">
-                      {tc('saving')}
-                    </span>
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-            <Textarea
-              value={instructions}
-              onChange={(e) => handleInstructionsChange(e.target.value)}
-              className="min-h-40 max-h-96 font-mono text-sm resize-y"
-              placeholder={t('instructionsPlaceholder')}
-            />
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <Textarea
+            value={instructions}
+            onChange={(e) => handleInstructionsChange(e.target.value)}
+            className="min-h-40 max-h-96 resize-y font-mono text-sm"
+            placeholder={t('instructionsPlaceholder')}
+          />
+        </ItemFooter>
+      )}
+    </Item>
   )
 }

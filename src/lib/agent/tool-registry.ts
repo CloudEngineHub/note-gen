@@ -909,6 +909,13 @@ function buildSkillLoadTool(): AgentTool {
           error: 'SKILL_NOT_FOUND',
         }
       }
+      if (skill.metadata.enabled === false) {
+        return {
+          ok: false,
+          message: `Skill is disabled: ${skillId}`,
+          error: 'SKILL_DISABLED',
+        }
+      }
 
       const resources = [
         { path: 'SKILL.md', uri: `skill://${skillId}/SKILL.md`, type: 'instructions', readable: true, executable: false },

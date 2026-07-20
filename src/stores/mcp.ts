@@ -40,7 +40,7 @@ export const useMcpStore = create<MCPState>((set, get) => ({
   serverStates: new Map(),
   selectedServerIds: [],
   initialized: false,
-  
+
   addServer: async (server: MCPServerConfig) => {
     const store = await Store.load('store.json')
     const servers = [...get().servers, server]

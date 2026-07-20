@@ -603,12 +603,12 @@ class SkillManager {
   }
 
   /**
-   * 获取所有已加载的 Skills（移除启用/禁用判断，直接返回所有）
+   * 获取所有已启用的 Skills
    */
   async getEnabledSkills(): Promise<SkillContent[]> {
-    // 直接返回所有已加载的 Skills，不进行启用/禁用过滤
-    const allSkills = this.getAllSkills()
-    return allSkills
+    return this.getAllSkills().filter(
+      (skill) => skill.metadata.enabled !== false
+    )
   }
 
   /**
@@ -616,7 +616,7 @@ class SkillManager {
    */
   getUserInvocableSkills(): SkillContent[] {
     return this.getAllSkills().filter(
-      (skill) => skill.metadata.userInvocable !== false
+      (skill) => skill.metadata.enabled !== false && skill.metadata.userInvocable !== false
     )
   }
 
