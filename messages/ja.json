@@ -617,6 +617,16 @@
       "ignoredVersionDesc": "このバージョンの更新通知は再表示されません。通知を復元してインストールを続行できます。",
       "restoreIgnoredVersion": "通知を復元",
       "restoreIgnoredVersionSuccess": "このバージョンの更新通知を復元しました",
+      "mobileUpdateTitle": "新しいバージョンがあります",
+      "mobileUpdateDescription": "現在の v{currentVersion} から v{latestVersion} に更新できます。",
+      "androidUpdateHint": "Android はまだアプリ内インストールに対応していません。公式サイトから最新版をダウンロードしてください。",
+      "iosUpdateHint": "iOS の更新は現在 TestFlight で配布しています。",
+      "openDownloadPage": "ダウンロードページを開く",
+      "openTestFlight": "TestFlight を開く",
+      "viewUpdateDetails": "更新内容",
+      "updateDetailsTitle": "v{version} の更新内容",
+      "later": "後で",
+      "close": "閉じる",
       "sections": {
         "appInfo": {
           "title": "アプリ情報",

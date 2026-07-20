@@ -20,6 +20,7 @@ import { MobileMeActivityDrawer } from './mobile-me-activity-drawer'
 import { buildActivityDaySummaryText, buildProfileCardData, getBackupMethodStatus, getBackupProviderName, getCurrentActivityStreak, getCurrentWeekActivityCount } from './mobile-me-helpers'
 import { MobileMeProfileCard } from './mobile-me-profile-card'
 import { SettingTab } from './setting-tab'
+import { MobileUpdateSettings } from './mobile-update-settings'
 
 const MOBILE_HEATMAP_WEEKS = 16
 const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
@@ -374,6 +375,8 @@ export function MobileMePage() {
       }}
     >
       <div className="flex-1 space-y-4 px-3 py-4">
+        <MobileUpdateSettings />
+
         <MobileMeProfileCard
           name={profileCardName}
           subtitle={profileCardSubtitle}

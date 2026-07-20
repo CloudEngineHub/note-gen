@@ -32,6 +32,7 @@ import { ControlTodo } from "@/app/core/main/mark/control-todo"
 import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
 import useArticleStore from "@/stores/article"
 import { WritingScreen } from "./writing/writing-screen"
+import { MobileUpdateChecker } from "./components/mobile-update-prompt"
 
 export default function RootLayout({
   children,
@@ -162,6 +163,7 @@ export default function RootLayout({
         </TooltipProvider>
         <SyncConfirmDialog />
         <AutoDataSyncConflictDialog />
+        <MobileUpdateChecker />
       </TextSizeProvider>
     </ThemeProvider>
   );

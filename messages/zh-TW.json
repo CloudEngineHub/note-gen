@@ -617,6 +617,16 @@
       "ignoredVersionDesc": "此版本不會再提示更新，你可以恢復提示並繼續安裝。",
       "restoreIgnoredVersion": "恢復提示",
       "restoreIgnoredVersionSuccess": "已恢復此版本更新提示",
+      "mobileUpdateTitle": "發現新版本",
+      "mobileUpdateDescription": "目前版本 v{currentVersion}，可升級至 v{latestVersion}。",
+      "androidUpdateHint": "Android 暫不支援應用程式內安裝，請前往官網下載新版安裝包。",
+      "iosUpdateHint": "iOS 暫時透過 TestFlight 提供更新。",
+      "openDownloadPage": "前往官網升級",
+      "openTestFlight": "前往 TestFlight",
+      "viewUpdateDetails": "更新內容",
+      "updateDetailsTitle": "v{version} 更新內容",
+      "later": "稍後",
+      "close": "關閉",
       "sections": {
         "appInfo": {
           "title": "應用資訊",

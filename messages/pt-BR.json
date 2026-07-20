@@ -476,6 +476,16 @@
       "ignoredVersionDesc": "Esta versão não avisará novamente. Você pode restaurar o aviso e continuar a instalação.",
       "restoreIgnoredVersion": "Restaurar aviso",
       "restoreIgnoredVersionSuccess": "O aviso de atualização desta versão foi restaurado",
+      "mobileUpdateTitle": "Nova versão disponível",
+      "mobileUpdateDescription": "A versão v{currentVersion} pode ser atualizada para v{latestVersion}.",
+      "androidUpdateHint": "A instalação no aplicativo ainda não está disponível no Android. Baixe a versão mais recente no site oficial.",
+      "iosUpdateHint": "As atualizações do iOS são distribuídas pelo TestFlight no momento.",
+      "openDownloadPage": "Abrir página de download",
+      "openTestFlight": "Abrir TestFlight",
+      "viewUpdateDetails": "Novidades",
+      "updateDetailsTitle": "Novidades da v{version}",
+      "later": "Mais tarde",
+      "close": "Fechar",
       "sections": {
         "appInfo": {
           "title": "Informações do app",

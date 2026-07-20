@@ -539,6 +539,16 @@
       "ignoredVersionDesc": "This version will not prompt again. You can restore the prompt and continue installing it.",
       "restoreIgnoredVersion": "Restore prompt",
       "restoreIgnoredVersionSuccess": "This version update prompt has been restored",
+      "mobileUpdateTitle": "New version available",
+      "mobileUpdateDescription": "Version v{currentVersion} can be updated to v{latestVersion}.",
+      "androidUpdateHint": "In-app installation is not available on Android yet. Download the latest installer from the official website.",
+      "iosUpdateHint": "iOS updates are currently distributed through TestFlight.",
+      "openDownloadPage": "Open download page",
+      "openTestFlight": "Open TestFlight",
+      "viewUpdateDetails": "What's new",
+      "updateDetailsTitle": "What's new in v{version}",
+      "later": "Later",
+      "close": "Close",
       "sections": {
         "appInfo": {
           "title": "App information",

@@ -29,6 +29,7 @@ import {
 } from '@/lib/sync/auto-data-sync-queue'
 import useRecordingStore from "@/stores/recording"
 import emitter from "@/lib/emitter"
+import useUpdateStore from "@/stores/update"
 
 type MobileSyncIndicator = 'none' | 'syncing' | 'warning' | 'attention'
 
@@ -129,6 +130,7 @@ export function AppFootbar() {
   const [autoDataSyncState, setAutoDataSyncState] = useState<AutoDataSyncState>(getAutoDataSyncState())
   const organizeRef = useRef<{ openOrganize: () => void }>(null)
   const { isRecording, recordingDuration } = useRecordingStore()
+  const hasMobileUpdate = useUpdateStore((state) => Boolean(state.mobileUpdate))
   const { 
     githubUsername,
     accessToken,
@@ -163,6 +165,7 @@ export function AppFootbar() {
   const hasGiteaAccount = Boolean(giteaAccessToken)
   const showAvatar = hasGithubAccount || hasGiteeAccount || hasGitlabAccount || hasGiteaAccount
   const syncIndicator = getMobileSyncIndicator(autoDataSyncEnabled, autoDataSyncState)
+  const settingIndicator: MobileSyncIndicator = hasMobileUpdate ? 'attention' : syncIndicator
 
   // 获取当前主要备份方式的用户信息
   async function handleGetUserInfo() {
@@ -283,7 +286,7 @@ export function AppFootbar() {
       url: "/mobile/setting",
       icon: Settings,
       iconElement: showAvatar && avatarUrl ? <ProfileAvatarIcon avatarUrl={avatarUrl} /> : undefined,
-      indicator: <SyncIndicator indicator={syncIndicator} />,
+      indicator: <SyncIndicator indicator={settingIndicator} />,
     },
   ]
 
