@@ -15,6 +15,7 @@ mod keywords;
 mod mcp;
 mod mcp_runtime;
 mod ocr_packages;
+mod printing;
 mod screenshot;
 mod skill_runtime;
 mod skills;
@@ -107,6 +108,7 @@ fn main() {
             update_tray_record_toolbar_config,
             list_ocr_providers,
             run_ocr_provider,
+            printing::print_webview,
             file_open::drain_pending_open_files,
         ])
         // 应用设置 - 在所有插件和命令注册后

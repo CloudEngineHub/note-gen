@@ -27,8 +27,8 @@ export function ExportButton({ editor }: ExportButtonProps) {
 
   const showPdfExportStart = useCallback(() => {
     toast({
-      title: '正在导出 PDF',
-      description: '长篇文档可能需要一些时间，请稍候。',
+      title: '正在准备 PDF',
+      description: '请在系统打印窗口中选择“另存为 PDF”。',
     })
   }, [])
 
@@ -42,16 +42,14 @@ export function ExportButton({ editor }: ExportButtonProps) {
         {
           baseName: getMarkdownExportBaseName(activeFilePath),
           markdown: () => editor.getMarkdown(),
-          html: () => editor.getHTML(),
           json: () => editor.getJSON(),
-          pdfElement: () => document.querySelector('.tiptap') || document.querySelector('.ProseMirror'),
           sourcePath: activeFilePath,
         },
         { onPdfRenderStart: showPdfExportStart },
       )
 
       if (exported) {
-        toast({ title: format === 'pdf' ? 'PDF 导出成功' : '导出成功' })
+        toast({ title: format === 'pdf' ? '已打开 PDF 打印窗口' : '导出成功' })
       }
     } catch (error) {
       console.error(`${format} export failed:`, error)

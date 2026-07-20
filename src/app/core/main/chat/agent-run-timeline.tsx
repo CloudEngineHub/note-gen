@@ -10,22 +10,18 @@ import {
   Sparkles,
   Wrench,
 } from "lucide-react"
-import type { AgentChange, AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
+import type { AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
-import { AgentChangesPanel } from "./agent-changes-panel"
 import { AgentContextTray, type RagSourceDetail } from "./agent-context-tray"
 import { agentStatusText, formatAgentDuration, formatAgentToolName } from "./agent-display-utils"
 import { estimateTokens } from "@/lib/ai/token-counter"
-import ChatPreview from "./chat-preview"
 
 interface AgentRunTimelineProps {
   status?: AgentRunStatus
   isRunning?: boolean
   traceEvents?: AgentTraceEvent[]
   toolCalls?: ToolCall[]
-  changes?: AgentChange[]
-  showChanges?: boolean
   ragSources?: string[]
   ragSourceDetails?: RagSourceDetail[]
   loadedSkills?: AgentSkillSummary[]
@@ -279,8 +275,6 @@ export function AgentRunTimeline({
   isRunning = false,
   traceEvents = [],
   toolCalls = [],
-  changes = [],
-  showChanges = true,
   ragSources = [],
   ragSourceDetails = [],
   loadedSkills = [],
@@ -319,7 +313,7 @@ export function AgentRunTimeline({
     )
   }
 
-  if (!isRunning && events.length === 0 && ragSources.length === 0 && changes.length === 0 && loadedSkills.length === 0) {
+  if (!isRunning && events.length === 0 && ragSources.length === 0 && loadedSkills.length === 0) {
     return null
   }
 
@@ -425,12 +419,6 @@ export function AgentRunTimeline({
                   </div>
                 )}
 
-                {modelResponseContent && isRunning && (
-                  <div className="pb-2 text-sm">
-                    <ChatPreview text={modelResponseContent} />
-                  </div>
-                )}
-
                 {expanded && hasTraceDetails && (
                   <div className="flex flex-col gap-2 pb-2 pl-6 text-xs">
                     {visibleMessage && (
@@ -468,7 +456,6 @@ export function AgentRunTimeline({
         </Marker>
       )}
 
-      {showChanges && !isRunning && <AgentChangesPanel changes={changes} />}
     </div>
   )
 

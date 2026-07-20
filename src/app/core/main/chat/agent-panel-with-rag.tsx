@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl"
 import { useState } from "react"
 import useArticleStore from "@/stores/article"
 import { AgentRunTimeline } from "./agent-run-timeline"
-import type { AgentChange, AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
+import type { AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } from "@/lib/agent/types"
 
 interface RagSourceDetail {
   filepath: string
@@ -21,7 +21,6 @@ interface AgentPanelWithRagProps {
 
   // Agent 历史模式
   agentHistoryJson?: string
-  showChanges?: boolean
 
   // Agent 实时模式（如果需要）
   isRunning?: boolean
@@ -74,7 +73,6 @@ interface StructuredAgentHistory {
   runId?: string
   status?: AgentRunStatus
   traceEvents?: AgentTraceEvent[]
-  changes?: AgentChange[]
   toolCalls?: ToolCall[]
   loadedSkills?: AgentSkillSummary[]
 }
@@ -86,7 +84,6 @@ export function AgentPanelWithRag({
   ragSources = [],
   ragSourceDetails = [],
   agentHistoryJson,
-  showChanges = true,
   isRunning = false,
   isThinking = false,
   currentThought = "",
@@ -122,8 +119,7 @@ export function AgentPanelWithRag({
   const hasStructuredHistory = Boolean(
     structuredHistory?.runId ||
     structuredHistory?.status ||
-    structuredHistory?.traceEvents?.length ||
-    structuredHistory?.changes?.length
+    structuredHistory?.traceEvents?.length
   )
 
   // 创建文件名到详情的映射
@@ -166,8 +162,6 @@ export function AgentPanelWithRag({
         isRunning={false}
         traceEvents={structuredHistory?.traceEvents || []}
         toolCalls={structuredHistory?.toolCalls || []}
-        changes={structuredHistory?.changes || []}
-        showChanges={showChanges}
         ragSources={ragSources}
         ragSourceDetails={ragSourceDetails}
         loadedSkills={structuredHistory?.loadedSkills || []}

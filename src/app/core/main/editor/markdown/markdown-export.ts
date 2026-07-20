@@ -1,28 +1,20 @@
 'use client'
 
 import { save } from '@tauri-apps/plugin-dialog'
-import { readTextFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
-import { MarkdownManager } from '@tiptap/markdown'
+import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import type { JSONContent } from '@tiptap/core'
-import StarterKit from '@tiptap/starter-kit'
-import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import MarkdownIt from 'markdown-it'
-import katex from '@traptitech/markdown-it-katex'
-import hljs from 'highlight.js/lib/core'
-import javascript from 'highlight.js/lib/languages/javascript'
-import typescript from 'highlight.js/lib/languages/typescript'
-import bash from 'highlight.js/lib/languages/bash'
-import jsonLanguage from 'highlight.js/lib/languages/json'
-import xml from 'highlight.js/lib/languages/xml'
-import css from 'highlight.js/lib/languages/css'
-import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
+import TaskList from '@tiptap/extension-task-list'
+import { MarkdownManager } from '@tiptap/markdown'
+import StarterKit from '@tiptap/starter-kit'
+import { createElement } from 'react'
+import { flushSync } from 'react-dom'
+import { createRoot } from 'react-dom/client'
+import { StreamdownRenderer } from '@/components/markdown/streamdown-renderer'
 import { checkIsTauri } from '@/lib/check'
-import { getFilePathOptions } from '@/lib/workspace'
-import { convertImageByWorkspace } from '@/lib/utils'
-import { normalizeLatexForKatex } from '@/lib/latex'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
+import { convertImageByWorkspace } from '@/lib/utils'
+import { getFilePathOptions } from '@/lib/workspace'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 
 export type MarkdownExportFormat = 'markdown' | 'html' | 'json' | 'pdf'
@@ -30,9 +22,7 @@ export type MarkdownExportFormat = 'markdown' | 'html' | 'json' | 'pdf'
 export interface MarkdownExportSource {
   baseName: string
   markdown: string | (() => string | Promise<string>)
-  html?: string | (() => string | Promise<string>)
   json?: JSONContent | (() => JSONContent | Promise<JSONContent>)
-  pdfElement?: Element | null | (() => Element | null)
   sourcePath?: string
 }
 
@@ -40,210 +30,152 @@ export interface MarkdownExportOptions {
   onPdfRenderStart?: () => void
 }
 
-const UNSUPPORTED_COLOR_FUNCTION_PATTERN = /\b(?:oklab|oklch|color-mix)\(/i
 const IMAGE_LOAD_TIMEOUT_MS = 5000
-const PDF_RENDER_TIMEOUT_MS = 30000
+const PRINT_FRAME_CLEANUP_DELAY_MS = 60000
+const PRINT_EXPORT_STORE = 'print-export.json'
+const PRINT_WINDOW_START_TIMEOUT_MS = 15000
+const DIRECT_PDF_EXPORT_TIMEOUT_MS = 75000
+const CSS_URL_PATTERN = /url\(\s*(['"]?)([^'"\)]+)\1\s*\)/g
 
-const PDF_EXPORT_STYLES = `
+interface TauriPrintDocument {
+  html: string
+  outputPath?: string
+  completionEvent?: string
+}
+
+const EXPORT_DOCUMENT_STYLES = `
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
   html,
   body {
+    width: auto !important;
+    height: auto !important;
+    min-height: 100% !important;
     margin: 0;
     padding: 0;
-    background: #ffffff;
-    color: #333333;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 12px;
-    line-height: 1.6;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #24292f !important;
   }
 
-  #pdf-export-root {
-    box-sizing: border-box;
-    width: 595px;
-    padding: 40px;
-    background: #ffffff;
-    color: #333333;
+  body.notegen-export {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    font-size: 15px;
+    line-height: 1.65;
   }
 
-  #pdf-export-root * {
-    box-sizing: border-box;
+  .notegen-export .streamdown-document {
+    color: #24292f !important;
   }
 
-  #pdf-export-root h1,
-  #pdf-export-root h2,
-  #pdf-export-root h3,
-  #pdf-export-root h4,
-  #pdf-export-root h5,
-  #pdf-export-root h6 {
-    margin: 1.2em 0 0.55em;
-    color: #111827;
-    line-height: 1.25;
-    font-weight: 700;
+  .notegen-export h1,
+  .notegen-export h2,
+  .notegen-export h3,
+  .notegen-export h4,
+  .notegen-export h5,
+  .notegen-export h6 {
+    break-after: avoid-page;
+    color: #111827 !important;
   }
 
-  #pdf-export-root h1 { font-size: 28px; }
-  #pdf-export-root h2 { font-size: 22px; }
-  #pdf-export-root h3 { font-size: 18px; }
-  #pdf-export-root h4 { font-size: 15px; }
+  .notegen-export h1 { font-size: 28px; }
+  .notegen-export h2 { font-size: 22px; }
+  .notegen-export h3 { font-size: 18px; }
+  .notegen-export h4 { font-size: 16px; }
 
-  #pdf-export-root p {
-    margin: 0.65em 0;
+  .notegen-export p,
+  .notegen-export li,
+  .notegen-export blockquote {
+    orphans: 3;
+    widows: 3;
   }
 
-  #pdf-export-root a {
-    color: #0969da;
+  .notegen-export ul,
+  .notegen-export ol,
+  .notegen-export li {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .notegen-export a {
+    color: #0969da !important;
     text-decoration: underline;
   }
 
-  #pdf-export-root blockquote {
-    margin: 1em 0;
-    padding: 0.2em 0 0.2em 1em;
-    border-left: 4px solid #d0d7de;
-    color: #57606a;
+  .notegen-export blockquote {
+    border-left-color: #d0d7de !important;
+    color: #57606a !important;
   }
 
-  #pdf-export-root pre {
-    margin: 1em 0;
-    padding: 16px;
-    overflow-x: auto;
-    border-radius: 6px;
-    background: #f6f8fa;
+  .notegen-export pre,
+  .notegen-export table,
+  .notegen-export img,
+  .notegen-export .katex-display {
+    break-inside: avoid-page;
+  }
+
+  .notegen-export pre {
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere;
+    background: #f6f8fa !important;
+    color: #24292f !important;
+  }
+
+  .notegen-export code {
     color: #24292f;
-    white-space: pre-wrap;
   }
 
-  #pdf-export-root code {
-    border-radius: 3px;
-    background: #f6f8fa;
-    color: #24292f;
-    font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.92em;
-    padding: 0.2em 0.4em;
-  }
-
-  #pdf-export-root pre code {
-    background: transparent;
-    padding: 0;
-  }
-
-  #pdf-export-root ul,
-  #pdf-export-root ol {
-    margin: 0.65em 0;
-    padding-left: 1.6em;
-  }
-
-  #pdf-export-root li {
-    margin: 0.25em 0;
-  }
-
-  #pdf-export-root ul[data-type="taskList"] {
-    list-style: none;
-    padding-left: 0;
-  }
-
-  #pdf-export-root ul[data-type="taskList"] li {
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-  }
-
-  #pdf-export-root table {
+  .notegen-export table {
     width: 100%;
-    margin: 1em 0;
     border-collapse: collapse;
-    table-layout: auto;
   }
 
-  #pdf-export-root th,
-  #pdf-export-root td {
-    border: 1px solid #d0d7de;
-    padding: 8px 12px;
-    text-align: left;
-    vertical-align: top;
-    overflow-wrap: break-word;
+  .notegen-export th,
+  .notegen-export td {
+    border: 1px solid #d0d7de !important;
+    padding: 8px 10px;
+    overflow-wrap: anywhere;
   }
 
-  #pdf-export-root th {
-    background: #f6f8fa;
-    font-weight: 600;
+  .notegen-export th {
+    background: #f6f8fa !important;
   }
 
-  #pdf-export-root tr:nth-child(2n) {
-    background: #fbfbfb;
-  }
-
-  #pdf-export-root img,
-  #pdf-export-root svg,
-  #pdf-export-root canvas {
+  .notegen-export img,
+  .notegen-export svg,
+  .notegen-export canvas {
     max-width: 100%;
     height: auto;
   }
 
-  #pdf-export-root img {
-    border-radius: 8px;
-  }
+  @media print {
+    body.notegen-export {
+      max-width: none;
+      padding: 0;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
 
-  #pdf-export-root hr {
-    height: 1px;
-    border: 0;
-    background: #d0d7de;
-    margin: 1.5em 0;
-  }
+    .notegen-export [data-streamdown="table-wrapper"] {
+      overflow: visible;
+    }
 
-  #pdf-export-root mark {
-    background: #fff8c5;
-    color: inherit;
+    .notegen-export a {
+      overflow-wrap: anywhere;
+    }
   }
 `
 
-const HTML_EXPORT_STYLES = `
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 40px 20px;
-    line-height: 1.6;
-    color: #333333;
-  }
-  pre {
-    background: #f6f8fa;
-    padding: 16px;
-    border-radius: 6px;
-    overflow-x: auto;
-  }
-  code {
-    background: #f6f8fa;
-    padding: 0.2em 0.4em;
-    border-radius: 3px;
-  }
-  pre code {
-    background: transparent;
-    padding: 0;
-  }
-  blockquote {
-    border-left: 4px solid #dfe2e5;
-    margin: 0;
-    padding-left: 16px;
-    color: #6a737d;
-  }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-  table th,
-  table td {
-    border: 1px solid #dfe2e5;
-    padding: 8px 12px;
-  }
-  table th {
-    background: #f6f8fa;
-  }
-  img {
-    max-width: 100%;
-    height: auto;
-  }
-`
-
-let markdownRenderer: MarkdownIt | null = null
 let markdownManager: MarkdownManager | null = null
 
 export function sanitizeExportFileName(fileName: string) {
@@ -274,13 +206,8 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;')
 }
 
-function escapeHtmlAttribute(value: string) {
-  return escapeHtml(value)
-}
-
 function downloadTextFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType })
-  downloadBlob(blob, filename)
+  downloadBlob(new Blob([content], { type: mimeType }), filename)
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -290,7 +217,7 @@ function downloadBlob(blob: Blob, filename: string) {
   link.download = filename
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
+  link.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
@@ -320,108 +247,13 @@ async function saveTextExport(
   return true
 }
 
-async function notifyPdfRenderStart(options?: MarkdownExportOptions) {
-  options?.onPdfRenderStart?.()
-
-  await new Promise<void>((resolve) => {
-    window.requestAnimationFrame(() => {
-      window.setTimeout(resolve, 0)
-    })
-  })
-}
-
-async function savePdfExport(
-  renderContent: () => Promise<Uint8Array>,
-  filename: string,
-  options?: MarkdownExportOptions,
-) {
-  if (checkIsTauri()) {
-    const selectedPath = await save({
-      title: '导出',
-      defaultPath: filename,
-      filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
-    })
-
-    if (!selectedPath) {
-      return false
-    }
-
-    await notifyPdfRenderStart(options)
-    const content = await renderContent()
-    await writeFile(ensureExtension(selectedPath, 'pdf'), content)
-    return true
-  }
-
-  await notifyPdfRenderStart(options)
-  const content = await renderContent()
-  downloadBlob(new Blob([content]), filename)
-  return true
-}
-
-function registerHighlightLanguages() {
-  if (!hljs.getLanguage('javascript')) {
-    hljs.registerLanguage('javascript', javascript)
-  }
-  if (!hljs.getLanguage('typescript')) {
-    hljs.registerLanguage('typescript', typescript)
-  }
-  if (!hljs.getLanguage('bash')) {
-    hljs.registerLanguage('bash', bash)
-  }
-  if (!hljs.getLanguage('json')) {
-    hljs.registerLanguage('json', jsonLanguage)
-  }
-  if (!hljs.getLanguage('html')) {
-    hljs.registerLanguage('html', xml)
-  }
-  if (!hljs.getLanguage('css')) {
-    hljs.registerLanguage('css', css)
-  }
-}
-
-function getMarkdownRenderer() {
-  if (markdownRenderer) {
-    return markdownRenderer
-  }
-
-  registerHighlightLanguages()
-
-  const renderer = new MarkdownIt({
-    html: true,
-    linkify: true,
-    typographer: true,
-    highlight: (code, lang): string => {
-      if (lang && hljs.getLanguage(lang)) {
-        try {
-          return `<pre class="hljs"><code>${hljs.highlight(code, { language: lang, ignoreIllegals: true }).value}</code></pre>`
-        } catch {}
-      }
-      return `<pre class="hljs"><code>${renderer.utils.escapeHtml(code)}</code></pre>`
-    },
-  }).use(katex, {
-    throwOnError: false,
-    errorColor: '#cc0000',
-  })
-
-  renderer.renderer.rules.link_open = (tokens, index, options, _env, self) => {
-    tokens[index].attrSet('target', '_blank')
-    tokens[index].attrSet('rel', 'noopener noreferrer')
-    return self.renderToken(tokens, index, options)
-  }
-
-  markdownRenderer = renderer
-  return renderer
-}
-
 function getMarkdownManager() {
   if (!markdownManager) {
     markdownManager = new MarkdownManager({
       extensions: [
         StarterKit,
         TaskList,
-        TaskItem.configure({
-          nested: true,
-        }),
+        TaskItem.configure({ nested: true }),
       ],
       indentation: {
         style: 'space',
@@ -433,142 +265,71 @@ function getMarkdownManager() {
   return markdownManager
 }
 
-async function resolveMarkdownImageSources(html: string, sourcePath?: string) {
-  if (!sourcePath) {
-    return html
+async function getValue<T>(value: T | (() => T | Promise<T>)) {
+  if (typeof value === 'function') {
+    return await (value as () => T | Promise<T>)()
   }
 
-  const template = document.createElement('template')
-  template.innerHTML = html
-  const images = Array.from(template.content.querySelectorAll('img'))
-
-  await Promise.all(images.map(async (image) => {
-    const src = image.getAttribute('src')
-    if (!shouldTransformImageSrcToWorkspaceAsset(src)) {
-      return
-    }
-
-    const fullRelativePath = resolveImagePathFromMarkdown(sourcePath, src || '')
-    const assetUrl = await convertImageByWorkspace(fullRelativePath)
-    image.setAttribute('src', assetUrl)
-  }))
-
-  return template.innerHTML
-}
-
-function sanitizeExportElementAttributes(root: DocumentFragment | Element) {
-  const elements = root instanceof Element
-    ? [root, ...Array.from(root.querySelectorAll<Element>('*'))]
-    : Array.from(root.querySelectorAll<Element>('*'))
-
-  elements.forEach((element) => {
-    Array.from(element.attributes).forEach((attribute) => {
-      if (
-        attribute.name.toLowerCase().startsWith('on') ||
-        UNSUPPORTED_COLOR_FUNCTION_PATTERN.test(attribute.value)
-      ) {
-        element.removeAttribute(attribute.name)
-      }
-    })
-  })
+  return value
 }
 
 function sanitizeExportHtml(html: string) {
   const template = document.createElement('template')
   template.innerHTML = html
   template.content
-    .querySelectorAll('script, style, link')
+    .querySelectorAll('script, style, link, iframe, object, embed')
     .forEach((element) => element.remove())
-  sanitizeExportElementAttributes(template.content)
+
+  template.content.querySelectorAll<Element>('*').forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      if (attribute.name.toLowerCase().startsWith('on')) {
+        element.removeAttribute(attribute.name)
+      }
+    })
+  })
+
   return template.innerHTML
 }
 
-function preparePdfExportHtml(editorElement: Element) {
-  const clone = editorElement.cloneNode(true) as HTMLElement
+async function resolveMarkdownImageSources(html: string, sourcePath?: string) {
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const images = Array.from(template.content.querySelectorAll('img'))
 
-  clone
-    .querySelectorAll('script, style, link, .image-resize-handle, .tableResizeHandle, .ProseMirror-gapcursor, .ProseMirror-widget')
-    .forEach((element) => element.remove())
+  await Promise.all(images.map(async (image) => {
+    const src = image.getAttribute('src')
+    if (!src || /^(?:data:|blob:)/i.test(src)) {
+      return
+    }
 
-  clone.querySelectorAll<HTMLElement>('[contenteditable], [spellcheck], [data-resize-state]').forEach((element) => {
-    element.removeAttribute('contenteditable')
-    element.removeAttribute('spellcheck')
-    element.removeAttribute('data-resize-state')
-  })
+    if (sourcePath && shouldTransformImageSrcToWorkspaceAsset(src)) {
+      const fullRelativePath = resolveImagePathFromMarkdown(sourcePath, src)
+      image.setAttribute('src', await convertImageByWorkspace(fullRelativePath))
+      return
+    }
 
-  clone.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((checkbox) => {
-    checkbox.disabled = true
-  })
+    try {
+      const response = await fetch(new URL(src, document.baseURI))
+      if (response.ok) {
+        image.setAttribute('src', await blobToDataUrl(await response.blob()))
+      }
+    } catch {
+      // Keep remote images when CORS or the network prevents embedding them.
+    }
+  }))
 
-  sanitizeExportElementAttributes(clone)
-
-  return clone.innerHTML
-}
-
-function createPdfRenderFrame(content: string) {
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('aria-hidden', 'true')
-  iframe.tabIndex = -1
-  iframe.style.position = 'fixed'
-  iframe.style.left = '-10000px'
-  iframe.style.top = '0'
-  iframe.style.width = '595px'
-  iframe.style.height = '1px'
-  iframe.style.border = '0'
-  iframe.style.pointerEvents = 'none'
-
-  document.body.appendChild(iframe)
-
-  const frameDocument = iframe.contentDocument
-  if (!frameDocument) {
-    document.body.removeChild(iframe)
-    throw new Error('PDF render frame unavailable')
-  }
-
-  frameDocument.open()
-  frameDocument.write(`<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <base href="${escapeHtmlAttribute(document.baseURI)}" />
-    <style>${PDF_EXPORT_STYLES}</style>
-  </head>
-  <body>
-    <main id="pdf-export-root">${sanitizeExportHtml(content)}</main>
-  </body>
-</html>`)
-  frameDocument.close()
-
-  return iframe
+  return template.innerHTML
 }
 
 function waitForAnimationFrame() {
   return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve())
+    window.requestAnimationFrame(() => resolve())
   })
 }
 
 function waitForTimeout(timeoutMs: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, timeoutMs)
-  })
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
-  return new Promise<T>((resolve, reject) => {
-    const timeout = window.setTimeout(() => {
-      reject(new Error(message))
-    }, timeoutMs)
-
-    promise
-      .then((value) => {
-        window.clearTimeout(timeout)
-        resolve(value)
-      })
-      .catch((error) => {
-        window.clearTimeout(timeout)
-        reject(error)
-      })
   })
 }
 
@@ -588,107 +349,317 @@ async function waitForImage(image: HTMLImageElement) {
   ])
 }
 
-async function waitForImages(root: HTMLElement) {
-  const images = Array.from(root.querySelectorAll('img'))
-  await Promise.all(images.map(waitForImage))
+async function waitForDocumentResources(frameDocument: Document) {
+  await Promise.all(Array.from(frameDocument.images).map(waitForImage))
+  await frameDocument.fonts?.ready
 }
 
-async function getValue<T>(value: T | (() => T | Promise<T>)) {
-  if (typeof value === 'function') {
-    return await (value as () => T | Promise<T>)()
+async function renderMarkdownToHtml(markdown: string, sourcePath?: string) {
+  const container = document.createElement('div')
+  container.style.position = 'fixed'
+  container.style.left = '-10000px'
+  container.style.top = '0'
+  container.style.width = '800px'
+  container.style.pointerEvents = 'none'
+  container.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(container)
+
+  const root = createRoot(container)
+
+  try {
+    flushSync(() => {
+      root.render(createElement(StreamdownRenderer, { markdown }))
+    })
+    await waitForAnimationFrame()
+
+    return await resolveMarkdownImageSources(
+      sanitizeExportHtml(container.innerHTML),
+      sourcePath,
+    )
+  } finally {
+    root.unmount()
+    container.remove()
+  }
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read export asset'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function inlineCssAssetUrls(
+  css: string,
+  baseUrl: string,
+  assetCache: Map<string, Promise<string>>,
+) {
+  const matches = Array.from(css.matchAll(CSS_URL_PATTERN))
+  if (matches.length === 0) {
+    return css
   }
 
-  return value
+  let output = ''
+  let offset = 0
+
+  for (const match of matches) {
+    const index = match.index ?? 0
+    const rawUrl = match[2].trim()
+    output += css.slice(offset, index)
+
+    if (/^(?:data:|blob:|#)/i.test(rawUrl)) {
+      output += match[0]
+      offset = index + match[0].length
+      continue
+    }
+
+    let absoluteUrl: string
+    try {
+      absoluteUrl = new URL(rawUrl, baseUrl).href
+    } catch {
+      output += match[0]
+      offset = index + match[0].length
+      continue
+    }
+
+    let dataUrlPromise = assetCache.get(absoluteUrl)
+    if (!dataUrlPromise) {
+      dataUrlPromise = fetch(absoluteUrl)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Unable to load export asset: ${absoluteUrl}`)
+          }
+          return response.blob()
+        })
+        .then(blobToDataUrl)
+      assetCache.set(absoluteUrl, dataUrlPromise)
+    }
+
+    try {
+      output += `url("${await dataUrlPromise}")`
+    } catch {
+      output += `url("${absoluteUrl}")`
+    }
+    offset = index + match[0].length
+  }
+
+  return output + css.slice(offset)
 }
 
-function buildHtmlDocument(title: string, body: string) {
+async function collectExportStyles() {
+  const assetCache = new Map<string, Promise<string>>()
+  const styleChunks: string[] = []
+
+  for (const styleSheet of Array.from(document.styleSheets)) {
+    try {
+      const css = Array.from(styleSheet.cssRules).map((rule) => rule.cssText).join('\n')
+      styleChunks.push(await inlineCssAssetUrls(
+        css,
+        styleSheet.href || document.baseURI,
+        assetCache,
+      ))
+    } catch {
+      // Cross-origin stylesheets cannot expose cssRules. Streamdown's local styles remain available.
+    }
+  }
+
+  styleChunks.push(EXPORT_DOCUMENT_STYLES)
+  return styleChunks.join('\n')
+}
+
+function buildHtmlDocument(title: string, body: string, styles: string) {
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
-  <style>${HTML_EXPORT_STYLES}</style>
+  <style>${styles}</style>
 </head>
-<body>
+<body class="notegen-export">
 ${body}
 </body>
 </html>`
 }
 
-async function renderMarkdownToHtml(markdown: string, sourcePath?: string, resolveImages = false) {
-  const html = getMarkdownRenderer().render(normalizeLatexForKatex(markdown))
-  if (!resolveImages) {
-    return html
-  }
+export async function buildMarkdownExportDocument(source: MarkdownExportSource) {
+  const fileName = getMarkdownExportBaseName(source.baseName)
+  const markdown = await getValue(source.markdown)
+  const [body, styles] = await Promise.all([
+    renderMarkdownToHtml(markdown, source.sourcePath),
+    collectExportStyles(),
+  ])
 
-  return await resolveMarkdownImageSources(html, sourcePath)
+  return buildHtmlDocument(fileName, body, styles)
 }
 
-async function renderSourcePdf(source: MarkdownExportSource) {
-  const pdfElement = typeof source.pdfElement === 'function'
-    ? source.pdfElement()
-    : source.pdfElement
+function createPrintFrame(html: string) {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.tabIndex = -1
+  iframe.style.position = 'fixed'
+  iframe.style.left = '-10000px'
+  iframe.style.top = '0'
+  iframe.style.width = '210mm'
+  iframe.style.height = '297mm'
+  iframe.style.border = '0'
+  iframe.style.pointerEvents = 'none'
+  document.body.appendChild(iframe)
 
-  const html = pdfElement
-    ? preparePdfExportHtml(pdfElement)
-    : await renderMarkdownToHtml(await getValue(source.markdown), source.sourcePath, true)
+  const frameDocument = iframe.contentDocument
+  if (!frameDocument) {
+    iframe.remove()
+    throw new Error('无法创建 PDF 打印页面')
+  }
 
-  const iframe = createPdfRenderFrame(html)
+  frameDocument.open()
+  frameDocument.write(html)
+  frameDocument.close()
+
+  return iframe
+}
+
+async function openTauriPrintWindow(html: string, title: string, outputPath?: string) {
+  const [{ once }, { WebviewWindow }, { Store }] = await Promise.all([
+    import('@tauri-apps/api/event'),
+    import('@tauri-apps/api/webviewWindow'),
+    import('@tauri-apps/plugin-store'),
+  ])
+  const documentKey = `document-${crypto.randomUUID()}`
+  const windowLabel = `pdf-print-${crypto.randomUUID()}`
+  const completionEvent = outputPath ? `pdf-export-result-${crypto.randomUUID()}` : undefined
+  const store = await Store.load(PRINT_EXPORT_STORE)
+  await store.set(documentKey, {
+    html,
+    outputPath,
+    completionEvent,
+  } satisfies TauriPrintDocument)
+  await store.save()
+
+  return await new Promise<boolean>((resolve, reject) => {
+    let settled = false
+    let removeCompletionListener: (() => void) | undefined
+    const timeout = window.setTimeout(() => {
+      void finishWithError(new Error(outputPath ? 'PDF 导出超时' : 'PDF 打印窗口启动超时'))
+    }, outputPath ? DIRECT_PDF_EXPORT_TIMEOUT_MS : PRINT_WINDOW_START_TIMEOUT_MS)
+
+    const removeStoredDocument = async () => {
+      await store.delete(documentKey)
+      await store.save()
+    }
+
+    const finish = (result: boolean) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      removeCompletionListener?.()
+      resolve(result)
+    }
+
+    const finishWithError = async (reason: unknown) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      removeCompletionListener?.()
+      await removeStoredDocument().catch(() => undefined)
+      reject(reason instanceof Error ? reason : new Error(String(reason)))
+    }
+
+    void (async () => {
+      if (completionEvent) {
+        removeCompletionListener = await once<{ success: boolean; error?: string }>(completionEvent, (event) => {
+          if (event.payload.success) {
+            finish(true)
+          } else {
+            void finishWithError(new Error(event.payload.error || '原生 PDF 导出失败'))
+          }
+        })
+      }
+
+      const printWindow = new WebviewWindow(windowLabel, {
+        url: `/print?key=${encodeURIComponent(documentKey)}`,
+        title: outputPath ? `${title} - 正在导出 PDF` : `${title} - PDF 打印预览`,
+        width: 900,
+        height: 700,
+        center: true,
+        visible: !outputPath,
+      })
+
+      await printWindow.once('tauri://created', () => {
+        if (!outputPath) finish(true)
+      })
+      await printWindow.once<string>('tauri://error', (event) => {
+        void finishWithError(new Error(`PDF 打印窗口启动失败：${event.payload}`))
+      })
+    })().catch((reason: unknown) => {
+      void finishWithError(reason)
+    })
+  })
+}
+
+async function notifyPdfRenderStart(options?: MarkdownExportOptions) {
+  options?.onPdfRenderStart?.()
+  await waitForAnimationFrame()
+}
+
+async function printExportDocument(source: MarkdownExportSource, options?: MarkdownExportOptions) {
+  const fileName = getMarkdownExportBaseName(source.baseName)
+
+  if (checkIsTauri()) {
+    const { platform } = await import('@tauri-apps/plugin-os')
+    let outputPath: string | undefined
+
+    if (platform() === 'macos') {
+      const selectedPath = await save({
+        title: '导出 PDF',
+        defaultPath: `${fileName}.pdf`,
+        filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+      })
+
+      if (!selectedPath) return false
+      outputPath = ensureExtension(selectedPath, 'pdf')
+    }
+
+    await notifyPdfRenderStart(options)
+    return await openTauriPrintWindow(
+      await buildMarkdownExportDocument(source),
+      fileName,
+      outputPath,
+    )
+  }
+
+  await notifyPdfRenderStart(options)
+  const html = await buildMarkdownExportDocument(source)
+
+  const iframe = createPrintFrame(html)
 
   try {
     const frameDocument = iframe.contentDocument
-    const container = frameDocument?.getElementById('pdf-export-root')
-    if (!container) {
-      throw new Error('PDF render container unavailable')
+    const printWindow = iframe.contentWindow
+    if (!frameDocument || !printWindow || typeof printWindow.print !== 'function') {
+      throw new Error('当前平台不支持系统 PDF 打印')
     }
 
+    await waitForDocumentResources(frameDocument)
     await waitForAnimationFrame()
-    await waitForImages(container)
-    const renderHeight = Math.max(container.scrollHeight, container.offsetHeight, 842)
-    iframe.style.height = `${renderHeight}px`
 
-    const canvas = await withTimeout(
-      html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 595,
-        windowHeight: renderHeight,
-        imageTimeout: IMAGE_LOAD_TIMEOUT_MS,
-      }),
-      PDF_RENDER_TIMEOUT_MS,
-      'PDF 渲染超时，请检查文档中是否包含无法加载的图片',
-    )
-
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'a4',
-    })
-
-    const imgWidth = 595
-    const pageHeight = 842
-    const imgHeight = (canvas.height * imgWidth) / canvas.width
-    let heightLeft = imgHeight
-    let position = 0
-
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-    heightLeft -= pageHeight
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight
-      pdf.addPage()
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight
+    let cleanedUp = false
+    const cleanup = () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      iframe.remove()
     }
 
-    return new Uint8Array(pdf.output('arraybuffer'))
-  } finally {
-    document.body.removeChild(iframe)
+    printWindow.addEventListener('afterprint', cleanup, { once: true })
+    window.setTimeout(cleanup, PRINT_FRAME_CLEANUP_DELAY_MS)
+    printWindow.focus()
+    printWindow.print()
+    return true
+  } catch (error) {
+    iframe.remove()
+    throw error
   }
 }
 
@@ -710,15 +681,8 @@ export async function exportMarkdownSource(
   }
 
   if (format === 'html') {
-    const html = source.html
-      ? await getValue(source.html)
-      : buildHtmlDocument(
-        fileName,
-        await renderMarkdownToHtml(await getValue(source.markdown), source.sourcePath),
-      )
-
     return await saveTextExport(
-      html,
+      await buildMarkdownExportDocument(source),
       `${fileName}.html`,
       'html',
       'text/html',
@@ -740,11 +704,7 @@ export async function exportMarkdownSource(
     )
   }
 
-  return await savePdfExport(
-    () => renderSourcePdf(source),
-    `${fileName}.pdf`,
-    options,
-  )
+  return await printExportDocument(source, options)
 }
 
 export async function exportMarkdownFile(

@@ -164,10 +164,12 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
     (loading && isLatestSystemMessage) ||
     (isActiveAgentMessage && agentState.isRunning)
   )
+  const liveAgentContent = isActiveAgentMessage && agentState.isFinalAnswerMode
+    ? agentState.finalAnswerContent
+    : undefined
   const hasLiveAgentTrace = Boolean(
     agentState.completedSteps?.length ||
     agentState.traceEvents?.some((event) => event.type !== 'final') ||
-    agentState.changes?.length ||
     agentState.pendingConfirmation
   )
   const isLiveAgentVisible = isActiveAgentMessage && (agentState.isRunning || agentState.isFinalAnswerMode || hasLiveAgentTrace)
@@ -303,7 +305,6 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
                 ragSources={ragSources}
                 ragSourceDetails={ragSourceDetails}
                 agentHistoryJson={chat.agentHistory}
-                showChanges
               />
             )}
 
@@ -311,12 +312,6 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
               <div className="space-y-2">
                 {(agentState.isRunning || hasLiveAgentTrace) && (
                   <AgentExecutionStatus />
-                )}
-                {!agentState.isRunning && agentState.isFinalAnswerMode && agentState.finalAnswerContent && (
-                  <ChatPreview
-                    text={agentState.finalAnswerContent}
-                    streaming={loading && isActiveAgentMessage}
-                  />
                 )}
               </div>
             )}
@@ -331,7 +326,10 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
             )}
 
             <ChatThinking chat={chat} />
-            <ChatPreview text={content || ''} streaming={loading && isActiveAgentMessage} />
+            <ChatPreview
+              text={liveAgentContent ?? content ?? ''}
+              streaming={isGeneratingMessage}
+            />
             {!isGeneratingMessage && (
               <MessageControl chat={chat}>
                 <MarkText chat={chat} />

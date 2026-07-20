@@ -15,8 +15,6 @@ export function AgentExecutionStatus() {
       isRunning={agentState.isRunning}
       toolCalls={agentState.toolCalls}
       traceEvents={agentState.traceEvents || []}
-      changes={agentState.changes || []}
-      showChanges={false}
       loadedSkills={agentState.loadedSkills || []}
     />
   )

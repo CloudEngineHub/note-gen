@@ -11,6 +11,7 @@ mod mcp;
 mod mcp_runtime;
 mod mobile_system_bars;
 mod ocr_packages;
+mod printing;
 mod skill_runtime;
 mod skills;
 
@@ -84,6 +85,7 @@ pub fn run() {
             cancel_ai_request,
             list_ocr_providers,
             run_ocr_provider,
+            printing::print_webview,
             mobile_system_bars::set_mobile_system_bars,
         ])
         .run(tauri::generate_context!())

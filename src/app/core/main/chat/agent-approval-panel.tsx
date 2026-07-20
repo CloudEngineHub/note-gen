@@ -4,9 +4,9 @@ import * as React from "react"
 import { CheckCircle2, ChevronDown, ChevronRight, ShieldAlert, XCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import { DiffViewer } from "@/components/ui/diff-viewer"
 import { formatConfirmationPreview } from "@/lib/agent/tool-confirmation-display"
 import emitter from "@/lib/emitter"
+import { cn } from "@/lib/utils"
 import { formatAgentToolName } from "./agent-display-utils"
 
 export interface PendingAgentConfirmation {
@@ -108,10 +108,7 @@ export function AgentApprovalPanel({
     approvalPreview.descriptionKey,
     "Agent 请求执行需要确认的操作。"
   )
-  const hasDiff =
-    pendingConfirmation.originalContent !== undefined &&
-    pendingConfirmation.modifiedContent !== undefined
-  const hasDetails = hasDiff || approvalPreview.fields.length > 0
+  const hasDetails = approvalPreview.fields.length > 0
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-md border bg-background p-2 shadow-sm">
@@ -173,15 +170,6 @@ export function AgentApprovalPanel({
 
       {expanded && hasDetails && (
         <div className="mt-2 border-t pt-2">
-          {hasDiff && (
-            <DiffViewer
-              original={pendingConfirmation.originalContent || ""}
-              modified={pendingConfirmation.modifiedContent || ""}
-              maxHeight={220}
-              className="text-xs"
-            />
-          )}
-
           {approvalPreview.fields.length > 0 && (
             <div className="mt-2 flex max-h-56 flex-col gap-2 overflow-auto text-xs">
               {approvalPreview.fields.map((field) => {
@@ -193,7 +181,12 @@ export function AgentApprovalPanel({
                       {translateKey(field.labelKey, field.name)}
                     </span>
                     {field.displayType === "content" || field.displayType === "json" ? (
-                      <pre className="whitespace-pre-wrap break-words rounded bg-muted/60 px-2 py-1 text-foreground">
+                      <pre
+                        className={cn(
+                          "whitespace-pre-wrap break-words rounded bg-muted/60 px-2 py-1 text-foreground",
+                          field.displayType === "content" && "max-h-[6.75rem] overflow-y-auto leading-5",
+                        )}
+                      >
                         {formattedValue}
                       </pre>
                     ) : (

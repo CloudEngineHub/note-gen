@@ -14,12 +14,9 @@ import {
   Clock,
   XCircle,
   CheckCircle,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
-import { DiffViewer } from "@/components/ui/diff-viewer";
 import { formatConfirmationPreview } from "@/lib/agent/tool-confirmation-display";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
@@ -143,7 +140,6 @@ export function AgentPlan({
   const contentRef = React.useRef<HTMLDivElement>(null);
   const thoughtRefs = React.useRef<Map<string, HTMLParagraphElement>>(new Map());
   const [currentStepDuration, setCurrentStepDuration] = React.useState<number>(0);
-  const [showDiff, setShowDiff] = React.useState(true);
   const [autoScrollEnabled, setAutoScrollEnabled] = React.useState(true);
 
   const scrollStepIntoView = React.useCallback((stepId: string) => {
@@ -883,42 +879,9 @@ export function AgentPlan({
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {/* Show diff button */}
-                {pendingConfirmation.originalContent && pendingConfirmation.modifiedContent && (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setShowDiff(!showDiff)}
-                  >
-                    {showDiff ? (
-                      <ChevronUp data-icon="inline-start" />
-                    ) : (
-                      <ChevronDown data-icon="inline-start" />
-                    )}
-                    <span>Diff</span>
-                  </Button>
-                )}
-              </div>
             </div>
 
-            {/* Diff view */}
-            {showDiff && pendingConfirmation.originalContent && pendingConfirmation.modifiedContent && (
-              <div className="border-t border-border/50">
-                <DiffViewer
-                  original={pendingConfirmation.originalContent}
-                  modified={pendingConfirmation.modifiedContent}
-                  mode="lines"
-                  showLineNumbers={true}
-                  maxHeight={200}
-                  className="border-0 rounded-none"
-                />
-              </div>
-            )}
-
-            {!pendingConfirmation.originalContent &&
-              !pendingConfirmation.modifiedContent &&
-              confirmationPreview &&
+            {confirmationPreview &&
               confirmationPreview.fields.length > 0 && (
                 <div className="flex flex-col gap-2 border-t px-3 py-2">
                   {confirmationPreview.fields.map((field) => {
@@ -931,7 +894,7 @@ export function AgentPlan({
                           {label}
                         </div>
                         {field.displayType === "content" ? (
-                          <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-words rounded bg-muted/40 px-2 py-1 text-xs text-foreground">
+                          <pre className="max-h-[6.75rem] overflow-y-auto whitespace-pre-wrap break-words rounded bg-muted/40 px-2 py-1 text-xs leading-5 text-foreground">
                             {formattedValue}
                           </pre>
                         ) : (
