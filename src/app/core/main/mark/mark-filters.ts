@@ -1,6 +1,7 @@
 import type { Mark } from '@/db/marks'
 
 type RecordTimePreset = 'all' | 'today' | 'last7Days' | 'last30Days'
+export type RecordSortMode = 'newest' | 'oldest' | 'type'
 
 type RecordFiltersLike = {
   search: string
@@ -131,5 +132,20 @@ export function filterMarks(
     }
 
     return matchesSearch(mark, search)
+  })
+}
+
+export function sortMarks(marks: Mark[], sortMode: RecordSortMode) {
+  return [...marks].sort((left, right) => {
+    if (sortMode === 'oldest') {
+      return left.createdAt - right.createdAt
+    }
+
+    if (sortMode === 'type') {
+      const typeOrder = left.type.localeCompare(right.type)
+      return typeOrder !== 0 ? typeOrder : right.createdAt - left.createdAt
+    }
+
+    return right.createdAt - left.createdAt
   })
 }

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import useMarkStore from "@/stores/mark";
 import { MarkLoading } from "./mark-loading";
 import MarkEmpty from "./mark-empty";
-import { buildRecordFilterSummary, filterMarks, getTrashRecordFilters } from "./mark-filters";
+import { buildRecordFilterSummary, filterMarks, getTrashRecordFilters, sortMarks } from "./mark-filters";
 import { MarkListDefaultView } from "./mark-list-default-view";
 import { MarkListCompactView } from "./mark-list-compact-view";
 import { MarkListCardView } from "./mark-list-card-view";
@@ -21,6 +21,7 @@ export const MarkList = React.memo(function MarkList() {
     trashState,
     recordFilters,
     recordViewMode,
+    recordSortMode,
     hasActiveRecordFilters,
     setVisibleMarkIds,
   } = useMarkStore()
@@ -30,8 +31,8 @@ export const MarkList = React.memo(function MarkList() {
   ), [trashState, recordFilters])
 
   const filteredMarks = React.useMemo(() => (
-    filterMarks(marks, effectiveFilters)
-  ), [marks, effectiveFilters])
+    sortMarks(filterMarks(marks, effectiveFilters), recordSortMode)
+  ), [marks, effectiveFilters, recordSortMode])
 
   const filterSummary = React.useMemo(() => buildRecordFilterSummary(effectiveFilters), [effectiveFilters])
 

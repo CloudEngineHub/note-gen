@@ -1859,8 +1859,8 @@
         "add": "添加"
       },
       "mark": {
-        "empty": "暂无记录",
-        "emptyHint": "使用顶部工具栏开始你的第一条记录吧！",
+        "empty": "还没有记录",
+        "emptyHint": "创建一条新的记录，\n或用文字、图片和录音捕捉灵感。",
         "type": {
           "text": "文本"
         },
@@ -1994,6 +1994,13 @@
         }
       },
       "toolbar": {
+        "more": "更多",
+        "sort": {
+          "title": "排序",
+          "newest": "最新优先",
+          "oldest": "最早优先",
+          "type": "按类型"
+        },
         "search": "搜索",
         "filter": {
           "title": "筛选",
@@ -2042,6 +2049,7 @@
         "deleteSelected": "删除选中的 {count} 项",
         "deleteSelectedForever": "彻底删除选中的 {count} 项",
         "view": {
+          "title": "视图",
           "list": "列表视图",
           "compact": "紧凑视图",
           "cards": "卡片视图"
@@ -2677,11 +2685,15 @@
       "openDirectory": "打开文件目录"
     },
     "file": {
+      "empty": {
+        "title": "还没有笔记",
+        "description": "创建一篇新的笔记，\n或从本地导入已有笔记。"
+      },
       "toolbar": {
         "accessRepo": "访问仓库",
         "loadingSync": "正在加载同步信息",
         "configSync": "配置同步",
-        "newArticle": "新建文章",
+        "newArticle": "新建笔记",
         "newFolder": "新建文件夹",
         "refresh": "刷新",
         "toggleFolders": "文件夹展开折叠",
@@ -2695,7 +2707,7 @@
         "sort": "排序",
         "processingVectors": "正在处理向量数据",
         "calculateVectors": "知识库计算（全量）",
-        "importMarkdown": "导入",
+        "importMarkdown": "导入笔记",
         "importing": "正在导入...",
         "importSuccess": "导入成功",
         "importSuccessDesc": "成功导入 {count} 个文件",

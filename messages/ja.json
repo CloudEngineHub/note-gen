@@ -1846,8 +1846,8 @@
         "add": "追加"
       },
       "mark": {
-        "empty": "記録がありません",
-        "emptyHint": "上部のツールバーを使用して最初の記録を作成しましょう！",
+        "empty": "まだ記録がありません",
+        "emptyHint": "新しい記録を作成するか、\nテキスト、画像、音声でアイデアを残しましょう。",
         "type": {
           "text": "テキスト"
         },
@@ -1981,6 +1981,13 @@
         }
       },
       "toolbar": {
+        "more": "その他",
+        "sort": {
+          "title": "並び順",
+          "newest": "新しい順",
+          "oldest": "古い順",
+          "type": "種類順"
+        },
         "search": "検索",
         "trash": "ゴミ箱",
         "restore": "復元",
@@ -2003,6 +2010,13 @@
         "moveSelectedTags": "選択した{count}項目を移動",
         "deleteSelected": "選択した{count}項目を削除",
         "deleteSelectedForever": "選択した{count}項目を完全削除",
+        "visibleCount": "{count}件の記録",
+        "view": {
+          "title": "表示",
+          "list": "リスト表示",
+          "compact": "コンパクト表示",
+          "cards": "カード表示"
+        },
         "organizeNotes": "ノート整理",
         "organizeSuccess": "ノート整理成功：{title}",
         "organizeError": "ノート整理失敗",
@@ -2589,11 +2603,15 @@
       "openDirectory": "ファイルのディレクトリを開く"
     },
     "file": {
+      "empty": {
+        "title": "ノートはまだありません",
+        "description": "新しいノートを作成するか、\n端末から既存のノートをインポートします。"
+      },
       "toolbar": {
         "accessRepo": "リポジトリにアクセス",
         "loadingSync": "同期情報を読み込み中",
         "configSync": "同期を設定",
-        "newArticle": "新規記事",
+        "newArticle": "新規ノート",
         "newFolder": "新規フォルダ",
         "refresh": "更新",
         "toggleFolders": "フォルダを展開/折りたたみ",
@@ -2607,7 +2625,7 @@
         "sort": "並べ替え",
         "processingVectors": "ベクトルデータ処理中",
         "calculateVectors": "知識庫計算（全量）",
-        "importMarkdown": "インポート",
+        "importMarkdown": "ノートをインポート",
         "importing": "インポート中...",
         "importSuccess": "インポート成功",
         "importSuccessDesc": "{count} 個のファイルをインポートしました",

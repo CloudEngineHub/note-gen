@@ -1,7 +1,7 @@
 "use client"
 import * as React from "react"
 import { useTranslations } from 'next-intl'
-import { Plus, TagIcon, Inbox, SquareCheck } from "lucide-react"
+import { TagIcon, Inbox, SquareCheck } from "lucide-react"
 import {
   Accordion,
   AccordionContent,
@@ -24,7 +24,7 @@ import useMarkStore from "@/stores/mark"
 import useChatStore from "@/stores/chat"
 import { MarkLoading } from './mark-loading'
 import { ImageGallery } from './image-gallery'
-import { filterMarks } from './mark-filters'
+import { filterMarks, sortMarks } from './mark-filters'
 import { MarkListDefaultView } from './mark-list-default-view'
 import { MarkListCompactView } from './mark-list-compact-view'
 import { MarkListCardView } from './mark-list-card-view'
@@ -138,6 +138,7 @@ export function TagManage() {
   const [editingName, setEditingName] = React.useState<string>("")
   const [expandedTagId, setExpandedTagId] = React.useState("")
   const [hasInitialized, setHasInitialized] = React.useState(false)
+  const newTagInputRef = React.useRef<HTMLInputElement>(null)
   const { init } = useChatStore()
   const textSize = getContextMenuTextSize('record')
 
@@ -182,6 +183,7 @@ export function TagManage() {
     fetchMarks,
     recordFilters,
     recordViewMode,
+    recordSortMode,
     hasActiveRecordFilters,
     setVisibleMarkIds,
     pendingScrollMarkId,
@@ -240,11 +242,11 @@ export function TagManage() {
   const filtersActive = hasActiveRecordFilters()
 
   const getFilteredTagMarks = React.useCallback((tagId: number) => {
-    return filterMarks(getTagMarks(tagId), {
+    return sortMarks(filterMarks(getTagMarks(tagId), {
       ...recordFilters,
       tagId: 'all',
-    })
-  }, [marks, recordFilters])
+    }), recordSortMode)
+  }, [marks, recordFilters, recordSortMode])
 
   const visibleTags = React.useMemo(() => {
     return tags.filter((tag) => {
@@ -286,6 +288,22 @@ export function TagManage() {
       await fetchTags()
     }
   }
+
+  React.useEffect(() => {
+    const handleOpenNewTag = () => {
+      setIsAdding(true)
+      window.requestAnimationFrame(() => {
+        newTagInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        newTagInputRef.current?.focus()
+      })
+    }
+
+    emitter.on(EmitterRecordEvents.openNewTag, handleOpenNewTag)
+
+    return () => {
+      emitter.off(EmitterRecordEvents.openNewTag, handleOpenNewTag)
+    }
+  }, [])
 
   React.useEffect(() => {
     const fetchData = async() => {
@@ -390,13 +408,13 @@ export function TagManage() {
 
     if (filteredMarks.length === 0 && queues.filter(queue => queue.tagId === tagId).length === 0) {
       return (
-        <Empty className="border-0 py-8">
+        <Empty className="min-h-48">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <Inbox />
             </EmptyMedia>
-            <EmptyTitle className="text-sm">{t('record.mark.empty')}</EmptyTitle>
-            <EmptyDescription className="text-xs">
+            <EmptyTitle>{t('record.mark.empty')}</EmptyTitle>
+            <EmptyDescription className="whitespace-pre-line text-xs">
               {t('record.mark.mark.emptyHint')}
             </EmptyDescription>
           </EmptyHeader>
@@ -417,6 +435,28 @@ export function TagManage() {
 
   return (
     <div className="w-full">
+      {isAdding ? (
+        <div className="flex gap-2 p-2">
+          <Input
+            ref={newTagInputRef}
+            placeholder={t('record.mark.tag.newTagPlaceholder')}
+            value={newTagName}
+            onChange={(e) => setNewTagName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddTag()
+              if (e.key === 'Escape') {
+                setIsAdding(false)
+                setNewTagName("")
+              }
+            }}
+            className={`h-8 text-${textSize}`}
+            autoFocus
+          />
+          <Button size="sm" onClick={handleAddTag} className={`h-8 text-${textSize}`}>
+            {t('record.mark.tag.add')}
+          </Button>
+        </div>
+      ) : null}
       <PhotoPreviewProvider>
         <DndContext
           sensors={sensors}
@@ -440,12 +480,12 @@ export function TagManage() {
               className="w-full"
             >
               {visibleTags.length === 0 ? (
-                <Empty className="border-0 py-10">
+                <Empty className="min-h-48">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
                       <Inbox />
                     </EmptyMedia>
-                    <EmptyTitle className="text-sm">{t('record.mark.list.emptyFiltered')}</EmptyTitle>
+                    <EmptyTitle>{t('record.mark.list.emptyFiltered')}</EmptyTitle>
                     <EmptyDescription className="text-xs">
                       {t('record.mark.list.emptyFilteredHint')}
                     </EmptyDescription>
@@ -528,40 +568,6 @@ export function TagManage() {
         </DndContext>
       </PhotoPreviewProvider>
 
-      {/* 添加标签 */}
-      <div className="p-2">
-        {isAdding ? (
-          <div className="flex gap-2">
-            <Input
-              placeholder={t('record.mark.tag.newTagPlaceholder')}
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddTag()
-                if (e.key === 'Escape') {
-                  setIsAdding(false)
-                  setNewTagName("")
-                }
-              }}
-              className={`h-8 text-${textSize}`}
-              autoFocus
-            />
-            <Button size="sm" onClick={handleAddTag} className={`h-8 text-${textSize}`}>
-              {t('record.mark.tag.add')}
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsAdding(true)}
-            className={`w-full h-8 text-${textSize}`}
-          >
-            <Plus className="size-3 mr-1" />
-            {t('record.mark.tag.newTag')}
-          </Button>
-        )}
-      </div>
     </div>
   )
 }

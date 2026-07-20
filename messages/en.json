@@ -1850,8 +1850,8 @@
         "add": "Add"
       },
       "mark": {
-        "empty": "No records",
-        "emptyHint": "Use the toolbar at the top to create your first record!",
+        "empty": "No records yet",
+        "emptyHint": "Create a new record,\nor capture ideas with text, images, and audio.",
         "type": {
           "text": "Text"
         },
@@ -1985,6 +1985,13 @@
         }
       },
       "toolbar": {
+        "more": "More",
+        "sort": {
+          "title": "Sort",
+          "newest": "Newest first",
+          "oldest": "Oldest first",
+          "type": "By type"
+        },
         "search": "Search",
         "filter": {
           "title": "Filter",
@@ -2040,6 +2047,7 @@
         "deleteSelected": "Delete selected {count} items",
         "deleteSelectedForever": "Permanently delete selected {count} items",
         "view": {
+          "title": "View",
           "list": "List view",
           "compact": "Compact view",
           "cards": "Card view"
@@ -2677,11 +2685,15 @@
       "openDirectory": "Open File Directory"
     },
     "file": {
+      "empty": {
+        "title": "No notes yet",
+        "description": "Create a new note,\nor import notes from your device."
+      },
       "toolbar": {
         "accessRepo": "Access Repository",
         "loadingSync": "Loading sync info",
         "configSync": "Configure Sync",
-        "newArticle": "New Article",
+        "newArticle": "New Note",
         "newFolder": "New Folder",
         "refresh": "Refresh",
         "toggleFolders": "Toggle Folders",
@@ -2695,7 +2707,7 @@
         "sort": "Sort",
         "processingVectors": "Processing Vector Data",
         "calculateVectors": "Knowledge Base Calculation (Full)",
-        "importMarkdown": "Import",
+        "importMarkdown": "Import Notes",
         "importing": "Importing...",
         "importSuccess": "Import Successful",
         "importSuccessDesc": "Successfully imported {count} files",

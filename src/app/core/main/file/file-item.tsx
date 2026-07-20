@@ -906,7 +906,7 @@ export function FileItem({
                   data-file-manager-drag-handle
                   draggable
                   onDragStart={handleDragStart}
-                  className="relative flex min-w-0 flex-1 cursor-grab select-none items-center gap-1 overflow-hidden active:cursor-grabbing"
+                  className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-1 overflow-hidden"
                 >
                   <span className={item.parent ? 'size-0' : `${iconSize} ml-1`}></span>
                   <div className="relative flex shrink-0 items-center">
@@ -956,7 +956,7 @@ export function FileItem({
                   data-file-manager-drag-handle
                   draggable
                   onDragStart={handleDragStart}
-                  className="relative flex min-w-0 flex-1 cursor-grab select-none items-center gap-1 overflow-hidden active:cursor-grabbing"
+                  className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-1 overflow-hidden"
                 >
                   <span className={item.parent ? 'size-0' : `${iconSize} ml-1`}></span>
                   <div className="relative flex shrink-0 items-center">

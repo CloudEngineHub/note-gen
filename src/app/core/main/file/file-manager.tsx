@@ -19,7 +19,7 @@ import { toast } from "@/hooks/use-toast"
 import { useTranslations } from "next-intl"
 import useClipboardStore from "@/stores/clipboard"
 import { cloneDeep } from "lodash-es"
-import { FilePlus, FileSymlink, FolderPlus } from "lucide-react"
+import { Files, FilePlus, FileSymlink, FolderPlus, Upload } from "lucide-react"
 import { pasteIntoFolder } from "./folder-item/paste-into-folder"
 import {
   collectFolderMarkdownPaths,
@@ -44,6 +44,17 @@ import {
   hasFileManagerDragData,
   moveFileManagerEntry,
 } from "./file-dnd"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { useMarkdownImport } from './use-markdown-import'
 
 // 递归过滤文件树，移除云端文件（如果 showCloudFiles 为 false）
 function filterFileTree(tree: DirTree[], showCloud: boolean): DirTree[] {
@@ -174,7 +185,10 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     clearSelectedFilePaths,
     cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder,
+    fileTreeLoading,
+    fileTreeInitialized,
   } = useArticleStore()
+  const { isImporting, importMarkdown } = useMarkdownImport()
   const setArticleState = useArticleStore.setState
   const { clipboardItem, clipboardItems, clipboardOperation, setClipboardItem } = useClipboardStore()
 
@@ -590,10 +604,10 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   }, [])
 
   useEffect(() => {
-    if (fileTree.length === 0) {
-      loadFileTree()
+    if (!fileTreeInitialized && !fileTreeLoading) {
+      void loadFileTree()
     }
-  }, [loadFileTree])
+  }, [fileTreeInitialized, fileTreeLoading, loadFileTree])
 
   useEffect(() => {
     function handleDeleteSelection() {
@@ -611,6 +625,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     () => filterFileTree(fileTree, showCloudFiles),
     [fileTree, showCloudFiles]
   )
+  const showEmptyState = fileTreeInitialized && filteredFileTree.length === 0
 
   useEffect(() => {
     const availablePaths = new Set(flattenFileTree(filteredFileTree).map(entry => entry.path))
@@ -661,6 +676,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
               data-file-manager-root-blank
               className={cn(
                 "min-h-24 flex-1 transition-colors",
+                showEmptyState && "flex",
                 isDragging && "bg-primary/5"
               )}
               onClick={clearSelectedFilePaths}
@@ -668,7 +684,36 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
                 e.stopPropagation()
                 clearSelectedFilePaths()
               }}
-            />
+            >
+              {showEmptyState ? (
+                <Empty className="min-h-48 justify-start pt-10">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Files />
+                    </EmptyMedia>
+                    <EmptyTitle>{t('empty.title')}</EmptyTitle>
+                    <EmptyDescription className="whitespace-pre-line text-xs">
+                      {t('empty.description')}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                  <EmptyContent className="flex-row justify-center">
+                    <Button size="sm" onClick={createRootFile}>
+                      <FilePlus data-icon="inline-start" />
+                      {t('toolbar.newArticle')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isImporting}
+                      onClick={() => void importMarkdown()}
+                    >
+                      {isImporting ? <Spinner data-icon="inline-start" /> : <Upload data-icon="inline-start" />}
+                      {isImporting ? t('toolbar.importing') : t('toolbar.importMarkdown')}
+                    </Button>
+                  </EmptyContent>
+                </Empty>
+              ) : null}
+            </div>
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem inset onClick={createRootFile} menuType="file">

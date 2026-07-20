@@ -289,6 +289,7 @@ interface NoteState {
 
   fileTree: DirTree[]
   fileTreeLoading: boolean
+  fileTreeInitialized: boolean
   setFileTree: (tree: DirTree[]) => void
   setEntryLoading: (relativePath: string, loading: boolean) => boolean
   markFileRemote: (relativePath: string, sha: string) => boolean
@@ -807,9 +808,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
   },
 
   fileTree: [],
+  fileTreeInitialized: false,
   setFileTree: (tree: DirTree[]) => {
     const sortedTree = get().sortFileTree(tree)
-    set({ fileTree: sortedTree })
+    set({ fileTree: sortedTree, fileTreeInitialized: true })
   },
   setEntryLoading: (relativePath: string, loading: boolean) => {
     const cacheTree = cloneDeep(get().fileTree)
@@ -1036,7 +1038,6 @@ const useArticleStore = create<NoteState>((set, get) => ({
   
   loadFileTree: async (options) => {
     set({ fileTreeLoading: true })
-    set({ fileTree: [] })
     const vectorIndexPromise = get().initVectorIndexedFiles()
 
     // 确保 collapsibleList 已初始化
@@ -1173,10 +1174,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // 排序文件树
     const sortedDirs = get().sortFileTree(dirs)
-    set({ fileTree: sortedDirs })
-
-    // 先显示本地文件树
-    set({ fileTreeLoading: false })
+    set({
+      fileTree: sortedDirs,
+      fileTreeInitialized: true,
+      fileTreeLoading: false,
+    })
 
     // 异步加载远程同步文件（不阻塞界面）
     if (!options?.skipRemoteSync) {

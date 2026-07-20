@@ -75,6 +75,7 @@ interface Events {
   'window-pin-changed': boolean;
   'link-shortcut-register': unknown;
   'refresh-marks': unknown;
+  'open-new-record-tag': void;
   'record-assets-downloaded': { paths: string[] };
   'quick-prompt-insert': string;
   'quick-prompt-send': string;

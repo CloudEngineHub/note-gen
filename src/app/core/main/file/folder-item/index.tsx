@@ -822,7 +822,7 @@ export function FolderItem({
                     data-file-manager-drag-handle
                     draggable={!isMobile && item.isLocale && !isEditing}
                     onDragStart={handleDragStart}
-                    className="relative flex min-w-0 flex-1 cursor-grab select-none items-center gap-1 overflow-hidden active:cursor-grabbing"
+                    className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-1 overflow-hidden"
                   >
                     {item.loading ? (
                       <Loader2 className={`${iconSize} shrink-0 animate-spin text-primary`} />

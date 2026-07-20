@@ -1851,8 +1851,8 @@
         "add": "添加"
       },
       "mark": {
-        "empty": "暫無記錄",
-        "emptyHint": "使用頂部工具欄開始你的第一條紀錄吧！",
+        "empty": "還沒有紀錄",
+        "emptyHint": "建立一條新的紀錄，\n或用文字、圖片和錄音捕捉靈感。",
         "type": {
           "text": "文本"
         },
@@ -1986,6 +1986,13 @@
         }
       },
       "toolbar": {
+        "more": "更多",
+        "sort": {
+          "title": "排序",
+          "newest": "最新優先",
+          "oldest": "最早優先",
+          "type": "按類型"
+        },
         "search": "搜索",
         "trash": "回收站",
         "restore": "還原",
@@ -2008,6 +2015,13 @@
         "moveSelectedTags": "轉移選中的 {count} 項",
         "deleteSelected": "刪除選中的 {count} 項",
         "deleteSelectedForever": "徹底刪除選中的 {count} 項",
+        "visibleCount": "共 {count} 條記錄",
+        "view": {
+          "title": "視圖",
+          "list": "列表視圖",
+          "compact": "緊湊視圖",
+          "cards": "卡片視圖"
+        },
         "organizeNotes": "整理筆記",
         "organizeSuccess": "筆記整理成功：{title}",
         "organizeError": "整理筆記失敗",
@@ -2579,11 +2593,15 @@
       "openDirectory": "打開文件目錄"
     },
     "file": {
+      "empty": {
+        "title": "還沒有筆記",
+        "description": "建立一篇新的筆記，\n或從本機匯入已有筆記。"
+      },
       "toolbar": {
         "accessRepo": "訪問倉庫",
         "loadingSync": "正在載入同步資訊",
         "configSync": "配置同步",
-        "newArticle": "新建文章",
+        "newArticle": "新增筆記",
         "newFolder": "新建文件夾",
         "refresh": "刷新",
         "toggleFolders": "文件夾展開摺疊",
@@ -2597,7 +2615,7 @@
         "sort": "排序",
         "processingVectors": "正在處理向量數據",
         "calculateVectors": "知識庫計算（全量）",
-        "importMarkdown": "匯入",
+        "importMarkdown": "匯入筆記",
         "importing": "正在匯入...",
         "importSuccess": "匯入成功",
         "importSuccessDesc": "成功匯入 {count} 個文件",

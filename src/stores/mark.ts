@@ -11,7 +11,7 @@ import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileErr
 import { Store } from '@tauri-apps/plugin-store';
 import { create } from 'zustand'
 import { S3Config } from '@/types/sync'
-import { normalizeRecordFilters } from '@/app/core/main/mark/mark-filters'
+import { normalizeRecordFilters, type RecordSortMode } from '@/app/core/main/mark/mark-filters'
 import { normalizeRecordViewMode } from '@/app/core/main/mark/mark-view-mode.mjs'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
 import useArticleStore from './article'
@@ -54,6 +54,15 @@ async function persistRecordFilters(recordFilters: RecordFilters) {
 async function persistRecordViewMode(recordViewMode: RecordViewMode) {
   const store = await Store.load('store.json')
   await store.set('recordViewMode', recordViewMode)
+}
+
+function normalizeRecordSortMode(value?: string): RecordSortMode {
+  return value === 'oldest' || value === 'type' ? value : 'newest'
+}
+
+async function persistRecordSortMode(recordSortMode: RecordSortMode) {
+  const store = await Store.load('store.json')
+  await store.set('recordSortMode', recordSortMode)
 }
 
 async function fetchVisibleMarks(trashState: boolean) {
@@ -126,6 +135,10 @@ interface MarkState {
   recordViewMode: RecordViewMode
   setRecordViewMode: (mode: RecordViewMode) => void
   initRecordViewMode: () => Promise<void>
+
+  recordSortMode: RecordSortMode
+  setRecordSortMode: (mode: RecordSortMode) => void
+  initRecordSortMode: () => Promise<void>
 
   // 同步
   syncState: boolean
@@ -363,6 +376,22 @@ const useMarkStore = create<MarkState>((set, get) => ({
       await store.set('recordViewMode', recordViewMode)
     }
     set({ recordViewMode })
+  },
+
+  recordSortMode: 'newest',
+  setRecordSortMode: (mode) => {
+    const recordSortMode = normalizeRecordSortMode(mode)
+    void persistRecordSortMode(recordSortMode)
+    set({ recordSortMode })
+  },
+  initRecordSortMode: async () => {
+    const store = await Store.load('store.json')
+    const savedRecordSortMode = await store.get<RecordSortMode>('recordSortMode')
+    const recordSortMode = normalizeRecordSortMode(savedRecordSortMode)
+    if (savedRecordSortMode !== recordSortMode) {
+      await store.set('recordSortMode', recordSortMode)
+    }
+    set({ recordSortMode })
   },
 
   // 同步

@@ -268,7 +268,7 @@ export function FileSidebar() {
       className="w-full h-full flex flex-col outline-none"
       tabIndex={-1}
     >
-      <div className="flex-1 overflow-x-hidden overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <FileManager focusSidebar={focusSidebar} />
       </div>
       <FileFooter />

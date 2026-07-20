@@ -9,7 +9,8 @@ import { MarkActions } from "./mark/mark-actions"
 import { useTranslations } from "next-intl"
 import { useSidebarStore } from "@/stores/sidebar"
 import { ExpandableTabs } from "@/components/ui/expandable-tabs"
-import { AnimatePresence, motion } from "framer-motion"
+import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
 
 const SIDEBAR_TABS = [
   { title: "files", icon: Files },
@@ -38,46 +39,58 @@ export function LeftSidebar() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <Tabs value={leftSidebarTab} className="w-full h-full flex flex-col">
-        <div className="w-full h-12 border-b flex items-center justify-between px-2">
+      <Tabs value={leftSidebarTab} className="h-full w-full gap-0 overflow-hidden">
+        <div className="flex h-12 w-full shrink-0 items-center justify-between border-b px-2">
           <ExpandableTabs
             tabs={tabs}
             onChange={handleTabChange}
             selected={getSelectedIndex()}
           />
-          <div className="relative">
-            <AnimatePresence mode="wait">
-              {leftSidebarTab === "files" && (
-                <motion.div
-                  key="files-actions"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <FileActions />
-                </motion.div>
+          <div className="grid shrink-0">
+            <motion.div
+              initial={false}
+              animate={leftSidebarTab === "files"
+                ? { opacity: 1, x: 0 }
+                : { opacity: 0, x: -10 }}
+              transition={{ duration: 0.2 }}
+              className={cn(
+                "col-start-1 row-start-1",
+                leftSidebarTab !== "files" && "pointer-events-none"
               )}
-              {leftSidebarTab === "notes" && (
-                <motion.div
-                  key="notes-actions"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <MarkActions />
-                </motion.div>
+            >
+              <FileActions />
+            </motion.div>
+            <motion.div
+              initial={false}
+              animate={leftSidebarTab === "notes"
+                ? { opacity: 1, x: 0 }
+                : { opacity: 0, x: 10 }}
+              transition={{ duration: 0.2 }}
+              className={cn(
+                "col-start-1 row-start-1",
+                leftSidebarTab !== "notes" && "pointer-events-none"
               )}
-            </AnimatePresence>
+            >
+              <MarkActions />
+            </motion.div>
           </div>
         </div>
-        <TabsContent value="files" className="flex-1 m-0 overflow-hidden">
-          <FileSidebar />
-        </TabsContent>
-        <TabsContent value="notes" className="flex-1 m-0 overflow-hidden">
-          <NoteSidebar />
-        </TabsContent>
+        <div className="relative min-h-0 flex-1">
+          <TabsContent
+            forceMount
+            value="files"
+            className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+          >
+            <FileSidebar />
+          </TabsContent>
+          <TabsContent
+            forceMount
+            value="notes"
+            className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+          >
+            <NoteSidebar />
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   )

@@ -1835,8 +1835,8 @@
         "add": "Adicionar"
       },
       "mark": {
-        "empty": "Nenhum registro",
-        "emptyHint": "Use a barra de ferramentas no topo para criar seu primeiro registro!",
+        "empty": "Ainda não há registros",
+        "emptyHint": "Crie um novo registro\nou capture ideias com texto, imagens e áudio.",
         "type": {
           "text": "Texto"
         },
@@ -1970,6 +1970,13 @@
         }
       },
       "toolbar": {
+        "more": "Mais",
+        "sort": {
+          "title": "Ordenar",
+          "newest": "Mais recentes",
+          "oldest": "Mais antigos",
+          "type": "Por tipo"
+        },
         "search": "Pesquisar",
         "trash": "Lixeira",
         "restore": "Restaurar",
@@ -1992,6 +1999,13 @@
         "moveSelectedTags": "Mover {count} itens selecionados",
         "deleteSelected": "Excluir {count} itens selecionados",
         "deleteSelectedForever": "Excluir {count} itens selecionados permanentemente",
+        "visibleCount": "{count} registros",
+        "view": {
+          "title": "Visualização",
+          "list": "Lista",
+          "compact": "Compacta",
+          "cards": "Cartões"
+        },
         "organizeNotes": "Organizar Notas",
         "organizeSuccess": "Notas organizadas com sucesso: {title}",
         "organizeError": "Falha ao organizar notas",
@@ -2572,11 +2586,15 @@
       "openDirectory": "Abrir Diretório do Arquivo"
     },
     "file": {
+      "empty": {
+        "title": "Nenhuma nota ainda",
+        "description": "Crie uma nova nota,\nou importe notas do seu dispositivo."
+      },
       "toolbar": {
         "accessRepo": "Acessar Repositório",
         "loadingSync": "Carregando informações de sincronização",
         "configSync": "Configurar Sincronização",
-        "newArticle": "Novo Artigo",
+        "newArticle": "Nova Nota",
         "newFolder": "Nova Pasta",
         "refresh": "Atualizar",
         "toggleFolders": "Alternar Pastas",
@@ -2590,7 +2608,7 @@
         "sort": "Ordenar",
         "processingVectors": "Processando Dados Vetoriais",
         "calculateVectors": "Cálculo da Base de Conhecimento (Completo)",
-        "importMarkdown": "Importar",
+        "importMarkdown": "Importar notas",
         "importing": "Importando...",
         "importSuccess": "Importação Bem-sucedida",
         "importSuccessDesc": "Importados {count} arquivos com sucesso",

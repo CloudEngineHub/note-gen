@@ -83,7 +83,7 @@ export function FileFooter() {
   }
 
   return (
-    <div className="flex h-6 items-center justify-between gap-1 overflow-hidden border-t border-border bg-background px-2 text-xs text-muted-foreground">
+    <div className="flex h-6 shrink-0 items-center justify-between gap-1 overflow-hidden border-t border-border bg-background px-2 text-xs text-muted-foreground">
       {/* 左侧：工作区选择器 */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
