@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect, useCallback, useRef } from "react"
 import useMarkStore from "@/stores/mark"
 import useTagStore from "@/stores/tag"
-import { CheckSquare } from "lucide-react"
+import { ArrowDown, ArrowUp, CheckSquare, Minus } from "lucide-react"
 import { parseTodoMarkContent } from "./mark-list-item-content"
 import type { Priority } from "./todo-form"
 
@@ -113,15 +113,33 @@ export function TodoEditDialog({ mark, open, onOpenChange }: TodoEditDialogProps
 
           <div>
             <Label htmlFor="edit-todo-priority">{t('record.mark.todo.priority')}</Label>
-            <Tabs value={todoData.priority} onValueChange={(value) => void persistTodoData({ ...todoData, priority: value as Priority })} className="mt-1.5">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="low" className="data-[state=active]:bg-green-800 data-[state=active]:text-white">
+            <Tabs
+              id="edit-todo-priority"
+              orientation="horizontal"
+              value={todoData.priority}
+              onValueChange={(value) => void persistTodoData({ ...todoData, priority: value as Priority })}
+              className="mt-1.5"
+            >
+              <TabsList className="w-full group-data-vertical/tabs:h-8 group-data-vertical/tabs:flex-row">
+                <TabsTrigger
+                  value="low"
+                  className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+                >
+                  <ArrowDown data-icon="inline-start" />
                   {t('record.mark.todo.priorityLow')}
                 </TabsTrigger>
-                <TabsTrigger value="medium" className="data-[state=active]:bg-orange-700 data-[state=active]:text-white">
+                <TabsTrigger
+                  value="medium"
+                  className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+                >
+                  <Minus data-icon="inline-start" />
                   {t('record.mark.todo.priorityMedium')}
                 </TabsTrigger>
-                <TabsTrigger value="high" className="data-[state=active]:bg-red-900 data-[state=active]:text-white">
+                <TabsTrigger
+                  value="high"
+                  className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+                >
+                  <ArrowUp data-icon="inline-start" />
                   {t('record.mark.todo.priorityHigh')}
                 </TabsTrigger>
               </TabsList>

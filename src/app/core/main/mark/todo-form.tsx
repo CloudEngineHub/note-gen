@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTranslations } from "next-intl"
+import { ArrowDown, ArrowUp, Minus } from "lucide-react"
 
 export type Priority = 'low' | 'medium' | 'high'
 
@@ -101,18 +102,33 @@ export function TodoForm({
 
       <div>
         <Label htmlFor={`todo-priority-${mode}`}>{t('record.mark.todo.priority')}</Label>
-        <Tabs value={data.priority} onValueChange={(value) => onChange({ ...data, priority: value as Priority })} className="mt-1.5">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="low" className="gap-2 data-[state=active]:bg-accent">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
+        <Tabs
+          id={`todo-priority-${mode}`}
+          orientation="horizontal"
+          value={data.priority}
+          onValueChange={(value) => onChange({ ...data, priority: value as Priority })}
+          className="mt-1.5"
+        >
+          <TabsList className="w-full group-data-vertical/tabs:h-8 group-data-vertical/tabs:flex-row">
+            <TabsTrigger
+              value="low"
+              className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+            >
+              <ArrowDown data-icon="inline-start" />
               {t('record.mark.todo.priorityLow')}
             </TabsTrigger>
-            <TabsTrigger value="medium" className="gap-2 data-[state=active]:bg-accent">
-              <span className="w-2 h-2 rounded-full bg-orange-500" />
+            <TabsTrigger
+              value="medium"
+              className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+            >
+              <Minus data-icon="inline-start" />
               {t('record.mark.todo.priorityMedium')}
             </TabsTrigger>
-            <TabsTrigger value="high" className="gap-2 data-[state=active]:bg-accent">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
+            <TabsTrigger
+              value="high"
+              className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+            >
+              <ArrowUp data-icon="inline-start" />
               {t('record.mark.todo.priorityHigh')}
             </TabsTrigger>
           </TabsList>
