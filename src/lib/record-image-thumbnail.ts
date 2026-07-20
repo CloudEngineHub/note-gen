@@ -7,6 +7,16 @@ const RESOLVED_IMAGE_SRC_RE = /^(?:https?:|data:|blob:|asset:|tauri:|file:)/i
 const RECORD_IMAGE_PATH_RE = /^(?:image|screenshot)\//
 
 const thumbnailPromises = new Map<string, Promise<string | null>>()
+let thumbnailGenerationTail = Promise.resolve()
+
+function scheduleThumbnailGeneration(task: () => Promise<string | null>) {
+  const scheduledTask = thumbnailGenerationTail.then(task)
+  thumbnailGenerationTail = scheduledTask.then(
+    () => undefined,
+    () => undefined
+  )
+  return scheduledTask
+}
 
 function normalizeRecordImagePath(src: string) {
   const path = src.trim().replace(/^\/+/, '')
@@ -56,6 +66,20 @@ function getSafeBaseName(path: string) {
 
 function getThumbnailPath(path: string, maxSize: number, extension: 'webp' | 'png') {
   return `${THUMBNAIL_DIR}/${getSafeBaseName(path)}-${hashPath(path)}-${maxSize}.${extension}`
+}
+
+async function findExistingThumbnailPath(imagePath: string, maxSize: number) {
+  const webpPath = getThumbnailPath(imagePath, maxSize, 'webp')
+  if (await exists(webpPath, { baseDir: BaseDirectory.AppData })) {
+    return `/${webpPath}`
+  }
+
+  const pngPath = getThumbnailPath(imagePath, maxSize, 'png')
+  if (await exists(pngPath, { baseDir: BaseDirectory.AppData })) {
+    return `/${pngPath}`
+  }
+
+  return null
 }
 
 async function ensureThumbnailDir() {
@@ -135,14 +159,9 @@ async function generateRecordImageThumbnail(imagePath: string, maxSize: number) 
     return null
   }
 
-  const webpPath = getThumbnailPath(imagePath, maxSize, 'webp')
-  if (await exists(webpPath, { baseDir: BaseDirectory.AppData })) {
-    return `/${webpPath}`
-  }
-
-  const pngPath = getThumbnailPath(imagePath, maxSize, 'png')
-  if (await exists(pngPath, { baseDir: BaseDirectory.AppData })) {
-    return `/${pngPath}`
+  const existingThumbnailPath = await findExistingThumbnailPath(imagePath, maxSize)
+  if (existingThumbnailPath) {
+    return existingThumbnailPath
   }
 
   await ensureThumbnailDir()
@@ -167,6 +186,20 @@ async function generateRecordImageThumbnail(imagePath: string, maxSize: number) 
   }
 }
 
+export async function getCachedRecordImageThumbnailPath(src: string, maxSize = DEFAULT_THUMBNAIL_MAX_SIZE) {
+  const imagePath = normalizeRecordImagePath(src)
+  if (!imagePath) {
+    return null
+  }
+
+  const preferredThumbnail = await findExistingThumbnailPath(imagePath, maxSize)
+  if (preferredThumbnail || maxSize === DEFAULT_THUMBNAIL_MAX_SIZE) {
+    return preferredThumbnail
+  }
+
+  return findExistingThumbnailPath(imagePath, DEFAULT_THUMBNAIL_MAX_SIZE)
+}
+
 export async function getRecordImageThumbnailPath(src: string, maxSize = DEFAULT_THUMBNAIL_MAX_SIZE) {
   const imagePath = normalizeRecordImagePath(src)
   if (!imagePath) {
@@ -179,7 +212,7 @@ export async function getRecordImageThumbnailPath(src: string, maxSize = DEFAULT
     return cachedPromise
   }
 
-  const thumbnailPromise = generateRecordImageThumbnail(imagePath, maxSize)
+  const thumbnailPromise = scheduleThumbnailGeneration(() => generateRecordImageThumbnail(imagePath, maxSize))
     .catch(() => null)
 
   thumbnailPromises.set(cacheKey, thumbnailPromise)

@@ -12,12 +12,12 @@ import { LocalImage } from '@/components/local-image'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
-import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle } from 'lucide-react'
+import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle, ImageIcon } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
 import useMarkStore, { RecordTimePreset } from '@/stores/mark'
 import useTagStore from '@/stores/tag'
-import { clearTrash, delMark, deleteMarks, delMarkForever, initMarksDb, Mark, restoreMark, restoreMarks, updateMark as updateMarkDb } from '@/db/marks'
+import { clearTrash, delMark, deleteMarks, delMarkForever, Mark, restoreMark, restoreMarks, updateMarkTag } from '@/db/marks'
 import { insertTag } from '@/db/tags'
 import { cn, isHttpUrl } from '@/lib/utils'
 import { RecordSyncStatusBanner } from '@/components/record-sync-status-banner'
@@ -27,6 +27,8 @@ import { refreshRemoteRecordsNow } from '@/lib/sync/auto-data-sync-queue'
 const TIME_OPTIONS: RecordTimePreset[] = ['all', 'today', 'last7Days', 'last30Days']
 const PULL_REFRESH_THRESHOLD = 72
 const PULL_REFRESH_MAX_DISTANCE = 112
+const INITIAL_RENDER_COUNT = 40
+const RENDER_BATCH_SIZE = 40
 
 function getMarkPreview(mark: Mark): string {
   if (mark.type === 'text') return mark.content?.trim() || mark.desc?.trim() || ''
@@ -55,8 +57,8 @@ export function MobileRecordStream() {
     setTrashState,
     marks,
     queues,
-    fetchMarks,
-    fetchAllTrashMarks,
+    fetchMarkPreviews,
+    fetchTrashMarkPreviews,
     recordFilters,
     setRecordSearch,
     toggleRecordType,
@@ -90,30 +92,36 @@ export function MobileRecordStream() {
   const pullStartYRef = useRef(0)
   const pullDistanceRef = useRef(0)
   const isPullGestureRef = useRef(false)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  const [visibleRecordCount, setVisibleRecordCount] = useState(INITIAL_RENDER_COUNT)
+  const [isRecordDataReady, setIsRecordDataReady] = useState(false)
 
   useEffect(() => {
-    initMarksDb()
-  }, [])
+    let cancelled = false
 
-  useEffect(() => {
-    initRecordFilters()
-  }, [initRecordFilters])
-
-  useEffect(() => {
-    initTags()
-  }, [initTags])
-
-  useEffect(() => {
-    fetchTags()
-  }, [fetchTags])
-
-  useEffect(() => {
-    if (trashState) {
-      fetchAllTrashMarks()
-    } else {
-      fetchMarks()
+    const prepareRecordData = async () => {
+      await Promise.all([initRecordFilters(), initTags()])
+      await fetchTags()
+      if (!cancelled) {
+        setIsRecordDataReady(true)
+      }
     }
-  }, [trashState, currentTagId, fetchMarks, fetchAllTrashMarks])
+
+    void prepareRecordData()
+    return () => {
+      cancelled = true
+    }
+  }, [fetchTags, initRecordFilters, initTags])
+
+  useEffect(() => {
+    if (!isRecordDataReady) return
+
+    if (trashState) {
+      void fetchTrashMarkPreviews()
+    } else {
+      void fetchMarkPreviews()
+    }
+  }, [currentTagId, fetchMarkPreviews, fetchTrashMarkPreviews, isRecordDataReady, trashState])
 
   useEffect(() => {
     if (!multiMode) {
@@ -138,10 +146,15 @@ export function MobileRecordStream() {
     return filterMarks(records, mobileRecordFilters)
   }, [records, mobileRecordFilters])
 
+  const renderedRecords = useMemo(
+    () => filteredRecords.slice(0, visibleRecordCount),
+    [filteredRecords, visibleRecordCount]
+  )
+
   const groupedRecords = useMemo(() => {
     const groups: Array<{ day: string; list: Mark[] }> = []
     const groupMap = new Map<string, Mark[]>()
-    for (const mark of filteredRecords) {
+    for (const mark of renderedRecords) {
       const day = dayjs(mark.createdAt).format('YYYY-MM-DD')
       if (!groupMap.has(day)) groupMap.set(day, [])
       groupMap.get(day)!.push(mark)
@@ -150,7 +163,31 @@ export function MobileRecordStream() {
       groups.push({ day, list: groupMap.get(day)! })
     })
     return groups
-  }, [filteredRecords])
+  }, [renderedRecords])
+
+  useEffect(() => {
+    setVisibleRecordCount(INITIAL_RENDER_COUNT)
+  }, [mobileRecordFilters, trashState])
+
+  useEffect(() => {
+    if (visibleRecordCount >= filteredRecords.length) return
+
+    const target = loadMoreRef.current
+    const scrollContainer = scrollContainerRef.current
+    if (!target || !scrollContainer || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+
+      setVisibleRecordCount((count) => Math.min(count + RENDER_BATCH_SIZE, filteredRecords.length))
+    }, {
+      root: scrollContainer,
+      rootMargin: '240px 0px',
+    })
+
+    observer.observe(target)
+    return () => observer.disconnect()
+  }, [filteredRecords.length, visibleRecordCount])
 
   useEffect(() => {
     setVisibleMarkIds(filteredRecords.map((mark: Mark) => mark.id))
@@ -159,7 +196,10 @@ export function MobileRecordStream() {
 
   useEffect(() => {
     if (!pendingScrollMarkId) return
-    if (!filteredRecords.some((mark: Mark) => mark.id === pendingScrollMarkId)) return
+    const targetIndex = filteredRecords.findIndex((mark: Mark) => mark.id === pendingScrollMarkId)
+    if (targetIndex < 0) return
+
+    setVisibleRecordCount((count) => Math.max(count, targetIndex + 1))
 
     let cancelled = false
     let attempts = 0
@@ -198,9 +238,9 @@ export function MobileRecordStream() {
 
   async function refreshRecords() {
     if (trashState) {
-      await fetchAllTrashMarks()
+      await fetchTrashMarkPreviews()
     } else {
-      await fetchMarks()
+      await fetchMarkPreviews()
     }
   }
 
@@ -321,17 +361,17 @@ export function MobileRecordStream() {
     })
     if (!accepted) return
     await clearTrash()
-    await fetchAllTrashMarks()
+    await fetchTrashMarkPreviews()
   }
 
   async function handleRestoreAll() {
     if (marks.length === 0) return
     await restoreMarks(marks.map((item) => item.id))
-    await fetchAllTrashMarks()
+    await fetchTrashMarkPreviews()
   }
 
   async function handleMove(mark: Mark, targetTagId: number) {
-    await updateMarkDb({ ...mark, tagId: targetTagId })
+    await updateMarkTag(mark.id, targetTagId)
     await refreshRecords()
   }
 
@@ -410,7 +450,7 @@ export function MobileRecordStream() {
   async function handleMoveSelected(targetTagId: number) {
     const targets = filteredRecords.filter((item: Mark) => selectedIds.has(item.id))
     for (const item of targets) {
-      await updateMarkDb({ ...item, tagId: targetTagId })
+      await updateMarkTag(item.id, targetTagId)
     }
     setSelectedIds(new Set())
     await refreshRecords()
@@ -497,7 +537,7 @@ export function MobileRecordStream() {
               <Button variant="ghost" size="icon" className="h-11 w-11" onClick={handleClearTrash} disabled={marks.length === 0} title={t('record.trash.empty')}>
                 <Trash2 className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setTrashState(false)} title={t('common.close')}>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => void setTrashState(false, { deferFetch: true })} title={t('common.close')}>
                 <XCircle className="size-4" />
               </Button>
             </>
@@ -550,7 +590,7 @@ export function MobileRecordStream() {
               <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setMultiMode(true)} title={t('record.mark.toolbar.multiSelect')}>
                 <CheckSquare className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setTrashState(true)} title={t('record.mark.toolbar.trash')}>
+              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => void setTrashState(true, { deferFetch: true })} title={t('record.mark.toolbar.trash')}>
                 <Trash2 className="size-4" />
               </Button>
             </>
@@ -749,12 +789,17 @@ export function MobileRecordStream() {
                             </div>
                             {(mark.type === 'image' || mark.type === 'scan') && mark.url ? (
                               <div className="mt-2 flex items-center gap-2">
-                                <LocalImage
-                                  src={getMarkImageSrc(mark)}
-                                  alt=""
-                                  useThumbnail
-                                  className="h-12 w-12 rounded-md object-cover"
-                                />
+                                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground/60">
+                                  <ImageIcon className="size-4" />
+                                  <LocalImage
+                                    src={getMarkImageSrc(mark)}
+                                    alt=""
+                                    useThumbnail
+                                    thumbnailMaxSize={96}
+                                    generateThumbnail={false}
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                  />
+                                </div>
                                 <p className="line-clamp-2 text-sm text-muted-foreground">{getMarkPreview(mark) || '-'}</p>
                               </div>
                             ) : (
@@ -769,6 +814,9 @@ export function MobileRecordStream() {
             </div>
           ))
         )}
+        {visibleRecordCount < filteredRecords.length ? (
+          <div ref={loadMoreRef} className="h-1" aria-hidden="true" />
+        ) : null}
       </div>
 
       <Sheet open={createTagOpen} onOpenChange={setCreateTagOpen}>

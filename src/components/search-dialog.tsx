@@ -342,7 +342,14 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
 
   const searchContent = (
     <>
-      <div className="flex items-center gap-3 border-b border-border/70 px-4 py-3">
+      <div
+        className={cn(
+          "flex border-b border-border/70 px-4 py-3",
+          isMobileRoute
+            ? "flex-col items-stretch gap-2"
+            : "items-center gap-3"
+        )}
+      >
         <div className="min-w-0 flex-1">
           <CommandInput
             ref={searchInputRef}
@@ -353,11 +360,16 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             className="h-10 text-base font-medium"
           />
         </div>
-        <div className="flex shrink-0 items-center gap-3">
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-3",
+            isMobileRoute && "justify-between px-1"
+          )}
+        >
           <div className="text-sm font-semibold tracking-tight text-foreground/90">
             {t('search.results', { count: filteredSearchResult.length })}
           </div>
-          <Separator orientation="vertical" className="h-5" />
+          {!isMobileRoute && <Separator orientation="vertical" className="h-5" />}
           <ToggleGroup
             type="single"
             variant="outline"

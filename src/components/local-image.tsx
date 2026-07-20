@@ -2,14 +2,17 @@
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react";
 import { convertImage } from '@/lib/utils'
-import { getRecordImageThumbnailPath } from "@/lib/record-image-thumbnail";
+import { getCachedRecordImageThumbnailPath, getRecordImageThumbnailPath } from "@/lib/record-image-thumbnail";
 import emitter from '@/lib/emitter'
 
 const BLANK_IMAGE_SRC = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+const RESOLVED_IMAGE_SRC_RE = /^(?:https?:|data:|blob:|asset:|tauri:|file:)/i
 
 type LocalImageProps = React.ComponentProps<typeof Image> & {
   onResolvedSrc?: (src: string) => void
   useThumbnail?: boolean
+  thumbnailMaxSize?: number
+  generateThumbnail?: boolean
 }
 
 function getImageSrcString(src: LocalImageProps['src']) {
@@ -24,6 +27,8 @@ export function LocalImage({
   onLoad,
   onResolvedSrc,
   useThumbnail = false,
+  thumbnailMaxSize,
+  generateThumbnail = true,
   src,
   alt = '',
   width = 0,
@@ -100,7 +105,7 @@ export function LocalImage({
         observer.disconnect()
       }
     }, {
-      rootMargin: '320px',
+      rootMargin: useThumbnail ? '120px' : '320px',
     })
 
     observer.observe(imageElement)
@@ -108,7 +113,7 @@ export function LocalImage({
     return () => {
       observer.disconnect()
     }
-  }, [shouldResolve])
+  }, [shouldResolve, useThumbnail])
 
   useEffect(() => {
     if (!shouldResolve) {
@@ -121,11 +126,15 @@ export function LocalImage({
       const sourcePath = getImageSrcString(src)
       const originalSrc = await convertImage(sourcePath)
       const thumbnailPath = useThumbnail
-        ? await getRecordImageThumbnailPath(sourcePath)
+        ? generateThumbnail
+          ? await getRecordImageThumbnailPath(sourcePath, thumbnailMaxSize)
+          : await getCachedRecordImageThumbnailPath(sourcePath, thumbnailMaxSize)
         : null
       const nextSrc = thumbnailPath
         ? await convertImage(thumbnailPath)
-        : originalSrc
+        : useThumbnail && !generateThumbnail && !RESOLVED_IMAGE_SRC_RE.test(sourcePath)
+          ? BLANK_IMAGE_SRC
+          : originalSrc
 
       if (cancelled) {
         return
@@ -139,7 +148,7 @@ export function LocalImage({
     return () => {
       cancelled = true
     }
-  }, [onResolvedSrc, resolveVersion, shouldResolve, src, useThumbnail])
+  }, [generateThumbnail, onResolvedSrc, resolveVersion, shouldResolve, src, thumbnailMaxSize, useThumbnail])
 
   return (
     <Image

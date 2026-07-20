@@ -4,6 +4,7 @@ import { insertActivityEvent } from './activity'
 import { truncateActivityText } from '@/lib/activity/events'
 import { enqueueAutoDataSync } from '@/lib/sync/auto-data-sync-queue'
 import { getMarkLocalAssetPath, queueRecordAssetRemoteDeletions } from '@/lib/sync/record-assets'
+import { getRecordImageThumbnailPath } from '@/lib/record-image-thumbnail'
 
 export { getMarkLocalAssetPath }
 
@@ -86,6 +87,55 @@ export async function getMarks(id: number) {
   return await db.select<Mark[]>("select * from marks where tagId = $1 order by createdAt desc", [id])
 }
 
+export async function getMarkPreviews(id: number) {
+  const db = await getDb()
+  return await db.select<Mark[]>(`
+    select
+      id,
+      tagId,
+      type,
+      substr(content, 1, 500) as content,
+      url,
+      substr(desc, 1, 500) as desc,
+      deleted,
+      createdAt
+    from marks
+    where tagId = $1 and deleted = 0
+    order by createdAt desc
+  `, [id])
+}
+
+export async function getTrashMarkPreviews() {
+  const db = await getDb()
+  return await db.select<Mark[]>(`
+    select
+      id,
+      tagId,
+      type,
+      substr(content, 1, 500) as content,
+      url,
+      substr(desc, 1, 500) as desc,
+      deleted,
+      createdAt
+    from marks
+    where deleted = 1
+    order by createdAt desc
+  `)
+}
+
+export async function getMarkById(id: number) {
+  const db = await getDb()
+  const marks = await db.select<Mark[]>("select * from marks where id = $1", [id])
+  return marks[0]
+}
+
+export async function updateMarkTag(id: number, tagId: number) {
+  const db = await getDb()
+  const result = await db.execute("update marks set tagId = $1 where id = $2", [tagId, id])
+  enqueueRecordsAutoSync('mark:update-tag')
+  return result
+}
+
 export async function insertMark(mark: Partial<Mark>) {
   const db = await getDb();
   const createdAt = Date.now();
@@ -93,6 +143,13 @@ export async function insertMark(mark: Partial<Mark>) {
     "insert into marks (tagId, type, content, url, desc, createdAt, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
     [mark.tagId, mark.type,  mark.content, mark.url, mark.desc, createdAt, 0]
   )
+
+  const localImagePath = mark.type && mark.url
+    ? getMarkLocalAssetPath({ type: mark.type, url: mark.url })
+    : null
+  if (localImagePath) {
+    await getRecordImageThumbnailPath(localImagePath, 96)
+  }
 
   const preview = truncateActivityText(mark.desc || mark.content || mark.url || '', 140)
 

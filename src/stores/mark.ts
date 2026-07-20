@@ -1,4 +1,4 @@
-import { deleteAllMarks, getAllMarks, getMarks, insertMarks, Mark, updateMark } from '@/db/marks'
+import { deleteAllMarks, getAllMarks, getMarkPreviews, getMarks, getTrashMarkPreviews, insertMarks, Mark, updateMark } from '@/db/marks'
 import { uploadFile as uploadGithubFile, getFiles as githubGetFiles, decodeBase64ToString } from '@/lib/sync/github';
 import { uploadFile as uploadGiteeFile, getFiles as giteeGetFiles } from '@/lib/sync/gitee';
 import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileContent as gitlabGetFileContent } from '@/lib/sync/gitlab';
@@ -89,13 +89,15 @@ async function fetchVisibleMarks(trashState: boolean) {
 
 interface MarkState {
   trashState: boolean
-  setTrashState: (flag: boolean) => Promise<void>
+  setTrashState: (flag: boolean, options?: { deferFetch?: boolean }) => Promise<void>
 
   marks: Mark[]
   updateMark: (mark: Mark) => Promise<void>
   setMarks: (marks: Mark[]) => void
   fetchMarks: () => Promise<void>
   fetchAllTrashMarks: () => Promise<void>
+  fetchMarkPreviews: () => Promise<void>
+  fetchTrashMarkPreviews: () => Promise<void>
 
   allMarks: Mark[]
   fetchAllMarks: () => Promise<void>
@@ -151,8 +153,11 @@ interface MarkState {
 
 const useMarkStore = create<MarkState>((set, get) => ({
   trashState: false,
-  setTrashState: async (flag) => {
+  setTrashState: async (flag, options) => {
     set({ trashState: flag, marks: [] })
+    if (options?.deferFetch) {
+      return
+    }
     const marks = await fetchVisibleMarks(flag)
     set({ marks })
   },
@@ -194,6 +199,21 @@ const useMarkStore = create<MarkState>((set, get) => ({
   fetchAllTrashMarks: async () => {
     const decodeRes = await fetchVisibleMarks(true)
     set({ marks: decodeRes })
+  },
+  fetchMarkPreviews: async () => {
+    const store = await Store.load('store.json')
+    const currentTagId = await store.get<number>('currentTagId')
+    if (!currentTagId) {
+      set({ marks: [] })
+      return
+    }
+
+    const previews = await getMarkPreviews(currentTagId)
+    set({ marks: previews.map((item) => ({ ...item, content: item.content || '' })) })
+  },
+  fetchTrashMarkPreviews: async () => {
+    const previews = await getTrashMarkPreviews()
+    set({ marks: previews.map((item) => ({ ...item, content: item.content || '' })) })
   },
 
   allMarks: [],

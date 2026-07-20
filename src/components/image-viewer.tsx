@@ -52,7 +52,7 @@ export function ImageViewer({url, path, imageClassName, interactive = true}: {ur
     />
   )
 
-  if (!interactive) {
+  if (!interactive || !previewSrc) {
     return image
   }
 

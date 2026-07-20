@@ -8,7 +8,19 @@ type ToastOptions = Omit<ExternalToast, "id"> & {
   variant?: "default" | "destructive"
 }
 
+function isMobileRoute() {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/mobile")
+}
+
 function showToast({ title, variant = "default", ...options }: ToastOptions) {
+  if (isMobileRoute() && variant !== "destructive") {
+    return {
+      id: "mobile-toast-suppressed",
+      dismiss: () => undefined,
+      update: (next: ToastOptions) => void next,
+    }
+  }
+
   const notify = variant === "destructive" ? sonnerToast.error : sonnerToast
   const id = notify(title, options)
 

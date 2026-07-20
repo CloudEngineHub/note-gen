@@ -48,7 +48,7 @@ import {
 import { parseTodoMarkContent } from '@/app/core/main/mark/mark-list-item-content'
 import { getMarkTypeListBadgeClasses } from '@/app/core/main/mark/mark-type-meta'
 import type { Priority } from '@/app/core/main/mark/todo-form'
-import { delMark, delMarkForever, restoreMark, type Mark } from '@/db/marks'
+import { delMark, delMarkForever, getMarkById, restoreMark, type Mark } from '@/db/marks'
 import { toast } from '@/hooks/use-toast'
 import { cn, isHttpUrl } from '@/lib/utils'
 import useMarkStore from '@/stores/mark'
@@ -113,19 +113,12 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   const t = useTranslations()
   const router = useRouter()
   const {
-    marks,
-    allMarks,
-    trashState,
     updateMark,
-    fetchMarks,
-    fetchAllMarks,
-    fetchAllTrashMarks,
+    fetchMarkPreviews,
+    fetchTrashMarkPreviews,
   } = useMarkStore()
   const { tags, fetchTags, getCurrentTag } = useTagStore()
-  const mark = useMemo(
-    () => marks.find((item) => item.id === markId) || allMarks.find((item) => item.id === markId),
-    [allMarks, markId, marks]
-  )
+  const [mark, setMark] = useState<Mark | null>(null)
   const [draft, setDraft] = useState<MarkDraft | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -137,11 +130,10 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
     const load = async () => {
       try {
-        await Promise.all([
-          fetchAllMarks(),
-          trashState ? fetchAllTrashMarks() : fetchMarks(),
-          fetchTags(),
-        ])
+        const [record] = await Promise.all([getMarkById(markId), fetchTags()])
+        if (!cancelled) {
+          setMark(record || null)
+        }
       } catch (error) {
         toast({
           title: t('common.error'),
@@ -157,7 +149,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
     return () => {
       cancelled = true
     }
-  }, [fetchAllMarks, fetchAllTrashMarks, fetchMarks, fetchTags, trashState])
+  }, [fetchTags, markId])
 
   useEffect(() => {
     if (mark) setDraft(createDraft(mark))
@@ -174,13 +166,13 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
   const refreshRecords = useCallback(async (deleted: boolean) => {
     if (deleted) {
-      await fetchAllTrashMarks()
+      await fetchTrashMarkPreviews()
       return
     }
 
-    await Promise.all([fetchMarks(), fetchAllMarks(), fetchTags()])
+    await Promise.all([fetchMarkPreviews(), fetchTags()])
     getCurrentTag()
-  }, [fetchAllMarks, fetchAllTrashMarks, fetchMarks, fetchTags, getCurrentTag])
+  }, [fetchMarkPreviews, fetchTags, fetchTrashMarkPreviews, getCurrentTag])
 
   const saveDraft = useCallback(async (sourceMark: Mark, nextDraft: MarkDraft) => {
     if (sourceMark.deleted === 1) return false
@@ -207,6 +199,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
           }
 
       await updateMark(nextMark)
+      setMark(nextMark)
       if (sourceMark.tagId !== nextDraft.tagId) {
         await refreshRecords(false)
       }
@@ -282,7 +275,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   async function handleRestore() {
     if (!mark) return
     await restoreMark(mark.id)
-    await fetchAllTrashMarks()
+    await fetchTrashMarkPreviews()
     navigateBack()
   }
 

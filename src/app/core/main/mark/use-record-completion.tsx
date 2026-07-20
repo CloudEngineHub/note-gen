@@ -6,7 +6,7 @@ import emitter from '@/lib/emitter'
 import { handleRecordComplete } from '@/lib/record-navigation'
 import useMarkStore from '@/stores/mark'
 import useTagStore from '@/stores/tag'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
@@ -18,8 +18,9 @@ interface CompleteRecordOptions {
 
 export function useRecordCompletion() {
   const router = useRouter()
+  const pathname = usePathname()
   const t = useTranslations()
-  const { fetchMarks, setPendingScrollMarkId, setHighlightedMarkId } = useMarkStore()
+  const { fetchMarks, fetchMarkPreviews, setPendingScrollMarkId, setHighlightedMarkId } = useMarkStore()
   const { fetchTags, getCurrentTag, setCurrentTagId } = useTagStore()
 
   const openSavedRecord = useCallback(async (markId?: number | null, tagId?: number | null) => {
@@ -29,7 +30,11 @@ export function useRecordCompletion() {
 
     await fetchTags()
     getCurrentTag()
-    await fetchMarks()
+    if (pathname.startsWith('/mobile')) {
+      await fetchMarkPreviews()
+    } else {
+      await fetchMarks()
+    }
     emitter.emit(EmitterRecordEvents.refreshMarks)
     handleRecordComplete(router)
 
@@ -37,7 +42,7 @@ export function useRecordCompletion() {
       setPendingScrollMarkId(markId)
       setHighlightedMarkId(markId)
     }
-  }, [fetchMarks, fetchTags, getCurrentTag, router, setCurrentTagId, setHighlightedMarkId, setPendingScrollMarkId])
+  }, [fetchMarkPreviews, fetchMarks, fetchTags, getCurrentTag, pathname, router, setCurrentTagId, setHighlightedMarkId, setPendingScrollMarkId])
 
   return useCallback(async ({ markId, tagId, typeLabel }: CompleteRecordOptions = {}) => {
     await openSavedRecord(markId, tagId)
