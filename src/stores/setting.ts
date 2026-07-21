@@ -143,9 +143,6 @@ interface SettingState {
   autoPullOnOpen: boolean
   setAutoPullOnOpen: (autoPullOnOpen: boolean) => Promise<void>
 
-  autoPullOnSwitch: boolean
-  setAutoPullOnSwitch: (autoPullOnSwitch: boolean) => Promise<void>
-
   // Gitee 相关设置
   giteeAccessToken: string
   setGiteeAccessToken: (giteeAccessToken: string) => void
@@ -841,22 +838,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
       const { getSyncManager } = await import('@/lib/sync/sync-manager')
       const manager = getSyncManager()
       await manager.updateConfig({ autoPullOnOpen })
-    } catch {
-      // 静默处理
-    }
-  },
-
-  autoPullOnSwitch: true,
-  setAutoPullOnSwitch: async (autoPullOnSwitch: boolean) => {
-    set({ autoPullOnSwitch })
-    const store = await Store.load('store.json');
-    await store.set('autoPullOnSwitch', autoPullOnSwitch)
-
-    // 同步更新 sync-manager 的配置
-    try {
-      const { getSyncManager } = await import('@/lib/sync/sync-manager')
-      const manager = getSyncManager()
-      await manager.updateConfig({ autoPullOnSwitch })
     } catch {
       // 静默处理
     }

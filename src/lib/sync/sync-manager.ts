@@ -60,8 +60,7 @@ async function getWebDAVConfig(): Promise<WebDAVConfig | null> {
 export interface SyncConfig {
   autoSync: boolean           // 自动同步总开关
   autoPushOnSave: boolean     // 保存时自动推送
-  autoPullOnOpen: boolean     // 打开时自动拉取
-  autoPullOnSwitch: boolean   // 切换文件时自动拉取
+  autoPullOnOpen: boolean     // 打开或切换文件时自动拉取
   conflictPolicy: 'ask' | 'local' | 'remote'
 }
 
@@ -69,7 +68,6 @@ export const defaultSyncConfig: SyncConfig = {
   autoSync: true,
   autoPushOnSave: true,
   autoPullOnOpen: true,       // 默认开启
-  autoPullOnSwitch: true,     // 默认开启
   conflictPolicy: 'ask'
 }
 
@@ -131,14 +129,10 @@ export class SyncManager {
       // 再从 store.json 读取设置中的 autoPull 配置
       const settingStore = await Store.load('store.json')
       const autoPullOnOpen = await settingStore.get<boolean>('autoPullOnOpen')
-      const autoPullOnSwitch = await settingStore.get<boolean>('autoPullOnSwitch')
 
       // 覆盖配置
       if (autoPullOnOpen !== undefined && autoPullOnOpen !== null) {
         this.config.autoPullOnOpen = autoPullOnOpen
-      }
-      if (autoPullOnSwitch !== undefined && autoPullOnSwitch !== null) {
-        this.config.autoPullOnSwitch = autoPullOnSwitch
       }
     } catch {
       // 静默处理配置加载错误

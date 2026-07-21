@@ -779,12 +779,19 @@
       "title": "Sincronização",
       "desc": "Aqui, você pode configurar o repositório de sincronização, que pode ajudá-lo a sincronizar registros, arquivos markdown, configurações do sistema e outras informações.",
       "selectPlatform": "Selecionar Plataforma de Sincronização",
-      "platformSettings": "Selecionar Plataforma",
+      "platformSettings": "Provedor de Backup",
+      "platformListDesc": "Selecione um provedor para ver as configurações e defina-o como ativo após conectar.",
+      "currentPlatform": "Em uso",
+      "setCurrentPlatform": "Usar este provedor",
+      "connectionTab": "Conexão",
+      "syncOptionsTab": "Opções de Sincronização",
       "settings": "Configurações de Sincronização",
       "platformDesc": "Configure o Token e informações do repositório para habilitar a sincronização",
       "moreSettings": "Mais Configurações",
       "noteSettings": "Configurações de notas",
+      "noteSettingsDesc": "Controle uploads e downloads automáticos dos arquivos de notas.",
       "recordConfigSettings": "Registros e configurações",
+      "recordConfigSettingsDesc": "Controle a sincronização automática de registros, configurações e dados privados.",
       "repoStatus": "Status do Repositório",
       "syncRepo": "Repositório de Sincronização",
       "syncRepoDesc": "Sincronizar arquivos markdown na escrita",
@@ -863,9 +870,7 @@
         "pathPrefixDesc": "Usado para diferenciar arquivos entre diferentes usuários, similar ao nome do repositório",
         "customDomain": "Domínio Personalizado",
         "testConnection": "Testar Conexão",
-        "testing": "Testando",
-        "saveConfig": "Salvar Configuração",
-        "saving": "Salvando"
+        "testing": "Testando"
       },
       "webdav": {
         "title": "Sincronização WebDAV",
@@ -885,9 +890,7 @@
         "pathPrefixPlaceholder": "Por favor, insira o prefixo do caminho",
         "pathPrefixDesc": "Usado para diferenciar arquivos entre diferentes usuários",
         "testConnection": "Testar Conexão",
-        "testing": "Testando",
-        "saveConfig": "Salvar Configuração",
-        "saving": "Salvando"
+        "testing": "Testando"
       },
       "autoSync": "Sincronizar notas automaticamente",
       "autoDataSync": "Sincronizar registros e configurações automaticamente",
@@ -941,10 +944,8 @@
         "1m": "1 minuto",
         "2m": "2 minutos"
       },
-      "autoPullOnOpen": "Puxar automaticamente ao abrir arquivos",
-      "autoPullOnOpenDesc": "Ao abrir um arquivo, puxa automaticamente a versão remota se for mais recente",
-      "autoPullOnSwitch": "Puxar automaticamente ao trocar de arquivo",
-      "autoPullOnSwitchDesc": "Ao trocar para outro arquivo, puxa automaticamente a versão remota se for mais recente",
+      "autoPullOnOpen": "Puxar automaticamente ao abrir ou trocar arquivos",
+      "autoPullOnOpenDesc": "Verifica a versão remota ao abrir e a baixa se for mais recente; quando desativado, apenas avisa sobre atualizações",
       "exclusions": {
         "title": "Configuração de Exclusão de Sincronização",
         "desc": "As seguintes configurações não serão sincronizadas entre dispositivos, pois são específicas do dispositivo",

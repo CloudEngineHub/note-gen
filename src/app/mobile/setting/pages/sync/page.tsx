@@ -1,6 +1,6 @@
 'use client'
 
-import { FileDown, Files, FileUp, Loader2, RefreshCcw, ShieldCheck, UploadCloud } from 'lucide-react'
+import { FileDown, FileUp, Loader2, RefreshCcw, ShieldCheck, UploadCloud } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
@@ -11,6 +11,7 @@ import { GitlabSync } from '@/app/core/setting/sync/gitlab-sync'
 import { GiteaSync } from '@/app/core/setting/sync/gitea-sync'
 import { S3Sync } from '@/app/core/setting/sync/s3-sync'
 import { WebDAVSync } from '@/app/core/setting/sync/webdav-sync'
+import { UsePlatformButton } from '@/app/core/setting/sync/components/use-platform-button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
@@ -42,8 +43,6 @@ export default function SyncPage() {
     setExcludeSensitiveConfig,
     autoPullOnOpen,
     setAutoPullOnOpen,
-    autoPullOnSwitch,
-    setAutoPullOnSwitch,
   } = useSettingStore()
   const {
     syncRepoState,
@@ -127,10 +126,9 @@ export default function SyncPage() {
     return platform.charAt(0).toUpperCase() + platform.slice(1)
   }
 
-  async function handleTabChange(value: string) {
+  function handleTabChange(value: string) {
     const nextTab = value as SyncPlatform
     setTab(nextTab)
-    await setPrimaryBackupMethod(nextTab)
   }
 
   async function finishInitialSyncChoice() {
@@ -255,6 +253,12 @@ export default function SyncPage() {
             </SelectGroup>
           </SelectContent>
         </Select>
+        <div className="flex justify-end">
+          <UsePlatformButton
+            platform={tab}
+            disabled={currentSyncState !== SyncStateEnum.success}
+          />
+        </div>
         {renderSyncContent()}
       </section>
 
@@ -308,20 +312,6 @@ export default function SyncPage() {
           </ItemActions>
         </Item>
 
-        <Item variant="outline">
-          <ItemMedia variant="icon"><Files className="size-4" /></ItemMedia>
-          <ItemContent>
-            <ItemTitle>{t('settings.sync.autoPullOnSwitch')}</ItemTitle>
-            <ItemDescription>{t('settings.sync.autoPullOnSwitchDesc')}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Switch
-              checked={autoPullOnSwitch}
-              onCheckedChange={setAutoPullOnSwitch}
-              disabled={isFileAutoSyncDisabled}
-            />
-          </ItemActions>
-        </Item>
       </section>
 
       <section className="flex flex-col gap-3">

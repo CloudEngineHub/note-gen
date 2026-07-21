@@ -849,12 +849,19 @@
       "title": "同步配置",
       "desc": "在这里，你可以配置同步仓库，它可以帮助你同步记录、markdown 文件、系统配置等信息。",
       "selectPlatform": "选择同步平台",
-      "platformSettings": "选择平台",
+      "platformSettings": "备份方案",
+      "platformListDesc": "选择平台查看配置，连接成功后可设为使用平台。",
+      "currentPlatform": "使用中",
+      "setCurrentPlatform": "设为使用平台",
+      "connectionTab": "连接设置",
+      "syncOptionsTab": "同步选项",
       "settings": "同步设置",
       "platformDesc": "配置 Token 和仓库信息以启用同步功能",
       "moreSettings": "更多设置",
       "noteSettings": "笔记设置",
+      "noteSettingsDesc": "控制笔记文件的自动上传与拉取。",
       "recordConfigSettings": "记录与配置设置",
+      "recordConfigSettingsDesc": "控制记录、配置与隐私数据的自动同步。",
       "repoStatus": "仓库状态",
       "syncRepo": "同步仓库",
       "syncRepoDesc": "同步写作中的 markdown 文件。",
@@ -934,9 +941,7 @@
         "pathPrefixDesc": "用于区分不同用户的文件，类似仓库名",
         "customDomain": "自定义域名",
         "testConnection": "测试连接",
-        "testing": "测试中",
-        "saveConfig": "保存配置",
-        "saving": "保存中"
+        "testing": "测试中"
       },
       "webdav": {
         "title": "WebDAV 同步",
@@ -956,9 +961,7 @@
         "pathPrefixPlaceholder": "请输入路径前缀",
         "pathPrefixDesc": "用于区分不同用户的文件",
         "testConnection": "测试连接",
-        "testing": "测试中",
-        "saveConfig": "保存配置",
-        "saving": "保存中"
+        "testing": "测试中"
       },
       "autoSync": "自动同步笔记",
       "autoDataSync": "自动同步记录和配置",
@@ -1012,10 +1015,8 @@
         "1m": "1 分钟",
         "2m": "2 分钟"
       },
-      "autoPullOnOpen": "打开文件时自动拉取",
-      "autoPullOnOpenDesc": "打开文件时，如果远程有新版本则自动拉取覆盖本地",
-      "autoPullOnSwitch": "切换文件时自动拉取",
-      "autoPullOnSwitchDesc": "切换到其他文件时，如果远程有新版本则自动拉取覆盖本地",
+      "autoPullOnOpen": "打开或切换文件时自动拉取",
+      "autoPullOnOpenDesc": "打开文件时检查远程版本，远程较新则自动拉取；关闭后仅提示可用更新",
       "exclusions": {
         "title": "同步排除配置",
         "desc": "以下配置项不会在设备间同步，因为它们是设备特定的",

@@ -754,12 +754,19 @@
       "title": "同步配置",
       "desc": "在這裡，你可以配置同步倉庫，它可以幫助你同步記錄、markdown 文件、系統配置等資訊。",
       "selectPlatform": "選擇同步平台",
-      "platformSettings": "選擇平台",
+      "platformSettings": "備份方案",
+      "platformListDesc": "選擇平台查看設定，連線成功後可設為使用平台。",
+      "currentPlatform": "使用中",
+      "setCurrentPlatform": "設為使用平台",
+      "connectionTab": "連線設定",
+      "syncOptionsTab": "同步選項",
       "settings": "同步設置",
       "platformDesc": "配置 Token 和倉庫資訊以啟用同步功能",
       "moreSettings": "更多設置",
       "noteSettings": "筆記設定",
+      "noteSettingsDesc": "控制筆記檔案的自動上傳與拉取。",
       "recordConfigSettings": "記錄與配置設定",
+      "recordConfigSettingsDesc": "控制記錄、設定與隱私資料的自動同步。",
       "repoStatus": "倉庫狀態",
       "syncRepo": "同步倉庫",
       "syncRepoDesc": "同步寫作中的 markdown 文件。",
@@ -863,10 +870,8 @@
         "1m": "1 分鐘",
         "2m": "2 分鐘"
       },
-      "autoPullOnOpen": "開啟檔案時自動拉取",
-      "autoPullOnOpenDesc": "開啟檔案時，若遠端有新版本則自動拉取覆蓋本地",
-      "autoPullOnSwitch": "切換檔案時自動拉取",
-      "autoPullOnSwitchDesc": "切換到其他檔案時，若遠端有新版本則自動拉取覆蓋本地",
+      "autoPullOnOpen": "開啟或切換檔案時自動拉取",
+      "autoPullOnOpenDesc": "開啟檔案時檢查遠端版本，遠端較新則自動拉取；關閉後僅提示可用更新",
       "exclusions": {
         "title": "同步排除配置",
         "desc": "以下配置項不會在設備間同步，因為它們是設備特定的",
@@ -913,9 +918,7 @@
         "pathPrefixDesc": "用于区分不同用户的文件，类似仓库名",
         "customDomain": "自定义域名",
         "testConnection": "测试连接",
-        "testing": "测试中",
-        "saveConfig": "保存配置",
-        "saving": "保存中"
+        "testing": "测试中"
       },
       "webdav": {
         "title": "WebDAV 同步",
@@ -935,9 +938,7 @@
         "pathPrefixPlaceholder": "请输入路径前缀",
         "pathPrefixDesc": "用于区分不同用户的文件",
         "testConnection": "测试连接",
-        "testing": "测试中",
-        "saveConfig": "保存配置",
-        "saving": "保存中"
+        "testing": "测试中"
       }
     },
     "imageHosting": {

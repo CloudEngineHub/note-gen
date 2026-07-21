@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, EyeOff, CheckCircle, XCircle, Loader2, Save } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { testS3Connection } from '@/lib/sync/s3';
 import { S3Config } from '@/types/sync';
 import { Store } from '@tauri-apps/plugin-store';
@@ -30,19 +30,23 @@ export function S3Sync() {
 
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 初始化配置
   useEffect(() => {
     const initConfig = async () => {
-      const store = await Store.load('store.json');
-      const savedConfig = await store.get<S3Config>('s3SyncConfig');
-      if (savedConfig) {
-        setConfig(savedConfig);
-        // 如果配置完整，自动进行连接检测
-        if (savedConfig.accessKeyId && savedConfig.secretAccessKey && savedConfig.region && savedConfig.bucket) {
-          testConnection(savedConfig);
+      try {
+        const store = await Store.load('store.json');
+        const savedConfig = await store.get<S3Config>('s3SyncConfig');
+        if (savedConfig) {
+          setConfig(savedConfig);
+          // 如果配置完整，自动进行连接检测
+          if (savedConfig.accessKeyId && savedConfig.secretAccessKey && savedConfig.region && savedConfig.bucket) {
+            testConnection(savedConfig);
+          }
         }
+      } finally {
+        setIsInitialized(true);
       }
     };
     initConfig();
@@ -67,25 +71,27 @@ export function S3Sync() {
     }
   };
 
-  // 保存配置
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const store = await Store.load('store.json');
-      await store.set('s3SyncConfig', config);
-      await store.save();
-      // 保存后自动测试连接
-      await testConnection(config);
-    } catch (error) {
-      console.error('Failed to save S3 config:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // 配置变更后自动保存，避免输入过程中频繁写入磁盘
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const store = await Store.load('store.json');
+        await store.set('s3SyncConfig', config);
+        await store.save();
+      } catch (error) {
+        console.error('Failed to auto-save S3 config:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [config, isInitialized]);
 
   // 配置变更处理
   const handleConfigChange = (key: keyof S3Config, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+    setS3Connected(false);
   };
 
   const getStatusIcon = () => {
@@ -189,22 +195,6 @@ export function S3Sync() {
             </>
           ) : (
             t('settings.sync.s3.testConnection')
-          )}
-        </Button>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <>
-              <Loader2 data-icon="inline-start" className="animate-spin" />
-              {t('settings.sync.s3.saving')}
-            </>
-          ) : (
-            <>
-              <Save data-icon="inline-start" />
-              {t('settings.sync.s3.saveConfig')}
-            </>
           )}
         </Button>
       </CardFooter>

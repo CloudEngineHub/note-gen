@@ -754,12 +754,19 @@
       "title": "同期",
       "desc": "ここでは、同期リポジトリを設定することができます。ログ、markdownファイル、システム設定などの情報を同期するのに役立ちます。",
       "selectPlatform": "同期プラットフォームを選択",
-      "platformSettings": "プラットフォームを選択",
+      "platformSettings": "バックアップ先",
+      "platformListDesc": "プラットフォームを選択して設定を確認し、接続後に使用先として設定できます。",
+      "currentPlatform": "使用中",
+      "setCurrentPlatform": "使用するプラットフォームに設定",
+      "connectionTab": "接続設定",
+      "syncOptionsTab": "同期オプション",
       "settings": "同期設定",
       "platformDesc": "Tokenとリポジトリ情報を設定して同期を有効にします",
       "moreSettings": "その他の設定",
       "noteSettings": "ノート設定",
+      "noteSettingsDesc": "ノートファイルの自動アップロードと取得を設定します。",
       "recordConfigSettings": "記録と設定",
+      "recordConfigSettingsDesc": "記録、設定、プライベートデータの自動同期を設定します。",
       "repoStatus": "リポジトリの状態",
       "syncRepo": "同期リポジトリ",
       "syncRepoDesc": "執筆中のMarkdownファイルを同期",
@@ -862,10 +869,8 @@
         "1m": "1 分",
         "2m": "2 分"
       },
-      "autoPullOnOpen": "ファイルを開く時に自動プル",
-      "autoPullOnOpenDesc": "ファイルを開く時、リモートに新しいバージョンがある場合は自動的にプルしてローカルを上書き",
-      "autoPullOnSwitch": "ファイルを切り替える時に自動プル",
-      "autoPullOnSwitchDesc": "他のファイルに切り替える時、リモートに新しいバージョンがある場合は自動的にプルしてローカルを上書き",
+      "autoPullOnOpen": "ファイルを開く・切り替える時に自動プル",
+      "autoPullOnOpenDesc": "ファイルを開く時にリモート版を確認し、新しい場合は自動プルします。無効時は更新通知のみ表示します",
       "exclusions": {
         "title": "同期除外設定",
         "desc": "以下の設定はデバイス固有のものであるため、デバイス間で同期されません",
@@ -913,9 +918,7 @@
         "pathPrefixDesc": "異なるユーザーのファイルを区別するために使用、リポジトリ名に類似",
         "customDomain": "カスタムドメイン",
         "testConnection": "接続テスト",
-        "testing": "テスト中",
-        "saveConfig": "設定を保存",
-        "saving": "保存中"
+        "testing": "テスト中"
       },
       "webdav": {
         "title": "WebDAV 同期",
@@ -935,9 +938,7 @@
         "pathPrefixPlaceholder": "パスプレフィックスを入力してください",
         "pathPrefixDesc": "異なるユーザーのファイルを区別するために使用",
         "testConnection": "接続テスト",
-        "testing": "テスト中",
-        "saveConfig": "設定を保存",
-        "saving": "保存中"
+        "testing": "テスト中"
       }
     },
     "imageHosting": {
