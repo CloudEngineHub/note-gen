@@ -605,6 +605,47 @@ ol {
   }
 }
 
+/* Keep long overlay lists visibly scrollable in desktop webviews. */
+:is(
+  [data-slot="command-list"],
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="context-menu-content"]
+) {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+  scrollbar-width: thin;
+}
+
+:is(
+  [data-slot="command-list"],
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="context-menu-content"]
+)::-webkit-scrollbar {
+  width: 8px;
+}
+
+:is(
+  [data-slot="command-list"],
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="context-menu-content"]
+)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:is(
+  [data-slot="command-list"],
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="context-menu-content"]
+)::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.45);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+}
+
 /* Tiptap 搜索替换高亮样式 */
 .search-result {
   background-color: #ffeb3b !important;
