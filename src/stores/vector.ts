@@ -3,6 +3,15 @@ import { initVectorDb, processAllMarkdownFiles, processMarkdownFile, checkEmbedd
 import { checkRerankModelAvailable } from '@/lib/ai/embedding';
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from '@/hooks/use-toast';
+import {
+  clearVectorDb,
+  getAllVectorDocuments,
+  getVectorIndexStats,
+  replaceAllVectorDocuments,
+  type VectorDocumentSnapshot,
+  type VectorIndexStats
+} from '@/db/vector';
+import useRagSettingsStore from '@/stores/ragSettings';
 
 interface VectorState {
   isRagEnabled: boolean;           // 是否启用RAG检索功能
@@ -10,6 +19,8 @@ interface VectorState {
   isProcessing: boolean;           // 是否正在处理向量
   lastProcessTime: number | null;  // 最后一次处理向量的时间
   hasRerankModel: boolean;         // 是否有可用的重排序模型
+  hasEmbeddingModel: boolean;      // 是否有可用的嵌入模型
+  indexStats: VectorIndexStats;
 
   // 统计数据
   documentCount: number;           // 文档数量
@@ -26,6 +37,7 @@ interface VectorState {
   processDocument: (filename: string, content: string) => Promise<void>;
   checkEmbeddingModel: () => Promise<boolean>;
   checkRerankModel: () => Promise<boolean>;
+  refreshIndexStats: () => Promise<void>;
 }
 
 const useVectorStore = create<VectorState>((set, get) => ({
@@ -34,6 +46,14 @@ const useVectorStore = create<VectorState>((set, get) => ({
   isProcessing: false,
   lastProcessTime: null,
   hasRerankModel: false,
+  hasEmbeddingModel: false,
+  indexStats: {
+    documentCount: 0,
+    chunkCount: 0,
+    bm25DocumentCount: 0,
+    bm25ChunkCount: 0,
+    lastUpdatedAt: null
+  },
   documentCount: 0,
 
   // 初始化向量数据库
@@ -71,6 +91,7 @@ const useVectorStore = create<VectorState>((set, get) => ({
       // 检查重排序模型是否可用
       const hasRerankModel = await get().checkRerankModel();
       set({ hasRerankModel });
+      await get().refreshIndexStats();
     } catch (error) {
       console.error('初始化向量数据库失败:', error);
     }
@@ -100,6 +121,7 @@ const useVectorStore = create<VectorState>((set, get) => ({
     if (get().isProcessing) return;
 
     let processingToast: ReturnType<typeof toast> | undefined;
+    let previousDocuments: VectorDocumentSnapshot[] | null = null;
 
     try {
       // 检查嵌入模型是否可用
@@ -115,6 +137,12 @@ const useVectorStore = create<VectorState>((set, get) => ({
 
       // 设置处理状态
       set({ isProcessing: true });
+
+      const forceRebuild = useRagSettingsStore.getState().indexNeedsRebuild;
+      if (forceRebuild) {
+        previousDocuments = await getAllVectorDocuments();
+        await clearVectorDb();
+      }
 
       // 显示处理开始的提示
       processingToast = toast({
@@ -132,6 +160,11 @@ const useVectorStore = create<VectorState>((set, get) => ({
         });
       });
 
+      if (result.failed > 0 && previousDocuments) {
+        await replaceAllVectorDocuments(previousDocuments);
+        await initBM25Search();
+      }
+
       // 更新处理时间和状态
       const currentTime = Date.now();
       const store = await Store.load('store.json');
@@ -145,6 +178,10 @@ const useVectorStore = create<VectorState>((set, get) => ({
 
       // 重新初始化 BM25 索引
       await initBM25Search();
+      if (result.failed === 0) {
+        await useRagSettingsStore.getState().markIndexClean();
+      }
+      await get().refreshIndexStats();
 
       // 显示处理结果
       let description = `成功处理 ${result.success} 个文档`;
@@ -166,6 +203,16 @@ const useVectorStore = create<VectorState>((set, get) => ({
     } catch (error) {
       console.error('处理文档向量失败:', error);
       set({ isProcessing: false });
+
+      if (previousDocuments) {
+        try {
+          await replaceAllVectorDocuments(previousDocuments);
+          await initBM25Search();
+          await get().refreshIndexStats();
+        } catch (restoreError) {
+          console.error('恢复原有知识库索引失败:', restoreError);
+        }
+      }
 
       const errorToast = {
         title: '向量处理失败',
@@ -195,9 +242,11 @@ const useVectorStore = create<VectorState>((set, get) => ({
   checkEmbeddingModel: async () => {
     try {
       const modelAvailable = await checkEmbeddingModelAvailable();
+      set({ hasEmbeddingModel: modelAvailable });
       return modelAvailable;
     } catch (error) {
       console.error('检查嵌入模型失败:', error);
+      set({ hasEmbeddingModel: false });
       return false;
     }
   },
@@ -212,6 +261,15 @@ const useVectorStore = create<VectorState>((set, get) => ({
       console.error('检查重排序模型失败:', error);
       set({ hasRerankModel: false });
       return false;
+    }
+  },
+
+  refreshIndexStats: async () => {
+    try {
+      const indexStats = await getVectorIndexStats();
+      set({ indexStats, documentCount: indexStats.documentCount });
+    } catch (error) {
+      console.error('读取知识库索引统计失败:', error);
     }
   }
 }));

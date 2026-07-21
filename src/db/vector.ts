@@ -13,6 +13,14 @@ export interface VectorDocument {
 
 export type VectorDocumentSnapshot = Omit<VectorDocument, 'id'>;
 
+export interface VectorIndexStats {
+  documentCount: number;
+  chunkCount: number;
+  bm25DocumentCount: number;
+  bm25ChunkCount: number;
+  lastUpdatedAt: number | null;
+}
+
 // 向量缓存项
 interface CachedVector {
   id: number;
@@ -160,6 +168,28 @@ export async function getAllVectorDocuments(): Promise<VectorDocumentSnapshot[]>
     from vector_documents
     order by filename, chunk_id
   `);
+}
+
+export async function getVectorIndexStats(): Promise<VectorIndexStats> {
+  const rows = await db.select<Array<{
+    document_count: number;
+    chunk_count: number;
+    last_updated_at: number | null;
+  }>>(`
+    select
+      count(distinct filename) as document_count,
+      count(*) as chunk_count,
+      max(updated_at) as last_updated_at
+    from vector_documents
+  `);
+  const bm25Stats = getBM25Index()?.getStats();
+  return {
+    documentCount: Number(rows[0]?.document_count || 0),
+    chunkCount: Number(rows[0]?.chunk_count || 0),
+    bm25DocumentCount: bm25Stats?.documentCount || 0,
+    bm25ChunkCount: bm25Stats?.chunkCount || 0,
+    lastUpdatedAt: rows[0]?.last_updated_at ? Number(rows[0].last_updated_at) : null
+  };
 }
 
 async function insertVectorDocumentSnapshots(documents: VectorDocumentSnapshot[]): Promise<void> {

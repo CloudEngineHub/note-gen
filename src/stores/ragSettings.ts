@@ -19,6 +19,8 @@ export interface RagSettings {
   excludedPaths: string[];
 }
 
+export type RagPreset = 'precision' | 'balanced' | 'recall';
+
 // 默认参数值
 export const DEFAULT_RAG_SETTINGS: RagSettings = {
   chunkSize: 1000,
@@ -31,17 +33,22 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
 
 // RAG 设置状态接口
 interface RagSettingsState extends RagSettings {
+  indexNeedsRebuild: boolean;
   // 初始化设置
   initSettings: () => Promise<void>;
   // 更新单个设置项
   updateSetting: <K extends keyof RagSettings>(key: K, value: RagSettings[K]) => Promise<void>;
+  applyPreset: (preset: RagPreset) => Promise<void>;
+  markIndexDirty: () => Promise<void>;
+  markIndexClean: () => Promise<void>;
   // 重置所有设置为默认值
   resetToDefaults: () => Promise<void>;
 }
 
 // 创建状态存储
-const useRagSettingsStore = create<RagSettingsState>((set) => ({
+const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
   ...DEFAULT_RAG_SETTINGS,
+  indexNeedsRebuild: false,
 
   // 初始化设置
   initSettings: async () => {
@@ -55,6 +62,7 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
       const similarityThreshold = await store.get<number>('ragSimilarityThreshold') ?? DEFAULT_RAG_SETTINGS.similarityThreshold;
       const rerankThreshold = await store.get<number>('ragRerankThreshold') ?? DEFAULT_RAG_SETTINGS.rerankThreshold;
       const excludedPaths = await store.get<string[]>('ragExcludedPaths') ?? DEFAULT_RAG_SETTINGS.excludedPaths;
+      const indexNeedsRebuild = await store.get<boolean>('ragIndexNeedsRebuild') ?? false;
       
       set({
         chunkSize,
@@ -62,7 +70,8 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
         resultCount,
         similarityThreshold,
         rerankThreshold,
-        excludedPaths
+        excludedPaths,
+        indexNeedsRebuild
       });
     } catch (error) {
       console.error('初始化 RAG 设置失败:', error);
@@ -72,22 +81,71 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
   // 更新单个设置项
   updateSetting: async <K extends keyof RagSettings>(key: K, value: RagSettings[K]) => {
     try {
+      let resolvedValue = value;
+      if (key === 'chunkOverlap') {
+        resolvedValue = Math.min(value as number, Math.max(0, get().chunkSize - 50)) as RagSettings[K];
+      }
+      if (key === 'excludedPaths') {
+        resolvedValue = Array.from(new Set(
+          (value as string[]).map(path => path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+|\/+$/g, '').trim()).filter(Boolean)
+        )) as RagSettings[K];
+      }
+
       // 更新本地状态
-      set({ [key]: value } as Pick<RagSettings, K>);
+      set({ [key]: resolvedValue } as Pick<RagSettings, K>);
       
       // 保存到存储
       const store = await Store.load('store.json');
-      await store.set(`rag${key.charAt(0).toUpperCase() + key.slice(1)}`, value);
+      await store.set(`rag${key.charAt(0).toUpperCase() + key.slice(1)}`, resolvedValue);
+
+      if (key === 'chunkSize' && get().chunkOverlap >= (resolvedValue as number)) {
+        const chunkOverlap = Math.max(0, (resolvedValue as number) - 50);
+        set({ chunkOverlap });
+        await store.set('ragChunkOverlap', chunkOverlap);
+      }
+
+      if (key === 'chunkSize' || key === 'chunkOverlap' || key === 'excludedPaths') {
+        set({ indexNeedsRebuild: true });
+        await store.set('ragIndexNeedsRebuild', true);
+      }
     } catch (error) {
       console.error(`更新 RAG 设置 ${key} 失败:`, error);
     }
+  },
+
+  applyPreset: async (preset) => {
+    const presets: Record<RagPreset, Pick<RagSettings, 'resultCount' | 'similarityThreshold' | 'rerankThreshold'>> = {
+      precision: { resultCount: 3, similarityThreshold: 0.4, rerankThreshold: 0.25 },
+      balanced: { resultCount: 5, similarityThreshold: 0.25, rerankThreshold: 0.1 },
+      recall: { resultCount: 8, similarityThreshold: 0.1, rerankThreshold: 0.05 }
+    };
+    const values = presets[preset];
+    const store = await Store.load('store.json');
+    set(values);
+    await Promise.all([
+      store.set('ragResultCount', values.resultCount),
+      store.set('ragSimilarityThreshold', values.similarityThreshold),
+      store.set('ragRerankThreshold', values.rerankThreshold)
+    ]);
+  },
+
+  markIndexDirty: async () => {
+    set({ indexNeedsRebuild: true });
+    const store = await Store.load('store.json');
+    await store.set('ragIndexNeedsRebuild', true);
+  },
+
+  markIndexClean: async () => {
+    set({ indexNeedsRebuild: false });
+    const store = await Store.load('store.json');
+    await store.set('ragIndexNeedsRebuild', false);
   },
 
   // 重置所有设置为默认值
   resetToDefaults: async () => {
     try {
       // 更新本地状态
-      set(DEFAULT_RAG_SETTINGS);
+      set({ ...DEFAULT_RAG_SETTINGS, indexNeedsRebuild: true });
       
       // 保存到存储
       const store = await Store.load('store.json');
@@ -97,6 +155,7 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
       await store.set('ragSimilarityThreshold', DEFAULT_RAG_SETTINGS.similarityThreshold);
       await store.set('ragRerankThreshold', DEFAULT_RAG_SETTINGS.rerankThreshold);
       await store.set('ragExcludedPaths', DEFAULT_RAG_SETTINGS.excludedPaths);
+      await store.set('ragIndexNeedsRebuild', true);
     } catch (error) {
       toast({
         title: '重置 RAG 设置失败',

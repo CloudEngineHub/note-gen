@@ -31,10 +31,12 @@ export function ModelSelect({
   modelKey,
   emptyLabel,
   clearTooltip,
+  onValueChange,
 }: {
   modelKey: string
   emptyLabel?: string
   clearTooltip?: string
+  onValueChange?: (model: string) => void | Promise<void>
 }) {
   const [groupedModels, setGroupedModels] = useState<GroupedModel[]>([])
   const { setCompletionModel, setMarkDescModel, setPrimaryModel, setImageMethodModel, setAudioModel, setSttModel, setEmbeddingModel, setRerankingModel, setCondenseModel, setInspirationModel } = useSettingStore()
@@ -185,6 +187,7 @@ export function ModelSelect({
     const storeKey = getStoreKey(modelKey)
     store.set(storeKey, e)
     await store.save()
+    await onValueChange?.(e)
   }
 
   async function resetDefaultModel() {
@@ -193,6 +196,7 @@ export function ModelSelect({
     store.set(storeKey, '')
     await store.save()
     setPrimaryModelHandler('')
+    await onValueChange?.('')
   }
 
   // 检查模型是否被选中（支持向后兼容）

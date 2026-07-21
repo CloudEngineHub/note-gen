@@ -585,21 +585,29 @@ export async function processMarkdownFile(
       const { path, baseDir } = await getFilePathOptions(filePath)
       content = fileContent || await readTextFile(path, { baseDir })
     }
-    // 如果内容为空或只有空白字符，跳过处理
+    const vectorDocumentKey = getVectorDocumentKey(filePath);
+    const legacyFilename = filePath.split('/').pop() || filePath;
+    // 空文件也视为成功处理，同时清理它可能遗留的旧索引。
     if (!content || content.trim().length === 0) {
-      return false;
+      await deleteVectorDocumentsByFilename(vectorDocumentKey);
+      if (legacyFilename !== vectorDocumentKey) {
+        await deleteVectorDocumentsByFilename(legacyFilename);
+      }
+      return true;
     }
 
     const store = await Store.load('store.json')
     const chunkSize = await store.get<number>('ragChunkSize');
     const chunkOverlap = await store.get<number>('ragChunkOverlap');
     const chunks = chunkText(content, chunkSize, chunkOverlap).filter(chunk => chunk.trim().length > 0);
-    // 如果没有有效的文本块，跳过处理
+    // 没有有效分块时清理旧索引，避免空内容仍被检索到。
     if (chunks.length === 0) {
-      return false;
+      await deleteVectorDocumentsByFilename(vectorDocumentKey);
+      if (legacyFilename !== vectorDocumentKey) {
+        await deleteVectorDocumentsByFilename(legacyFilename);
+      }
+      return true;
     }
-    const vectorDocumentKey = getVectorDocumentKey(filePath);
-    const legacyFilename = filePath.split('/').pop() || filePath;
     const scope = await resolveRetrievalScope({}, store);
     if (!isPathAllowedForRag(vectorDocumentKey, scope)) {
       await deleteVectorDocumentsByFilename(vectorDocumentKey);
@@ -932,6 +940,7 @@ interface SearchResult {
   queryWeight: number;
   keyword?: string;
   type: 'fuzzy' | 'vector' | 'bm25';
+  matchedTypes?: Array<'fuzzy' | 'vector' | 'bm25'>;
 }
 
 function createChunkStableId(filename: string, chunkId: number): string {
@@ -995,6 +1004,21 @@ export interface RagSource {
   content: string;   // 引用的文本片段
 }
 
+export interface RagDiagnosticResult extends RagSource {
+  rank: number;
+  beforeRerankRank: number;
+  fusedScore: number;
+  finalScore: number;
+  retrievers: Array<'fuzzy' | 'vector' | 'bm25'>;
+}
+
+export interface RagSearchResponse {
+  context: string;
+  sources: string[];
+  sourceDetails: RagSource[];
+  diagnostics: RagDiagnosticResult[];
+}
+
 /**
  * 根据完整查询和关键词数组获取相关上下文
  * @param query 用户的完整查询，用于保留语义意图的向量检索和统一重排
@@ -1005,11 +1029,7 @@ export async function getContextForQuery(
   query: string,
   keywords: Keyword[],
   scope: RetrievalScope = {}
-): Promise<{
-  context: string;
-  sources: string[];
-  sourceDetails: RagSource[];
-}> {
+): Promise<RagSearchResponse> {
   try {
     const store = await Store.load('store.json');
     const resultCount = await store.get<number>('ragResultCount') ?? 5;
@@ -1034,7 +1054,7 @@ export async function getContextForQuery(
 
     // 完整查询为空时无法执行语义检索
     if (!query.trim()) {
-      return { context: '', sources: [], sourceDetails: [] };
+      return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
     }
 
     // 读取查询扩展配置
@@ -1179,14 +1199,14 @@ export async function getContextForQuery(
 
     // 如果没有找到任何相关上下文，返回空结果
     if (allResults.length === 0) {
-      return { context: '', sources: [], sourceDetails: [] };
+      return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
     }
 
     const windowSize = await store.get<number>('ragWindowSize') ?? 2;
     return await finalizeSearchResults(query, allResults, strategy, resultCount, windowSize);
   } catch (error) {
     handleRAGError(error, '获取查询上下文失败', false);
-    return { context: '', sources: [], sourceDetails: [] };
+    return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
   }
 }
 
@@ -1269,7 +1289,8 @@ function mergeResultsByDocument(
       ...bestResult,
       rawScore: hybridScore,
       normalizedScore: hybridScore,
-      keyword: keywords.join(', ')
+      keyword: keywords.join(', '),
+      matchedTypes: Array.from(new Set(group.map(result => result.type)))
     });
   }
 
@@ -1309,7 +1330,7 @@ async function finalizeSearchResults(
   strategy: RetrievalStrategy,
   resultCount: number,
   windowSize: number
-): Promise<{ context: string; sources: string[]; sourceDetails: RagSource[] }> {
+): Promise<RagSearchResponse> {
   const mergedResults = mergeResultsByDocument(allResults, strategy.weights);
   const uniqueResults: SearchResult[] = [];
   const mergedIndices = new Set<number>();
@@ -1381,6 +1402,8 @@ async function finalizeSearchResults(
   const rerankCandidates = uniqueResults
     .filter(result => selectedCandidateIds.has(result.stableId))
     .slice(0, rerankCandidateCount);
+  const fusedRankById = new Map(rerankCandidates.map((result, index) => [result.stableId, index + 1]));
+  const fusedScoreById = new Map(rerankCandidates.map(result => [result.stableId, result.normalizedScore]));
   const rerankDocumentsInput = rerankCandidates.map((result, index) => ({
     id: index,
     filename: result.filename,
@@ -1435,11 +1458,21 @@ async function finalizeSearchResults(
   }
 
   const sourceDetails = Array.from(sourceDetailsMap.values());
+  const diagnostics = finalResults.map((result, index): RagDiagnosticResult => ({
+    rank: index + 1,
+    beforeRerankRank: fusedRankById.get(result.stableId) || index + 1,
+    fusedScore: fusedScoreById.get(result.stableId) || result.normalizedScore,
+    finalScore: result.normalizedScore,
+    retrievers: result.matchedTypes || [result.type],
+    filepath: result.filepath,
+    filename: getRagDisplayFilename(result.filepath),
+    content: result.content
+  }));
   const context = finalResults.map(result => `文件：${normalizeRagPath(result.filepath)}
 ${result.content}
 `).join('\n---\n\n');
 
-  return { context, sources, sourceDetails };
+  return { context, sources, sourceDetails, diagnostics };
 }
 
 /**
@@ -1569,7 +1602,7 @@ export async function getContextForQueryInFolder(
   query: string,
   keywords: Keyword[],
   folderPath: string
-): Promise<{ context: string; sources: string[]; sourceDetails: RagSource[] }> {
+): Promise<RagSearchResponse> {
   try {
     const store = await Store.load('store.json');
     const resultCount = await store.get<number>('ragResultCount') ?? 5;
@@ -1591,7 +1624,7 @@ export async function getContextForQueryInFolder(
     const allResults: SearchResult[] = [];
 
     if (!query.trim()) {
-      return { context: '', sources: [], sourceDetails: [] };
+      return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
     }
 
     // 读取查询扩展配置
@@ -1730,13 +1763,13 @@ export async function getContextForQueryInFolder(
 
     // 如果没有找到任何相关上下文，返回空结果
     if (allResults.length === 0) {
-      return { context: '', sources: [], sourceDetails: [] };
+      return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
     }
 
     const windowSize = await store.get<number>('ragWindowSize') ?? 2;
     return await finalizeSearchResults(query, allResults, strategy, resultCount, windowSize);
   } catch (error) {
     handleRAGError(error, '获取文件夹查询上下文失败', false);
-    return { context: '', sources: [], sourceDetails: [] };
+    return { context: '', sources: [], sourceDetails: [], diagnostics: [] };
   }
 }

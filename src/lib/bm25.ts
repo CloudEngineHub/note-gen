@@ -54,6 +54,17 @@ export class BM25Index {
     this.b = b;
   }
 
+  getStats(): { chunkCount: number; documentCount: number } {
+    const filenames = new Set<string>();
+    for (const id of this.documents.keys()) {
+      filenames.add(parseBM25ChunkKey(id)?.filename || id);
+    }
+    return {
+      chunkCount: this.documents.size,
+      documentCount: filenames.size
+    };
+  }
+
   /**
    * 多语言分词：空格语言保留单词和数字，CJK/Hangul 连续文本生成字符二元组。
    * 这种方式不依赖特定语言的词典，也能检索编号、日文和阿拉伯文。
