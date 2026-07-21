@@ -281,7 +281,7 @@ html, body {
   }
 
   .mobile-setting-screen [data-slot="item"]:has(> [data-slot="item-actions"] > [data-slot="switch"]),
-  .mobile-setting-screen [data-slot="item"]:has(> .mobile-setting-inline-action) {
+  .mobile-setting-screen [data-slot="item"].mobile-setting-inline-item {
     flex-wrap: nowrap;
     align-items: center;
   }
@@ -293,6 +293,11 @@ html, body {
     flex: 0 0 auto;
     margin-left: auto;
     justify-content: flex-end;
+  }
+
+  .mobile-setting-screen [data-slot="button"][data-variant="destructive"] {
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
   }
 
   .mobile-setting-screen [data-slot="item"].mobile-setting-skill-card:has(> [data-slot="item-actions"]) {

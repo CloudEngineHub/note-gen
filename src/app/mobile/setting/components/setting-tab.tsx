@@ -60,7 +60,7 @@ export function SettingTab() {
           }
           
           return (
-            <Item key={item.anchor} asChild className="rounded-2xl active:bg-muted">
+            <Item key={item.anchor} asChild className="mobile-setting-inline-item rounded-2xl active:bg-muted">
               <button type="button" onClick={() => handleNavigation(item.anchor)}>
                 <ItemMedia variant="icon">{item.icon}</ItemMedia>
                 <ItemContent>
