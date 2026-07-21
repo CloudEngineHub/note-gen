@@ -9,6 +9,7 @@ import { isMobileDevice } from "@/lib/check"
 import { platform } from "@tauri-apps/plugin-os"
 import { isEditableKeyboardTarget } from "@/lib/is-editable-keyboard-target"
 import { flattenFileTree, getFileSelectionEntries, toClipboardItems } from "./file-selection"
+import { useShallow } from 'zustand/react/shallow'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -17,7 +18,11 @@ type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
  * 只有当文件管理器区域获得焦点时才响应快捷键
  */
 function useFileManagerShortcuts() {
-  const { activeFilePath, fileTree, selectedFilePaths } = useArticleStore()
+  const { activeFilePath, fileTree, selectedFilePaths } = useArticleStore(useShallow((state) => ({
+    activeFilePath: state.activeFilePath,
+    fileTree: state.fileTree,
+    selectedFilePaths: state.selectedFilePaths,
+  })))
   const { setClipboardItem, setClipboardItems } = useClipboardStore()
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isFocused, setIsFocused] = useState(false)
@@ -250,7 +255,13 @@ export function FileSidebar() {
     initShowCloudFiles,
     initSyncStaticAssets,
     initShowKnowledgeBaseStatus,
-  } = useArticleStore()
+  } = useArticleStore(useShallow((state) => ({
+    initCollapsibleList: state.initCollapsibleList,
+    initSortSettings: state.initSortSettings,
+    initShowCloudFiles: state.initShowCloudFiles,
+    initSyncStaticAssets: state.initSyncStaticAssets,
+    initShowKnowledgeBaseStatus: state.initShowKnowledgeBaseStatus,
+  })))
   const { sidebarRef, focusSidebar } = useFileManagerShortcuts()
 
   useEffect(() => {

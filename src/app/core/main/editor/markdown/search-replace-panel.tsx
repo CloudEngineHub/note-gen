@@ -205,7 +205,7 @@ export function SearchReplacePanel({ editor, open, onOpenChange }: SearchReplace
 
   // 监听编辑器状态变化
   useEffect(() => {
-    if (!editor) return
+    if (!editor || !open) return
 
     const handleUpdate = () => {
       updateResults()
@@ -215,7 +215,7 @@ export function SearchReplacePanel({ editor, open, onOpenChange }: SearchReplace
     return () => {
       editor.off('transaction', handleUpdate)
     }
-  }, [editor, updateResults])
+  }, [editor, open, updateResults])
 
   // 替换当前
   const handleReplace = useCallback(() => {

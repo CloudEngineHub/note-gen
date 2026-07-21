@@ -16,6 +16,7 @@ import {
   type OutlinePosition,
 } from '@/lib/outline-preferences'
 import { Store } from '@tauri-apps/plugin-store'
+import { useShallow } from 'zustand/react/shallow'
 
 interface MdEditorProps {
   tabContentsRef: RefObject<Record<string, string>>
@@ -31,7 +32,14 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     activeFilePath,
     currentArticle,
     justPulledFile
-  } = useArticleStore()
+  } = useArticleStore(useShallow((state) => ({
+    saveCurrentArticle: state.saveCurrentArticle,
+    isPulling: state.isPulling,
+    setCurrentArticle: state.setCurrentArticle,
+    activeFilePath: state.activeFilePath,
+    currentArticle: state.currentArticle,
+    justPulledFile: state.justPulledFile,
+  })))
 
   const t = useTranslations('article.file.sync')
   const tEditor = useTranslations('editor')
@@ -304,7 +312,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
 
     // Save to disk - only if this is the active file
     if (filePath && filePath === activeFilePath) {
-      saveCurrentArticle(content)
+      saveCurrentArticle(content, filePath)
     } else if (!filePath && !isCreatingFileRef.current) {
       // Auto-create untitled file
       isCreatingFileRef.current = true

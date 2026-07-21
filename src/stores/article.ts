@@ -38,6 +38,14 @@ type ArticleSyncListenerGlobal = typeof globalThis & {
 
 // 缓存 Store 实例，避免每次都重新加载
 let storeInstance: Store | null = null
+const pendingArticleSaves = new Map<string, {
+  timer: ReturnType<typeof setTimeout> | null
+  content: string
+}>()
+let vectorCalculationTimer: ReturnType<typeof setTimeout> | null = null
+let pendingVectorCalculation: { path: string; content: string } | null = null
+let vectorIndexedFilesInitPromise: Promise<void> | null = null
+
 async function getStore(): Promise<Store> {
   if (!storeInstance) {
     storeInstance = await Store.load('store.json')
@@ -331,20 +339,12 @@ interface NoteState {
   setSkipSyncOnSave: (skip: boolean) => void
   setAiGeneratingFilePath: (path: string | null) => void
   setAiTerminateFn: (fn: (() => void) | null) => void
-  saveCurrentArticle: (content: string) => Promise<void>
-  // 防抖保存相关
-  debounceSaveTimer: NodeJS.Timeout | null
-  pendingSaveContent: string | null
+  saveCurrentArticle: (content: string, pathOverride?: string) => Promise<void>
   // 更新文件 sha 状态（推送成功后调用）
   updateFileSha: (path: string, sha: string) => void
 
   // 向量计算相关
-  vectorCalcTimer: NodeJS.Timeout | null
-  vectorCalcProgressInterval: NodeJS.Timeout | null
-  vectorCalcProgress: number
   isVectorCalculating: boolean
-  lastEditTime: number
-  pendingVectorContent: { path: string; content: string } | null
   scheduleVectorCalculation: (path: string, content: string) => void
   executeVectorCalculation: (options?: { force?: boolean }) => Promise<void>
   cancelVectorCalculation: () => void
@@ -363,10 +363,6 @@ interface NoteState {
 
 const useArticleStore = create<NoteState>((set, get) => ({
   loading: false,
-
-  // 防抖保存相关状态
-  debounceSaveTimer: null,
-  pendingSaveContent: null,
 
   setLoading: (loading: boolean) => { set({ loading }) },
 
@@ -1038,7 +1034,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
   
   loadFileTree: async (options) => {
     set({ fileTreeLoading: true })
-    const vectorIndexPromise = get().initVectorIndexedFiles()
+    // 知识库状态不应阻塞文件树展示；初始化函数会合并并发请求。
+    void get().initVectorIndexedFiles()
 
     // 确保 collapsibleList 已初始化
     if (!get().collapsibleListInitialized) {
@@ -1169,9 +1166,6 @@ const useArticleStore = create<NoteState>((set, get) => ({
       }
     }
         
-    // 在展示文件树前确保知识库索引映射已准备完成，避免状态图标延迟出现。
-    await vectorIndexPromise
-
     // 排序文件树
     const sortedDirs = get().sortFileTree(dirs)
     set({
@@ -2181,12 +2175,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
   },
 
   // 向量计算相关状态
-  vectorCalcTimer: null as NodeJS.Timeout | null,
-  vectorCalcProgressInterval: null as NodeJS.Timeout | null,
-  vectorCalcProgress: 0, // 0-100，表示距离自动计算的进度
   isVectorCalculating: false,
-  lastEditTime: 0,
-  pendingVectorContent: null as { path: string; content: string } | null,
   // 向量索引状态
   vectorIndexedFiles: new Map<string, number>(), // 文件名 -> 向量索引时间戳
 
@@ -2251,8 +2240,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
     }
   },
 
-  saveCurrentArticle: async (content: string) => {
-    const path = get().activeFilePath
+  saveCurrentArticle: async (content: string, pathOverride?: string) => {
+    const path = pathOverride ?? get().activeFilePath
     const justPulled = get().justPulledFile
 
     if (path && content !== undefined && content !== null) {
@@ -2271,33 +2260,27 @@ const useArticleStore = create<NoteState>((set, get) => ({
         return
       }
 
-      // 清除之前的防抖定时器
-      const existingTimer = get().debounceSaveTimer
-      if (existingTimer) {
-        clearTimeout(existingTimer)
+      // 保存中的完整正文和定时器不属于 UI 状态，避免每次输入触发所有 store 订阅者。
+      const existingSave = pendingArticleSaves.get(path)
+      if (existingSave?.timer) {
+        clearTimeout(existingSave.timer)
       }
 
       // 设置新的防抖定时器，500ms 后执行保存
       // 这样可以合并短时间内多次 content change
-      // 保存 pendingContent 用于防抖检查
-      set({ pendingSaveContent: content, debounceSaveTimer: undefined })
-      const timer = setTimeout(async () => {
-        const state = get()
-        const debouncedContent = state.pendingSaveContent || content
-
-        // Bug fix: 检查路径是否仍然匹配，避免文件切换时保存到错误的文件
-        const currentActivePath = state.activeFilePath
-        if (currentActivePath !== path) {
-          // 文件已切换，取消保存
-          set({ debounceSaveTimer: null, pendingSaveContent: null })
+      const pendingSave = {
+        content,
+        timer: null as ReturnType<typeof setTimeout> | null,
+      }
+      pendingSave.timer = setTimeout(async () => {
+        if (pendingArticleSaves.get(path) !== pendingSave) {
           return
         }
-
-        set({ debounceSaveTimer: null, pendingSaveContent: null })
+        pendingArticleSaves.delete(path)
 
         // 执行实际保存操作
         const savePath = path
-        const saveContent = debouncedContent
+        const saveContent = pendingSave.content
         // 检查文件是否存在
         let isLocale = false
         const pathOptions = await getFilePathOptions(savePath)
@@ -2408,9 +2391,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
           emitter.emit('article-saved', { path: savePath, content: saveContent })
         }
       }, 500)
-
-      // 保存待处理的内容（最新的内容）
-      set({ debounceSaveTimer: timer as any, pendingSaveContent: content })
+      pendingArticleSaves.set(path, pendingSave)
     }
   },
 
@@ -2421,55 +2402,27 @@ const useArticleStore = create<NoteState>((set, get) => ({
       return
     }
 
-    const state = get()
-    
-    // 清除之前的定时器
-    if (state.vectorCalcTimer) {
-      clearTimeout(state.vectorCalcTimer)
+    if (vectorCalculationTimer) {
+      clearTimeout(vectorCalculationTimer)
     }
-    if (state.vectorCalcProgressInterval) {
-      clearInterval(state.vectorCalcProgressInterval)
-    }
-    
-    // 更新最后编辑时间和待处理内容
-    const now = Date.now()
-    set({ 
-      lastEditTime: now,
-      pendingVectorContent: { path, content },
-      vectorCalcProgress: 0
-    })
-    
-    // 创建进度更新定时器（每100ms更新一次进度）
-    const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - get().lastEditTime
-      const progress = Math.min((elapsed / 5000) * 100, 100)
-      set({ vectorCalcProgress: progress })
-      
-      if (progress >= 100) {
-        clearInterval(progressInterval)
-      }
-    }, 100)
+
+    pendingVectorCalculation = { path, content }
     
     // 设置5秒后自动执行向量计算
-    const timer = setTimeout(() => {
-      clearInterval(progressInterval)
-      get().executeVectorCalculation()
+    vectorCalculationTimer = setTimeout(() => {
+      vectorCalculationTimer = null
+      void get().executeVectorCalculation()
     }, 5000)
-    
-    set({ 
-      vectorCalcTimer: timer as any,
-      vectorCalcProgressInterval: progressInterval as any
-    })
   },
 
   // 执行向量计算
   executeVectorCalculation: async (options = {}) => {
-    const state = get()
-    
     // 如果没有待处理内容或正在计算中，直接返回
-    if (!state.pendingVectorContent || state.isVectorCalculating) {
+    if (!pendingVectorCalculation || get().isVectorCalculating) {
       return
     }
+
+    const calculation = pendingVectorCalculation
 
     if (!options.force) {
       if (!useVectorStore.getState().isAutoVectorEnabled) {
@@ -2479,16 +2432,16 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
       const store = await getStore()
       const disabledFiles = await store.get<string[]>('vectorAutoCalcDisabled') || []
-      if (disabledFiles.includes(state.pendingVectorContent.path)) {
+      if (disabledFiles.includes(calculation.path)) {
         get().cancelVectorCalculation()
         return
       }
     }
     
     try {
-      set({ isVectorCalculating: true, vectorCalcProgress: 100 })
+      set({ isVectorCalculating: true })
       
-      const { path, content } = state.pendingVectorContent
+      const { path, content } = calculation
       const vectorStore = useVectorStore.getState()
 
       // 执行向量计算
@@ -2499,20 +2452,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
       newMap.set(vectorKey, Date.now())
       set({ vectorIndexedFiles: newMap })
 
-      // 清除待处理内容和定时器
-      if (state.vectorCalcTimer) {
-        clearTimeout(state.vectorCalcTimer)
+      if (pendingVectorCalculation === calculation) {
+        pendingVectorCalculation = null
       }
-      if (state.vectorCalcProgressInterval) {
-        clearInterval(state.vectorCalcProgressInterval)
-      }
-      
-      set({ 
-        pendingVectorContent: null,
-        vectorCalcTimer: null,
-        vectorCalcProgressInterval: null,
-        vectorCalcProgress: 0
-      })
+      set({ isVectorCalculating: false })
     } catch {
       set({ isVectorCalculating: false })
     }
@@ -2520,19 +2463,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
   // 取消向量计算
   cancelVectorCalculation: () => {
-    const state = get()
-    if (state.vectorCalcTimer) {
-      clearTimeout(state.vectorCalcTimer)
+    if (vectorCalculationTimer) {
+      clearTimeout(vectorCalculationTimer)
+      vectorCalculationTimer = null
     }
-    if (state.vectorCalcProgressInterval) {
-      clearInterval(state.vectorCalcProgressInterval)
-    }
-    set({
-      vectorCalcTimer: null,
-      vectorCalcProgressInterval: null,
-      vectorCalcProgress: 0,
-      pendingVectorContent: null
-    })
+    pendingVectorCalculation = null
   },
 
   // 检查文件是否已被向量索引
@@ -2571,14 +2506,20 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
   // 初始化向量索引状态 - 加载所有已索引的文件
   initVectorIndexedFiles: async () => {
-    try {
-      const { getAllVectorDocuments } = await import('@/db/vector')
-      const vectorIndexedDocs = await getAllVectorDocuments()
-      const vectorIndexedMap = buildVectorIndexedMap(vectorIndexedDocs)
+    if (!vectorIndexedFilesInitPromise) {
+      vectorIndexedFilesInitPromise = (async () => {
+        const { getVectorIndexSummaries } = await import('@/db/vector')
+        const vectorIndexedDocs = await getVectorIndexSummaries()
+        const vectorIndexedMap = buildVectorIndexedMap(vectorIndexedDocs)
 
-      set({ vectorIndexedFiles: vectorIndexedMap })
-    } catch {
+        set({ vectorIndexedFiles: vectorIndexedMap })
+      })().catch(() => {
+      }).finally(() => {
+        vectorIndexedFilesInitPromise = null
+      })
     }
+
+    await vectorIndexedFilesInitPromise
   },
 
   // 手动触发向量计算（使用当前文章内容）
@@ -2594,13 +2535,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
       return
     }
 
-    // 设置待处理内容并执行
-    set({
-      pendingVectorContent: {
-        path: state.activeFilePath,
-        content
-      }
-    })
+    pendingVectorCalculation = {
+      path: state.activeFilePath,
+      content
+    }
 
     await get().executeVectorCalculation({ force: true })
   },

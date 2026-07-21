@@ -21,7 +21,6 @@ import Image from '@tiptap/extension-image'
 import { common, createLowlight } from 'lowlight'
 import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
-import UniqueId from '@tiptap/extension-unique-id'
 import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
 import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
@@ -1109,6 +1108,10 @@ export function TipTapEditor({
 
   // Content version ref for race condition prevention between editor and agent
   const contentVersionRef = useRef(0)
+  const markdownChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasPendingMarkdownChangeRef = useRef(false)
+  const onChangeRef = useRef(onChange)
+  const viewStatePersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editorDragHandleTargetRef = useRef<{ editor: CoreEditor; from: number; to: number } | null>(null)
   const editorBlockPointerDragStateRef = useRef<EditorBlockPointerDragState | null>(null)
   const editorShortcuts = useEditorShortcutStore((state) => state.shortcuts)
@@ -1121,6 +1124,37 @@ export function TipTapEditor({
   useEffect(() => {
     editorShortcutsRef.current = editorShortcuts
   }, [editorShortcuts])
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
+
+  const flushMarkdownChange = useCallback((targetEditor: TipTapReactEditor) => {
+    if (markdownChangeTimerRef.current) {
+      clearTimeout(markdownChangeTimerRef.current)
+      markdownChangeTimerRef.current = null
+    }
+
+    if (!hasPendingMarkdownChangeRef.current || targetEditor.isDestroyed) {
+      return
+    }
+
+    hasPendingMarkdownChangeRef.current = false
+    const markdown = normalizeMarkdownPlaceholders(targetEditor.getMarkdown())
+    onChangeRef.current?.(markdown)
+  }, [])
+
+  const scheduleMarkdownChange = useCallback((targetEditor: TipTapReactEditor) => {
+    hasPendingMarkdownChangeRef.current = true
+    if (markdownChangeTimerRef.current) {
+      clearTimeout(markdownChangeTimerRef.current)
+    }
+
+    markdownChangeTimerRef.current = setTimeout(() => {
+      markdownChangeTimerRef.current = null
+      flushMarkdownChange(targetEditor)
+    }, 500)
+  }, [flushMarkdownChange])
 
   const runEditorShortcutCommand = useCallback((id: EditorShortcutCommandId, targetEditor: CoreEditor) => {
     return editorShortcutHandlersRef.current[id]?.(targetEditor) ?? false
@@ -1244,10 +1278,6 @@ export function TipTapEditor({
       AISuggestion,
       AiSuggestionHighlight,
       AgentDiffPreview,
-      UniqueId.configure({
-        attributeName: 'data-id',
-        types: ['paragraph', 'heading', 'blockquote', 'codeBlock', 'listItem', 'bulletList', 'orderedList', 'taskItem', 'table', 'tableRow', 'tableCell', 'tableHeader'],
-      }),
       InlineMath,
       BlockMath,
       MermaidDiagram,
@@ -1474,8 +1504,7 @@ export function TipTapEditor({
       // Bug fix: Only trigger onChange if editor is ready (not during initialization)
       // Using counter to handle rapid successive updates
       if (externalUpdateCounterRef.current === 0 && isReadyRef.current) {
-        const markdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
-        onChange?.(markdown)
+        scheduleMarkdownChange(editor)
         // Mark that we've processed the first update
         isFirstUpdateRef.current = false
         // Increment version on user content changes
@@ -1487,6 +1516,18 @@ export function TipTapEditor({
       }
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+
+    const handleBlur = () => flushMarkdownChange(editor)
+    editor.on('blur', handleBlur)
+
+    return () => {
+      editor.off('blur', handleBlur)
+      flushMarkdownChange(editor)
+    }
+  }, [editor, flushMarkdownChange])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) {
@@ -1689,7 +1730,13 @@ export function TipTapEditor({
   }, [activeFilePath, editor, setEditorViewState])
 
   const handleEditorScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
-    persistEditorViewState()
+    if (viewStatePersistTimerRef.current) {
+      clearTimeout(viewStatePersistTimerRef.current)
+    }
+    viewStatePersistTimerRef.current = setTimeout(() => {
+      viewStatePersistTimerRef.current = null
+      persistEditorViewState()
+    }, 150)
 
     if (!isMobile) {
       return
@@ -1748,34 +1795,26 @@ export function TipTapEditor({
       return
     }
 
-    const handleSelectionUpdate = () => {
+    const handleBlur = () => {
+      if (viewStatePersistTimerRef.current) {
+        clearTimeout(viewStatePersistTimerRef.current)
+        viewStatePersistTimerRef.current = null
+      }
       persistEditorViewState()
     }
 
-    editor.on('selectionUpdate', handleSelectionUpdate)
+    editor.on('blur', handleBlur)
     return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate)
+      editor.off('blur', handleBlur)
     }
   }, [activeFilePath, editor, persistEditorViewState])
 
   useEffect(() => {
-    const scrollContainer = scrollContainerRef.current
-    if (!scrollContainer || !activeFilePath) {
-      return
-    }
-
-    const handleScroll = () => {
-      persistEditorViewState()
-    }
-
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
-      scrollContainer.removeEventListener('scroll', handleScroll)
-    }
-  }, [activeFilePath, persistEditorViewState])
-
-  useEffect(() => {
-    return () => {
+      if (viewStatePersistTimerRef.current) {
+        clearTimeout(viewStatePersistTimerRef.current)
+        viewStatePersistTimerRef.current = null
+      }
       persistEditorViewState()
     }
   }, [persistEditorViewState])
@@ -3456,16 +3495,6 @@ export function TipTapEditor({
       })
     }
 
-    // 监听 transaction 事件 - 在文档更新时立即转换
-    const handleTransaction = () => {
-      scheduleTransformImagePaths()
-    }
-
-    // 监听 selectionUpdate 事件
-    const handleSelectionUpdate = () => {
-      scheduleTransformImagePaths()
-    }
-
     const imageNodeObserver = new MutationObserver((mutations) => {
       const hasAddedImageNode = mutations.some(mutation =>
         Array.from(mutation.addedNodes).some(node =>
@@ -3479,16 +3508,12 @@ export function TipTapEditor({
       }
     })
 
-    editor.on('transaction', handleTransaction)
-    editor.on('selectionUpdate', handleSelectionUpdate)
     imageNodeObserver.observe(editor.view.dom, { childList: true, subtree: true })
 
     // 初始执行
     scheduleTransformImagePaths()
 
     return () => {
-      editor.off('transaction', handleTransaction)
-      editor.off('selectionUpdate', handleSelectionUpdate)
       imageNodeObserver.disconnect()
       if (transformFrameId !== null) {
         cancelAnimationFrame(transformFrameId)
@@ -3508,8 +3533,6 @@ export function TipTapEditor({
 
     emitUndoRedoState()
     const handleTransaction = () => {
-      emitUndoRedoState()
-
       if (frameId !== null) {
         cancelAnimationFrame(frameId)
       }

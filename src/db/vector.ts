@@ -21,6 +21,11 @@ export interface VectorIndexStats {
   lastUpdatedAt: number | null;
 }
 
+export interface VectorIndexSummary {
+  filename: string;
+  updated_at: number;
+}
+
 // 向量缓存项
 interface CachedVector {
   id: number;
@@ -139,27 +144,38 @@ class VectorCache {
 const vectorCache = new VectorCache();
 
 // 初始化向量数据库表
+let vectorDbInitPromise: Promise<void> | null = null;
+
 export async function initVectorDb() {
-  await db.execute(`
-    create table if not exists vector_documents (
-      id integer primary key autoincrement,
-      filename text not null,
-      chunk_id integer not null,
-      content text not null,
-      embedding text not null,
-      updated_at integer not null,
-      unique(filename, chunk_id)
-    )
-  `);
+  if (!vectorDbInitPromise) {
+    vectorDbInitPromise = (async () => {
+      await db.execute(`
+        create table if not exists vector_documents (
+          id integer primary key autoincrement,
+          filename text not null,
+          chunk_id integer not null,
+          content text not null,
+          embedding text not null,
+          updated_at integer not null,
+          unique(filename, chunk_id)
+        )
+      `);
 
-  // 创建用于快速查找文件的索引
-  await db.execute(`
-    create index if not exists idx_vector_documents_filename
-    on vector_documents(filename)
-  `);
+      // 创建用于快速查找文件的索引
+      await db.execute(`
+        create index if not exists idx_vector_documents_filename
+        on vector_documents(filename)
+      `);
 
-  // 初始化缓存
-  await vectorCache.update();
+      // 初始化缓存。应用启动期间可能从多个入口调用初始化，确保只加载一次。
+      await vectorCache.update();
+    })().catch((error) => {
+      vectorDbInitPromise = null;
+      throw error;
+    });
+  }
+
+  await vectorDbInitPromise;
 }
 
 export async function getAllVectorDocuments(): Promise<VectorDocumentSnapshot[]> {
@@ -167,6 +183,14 @@ export async function getAllVectorDocuments(): Promise<VectorDocumentSnapshot[]>
     select filename, chunk_id, content, embedding, updated_at
     from vector_documents
     order by filename, chunk_id
+  `);
+}
+
+export async function getVectorIndexSummaries(): Promise<VectorIndexSummary[]> {
+  return await db.select<VectorIndexSummary[]>(`
+    select filename, max(updated_at) as updated_at
+    from vector_documents
+    group by filename
   `);
 }
 

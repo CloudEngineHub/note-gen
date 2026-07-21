@@ -23,6 +23,7 @@ import { ImageEditor } from './image/image-editor'
 import { EmptyState } from './empty-state'
 import { FolderView } from './folder'
 import { UnsupportedFile } from './unsupported-file'
+import { useShallow } from 'zustand/react/shallow'
 import { MarkDetailPanel } from '../mark/mark-detail-panel'
 import { getRecordIdFromTabPath, isRecordTabPath } from '../mark/mark-record-tab'
 import {
@@ -65,7 +66,19 @@ export function EditorLayout() {
     removeTab,
     initOpenTabs,
     initShowCloudFiles
-  } = useArticleStore()
+  } = useArticleStore(useShallow((state) => ({
+    activeFilePath: state.activeFilePath,
+    fileTree: state.fileTree,
+    setActiveFilePath: state.setActiveFilePath,
+    openTabs: state.openTabs,
+    activeTabId: state.activeTabId,
+    setOpenTabs: state.setOpenTabs,
+    setActiveTabId: state.setActiveTabId,
+    addTab: state.addTab,
+    removeTab: state.removeTab,
+    initOpenTabs: state.initOpenTabs,
+    initShowCloudFiles: state.initShowCloudFiles,
+  })))
   const { setLeftSidebarTab, rightSidebarVisible, toggleRightSidebar } = useSidebarStore()
   const { setOnboardingPromptDraft } = useChatStore()
   const setActiveMarkId = useMarkStore((state) => state.setActiveMarkId)

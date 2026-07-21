@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, mkdir, rename } from "@tauri-apps/plugin-fs";
 import { ChevronRight, Folder, FolderDot, FolderDown, FolderOpen, FolderOpenDot, FolderUp, Loader2, LoaderCircle, Database, Sparkles } from "lucide-react"
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import { cloneDeep } from "lodash-es";
 import { computedParentPath, getCurrentFolder, joinRelativePath } from "@/lib/path";
@@ -46,6 +46,7 @@ import {
 import { debugSyncPath } from "@/lib/sync/remote-file";
 import { BatchSelectionContextMenu } from "../batch-selection-context-menu";
 import type { FileSelectionEntry } from "../file-selection";
+import { useShallow } from 'zustand/react/shallow';
 
 export function FolderItem({
   item,
@@ -107,7 +108,25 @@ export function FolderItem({
     selectedFilePaths,
     setSelectedFilePaths,
     clearSelectedFilePaths,
-  } = useArticleStore()
+  } = useArticleStore(useShallow((state) => ({
+    activeFilePath: state.activeFilePath,
+    loadFileTree: state.loadFileTree,
+    setActiveFilePath: state.setActiveFilePath,
+    collapsibleList: state.collapsibleList,
+    setCollapsibleList: state.setCollapsibleList,
+    loadCollapsibleFiles: state.loadCollapsibleFiles,
+    fileTree: state.fileTree,
+    setFileTree: state.setFileTree,
+    vectorIndexedFiles: state.vectorIndexedFiles,
+    showKnowledgeBaseStatus: state.showKnowledgeBaseStatus,
+    moveLocalEntry: state.moveLocalEntry,
+    syncOpenTabsForPathChange: state.syncOpenTabsForPathChange,
+    cleanTabsByDeletedFile: state.cleanTabsByDeletedFile,
+    cleanTabsByDeletedFolder: state.cleanTabsByDeletedFolder,
+    selectedFilePaths: state.selectedFilePaths,
+    setSelectedFilePaths: state.setSelectedFilePaths,
+    clearSelectedFilePaths: state.clearSelectedFilePaths,
+  })))
   const { setClipboardItem, clipboardItem, clipboardItems, clipboardOperation } = useClipboardStore()
 
   const path = computedParentPath(item)
@@ -121,7 +140,7 @@ export function FolderItem({
   const useSelectionMenu = isSelected && selectionEntries.length > 1
 
   // 计算文件夹的向量状态
-  const folderVectorStatus = useCallback(() => {
+  const folderVectorStatus = useMemo(() => {
     let totalCount = 0
     let loadedIndexedCount = 0
 
@@ -160,7 +179,7 @@ export function FolderItem({
     if (!showKnowledgeBaseStatus || isInSkillsFolder(path)) return null
 
     const status = item.vectorCalcStatus
-    const vectorStatus = folderVectorStatus()
+    const vectorStatus = folderVectorStatus
 
     if (status === 'calculating') {
       return (
@@ -771,7 +790,7 @@ export function FolderItem({
           <button
             type="button"
             data-file-manager-toggle
-            className="ml-1 inline-flex shrink-0 items-center justify-center bg-sidebar group-hover:bg-transparent"
+            className="ml-1 inline-flex shrink-0 items-center justify-center bg-transparent"
             onClick={async (e) => {
               e.stopPropagation()
               const nextExpanded = !isExpanded

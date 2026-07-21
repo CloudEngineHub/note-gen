@@ -38,6 +38,7 @@ import { BatchSelectionContextMenu } from "./batch-selection-context-menu";
 import type { FileSelectionEntry } from "./file-selection";
 import { pasteIntoFolder } from "./folder-item/paste-into-folder";
 import { downloadRemoteLibraryFile, uploadLocalLibraryFile } from "@/lib/sync/remote-library";
+import { useShallow } from 'zustand/react/shallow';
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -105,7 +106,24 @@ export function FileItem({
     clearSelectedFilePaths,
     setEntryLoading,
     markFileLocal,
-  } = useArticleStore()
+  } = useArticleStore(useShallow((state) => ({
+    activeFilePath: state.activeFilePath,
+    setActiveFilePath: state.setActiveFilePath,
+    readArticle: state.readArticle,
+    fileTree: state.fileTree,
+    setFileTree: state.setFileTree,
+    loadFileTree: state.loadFileTree,
+    vectorIndexedFiles: state.vectorIndexedFiles,
+    showKnowledgeBaseStatus: state.showKnowledgeBaseStatus,
+    checkFileVectorIndexed: state.checkFileVectorIndexed,
+    cleanTabsByDeletedFile: state.cleanTabsByDeletedFile,
+    cleanTabsByDeletedFolder: state.cleanTabsByDeletedFolder,
+    selectedFilePaths: state.selectedFilePaths,
+    setSelectedFilePaths: state.setSelectedFilePaths,
+    clearSelectedFilePaths: state.clearSelectedFilePaths,
+    setEntryLoading: state.setEntryLoading,
+    markFileLocal: state.markFileLocal,
+  })))
   const setArticleState = useArticleStore.setState
   const { setClipboardItem, clipboardItem, clipboardItems, clipboardOperation } = useClipboardStore()
   const { fileManagerTextSize } = useSettingStore()

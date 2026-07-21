@@ -407,7 +407,7 @@ export function Outline({
   // Update headings when editor content changes
   useEffect(() => {
     // Check if editor is fully initialized
-    if (!editor || !editor.view || !editor.view.dom) {
+    if (!isOpen || !editor || !editor.view || !editor.view.dom) {
       return
     }
 
@@ -432,7 +432,7 @@ export function Outline({
     return () => {
       editor.off('update', handleUpdate)
     }
-  }, [editor, extractHeadings])
+  }, [editor, extractHeadings, isOpen])
 
   const outlineMeta = useMemo<OutlineMeta>(() => {
     const ancestorIdsById = new Map<string, string[]>()
@@ -713,7 +713,7 @@ export function Outline({
   // Update active heading when selection or scroll changes
   useEffect(() => {
     // Check if editor is fully initialized
-    if (!editor || !editor.view || !editor.view.dom) return
+    if (!isOpen || !editor || !editor.view || !editor.view.dom) return
 
     const updateActiveHeading = () => {
       // First try to get heading from cursor position
@@ -742,7 +742,7 @@ export function Outline({
       editor.off('transaction', updateActiveHeading)
       scrollContainer?.removeEventListener('scroll', handleScroll)
     }
-  }, [editor, findActiveHeading, findActiveHeadingByScroll, getEditorScrollContainer, headings])
+  }, [editor, findActiveHeading, findActiveHeadingByScroll, getEditorScrollContainer, headings, isOpen])
 
   // Scroll to heading when clicked
   const scrollToHeading = useCallback((id: string) => {
