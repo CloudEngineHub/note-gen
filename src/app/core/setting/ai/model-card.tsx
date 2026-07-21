@@ -50,8 +50,16 @@ interface ModelCardProps {
   mobile?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
-  onUpdate: (modelId: string, field: keyof ModelConfig, value: any) => void
+  onUpdate: <K extends keyof ModelConfig>(modelId: string, field: K, value: ModelConfig[K]) => void
   onDelete: (modelId: string) => void
+}
+
+interface RerankCheckResponse {
+  results?: unknown[]
+}
+
+interface EmbeddingCheckResponse {
+  data?: Array<{ embedding?: number[] }>
 }
 
 const modelTypeOptions: Array<{
@@ -93,8 +101,7 @@ export default function ModelCard({
       if (aiStatus) {
         setCheckState('ok')
         toast({
-          description: t('connectionSuccess'),
-          className: 'border-green-500 bg-green-50 text-green-800'
+          description: t('connectionSuccess')
         })
       } else {
         setCheckState('error')
@@ -126,7 +133,7 @@ export default function ModelCard({
         case 'rerank':
           const query = 'Apple'
           const documents = ["apple","banana","fruit","vegetable"]
-          const rerankData = await invokeAiJson<any>({
+          const rerankData = await invokeAiJson<RerankCheckResponse>({
             config: requestConfig,
             path: '/rerank',
             method: 'POST',
@@ -143,7 +150,7 @@ export default function ModelCard({
 
         case 'embedding':
           const testText = '测试文本'
-          const embeddingDataJson = await invokeAiJson<any>({
+          const embeddingDataJson = await invokeAiJson<EmbeddingCheckResponse>({
             config: requestConfig,
             path: '/embeddings',
             method: 'POST',
@@ -222,9 +229,9 @@ export default function ModelCard({
   const renderCheckIcon = () => {
     switch (checkState) {
       case 'ok':
-        return <CircleCheck data-icon="inline-start" className="text-green-500" />
+        return <CircleCheck data-icon="inline-start" className="text-primary" />
       case 'error':
-        return <CircleX data-icon="inline-start" className="text-red-500" />
+        return <CircleX data-icon="inline-start" className="text-destructive" />
       case 'checking':
         return <LoaderCircle data-icon="inline-start" className="animate-spin" />
       default:
@@ -348,19 +355,21 @@ export default function ModelCard({
               <Field>
                 <FieldLabel>{t('modelType.title')}</FieldLabel>
                 <Tabs
+                  className="w-full"
                   orientation="horizontal"
                   value={modelConfig.modelType}
                   onValueChange={(value) => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
                 >
-                  <TabsList className="group-data-vertical/tabs:h-8 group-data-vertical/tabs:flex-row">
+                  <TabsList className="grid h-8 w-full grid-cols-5">
                     {modelTypeOptions.map(({ value, icon: Icon }) => (
                       <TabsTrigger
                         key={value}
                         value={value}
-                        className="group-data-vertical/tabs:w-auto group-data-vertical/tabs:justify-center"
+                        title={t(`modelType.${value}`)}
+                        className="min-w-0 !w-auto !justify-center px-1"
                       >
                         {mobile ? null : <Icon data-icon="inline-start" />}
-                        {t(`modelType.${value}`)}
+                        <span className="truncate">{t(`modelType.${value}`)}</span>
                       </TabsTrigger>
                     ))}
                   </TabsList>
@@ -368,26 +377,21 @@ export default function ModelCard({
               </Field>
 
               {modelConfig.modelType === 'chat' && (
-                <Collapsible>
-                  <Card size="sm">
-                    <CardHeader className={mobile ? 'mobile-setting-inline-card-header items-center' : 'items-center'}>
-                      <CardTitle>{t('advancedParameters')}</CardTitle>
-                      <CardAction className={mobile ? 'mobile-setting-inline-card-action row-span-1 self-center' : 'row-span-1 self-center'}>
-                        <CollapsibleTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            className="group"
-                            aria-label={t('advancedParameters')}
-                          >
-                            <ChevronDown className="transition-transform group-data-[state=open]:rotate-180" />
-                          </Button>
-                        </CollapsibleTrigger>
-                      </CardAction>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent>
-                        <FieldGroup>
+                <Collapsible className="flex flex-col gap-3">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="group w-full justify-between bg-transparent px-0 hover:bg-transparent data-[state=open]:bg-transparent"
+                    >
+                      <span>{t('advancedParameters')}</span>
+                      <ChevronDown
+                        data-icon="inline-end"
+                        className="transition-transform group-data-[state=open]:rotate-180"
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <FieldGroup>
                           <Field>
                             <FieldLabel>{t('maxTokens')}</FieldLabel>
                             <Input
@@ -441,13 +445,13 @@ export default function ModelCard({
                             <div className="flex items-center gap-3">
                               <Slider
                                 className="flex-1"
-                                value={[modelConfig.temperature || 0.7]}
+                                value={[modelConfig.temperature ?? 0.7]}
                                 max={2}
                                 step={0.01}
                                 onValueChange={(value) => onUpdate(modelConfig.id, 'temperature', value[0])}
                               />
                               <Badge variant="outline">
-                                {(modelConfig.temperature || 0.7).toFixed(2)}
+                                {(modelConfig.temperature ?? 0.7).toFixed(2)}
                               </Badge>
                             </div>
                           </Field>
@@ -457,14 +461,14 @@ export default function ModelCard({
                             <div className="flex items-center gap-3">
                               <Slider
                                 className="flex-1"
-                                value={[modelConfig.topP || 1.0]}
+                                value={[modelConfig.topP ?? 1.0]}
                                 max={1}
                                 min={0}
                                 step={0.01}
                                 onValueChange={(value) => onUpdate(modelConfig.id, 'topP', value[0])}
                               />
                               <Badge variant="outline">
-                                {(modelConfig.topP || 1.0).toFixed(2)}
+                                {(modelConfig.topP ?? 1.0).toFixed(2)}
                               </Badge>
                             </div>
                           </Field>
@@ -479,10 +483,8 @@ export default function ModelCard({
                               onCheckedChange={(checked) => onUpdate(modelConfig.id, 'enableStream', checked)}
                             />
                           </Field>
-                        </FieldGroup>
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
+                    </FieldGroup>
+                  </CollapsibleContent>
                 </Collapsible>
               )}
 

@@ -26,7 +26,7 @@ export function SettingTab() {
     if (typeof item === 'string') return item
     return {
       ...item,
-      title: t(`${item.anchor}.title`)
+      title: t(item.anchor === 'ai' ? 'ai.menuTitle' : `${item.anchor}.title`)
     }
   }).filter(item => {
     // 过滤掉不支持的移动端页面，但保留分隔符
