@@ -4,7 +4,7 @@ import useRagSettingsStore from "@/stores/ragSettings";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemActions, ItemDescription } from '@/components/ui/item';
+import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemActions, ItemDescription, ItemFooter } from '@/components/ui/item';
 import { clearVectorDb, initVectorDb } from "@/db/vector";
 import { toast } from "@/hooks/use-toast";
 import { confirm } from "@tauri-apps/plugin-dialog";
@@ -136,7 +136,7 @@ export function Settings() {
       </Field>
       <Field className="mt-4">
         <FieldTitle>{t('excludedPaths')}</FieldTitle>
-        <Item variant="outline" className="max-md:flex-col max-md:items-start">
+        <Item variant="outline">
           <ItemMedia variant="icon">
             <Shield className="size-4" />
           </ItemMedia>
@@ -144,7 +144,7 @@ export function Settings() {
             <ItemTitle>{t('excludedPaths')}</ItemTitle>
             <ItemDescription>{t('excludedPathsDesc')}</ItemDescription>
           </ItemContent>
-          <ItemActions className="w-[320px] max-md:w-full">
+          <ItemFooter className="w-full">
             <Textarea
               key={excludedPaths.join('\n')}
               defaultValue={excludedPaths.join('\n')}
@@ -155,7 +155,7 @@ export function Settings() {
                 event.currentTarget.value.split(/[\n,]/).map(path => path.trim()).filter(Boolean)
               )}
             />
-          </ItemActions>
+          </ItemFooter>
         </Item>
       </Field>
       <div className="flex gap-2 mt-4">
