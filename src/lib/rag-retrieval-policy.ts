@@ -79,9 +79,9 @@ export function createRetrievalStrategy(
     return {
       kind: 'exact',
       weights: {
-        fuzzyWeight: Math.max(baseWeights.fuzzyWeight, 0.25),
-        vectorWeight: Math.min(baseWeights.vectorWeight, 0.45),
-        bm25Weight: Math.max(baseWeights.bm25Weight, 0.6)
+        fuzzyWeight: 0.15,
+        vectorWeight: 0.25,
+        bm25Weight: 0.6
       },
       vectorCandidateMultiplier: 3,
       lexicalCandidateMultiplier: 6,
@@ -94,9 +94,9 @@ export function createRetrievalStrategy(
     return {
       kind: 'multi-constraint',
       weights: {
-        fuzzyWeight: baseWeights.fuzzyWeight,
-        vectorWeight: Math.max(baseWeights.vectorWeight, 0.65),
-        bm25Weight: Math.max(baseWeights.bm25Weight, 0.25)
+        fuzzyWeight: 0.15,
+        vectorWeight: 0.6,
+        bm25Weight: 0.25
       },
       vectorCandidateMultiplier: 6,
       lexicalCandidateMultiplier: 6,
@@ -109,9 +109,9 @@ export function createRetrievalStrategy(
     return {
       kind: 'short',
       weights: {
-        fuzzyWeight: Math.max(baseWeights.fuzzyWeight, 0.35),
-        vectorWeight: Math.min(baseWeights.vectorWeight, 0.55),
-        bm25Weight: Math.max(baseWeights.bm25Weight, 0.3)
+        fuzzyWeight: 0.35,
+        vectorWeight: 0.4,
+        bm25Weight: 0.25
       },
       vectorCandidateMultiplier: 3,
       lexicalCandidateMultiplier: 4,

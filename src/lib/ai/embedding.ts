@@ -18,6 +18,15 @@ interface EmbeddingResponse {
   };
 }
 
+interface RerankResponse {
+  results: Array<{
+    relevance_score?: number;
+    score?: number;
+    document_index?: number;
+    index?: number;
+  }>;
+}
+
 /**
  * 获取嵌入模型信息
  */
@@ -120,7 +129,7 @@ export async function checkRerankModelAvailable(): Promise<boolean> {
     ];
     
     // 发送测试请求
-    const data = await invokeAiJson<any>({
+    const data = await invokeAiJson<RerankResponse>({
       config: await resolveAiRequestConfig(modelInfo),
       path: '/rerank',
       method: 'POST',
@@ -249,7 +258,7 @@ export async function rerankDocuments(
 
     const passages = documents.map(doc => doc.content);
 
-    const data = await invokeAiJson<any>({
+    const data = await invokeAiJson<RerankResponse>({
       config: await resolveAiRequestConfig(modelInfo),
       path: '/rerank',
       method: 'POST',
@@ -264,23 +273,38 @@ export async function rerankDocuments(
       throw new Error('重排序结果格式不正确');
     }
 
-    // 计算最高 rerank 分数，用于判断是否使用 rerank 结果
-    const maxRerankScore = Math.max(...data.results.map((r: any) => r.relevance_score || r.score || 0));
+    const scoredResults = data.results.flatMap((result, index) => {
+      const docIndex = result.document_index ?? result.index ?? index;
+      const originalDoc = documents[docIndex];
+      if (!originalDoc) return [];
+      const candidateScore = Number(result.relevance_score ?? result.score ?? originalDoc.similarity);
+      return Number.isFinite(candidateScore) ? [{ originalDoc, candidateScore }] : [];
+    });
+    if (scoredResults.length === 0) {
+      throw new Error('重排序结果没有有效分数');
+    }
+
+    const rawScores = scoredResults.map(result => result.candidateScore);
+    const minRawScore = Math.min(...rawScores);
+    const maxRawScore = Math.max(...rawScores);
+    const normalizeRerankScore = (score: number) => {
+      if (minRawScore >= 0 && maxRawScore <= 1) return score;
+      if (minRawScore < 0) return 1 / (1 + Math.exp(-score));
+      return maxRawScore > 0 ? score / maxRawScore : 0;
+    };
+
+    // 将常见的概率、logit 和正数打分统一到 0-1，再应用同一个相关性阈值。
+    const normalizedResults = scoredResults.map(result => ({
+      ...result.originalDoc,
+      similarity: normalizeRerankScore(result.candidateScore)
+    }));
+    const maxRerankScore = Math.max(...normalizedResults.map(result => result.similarity));
     // 如果 rerank 模型认为没有相关文档，返回空结果而不是为了凑数量引入噪声。
     if (maxRerankScore < relevanceThreshold) {
       return [];
     }
 
-    const rerankResults = data.results.map((result: any, index: number) => {
-      const docIndex = result.document_index ?? result.index ?? index;
-      const originalDoc = documents[docIndex];
-      return {
-        ...originalDoc,
-        similarity: result.relevance_score || result.score || documents[index].similarity
-      };
-    }).filter((doc: any): doc is {id: number, filename: string, content: string, similarity: number} => (
-      doc !== undefined && doc.similarity >= relevanceThreshold
-    ));
+    const rerankResults = normalizedResults.filter(result => result.similarity >= relevanceThreshold);
 
     return rerankResults.sort((a: {similarity: number}, b: {similarity: number}) => b.similarity - a.similarity);
   } catch (error) {

@@ -55,7 +55,8 @@ fn search_item(
         };
 
         if let Some((score, indices)) = matcher.fuzzy_indices(text, pattern) {
-            let normalized_score = (score as f64).abs() / (pattern.len() as f64);
+            let pattern_length = pattern.chars().count().max(1) as f64;
+            let normalized_score = (score as f64).abs() / pattern_length;
 
             if normalized_score < threshold {
                 continue;

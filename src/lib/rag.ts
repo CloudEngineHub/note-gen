@@ -451,6 +451,18 @@ function transformQueries(
   return expandedKeywords;
 }
 
+function normalizeKeywordWeights(keywords: Keyword[]): Keyword[] {
+  const maxWeight = keywords.reduce((maximum, keyword) => (
+    Math.max(maximum, Number.isFinite(keyword.weight) ? Math.max(0, keyword.weight) : 0)
+  ), 0);
+  return keywords.map(keyword => ({
+    ...keyword,
+    weight: maxWeight > 0
+      ? Math.min(1, Math.max(0, keyword.weight) / maxWeight)
+      : 1
+  }));
+}
+
 /**
  * 扩展检索结果的句子窗口
  * 为每个匹配的 chunk 获取同一文件中相邻的 chunk，提供更完整的上下文
@@ -917,6 +929,7 @@ interface SearchResult {
   rawScore: number;      // 原始分数（未归一化）
   normalizedScore: number; // 归一化后的分数
   rank: number;
+  queryWeight: number;
   keyword?: string;
   type: 'fuzzy' | 'vector' | 'bm25';
 }
@@ -1029,7 +1042,9 @@ export async function getContextForQuery(
     const maxQueryVariations = await store.get<number>('ragMaxQueryVariations') ?? 3;
 
     // 应用查询转换（生成同义词变体）
-    const expandedKeywords = transformQueries(keywords || [], enableQueryExpansion, maxQueryVariations);
+    const expandedKeywords = normalizeKeywordWeights(
+      transformQueries(keywords || [], enableQueryExpansion, maxQueryVariations)
+    );
 
     // 将关键词按权重排序，优先考虑权重高的关键词
     const sortedKeywords = [...expandedKeywords].sort((a, b) => b.weight - a.weight);
@@ -1086,9 +1101,10 @@ export async function getContextForQuery(
                   filename: resolvedChunk.filename,
                   filepath: resolvedChunk.filename,
                   content: resolvedChunk.content,
-                  rawScore: result.score * keyword.weight, // 保留原始分数
+                  rawScore: result.score,
                   normalizedScore: 0, // 稍后计算
                   rank: resultIndex + 1,
+                  queryWeight: keyword.weight,
                   keyword: keyword.text,
                   type: 'fuzzy'
                 });
@@ -1123,6 +1139,7 @@ export async function getContextForQuery(
             rawScore: doc.similarity || 0,
             normalizedScore: 0,
             rank: docIndex + 1,
+            queryWeight: 1,
             type: 'vector'
           });
         }
@@ -1147,9 +1164,10 @@ export async function getContextForQuery(
             filename: chunkKey.filename,
             filepath: chunkKey.filename,
             content: result.content,
-            rawScore: result.score * lexicalQuery.weight,
+            rawScore: result.score,
             normalizedScore: 0,
             rank: resultIndex + 1,
+            queryWeight: lexicalQuery.weight,
             keyword: lexicalQuery.text,
             type: 'bm25'
           });
@@ -1195,31 +1213,62 @@ function mergeResultsByDocument(
   }
 
   const mergedResults: SearchResult[] = [];
-  const weightByType = {
-    fuzzy: weights.fuzzyWeight > 0 ? 0.5 + weights.fuzzyWeight : 0,
-    vector: weights.vectorWeight > 0 ? 0.5 + weights.vectorWeight : 0,
-    bm25: weights.bm25Weight > 0 ? 0.5 + weights.bm25Weight : 0
+  const sanitizedWeights = {
+    fuzzy: Math.max(0, weights.fuzzyWeight),
+    vector: Math.max(0, weights.vectorWeight),
+    bm25: Math.max(0, weights.bm25Weight)
   };
-  const reciprocalRankConstant = 60;
+  const totalWeight = sanitizedWeights.fuzzy + sanitizedWeights.vector + sanitizedWeights.bm25;
+  const weightByType = totalWeight > 0
+    ? {
+        fuzzy: sanitizedWeights.fuzzy / totalWeight,
+        vector: sanitizedWeights.vector / totalWeight,
+        bm25: sanitizedWeights.bm25 / totalWeight
+      }
+    : { fuzzy: 1 / 3, vector: 1 / 3, bm25: 1 / 3 };
+  const maxRawScoreByType = new Map<SearchResult['type'], number>();
+  const maxQueryWeightByType = new Map<SearchResult['type'], number>();
+  for (const result of results) {
+    maxRawScoreByType.set(
+      result.type,
+      Math.max(maxRawScoreByType.get(result.type) || 0, Math.max(0, result.rawScore))
+    );
+    maxQueryWeightByType.set(
+      result.type,
+      Math.max(maxQueryWeightByType.get(result.type) || 0, Math.max(0, result.queryWeight))
+    );
+  }
+  const reciprocalRankConstant = 20;
+  const rankBlend = 0.75;
 
   for (const group of docGroups.values()) {
     const bestContributionByType = new Map<SearchResult['type'], number>();
     for (const result of group) {
-      const contribution = weightByType[result.type] / (reciprocalRankConstant + result.rank);
+      const normalizedRank = (reciprocalRankConstant + 1)
+        / (reciprocalRankConstant + Math.max(1, result.rank));
+      const maxRawScore = maxRawScoreByType.get(result.type) || 0;
+      const normalizedConfidence = maxRawScore > 0
+        ? Math.min(1, Math.max(0, result.rawScore) / maxRawScore)
+        : 0;
+      const maxQueryWeight = maxQueryWeightByType.get(result.type) || 1;
+      const normalizedQueryWeight = Math.min(1, Math.max(0, result.queryWeight) / maxQueryWeight);
+      const contribution = weightByType[result.type]
+        * (rankBlend * normalizedRank + (1 - rankBlend) * normalizedConfidence)
+        * normalizedQueryWeight;
       bestContributionByType.set(
         result.type,
         Math.max(bestContributionByType.get(result.type) || 0, contribution)
       );
     }
-    const reciprocalRankScore = Array.from(bestContributionByType.values())
+    const hybridScore = Array.from(bestContributionByType.values())
       .reduce((total, contribution) => total + contribution, 0);
     const bestResult = group.find(result => result.type === 'vector') || group[0];
     const keywords = Array.from(new Set(group.flatMap(result => result.keyword ? [result.keyword] : [])));
 
     mergedResults.push({
       ...bestResult,
-      rawScore: reciprocalRankScore,
-      normalizedScore: reciprocalRankScore,
+      rawScore: hybridScore,
+      normalizedScore: hybridScore,
       keyword: keywords.join(', ')
     });
   }
@@ -1308,33 +1357,30 @@ async function finalizeSearchResults(
   );
   const perRetrieverCandidateCount = Math.max(resultCount, 5);
   const uniqueResultById = new Map(uniqueResults.map(result => [result.stableId, result]));
-  const candidateIds: string[] = [];
-  const seenCandidateIds = new Set<string>();
+  const selectedCandidateIds = new Set<string>();
 
   for (const type of ['vector', 'bm25', 'fuzzy'] as const) {
     const typeResults = allResults
       .filter(result => result.type === type)
-      .sort((a, b) => a.rank - b.rank)
-      .slice(0, perRetrieverCandidateCount);
+      .sort((a, b) => a.rank - b.rank);
+    const selectedForType = new Set<string>();
     for (const result of typeResults) {
-      if (!seenCandidateIds.has(result.stableId) && uniqueResultById.has(result.stableId)) {
-        seenCandidateIds.add(result.stableId);
-        candidateIds.push(result.stableId);
-      }
+      if (!uniqueResultById.has(result.stableId) || selectedForType.has(result.stableId)) continue;
+      selectedForType.add(result.stableId);
+      selectedCandidateIds.add(result.stableId);
+      if (selectedForType.size >= perRetrieverCandidateCount) break;
     }
   }
 
   for (const result of uniqueResults) {
-    if (candidateIds.length >= rerankCandidateCount) break;
-    if (!seenCandidateIds.has(result.stableId)) {
-      seenCandidateIds.add(result.stableId);
-      candidateIds.push(result.stableId);
-    }
+    if (selectedCandidateIds.size >= rerankCandidateCount) break;
+    selectedCandidateIds.add(result.stableId);
   }
 
-  const rerankCandidates = candidateIds
-    .slice(0, rerankCandidateCount)
-    .flatMap(id => uniqueResultById.get(id) || []);
+  // 即使 rerank 不可用或请求失败，也保持融合分数顺序，不退化为检索器插入顺序。
+  const rerankCandidates = uniqueResults
+    .filter(result => selectedCandidateIds.has(result.stableId))
+    .slice(0, rerankCandidateCount);
   const rerankDocumentsInput = rerankCandidates.map((result, index) => ({
     id: index,
     filename: result.filename,
@@ -1553,7 +1599,9 @@ export async function getContextForQueryInFolder(
     const maxQueryVariations = await store.get<number>('ragMaxQueryVariations') ?? 3;
 
     // 应用查询转换（生成同义词变体）
-    const expandedKeywords = transformQueries(keywords || [], enableQueryExpansion, maxQueryVariations);
+    const expandedKeywords = normalizeKeywordWeights(
+      transformQueries(keywords || [], enableQueryExpansion, maxQueryVariations)
+    );
 
     const sortedKeywords = [...expandedKeywords].sort((a, b) => b.weight - a.weight);
     const lexicalQueries = buildLexicalQueries(query, sortedKeywords);
@@ -1605,9 +1653,10 @@ export async function getContextForQueryInFolder(
                   filename: resolvedChunk.filename,
                   filepath: resolvedChunk.filename,
                   content: resolvedChunk.content,
-                  rawScore: result.score * keyword.weight,
+                  rawScore: result.score,
                   normalizedScore: 0,
                   rank: resultIndex + 1,
+                  queryWeight: keyword.weight,
                   keyword: keyword.text,
                   type: 'fuzzy'
                 });
@@ -1641,6 +1690,7 @@ export async function getContextForQueryInFolder(
             rawScore: doc.similarity || 0,
             normalizedScore: 0,
             rank: docIndex + 1,
+            queryWeight: 1,
             type: 'vector'
           });
         }
@@ -1665,9 +1715,10 @@ export async function getContextForQueryInFolder(
             filename: chunkKey.filename,
             filepath: chunkKey.filename,
             content: result.content,
-            rawScore: result.score * lexicalQuery.weight,
+            rawScore: result.score,
             normalizedScore: 0,
             rank: resultIndex + 1,
+            queryWeight: lexicalQuery.weight,
             keyword: lexicalQuery.text,
             type: 'bm25'
           });
