@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from '@/hooks/use-toast';
+import { DEFAULT_EXCLUDED_RAG_PATHS } from '@/lib/rag-retrieval-policy';
 
 // RAG 设置参数接口
 export interface RagSettings {
@@ -12,6 +13,10 @@ export interface RagSettings {
   resultCount: number;
   // 文档相似度阈值 (0.0-1.0)
   similarityThreshold: number;
+  // 重排结果的最低相关性分数
+  rerankThreshold: number;
+  // 不参与索引和检索的路径前缀
+  excludedPaths: string[];
 }
 
 // 默认参数值
@@ -19,7 +24,9 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   chunkSize: 1000,
   chunkOverlap: 200,
   resultCount: 5,
-  similarityThreshold: 0.7
+  similarityThreshold: 0.25,
+  rerankThreshold: 0.1,
+  excludedPaths: DEFAULT_EXCLUDED_RAG_PATHS
 };
 
 // RAG 设置状态接口
@@ -42,16 +49,20 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
       const store = await Store.load('store.json');
       
       // 从存储中读取各个设置项，如果不存在则使用默认值
-      const chunkSize = await store.get<number>('ragChunkSize') || DEFAULT_RAG_SETTINGS.chunkSize;
-      const chunkOverlap = await store.get<number>('ragChunkOverlap') || DEFAULT_RAG_SETTINGS.chunkOverlap;
-      const resultCount = await store.get<number>('ragResultCount') || DEFAULT_RAG_SETTINGS.resultCount;
-      const similarityThreshold = await store.get<number>('ragSimilarityThreshold') || DEFAULT_RAG_SETTINGS.similarityThreshold;
+      const chunkSize = await store.get<number>('ragChunkSize') ?? DEFAULT_RAG_SETTINGS.chunkSize;
+      const chunkOverlap = await store.get<number>('ragChunkOverlap') ?? DEFAULT_RAG_SETTINGS.chunkOverlap;
+      const resultCount = await store.get<number>('ragResultCount') ?? DEFAULT_RAG_SETTINGS.resultCount;
+      const similarityThreshold = await store.get<number>('ragSimilarityThreshold') ?? DEFAULT_RAG_SETTINGS.similarityThreshold;
+      const rerankThreshold = await store.get<number>('ragRerankThreshold') ?? DEFAULT_RAG_SETTINGS.rerankThreshold;
+      const excludedPaths = await store.get<string[]>('ragExcludedPaths') ?? DEFAULT_RAG_SETTINGS.excludedPaths;
       
       set({
         chunkSize,
         chunkOverlap,
         resultCount,
-        similarityThreshold
+        similarityThreshold,
+        rerankThreshold,
+        excludedPaths
       });
     } catch (error) {
       console.error('初始化 RAG 设置失败:', error);
@@ -84,6 +95,8 @@ const useRagSettingsStore = create<RagSettingsState>((set) => ({
       await store.set('ragChunkOverlap', DEFAULT_RAG_SETTINGS.chunkOverlap);
       await store.set('ragResultCount', DEFAULT_RAG_SETTINGS.resultCount);
       await store.set('ragSimilarityThreshold', DEFAULT_RAG_SETTINGS.similarityThreshold);
+      await store.set('ragRerankThreshold', DEFAULT_RAG_SETTINGS.rerankThreshold);
+      await store.set('ragExcludedPaths', DEFAULT_RAG_SETTINGS.excludedPaths);
     } catch (error) {
       toast({
         title: '重置 RAG 设置失败',

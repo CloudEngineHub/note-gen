@@ -134,19 +134,23 @@ export async function collectFolderMarkdownPaths(folderPath: string, item: DirTr
   return Array.from(paths);
 }
 
-export async function deleteVectorDocumentsByPaths(paths: string[]) {
-  if (paths.length === 0) {
+export async function deleteVectorDocumentsByPaths(paths: string[], folderPath?: string) {
+  if (paths.length === 0 && !folderPath) {
     return;
   }
 
-  const { deleteVectorDocumentsByFilename } = await import("@/db/vector");
-  for (const path of paths) {
+  if (folderPath) {
+    const { deleteVectorDocumentsByPrefix } = await import("@/db/vector");
     try {
-      await deleteVectorDocumentsByFilename(path);
+      await deleteVectorDocumentsByPrefix(folderPath);
+      return;
     } catch (error) {
-      console.error(`删除文件 ${path} 的向量数据失败:`, error);
+      console.error(`删除文件夹 ${folderPath} 的向量数据失败，将逐文件重试:`, error);
     }
   }
+
+  const { deleteVectorDocumentsByFilename } = await import("@/db/vector");
+  for (const path of paths) await deleteVectorDocumentsByFilename(path);
 }
 
 export async function deleteLocalFolderIfExists(folderPath: string) {

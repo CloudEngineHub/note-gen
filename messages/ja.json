@@ -224,6 +224,11 @@
       "resultCountDesc": "検索時に返される関連するドキュメント数。数が多いと提供される情報がより豊富かもしれませんが、ノイズも増加する可能性があります。",
       "similarityThreshold": "類似度閾値",
       "similarityThresholdDesc": "ドキュメントとクエリの最小類似度閾値。この閾値を超えるドキュメントのみが返されます。値の範囲は 0.0-1.0、高いほど厳格です。",
+      "rerankThreshold": "リランキング関連度しきい値",
+      "rerankThresholdDesc": "リランカー有効時に関連度の低い結果を除外し、件数合わせのノイズを減らします。",
+      "excludedPaths": "除外パス",
+      "excludedPathsDesc": "1 行に 1 つ、フォルダーまたはパスの接頭辞を入力します。ベクトル化・語彙索引・検索から除外されます。",
+      "excludedPathsPlaceholder": "例：archive\nprivate",
       "resetToDefaults": "デフォルト値に戻す",
       "deleteVector": "知識庫を空にする",
       "topPDesc": "Top P パラメータはモデルが生成するテキストの多様性を制御します。値が小さいほど出力は決定论的になり、値が大きいほど多様になります。"

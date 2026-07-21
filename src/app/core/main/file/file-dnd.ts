@@ -104,6 +104,9 @@ export async function moveFileManagerEntry(sourcePath: string, targetDirectoryPa
     })
   }
 
+  const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
+  await renameVectorDocumentsByPrefix(sourcePath, targetPath)
+
   return {
     moved: true,
     sourcePath,

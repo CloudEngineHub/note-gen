@@ -224,6 +224,11 @@
       "resultCountDesc": "O número de documentos relacionados retornados na busca. Mais documentos fornecem mais informação, mas também podem introduzir ruído.",
       "similarityThreshold": "Limiar de Similaridade",
       "similarityThresholdDesc": "O limiar mínimo de similaridade entre documentos e consultas. Apenas documentos que excederem este limiar serão retornados. O valor varia de 0.0 a 1.0; quanto maior o limiar, mais rigoroso o requisito.",
+      "rerankThreshold": "Limite de relevância do reranking",
+      "rerankThresholdDesc": "Quando o reranker estiver ativo, filtra resultados pouco relevantes em vez de completar o limite com ruído.",
+      "excludedPaths": "Caminhos excluídos",
+      "excludedPathsDesc": "Digite uma pasta ou prefixo de caminho por linha. Esses caminhos não participam da vetorização, indexação lexical ou busca.",
+      "excludedPathsPlaceholder": "Por exemplo: arquivo\nprivado",
       "resetToDefaults": "Redefinir para Padrões",
       "deleteVector": "Limpar Base de Conhecimento",
       "topPDesc": "O parâmetro Top P controla a diversidade do texto gerado pelo modelo: quanto menor o valor, mais determinístico; quanto maior, mais variado."

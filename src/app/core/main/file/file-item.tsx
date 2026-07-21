@@ -576,6 +576,8 @@ export function FileItem({
             oldPathBaseDir: BaseDirectory.AppData 
           })
         }
+        const { renameVectorDocumentsByFilename } = await import('@/db/vector')
+        await renameVectorDocumentsByFilename(path, targetRelativePath)
       } else {
         // 创建新文件
         const pathOptions = await getFilePathOptions(targetRelativePath)

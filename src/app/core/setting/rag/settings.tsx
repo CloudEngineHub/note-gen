@@ -1,5 +1,5 @@
 import { useTranslations } from 'next-intl';
-import { RefreshCw, Trash, FileText, Layers, Hash, Target } from "lucide-react";
+import { RefreshCw, Trash, FileText, Layers, Hash, Target, ListFilter, Shield } from "lucide-react";
 import useRagSettingsStore from "@/stores/ragSettings";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { clearVectorDb, initVectorDb } from "@/db/vector";
 import { toast } from "@/hooks/use-toast";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { Field, FieldTitle } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 
 export function Settings() {
   const t = useTranslations('settings.rag');
@@ -18,6 +19,8 @@ export function Settings() {
     chunkOverlap, 
     resultCount, 
     similarityThreshold,
+    rerankThreshold,
+    excludedPaths,
     initSettings,
     updateSetting,
     resetToDefaults
@@ -80,6 +83,16 @@ export function Settings() {
       step: 0.01,
       icon: Target,
       onChange: (value: number) => updateSetting('similarityThreshold', value)
+    },
+    {
+      title: t('rerankThreshold'),
+      desc: t('rerankThresholdDesc'),
+      value: rerankThreshold,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      icon: ListFilter,
+      onChange: (value: number) => updateSetting('rerankThreshold', value)
     }
   ]
 
@@ -120,6 +133,30 @@ export function Settings() {
           )
           })}
         </ItemGroup>
+      </Field>
+      <Field className="mt-4">
+        <FieldTitle>{t('excludedPaths')}</FieldTitle>
+        <Item variant="outline" className="max-md:flex-col max-md:items-start">
+          <ItemMedia variant="icon">
+            <Shield className="size-4" />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle>{t('excludedPaths')}</ItemTitle>
+            <ItemDescription>{t('excludedPathsDesc')}</ItemDescription>
+          </ItemContent>
+          <ItemActions className="w-[320px] max-md:w-full">
+            <Textarea
+              key={excludedPaths.join('\n')}
+              defaultValue={excludedPaths.join('\n')}
+              placeholder={t('excludedPathsPlaceholder')}
+              className="min-h-24 font-mono text-xs"
+              onBlur={(event) => updateSetting(
+                'excludedPaths',
+                event.currentTarget.value.split(/[\n,]/).map(path => path.trim()).filter(Boolean)
+              )}
+            />
+          </ItemActions>
+        </Item>
       </Field>
       <div className="flex gap-2 mt-4">
         <Button variant="outline" onClick={resetToDefaults}>

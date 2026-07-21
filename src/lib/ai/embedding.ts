@@ -183,6 +183,44 @@ export async function fetchEmbedding(text: string): Promise<number[] | null> {
 }
 
 /**
+ * 批量计算嵌入。提供商不支持数组输入或返回不完整时，自动退回逐条请求。
+ */
+export async function fetchEmbeddings(texts: string[]): Promise<Array<number[] | null>> {
+  if (texts.length === 0) return [];
+  if (texts.length === 1) return [await fetchEmbedding(texts[0])];
+
+  try {
+    const modelInfo = await getEmbeddingModelInfo();
+    if (!modelInfo?.baseURL || !modelInfo.model) {
+      return await Promise.all(texts.map(text => fetchEmbedding(text)));
+    }
+
+    const data = await invokeAiJson<EmbeddingResponse>({
+      config: await resolveAiRequestConfig(modelInfo),
+      path: '/embeddings',
+      method: 'POST',
+      body: {
+        model: modelInfo.model,
+        input: texts,
+        encoding_format: 'float'
+      }
+    });
+    const ordered = [...(data?.data || [])].sort((a, b) => a.index - b.index);
+    if (ordered.length !== texts.length || ordered.some(item => !Array.isArray(item.embedding))) {
+      throw new Error('批量嵌入结果数量不匹配');
+    }
+    return ordered.map(item => item.embedding);
+  } catch (error) {
+    console.warn('[Embedding] 批量请求失败，退回逐条计算:', error);
+    const results: Array<number[] | null> = [];
+    for (const text of texts) {
+      results.push(await fetchEmbedding(text));
+    }
+    return results;
+  }
+}
+
+/**
  * 使用重排序模型重新排序检索的文档
  * @param query 用户查询
  * @param documents 要重新排序的文档列表
@@ -190,7 +228,8 @@ export async function fetchEmbedding(text: string): Promise<number[] | null> {
  */
 export async function rerankDocuments(
   query: string,
-  documents: {id: number, filename: string, content: string, similarity: number}[]
+  documents: {id: number, filename: string, content: string, similarity: number}[],
+  relevanceThreshold: number = 0.1
 ): Promise<{id: number, filename: string, content: string, similarity: number}[]> {
   try {
     if (!documents.length) {
@@ -227,11 +266,9 @@ export async function rerankDocuments(
 
     // 计算最高 rerank 分数，用于判断是否使用 rerank 结果
     const maxRerankScore = Math.max(...data.results.map((r: any) => r.relevance_score || r.score || 0));
-    const RERANK_THRESHOLD = 0.1;
-
-    // 如果 rerank 模型认为没有相关文档（最高分太低），返回原始排序
-    if (maxRerankScore < RERANK_THRESHOLD) {
-      return documents;
+    // 如果 rerank 模型认为没有相关文档，返回空结果而不是为了凑数量引入噪声。
+    if (maxRerankScore < relevanceThreshold) {
+      return [];
     }
 
     const rerankResults = data.results.map((result: any, index: number) => {
@@ -241,7 +278,9 @@ export async function rerankDocuments(
         ...originalDoc,
         similarity: result.relevance_score || result.score || documents[index].similarity
       };
-    }).filter((doc: any): doc is {id: number, filename: string, content: string, similarity: number} => doc !== undefined);
+    }).filter((doc: any): doc is {id: number, filename: string, content: string, similarity: number} => (
+      doc !== undefined && doc.similarity >= relevanceThreshold
+    ));
 
     return rerankResults.sort((a: {similarity: number}, b: {similarity: number}) => b.similarity - a.similarity);
   } catch (error) {

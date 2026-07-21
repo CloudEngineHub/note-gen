@@ -59,7 +59,7 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
 
       // 删除向量数据库中该文件夹下所有文件的记录
       try {
-        await deleteVectorDocumentsByPaths(markdownPaths);
+        await deleteVectorDocumentsByPaths(markdownPaths, path);
       } catch (error) {
         console.error('删除文件夹向量数据失败:', error)
       }

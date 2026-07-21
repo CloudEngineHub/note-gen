@@ -225,6 +225,11 @@
       "resultCountDesc": "檢索時返回的相關文件數量，數量越多提供的資訊可能更豐富，但也可能引入噪聲。",
       "similarityThreshold": "相似度閾值",
       "similarityThresholdDesc": "文件與查詢的最小相似度閾值，只有超過此閾值的文件才會被返回。值範圍 0.0-1.0，越高要求越嚴格。",
+      "rerankThreshold": "重排相關性閾值",
+      "rerankThresholdDesc": "重排模型啟用時過濾低相關結果，減少為了湊數而加入的雜訊。",
+      "excludedPaths": "排除路徑",
+      "excludedPathsDesc": "每行填寫一個資料夾或路徑前綴；這些內容不會參與向量化、詞法索引和檢索。",
+      "excludedPathsPlaceholder": "例如：封存\n敏感資訊",
       "resetToDefaults": "重設預設值",
       "deleteVector": "清空知識庫"
     },

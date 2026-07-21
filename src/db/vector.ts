@@ -1,4 +1,5 @@
 import { db } from './index';
+import { getBM25Index } from '@/lib/bm25';
 
 // 向量数据库表结构定义
 export interface VectorDocument {
@@ -16,6 +17,7 @@ export type VectorDocumentSnapshot = Omit<VectorDocument, 'id'>;
 interface CachedVector {
   id: number;
   filename: string;
+  chunk_id: number;
   content: string;
   embedding: number[];  // 解析后的向量
   updated_at: number;
@@ -47,7 +49,7 @@ class VectorCache {
   // 更新缓存
   async update() {
     const docs = await db.select<VectorDocument[]>(`
-      select id, filename, content, embedding, updated_at from vector_documents
+      select id, filename, chunk_id, content, embedding, updated_at from vector_documents
     `);
 
     // 清空旧缓存
@@ -61,6 +63,7 @@ class VectorCache {
         const cached: CachedVector = {
           id: doc.id,
           filename: doc.filename,
+          chunk_id: doc.chunk_id,
           content: doc.content,
           embedding,
           updated_at: doc.updated_at
@@ -88,6 +91,7 @@ class VectorCache {
       const cached: CachedVector = {
         id: doc.id,
         filename: doc.filename,
+        chunk_id: doc.chunk_id,
         content: doc.content,
         embedding,
         updated_at: doc.updated_at
@@ -97,7 +101,10 @@ class VectorCache {
       if (!this.vectorsByFilename.has(doc.filename)) {
         this.vectorsByFilename.set(doc.filename, []);
       }
-      this.vectorsByFilename.get(doc.filename)!.push(doc.id);
+      const fileIds = this.vectorsByFilename.get(doc.filename)!;
+      if (!fileIds.includes(doc.id)) {
+        fileIds.push(doc.id);
+      }
       this.cacheVersion++;
     } catch (error) {
       console.error(`Failed to add vector to cache for doc ${doc.id}:`, error);
@@ -222,6 +229,46 @@ export async function deleteVectorDocumentsByFilename(filename: string) {
 
   // 从缓存中删除
   vectorCache.deleteByFilename(filename);
+  getBM25Index()?.deleteByFilename(filename);
+}
+
+export async function renameVectorDocumentsByFilename(oldFilename: string, newFilename: string) {
+  if (oldFilename === newFilename) return;
+  await db.execute('delete from vector_documents where filename = $1', [newFilename]);
+  await db.execute(
+    'update vector_documents set filename = $1, updated_at = $2 where filename = $3',
+    [newFilename, Date.now(), oldFilename]
+  );
+  getBM25Index()?.renameFilename(oldFilename, newFilename);
+  await vectorCache.update();
+}
+
+export async function deleteVectorDocumentsByPrefix(prefix: string) {
+  await db.execute(
+    'delete from vector_documents where filename = $1 or filename like $2',
+    [prefix, `${prefix}/%`]
+  );
+  getBM25Index()?.deleteByFilenamePrefix(prefix);
+  await vectorCache.update();
+}
+
+export async function renameVectorDocumentsByPrefix(oldPrefix: string, newPrefix: string) {
+  if (oldPrefix === newPrefix) return;
+  const filenames = await db.select<{ filename: string }[]>(
+    'select distinct filename from vector_documents where filename = $1 or filename like $2',
+    [oldPrefix, `${oldPrefix}/%`]
+  );
+  for (const { filename } of filenames) {
+    const suffix = filename.slice(oldPrefix.length);
+    const nextFilename = `${newPrefix}${suffix}`;
+    await db.execute('delete from vector_documents where filename = $1', [nextFilename]);
+    await db.execute(
+      'update vector_documents set filename = $1, updated_at = $2 where filename = $3',
+      [nextFilename, Date.now(), filename]
+    );
+  }
+  getBM25Index()?.renameFilenamePrefix(oldPrefix, newPrefix);
+  await vectorCache.update();
 }
 
 // 检查文件是否已存在于向量数据库中
@@ -237,15 +284,18 @@ export async function checkVectorDocumentExists(filename: string) {
 export async function getSimilarDocuments(
   queryEmbedding: number[],
   limit: number = 5,
-  threshold: number = 0.7
-): Promise<{id: number, filename: string, content: string, similarity: number}[]> {
+  threshold: number = 0.7,
+  allowedFilenames?: ReadonlySet<string>
+): Promise<{id: number, filename: string, chunk_id: number, content: string, similarity: number}[]> {
   // 检查是否需要更新缓存
   if (vectorCache.needsUpdate()) {
     await vectorCache.update();
   }
 
   // 从缓存获取所有向量（已解析，避免重复 JSON.parse）
-  const cachedVectors = vectorCache.getAll();
+  const cachedVectors = vectorCache.getAll().filter(
+    doc => !allowedFilenames || allowedFilenames.has(doc.filename)
+  );
 
   if (!cachedVectors.length) return [];
 
@@ -256,6 +306,7 @@ export async function getSimilarDocuments(
     return {
       id: doc.id,
       filename: doc.filename,
+      chunk_id: doc.chunk_id,
       content: doc.content,
       similarity
     };
@@ -298,6 +349,7 @@ export async function clearVectorDb() {
 
   // 清空缓存
   await vectorCache.update();
+  getBM25Index()?.clear();
 }
 
 // 获取所有向量文档的文件名列表

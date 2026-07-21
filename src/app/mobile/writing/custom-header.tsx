@@ -859,6 +859,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       } else {
         await fsRename(oldPathOptions.path, newPathOptions.path)
       }
+      const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
+      await renameVectorDocumentsByPrefix(renameTarget.relativePath, newRelativePath)
 
       if (normalizedActivePath === renameTarget.relativePath) {
         await setActiveFilePath(newRelativePath)
@@ -898,6 +900,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       if (normalizedActivePath.startsWith(`${entry.relativePath}/`)) {
         await setActiveFilePath('')
       }
+      const { deleteVectorDocumentsByPrefix } = await import('@/db/vector')
+      await deleteVectorDocumentsByPrefix(entry.relativePath)
     } else {
       if (pathOptions.baseDir) {
         await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
@@ -907,6 +911,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       if (normalizedActivePath === entry.relativePath) {
         await setActiveFilePath('')
       }
+      const { deleteVectorDocumentsByFilename } = await import('@/db/vector')
+      await deleteVectorDocumentsByFilename(entry.relativePath)
     }
     await refreshTree(currentDir)
   }

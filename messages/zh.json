@@ -225,6 +225,11 @@
       "resultCountDesc": "检索时返回的相关文档数量，数量越多提供的信息可能更丰富，但也可能引入噪声。",
       "similarityThreshold": "相似度阈值",
       "similarityThresholdDesc": "文档与查询的最小相似度阈值，只有超过此阈值的文档才会被返回。值范围 0.0-1.0，越高要求越严格。",
+      "rerankThreshold": "重排相关性阈值",
+      "rerankThresholdDesc": "重排模型启用时过滤低相关结果，减少为了凑数量而加入的噪声。",
+      "excludedPaths": "排除路径",
+      "excludedPathsDesc": "每行填写一个文件夹或路径前缀；这些内容不会参与向量化、词法索引和检索。",
+      "excludedPathsPlaceholder": "例如：归档\n敏感信息",
       "resetToDefaults": "重置默认值",
       "deleteVector": "清空知识库"
     },

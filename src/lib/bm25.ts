@@ -19,6 +19,22 @@ export interface BM25Result {
   score: number;        // BM25 分数
 }
 
+const CHUNK_KEY_SEPARATOR = '::rag-chunk::';
+
+export function createBM25ChunkKey(filename: string, chunkId: number): string {
+  return `${filename}${CHUNK_KEY_SEPARATOR}${chunkId}`;
+}
+
+export function parseBM25ChunkKey(id: string): { filename: string; chunkId: number } | null {
+  const separatorIndex = id.lastIndexOf(CHUNK_KEY_SEPARATOR);
+  if (separatorIndex < 0) return null;
+
+  const chunkId = Number(id.slice(separatorIndex + CHUNK_KEY_SEPARATOR.length));
+  if (!Number.isInteger(chunkId) || chunkId < 0) return null;
+
+  return { filename: id.slice(0, separatorIndex), chunkId };
+}
+
 /**
  * BM25 索引类
  */
@@ -39,36 +55,32 @@ export class BM25Index {
   }
 
   /**
-   * 中文友好的分词函数
-   * 采用混合策略：边界分割 + 过滤单字 + 过滤数字
-   *
-   * 示例：
-   * "RAG检索增强生成系统用于智能问答"
-   * -> ["RAG", "检索", "增强", "生成", "系统", "用于", "智能", "问答"]
+   * 多语言分词：空格语言保留单词和数字，CJK/Hangul 连续文本生成字符二元组。
+   * 这种方式不依赖特定语言的词典，也能检索编号、日文和阿拉伯文。
    */
   private tokenize(text: string): string[] {
-    // 1. 按边界分割：标点、空格、中英文边界
-    // 匹配：英文单词、数字、连续的中文（2个或以上）
     const tokens: string[] = [];
-
-    // 正则表达式模式：
-    // - 英文单词/数字：[a-zA-Z0-9]+
-    // - 中文词语（2字以上）：[\u4e00-\u9fa5]{2,}
-    const pattern = /[a-zA-Z0-9]+|[\u4e00-\u9fa5]{2,}/g;
+    const normalized = text.normalize('NFKC').toLowerCase();
+    const pattern = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[\p{L}\p{N}]+(?:[-_][\p{L}\p{N}]+)*/gu;
 
     let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = pattern.exec(normalized)) !== null) {
       const token = match[0];
-
-      // 2. 过滤纯数字（如 "123", "2024"）
-      if (/^\d+$/.test(token)) {
-        continue;
+      if (/^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+$/u.test(token)) {
+        const characters = Array.from(token);
+        if (characters.length === 1) {
+          tokens.push(token);
+        } else {
+          for (let index = 0; index < characters.length - 1; index++) {
+            tokens.push(characters[index] + characters[index + 1]);
+          }
+        }
+      } else {
+        tokens.push(token);
+        if (token.includes('-') || token.includes('_')) {
+          tokens.push(...token.split(/[-_]+/).filter(Boolean));
+        }
       }
-
-      // 3. 转换为小写（英文）
-      const normalizedToken = token.toLowerCase();
-
-      tokens.push(normalizedToken);
     }
 
     return tokens;
@@ -186,13 +198,69 @@ export class BM25Index {
    * @param document 要更新的文档
    */
   update(document: BM25Document): void {
-    // 如果文档已存在，先删除
-    if (this.documents.has(document.id)) {
-      this.delete(document.id);
-    }
+    const documents = new Map(this.documents);
+    documents.set(document.id, document.content);
+    this.index(Array.from(documents, ([id, content]) => ({ id, content })));
+  }
 
-    // 添加新文档
-    this.index([document]);
+  replaceByFilename(filename: string, chunks: string[]): void {
+    const documents = new Map(this.documents);
+    for (const id of documents.keys()) {
+      if (parseBM25ChunkKey(id)?.filename === filename || id === filename) {
+        documents.delete(id);
+      }
+    }
+    chunks.forEach((content, chunkId) => {
+      documents.set(createBM25ChunkKey(filename, chunkId), content);
+    });
+    this.index(Array.from(documents, ([id, content]) => ({ id, content })));
+  }
+
+  deleteByFilename(filename: string): void {
+    this.replaceByFilename(filename, []);
+  }
+
+  deleteByFilenamePrefix(prefix: string): void {
+    const documents = new Map(this.documents);
+    for (const id of documents.keys()) {
+      const filename = parseBM25ChunkKey(id)?.filename;
+      if (filename && (filename === prefix || filename.startsWith(`${prefix}/`))) {
+        documents.delete(id);
+      }
+    }
+    this.index(Array.from(documents, ([id, content]) => ({ id, content })));
+  }
+
+  renameFilename(oldFilename: string, newFilename: string): void {
+    if (oldFilename === newFilename) return;
+    const chunks = Array.from(this.documents.entries())
+      .flatMap(([id, content]) => {
+        const parsed = parseBM25ChunkKey(id);
+        return parsed?.filename === oldFilename ? [{ chunkId: parsed.chunkId, content }] : [];
+      })
+      .sort((a, b) => a.chunkId - b.chunkId)
+      .map(chunk => chunk.content);
+    this.deleteByFilename(oldFilename);
+    if (chunks.length > 0) {
+      this.replaceByFilename(newFilename, chunks);
+    }
+  }
+
+  renameFilenamePrefix(oldPrefix: string, newPrefix: string): void {
+    const documents = new Map(this.documents);
+    for (const [id, content] of this.documents.entries()) {
+      const parsed = parseBM25ChunkKey(id);
+      if (parsed && (parsed.filename === oldPrefix || parsed.filename.startsWith(`${oldPrefix}/`))) {
+        documents.delete(id);
+        const suffix = parsed.filename.slice(oldPrefix.length);
+        documents.set(createBM25ChunkKey(`${newPrefix}${suffix}`, parsed.chunkId), content);
+      }
+    }
+    this.index(Array.from(documents, ([id, content]) => ({ id, content })));
+  }
+
+  getDocument(docId: string): string | undefined {
+    return this.documents.get(docId);
   }
 
   /**

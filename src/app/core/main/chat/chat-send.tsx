@@ -198,28 +198,26 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       try {
         let keywords = await invoke<{text: string, weight: number}[]>('rank_keywords', { text, topK: 15 })
         keywords = filterRAGKeywords(keywords)
-        if (keywords.length > 0) {
-          const ragResult = linkedResource && isLinkedFolder(linkedResource)
-            ? await getContextForQueryInFolder(keywords, linkedResource.relativePath)
-            : await getContextForQuery(keywords)
-          if (ragResult.context) {
-            context += `## 知识库检索结果\n\n${ragResult.context}\n\n`
-          }
-          const currentSources = useChatStore.getState().agentState.ragSources || []
-          const currentDetails = useChatStore.getState().agentState.ragSourceDetails || []
-          setAgentState({
-            ragSources: Array.from(new Set([...currentSources, ...ragResult.sources])),
-            ragSourceDetails: [...currentDetails, ...ragResult.sourceDetails],
-          })
-          const activeChatId = useChatStore.getState().agentState.activeChatId
-          const activeChat = useChatStore.getState().chats.find(chat => chat.id === activeChatId)
-          if (activeChat) {
-            await saveChat({
-              ...activeChat,
-              ragSources: JSON.stringify(Array.from(new Set([...currentSources, ...ragResult.sources]))),
-              ragSourceDetails: JSON.stringify([...currentDetails, ...ragResult.sourceDetails]),
-            }, true)
-          }
+        const ragResult = linkedResource && isLinkedFolder(linkedResource)
+          ? await getContextForQueryInFolder(text, keywords, linkedResource.relativePath)
+          : await getContextForQuery(text, keywords)
+        if (ragResult.context) {
+          context += `## 知识库检索结果\n\n${ragResult.context}\n\n`
+        }
+        const currentSources = useChatStore.getState().agentState.ragSources || []
+        const currentDetails = useChatStore.getState().agentState.ragSourceDetails || []
+        setAgentState({
+          ragSources: Array.from(new Set([...currentSources, ...ragResult.sources])),
+          ragSourceDetails: [...currentDetails, ...ragResult.sourceDetails],
+        })
+        const activeChatId = useChatStore.getState().agentState.activeChatId
+        const activeChat = useChatStore.getState().chats.find(chat => chat.id === activeChatId)
+        if (activeChat) {
+          await saveChat({
+            ...activeChat,
+            ragSources: JSON.stringify(Array.from(new Set([...currentSources, ...ragResult.sources]))),
+            ragSourceDetails: JSON.stringify([...currentDetails, ...ragResult.sourceDetails]),
+          }, true)
         }
       } catch (error) {
         console.error('Failed to get RAG context for steering:', error)
@@ -589,49 +587,44 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           // 过滤掉停用词（如"是"、"的"等没有检索意义的虚词）
           keywords = filterRAGKeywords(keywords)
 
-          // 如果过滤后没有有效关键词，明确告知
-          if (keywords.length === 0) {
-            context += `## 知识库检索结果\n\n由于用户问题中没有有效的关键词（仅包含停用词如"的"、"是"等），无法进行知识库检索。如果用户询问的是具体笔记内容，请告知用户需要提供更多具体信息。\n`
+          // 关键词只用于词法增强；即使提取失败，仍使用完整问题进行向量检索
+          let ragResult: { context: string; sources: string[]; sourceDetails: RagSource[] }
+
+          if (linkedResource && isLinkedFolder(linkedResource)) {
+            // 文件夹关联：限定检索范围到文件夹
+            ragResult = await getContextForQueryInFolder(requestText, keywords, linkedResource.relativePath)
           } else {
-            // 根据关联资源类型选择检索方式
-            let ragResult: { context: string; sources: string[]; sourceDetails: RagSource[] }
-
-            if (linkedResource && isLinkedFolder(linkedResource)) {
-              // 文件夹关联：限定检索范围到文件夹
-              ragResult = await getContextForQueryInFolder(keywords, linkedResource.relativePath)
-            } else {
-              // 文件关联或无关联：全局检索
-              ragResult = await getContextForQuery(keywords)
-            }
-
-            ragSources = ragResult.sources
-            ragSourceDetails = ragResult.sourceDetails
-
-            // 设置到 agentState，用于实时显示
-            setAgentState({
-              ragSources,
-              ragSourceDetails,
-            })
-
-            if (ragResult.context) {
-              // 找到相关内容
-              context += `## 知识库检索结果\n\n已在知识库中找到与用户问题相关的笔记内容。请优先使用以下信息回答用户问题：\n\n${ragResult.context}\n`
-            } else {
-              // 未找到相关内容
-              const searchScope = linkedResource && isLinkedFolder(linkedResource)
-                ? `在关联文件夹"${linkedResource.name}"中`
-                : '在知识库中'
-
-              context += `## 知识库检索结果\n\n${searchScope}未找到与用户问题相关的笔记内容。\n\n请根据情况处理：\n- 如果用户询问的是具体笔记内容，请告知用户${searchScope}可能没有相关资料\n- 如果问题可以基于一般知识回答，请使用你的知识回答\n- 如果需要更多信息，可以请用户提供更具体的关键词或问题\n`
-            }
-
-            agentDebugLog('chat_context_rag_result', {
-              enabled: true,
-              keywordCount: keywords.length,
-              sources: ragSources,
-              contextLength: ragResult.context.length,
-            })
+            // 文件关联或无关联：全局检索
+            ragResult = await getContextForQuery(requestText, keywords)
           }
+
+          ragSources = ragResult.sources
+          ragSourceDetails = ragResult.sourceDetails
+
+          // 设置到 agentState，用于实时显示
+          setAgentState({
+            ragSources,
+            ragSourceDetails,
+          })
+
+          if (ragResult.context) {
+            // 找到相关内容
+            context += `## 知识库检索结果\n\n已在知识库中找到与用户问题相关的笔记内容。请优先使用以下信息回答用户问题：\n\n${ragResult.context}\n`
+          } else {
+            // 未找到相关内容
+            const searchScope = linkedResource && isLinkedFolder(linkedResource)
+              ? `在关联文件夹"${linkedResource.name}"中`
+              : '在知识库中'
+
+            context += `## 知识库检索结果\n\n${searchScope}未找到与用户问题相关的笔记内容。\n\n请根据情况处理：\n- 如果用户询问的是具体笔记内容，请告知用户${searchScope}可能没有相关资料\n- 如果问题可以基于一般知识回答，请使用你的知识回答\n- 如果需要更多信息，可以请用户提供更具体的关键词或问题\n`
+          }
+
+          agentDebugLog('chat_context_rag_result', {
+            enabled: true,
+            keywordCount: keywords.length,
+            sources: ragSources,
+            contextLength: ragResult.context.length,
+          })
         } catch (error) {
           console.error('Failed to get RAG context in Agent mode:', error)
           // 检索出错时的处理

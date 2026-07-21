@@ -392,7 +392,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     removeFolderFromTree(tree, entry.path)
 
     try {
-      await deleteVectorDocumentsByPaths(markdownPaths)
+      await deleteVectorDocumentsByPaths(markdownPaths, entry.path)
     } catch (error) {
       console.error('删除文件夹向量数据失败:', error)
     }

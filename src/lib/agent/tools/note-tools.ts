@@ -8,6 +8,8 @@ import useChatStore from '@/stores/chat'
 import { isLinkedFolder } from '@/lib/files'
 import emitter from '@/lib/emitter'
 import { getVectorDocumentKey } from '@/lib/vector-document-key'
+import { Store } from '@tauri-apps/plugin-store'
+import { DEFAULT_EXCLUDED_RAG_PATHS, isPathAllowedForRag } from '@/lib/rag-retrieval-policy'
 
 function normalizeLinkedCandidate(candidate: unknown): string {
   return typeof candidate === 'string' ? candidate.trim() : ''
@@ -99,6 +101,12 @@ async function mirrorVectorDocuments(sourcePath: string, targetPath: string): Pr
     })
     latestUpdatedAt = Math.max(latestUpdatedAt, doc.updated_at)
   }
+
+  const { getBM25Index } = await import('@/lib/bm25')
+  getBM25Index()?.replaceByFilename(
+    targetKey,
+    sourceDocs.sort((a, b) => a.chunk_id - b.chunk_id).map(doc => doc.content)
+  )
 
   return latestUpdatedAt
 }
@@ -687,6 +695,9 @@ Use folderPath to limit scope to a specific folder.`,
       const normalizedFolderPath = params.folderPath
         ? await ensureSafeWorkspaceRelativePath(params.folderPath)
         : undefined
+      const ragStore = await Store.load('store.json')
+      const excludedPaths = await ragStore.get<string[]>('ragExcludedPaths') ?? DEFAULT_EXCLUDED_RAG_PATHS
+      const isSearchablePath = (relativePath: string) => isPathAllowedForRag(relativePath, { excludedPaths })
 
       // RAG 模式：调用 RAG 搜索
       if (params.mode === 'rag') {
@@ -697,11 +708,11 @@ Use folderPath to limit scope to a specific folder.`,
 
         // 根据是否指定文件夹选择不同的 RAG 方法
         const ragResult = normalizedFolderPath
-          ? await getContextForQueryInFolder(keywords, normalizedFolderPath)
-          : await getContextForQuery(keywords)
+          ? await getContextForQueryInFolder(params.query, keywords, normalizedFolderPath)
+          : await getContextForQuery(params.query, keywords)
 
         // 获取所有文件列表，用于补全路径（向量数据库只存文件名，需要补全相对路径）
-        const allFiles = await getAllMarkdownFiles()
+        const allFiles = (await getAllMarkdownFiles()).filter(file => isSearchablePath(file.relativePath))
         // 创建文件名到相对路径的映射（处理同名文件）
         const fileNameToPath = new Map<string, string[]>()
         for (const file of allFiles) {
@@ -740,7 +751,7 @@ Use folderPath to limit scope to a specific folder.`,
 
       // 关键词模式：原有的精确匹配搜索
       // 如果指定了文件夹路径，先过滤文件列表
-      let allFiles = await getAllMarkdownFiles()
+      let allFiles = (await getAllMarkdownFiles()).filter(file => isSearchablePath(file.relativePath))
       if (normalizedFolderPath) {
         allFiles = allFiles.filter(file => file.relativePath.startsWith(normalizedFolderPath))
       }
