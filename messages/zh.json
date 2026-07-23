@@ -2410,6 +2410,10 @@
                 "title": "在光标处插入内容",
                 "description": "会把内容插入到当前光标位置。"
               },
+              "canvas_apply_operations": {
+                "title": "修改当前画布",
+                "description": "预览 AI 即将在原生画布中执行的节点和连线操作。"
+              },
               "delete_markdown_file": {
                 "title": "删除文件",
                 "description": "将永久删除所选文件。"
@@ -2580,13 +2584,14 @@
     }
   },
   "search": {
-    "placeholder": "搜索笔记和文章...",
+    "placeholder": "搜索笔记、记录和画布...",
     "results": "{count} 个搜索结果",
     "noResults": "暂无搜索结果",
     "tryDifferentKeywords": "尝试使用不同的关键词搜索",
     "item": {
       "record": "记录",
       "article": "文章",
+      "canvas": "画布",
       "matches": "{count}个匹配项",
       "scanType": "截图"
     }
@@ -2600,7 +2605,63 @@
       "howToUse": "如何使用同步功能？"
     }
   },
+  "canvas": {
+    "new": "新建画布",
+    "chooseTemplate": "选择模板",
+    "manager": { "title": "绘图管理器", "view": "视图", "grid": "缩略图视图", "list": "列表视图", "switchToGrid": "切换到缩略图视图", "switchToList": "切换到列表视图", "sort": { "title": "排序", "updated": "最近修改", "created": "创建时间", "name": "名称" }, "pin": "置顶画布", "unpin": "取消置顶", "refreshThumbnails": "重新生成缩略图", "closeTrash": "返回绘图管理器", "trashEmpty": "最近删除为空", "trashEmptyDescription": "删除的画布会显示在这里。", "trashCount": "共 {count} 个已删除画布", "sync": { "upload": "上传", "pending": "等待上传", "clickToUpload": "等待上传，点击立即上传", "uploading": "正在上传", "synced": "已上传", "failed": "上传失败", "downloadingAll": "正在拉取远程画布", "deleting": "正在删除并同步", "permanentlyDeleting": "正在永久删除" }, "count": "共 {count} 个画布" },
+    "templates": { "blank": "空白画布", "flowchart": "流程图", "mindmap": "思维导图", "timeline": "时间线", "quadrant": "四象限", "kanban": "看板", "swot": "SWOT 分析" },
+    "import": { "action": "导入画布或 Mermaid", "fileType": "画布文件", "defaultTitle": "导入的画布", "success": "画布导入成功", "error": "无法导入这个文件" },
+    "untitled": "未命名画布",
+    "more": "更多操作",
+    "duplicate": "创建副本",
+    "duplicateTitle": "{title} 副本",
+    "delete": "删除画布",
+    "trash": "最近删除",
+    "restore": "恢复画布",
+    "deleteDialog": { "title": "删除这张画布？", "description": "“{title}”会移到最近删除，你可以稍后恢复。", "cancel": "取消", "confirm": "移到最近删除" },
+    "permanentDelete": "永久删除",
+    "permanentDeleteDialog": { "title": "永久删除这张画布？", "description": "“{title}”的本地内容会被删除；如已配置同步，远程同步文件也会一并删除。此操作无法撤销。", "cancel": "取消", "confirm": "永久删除", "deleting": "正在删除", "error": "永久删除失败，请检查同步配置和网络后重试。" },
+    "rename": "重命名",
+    "loading": "正在加载画布...",
+    "undo": "撤销",
+    "redo": "重做",
+    "layout": "整理",
+    "export": "导出",
+    "exportSuccess": "画布已导出",
+    "exportError": "导出画布失败",
+    "aiPreview": "AI 修改预览",
+    "tools": { "label": "画布工具", "select": "选择", "hand": "抓手", "pen": "画笔", "highlighter": "荧光笔", "eraser": "橡皮擦" },
+    "brush": { "penTitle": "画笔", "highlighterTitle": "荧光笔", "strokeTitle": "笔刷样式", "color": "颜色", "size": "笔刷宽度" },
+    "nodes": { "process": "处理步骤", "decision": "判断条件", "terminator": "开始 / 结束", "text": "文本", "note": "笔记引用", "image": "图片", "link": "网页链接", "todo": "待办事项", "group": "分组" },
+    "linkNode": { "urlPrompt": "输入网页地址", "labelPrompt": "输入链接标题" },
+    "utilityNodes": { "title": "实用节点", "description": "添加图片、网页链接或待办事项。" },
+    "arrange": { "title": "对齐与分组", "description": "整理当前选择的多个节点。", "alignHorizontal": "水平居中对齐", "alignVertical": "垂直居中对齐", "distributeHorizontal": "水平均匀分布", "distributeVertical": "垂直均匀分布", "group": "创建分组" },
+    "group": { "defaultLabel": "分组" },
+    "edge": { "title": "连线样式", "description": "调整选中连线的路径和文字。", "orthogonal": "折线", "straight": "直线", "curve": "曲线", "editLabel": "编辑连线文字", "labelPrompt": "输入连线文字", "labelDescription": "文字会显示在连线中间，留空可移除。", "saveLabel": "保存文字" },
+    "selection": { "style": "节点样式", "color": "强调色", "customColor": "自定义颜色", "border": "边框", "solid": "实线", "dashed": "虚线", "dotted": "点线", "borderWidth": "边框粗细", "fill": "背景填充", "transparent": "透明", "customFill": "自定义填充色", "imagePasted": "图片已粘贴到画布", "imagePasteError": "粘贴图片失败" },
+    "layer": { "front": "置于顶层", "forward": "上移一层", "backward": "下移一层", "back": "置于底层" },
+    "noteNode": { "title": "添加笔记引用", "description": "从文件管理器选择一篇笔记，双击节点可以打开原文件。", "search": "搜索笔记...", "empty": "没有找到笔记", "group": "工作区笔记", "added": "已添加笔记“{name}”" },
+    "footer": {
+      "nodes": "{count} 个节点",
+      "edges": "{count} 条连线",
+      "grid": "显示网格",
+      "snap": "吸附到网格",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fit": "适应视图",
+      "layout": "自动整理",
+      "export": "导出 PNG",
+      "import": { "title": "导入", "file": "选择文件", "content": "输入内容", "contentTitle": "导入画布内容", "contentDescription": "支持 NoteGen Canvas JSON 或 Mermaid 流程图内容，导入后会替换当前画布。", "contentPlaceholder": "粘贴 Canvas JSON 或 Mermaid 内容…", "confirm": "导入到当前画布" },
+      "exportMenu": { "computer": "保存到电脑", "source": "可编辑文件", "png2x": "PNG · 2× 高清", "png4x": "PNG · 4× 超清", "svg": "SVG · 矢量图", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid 流程图" }
+    },
+    "contextMenu": { "selectAll": "全选", "copy": "复制", "paste": "粘贴", "duplicate": "创建副本", "delete": "删除所选内容" },
+    "empty": {
+      "title": "还没有画布",
+      "description": "创建画布，用结构图和自由绘画整理想法。"
+    }
+  },
   "navigation": {
+    "canvases": "画布",
     "chat": "对话",
     "record": "记录",
     "quickRecord": "快捷记录",
@@ -2629,7 +2690,7 @@
     "hideCenterPanel": "隐藏编辑器",
     "showRightSidebar": "显示右侧边栏",
     "hideRightSidebar": "隐藏右侧边栏",
-    "searchPlaceholder": "搜索笔记或记录...",
+    "searchPlaceholder": "搜索笔记、记录或画布...",
     "navigate": "导航"
   },
   "activity": {
@@ -3284,6 +3345,14 @@
       "polish": "润色",
       "concise": "精简",
       "expand": "扩展",
+      "generateCanvas": "从选区生成画布",
+      "canvasFlowchart": "生成流程图",
+      "canvasMindmap": "生成思维导图",
+      "canvasTimeline": "生成时间线",
+      "canvasTasks": "提取任务关系",
+      "canvasSource": "以下是 Markdown 选区原文：",
+      "canvasPromptSuffix": "请先读取当前空白画布，再使用画布工具生成内容；先展示操作预览，等待我确认后应用。",
+      "canvasPrompts": { "flowchart": "把选中文本整理成清晰的流程图。", "mindmap": "把选中文本整理成层级清晰的思维导图。", "timeline": "识别时间、阶段和里程碑，生成时间线画布。", "tasks": "提取任务、依赖关系和先后顺序，生成任务关系图。" },
       "translate": "翻译",
       "translateSubtitle": "翻译为",
       "quoteToChat": "引用到对话",
@@ -3322,6 +3391,7 @@
       "generating": "生成中...",
       "abort": "终止"
     },
+    "canvasDrop": { "hint": "松开以插入画布图片", "generating": "正在生成画布图片…", "success": "画布已插入", "successDescription": "已生成静态图片：{path}", "failed": "插入画布失败" },
     "image": {
       "insert": "插入图片",
       "uploading": "上传中...",

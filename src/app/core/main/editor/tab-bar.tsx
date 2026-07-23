@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useState, useEffect, memo } from 'react'
-import { X, FileText, Folder, Plus, Undo2, Redo2 } from 'lucide-react'
+import { X, FileText, Folder, Plus, Undo2, Redo2, PencilRuler } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import emitter from '@/lib/emitter'
@@ -35,15 +35,17 @@ import useSettingStore from '@/stores/setting'
 import type { Mark } from '@/db/marks'
 import { isRecordTabPath } from '../mark/mark-record-tab'
 import { getMarkTypeListBadgeClasses } from '../mark/mark-type-meta'
+import { getCanvasIdFromTabPath, isCanvasTabPath } from '../canvas/canvas-tab'
 
 export interface TabInfo {
   id: string
   path: string
   name: string
   isFolder: boolean
-  kind?: 'file' | 'record'
+  kind?: 'file' | 'record' | 'canvas'
   markId?: number
   markType?: Mark['type']
+  canvasId?: string
 }
 
 interface TabBarProps {
@@ -105,6 +107,7 @@ function SortableTabWithMenu({
   const canCloseRight = currentIndex < tabs.length - 1
   const hasOthers = tabs.length > 1
   const isRecordTab = tab.kind === 'record' || isRecordTabPath(tab.path)
+  const isCanvasTab = tab.kind === 'canvas' || isCanvasTabPath(tab.path)
   const recordTypeLabel = isRecordTab ? recordTypeT(tab.markType || 'text') : ''
   const tabTitle = isRecordTab ? `${recordTypeLabel}: ${tab.name}` : tab.path
 
@@ -153,6 +156,8 @@ function SortableTabWithMenu({
             )}>
               {recordTypeLabel}
             </span>
+          ) : isCanvasTab ? (
+            <PencilRuler className={cn('size-4 shrink-0', isActive && 'text-primary')} />
           ) : tab.isFolder ? (
             <Folder className="w-4 h-4 shrink-0 text-amber-500" />
           ) : (
@@ -237,6 +242,12 @@ export function TabBar({
   const activeTabIsRecord = activeTab
     ? activeTab.kind === 'record' || isRecordTabPath(activeTab.path)
     : false
+  const activeTabIsCanvas = activeTab
+    ? activeTab.kind === 'canvas' || isCanvasTabPath(activeTab.path)
+    : false
+  const activeCanvasId = activeTabIsCanvas && activeTab
+    ? activeTab.canvasId || getCanvasIdFromTabPath(activeTab.path)
+    : null
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [scrollState, setScrollState] = useState({ left: 0, width: 0, scrollWidth: 0 })
@@ -245,31 +256,59 @@ export function TabBar({
 
   // Query undo/redo capability from editor
   const queryCanUndoRedo = useCallback(() => {
+    if (activeCanvasId) {
+      emitter.emit('canvas-can-undo-redo', {
+        canvasId: activeCanvasId,
+        resolve: (can) => {
+          setCanUndo(can.undo)
+          setCanRedo(can.redo)
+        }
+      })
+      return
+    }
     emitter.emit('editor-can-undo-redo', {
       resolve: (can) => {
         setCanUndo(can.undo)
         setCanRedo(can.redo)
       }
     })
-  }, [])
+  }, [activeCanvasId])
 
   // Query on mount and when activeTabId changes
   useEffect(() => {
+    setCanUndo(false)
+    setCanRedo(false)
     queryCanUndoRedo()
   }, [activeTabId, queryCanUndoRedo])
 
   // Listen for undo/redo state changes from editor
   useEffect(() => {
     const handleUndoRedoChanged = (can: { undo: boolean; redo: boolean }) => {
+      if (activeTabIsCanvas) return
       setCanUndo(can.undo)
       setCanRedo(can.redo)
     }
+    const handleCanvasUndoRedoChanged = ({
+      canvasId,
+      undo,
+      redo,
+    }: {
+      canvasId: string
+      undo: boolean
+      redo: boolean
+    }) => {
+      if (canvasId !== activeCanvasId) return
+      setCanUndo(undo)
+      setCanRedo(redo)
+    }
 
     emitter.on('editor-undo-redo-changed', handleUndoRedoChanged)
+    emitter.on('canvas-undo-redo-changed', handleCanvasUndoRedoChanged)
     return () => {
       emitter.off('editor-undo-redo-changed', handleUndoRedoChanged)
+      emitter.off('canvas-undo-redo-changed', handleCanvasUndoRedoChanged)
     }
-  }, [])
+  }, [activeCanvasId, activeTabIsCanvas])
 
   // Get current platform
   const [currentPlatform, setCurrentPlatform] = useState<'macos' | 'windows' | 'linux' | 'unknown'>('unknown')
@@ -414,7 +453,11 @@ export function TabBar({
                 tooltipText={`撤销 (${modKey}+Z)`}
                 side="bottom"
                 onClick={() => {
-                  emitter.emit('editor-undo')
+                  if (activeCanvasId) {
+                    emitter.emit('canvas-undo', { canvasId: activeCanvasId })
+                  } else {
+                    emitter.emit('editor-undo')
+                  }
                   // Update state after action
                   setTimeout(queryCanUndoRedo, 0)
                 }}
@@ -425,7 +468,11 @@ export function TabBar({
                 tooltipText={`重做 (${modKey}+Shift+Z)`}
                 side="bottom"
                 onClick={() => {
-                  emitter.emit('editor-redo')
+                  if (activeCanvasId) {
+                    emitter.emit('canvas-redo', { canvasId: activeCanvasId })
+                  } else {
+                    emitter.emit('editor-redo')
+                  }
                   // Update state after action
                   setTimeout(queryCanUndoRedo, 0)
                 }}

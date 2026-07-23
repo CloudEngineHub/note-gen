@@ -2480,13 +2480,14 @@
     }
   },
   "search": {
-    "placeholder": "Pesquisar notas e artigos...",
+    "placeholder": "Pesquisar notas, registros e telas...",
     "results": "{count} resultados da pesquisa",
     "noResults": "Nenhum resultado de pesquisa",
     "tryDifferentKeywords": "Tente usar palavras-chave diferentes",
     "item": {
       "record": "Registro",
       "article": "Artigo",
+      "canvas": "Tela",
       "matches": "{count} correspondências",
       "scanType": "digitalização"
     }
@@ -2500,7 +2501,63 @@
       "howToUse": "Como usar o recurso de sincronização?"
     }
   },
+  "canvas": {
+    "new": "Nova tela",
+    "chooseTemplate": "Escolher um modelo",
+    "manager": { "title": "Gerenciador de telas", "view": "Visualização", "grid": "Visualização em miniaturas", "list": "Visualização em lista", "switchToGrid": "Mudar para miniaturas", "switchToList": "Mudar para lista", "sort": { "title": "Ordenar", "updated": "Última modificação", "created": "Data de criação", "name": "Nome" }, "pin": "Fixar tela", "unpin": "Desafixar tela", "refreshThumbnails": "Gerar miniaturas novamente", "closeTrash": "Voltar ao gerenciador de telas", "trashEmpty": "Nenhuma exclusão recente", "trashEmptyDescription": "As telas excluídas aparecerão aqui.", "trashCount": "{count} telas excluídas", "sync": { "upload": "Enviar", "pending": "Aguardando envio", "clickToUpload": "Aguardando envio. Clique para enviar agora.", "uploading": "Enviando", "synced": "Enviada", "failed": "Falha no envio", "downloadingAll": "Buscando telas remotas", "deleting": "Excluindo e sincronizando", "permanentlyDeleting": "Excluindo permanentemente" }, "count": "{count} telas" },
+    "templates": { "blank": "Tela em branco", "flowchart": "Fluxograma", "mindmap": "Mapa mental", "timeline": "Linha do tempo", "quadrant": "Quatro quadrantes", "kanban": "Kanban", "swot": "Análise SWOT" },
+    "import": { "action": "Importar tela ou Mermaid", "fileType": "Arquivo de tela", "defaultTitle": "Tela importada", "success": "Tela importada", "error": "Não foi possível importar este arquivo" },
+    "untitled": "Tela sem título",
+    "more": "Mais ações",
+    "duplicate": "Duplicar",
+    "duplicateTitle": "Cópia de {title}",
+    "delete": "Excluir tela",
+    "trash": "Excluídas recentemente",
+    "restore": "Restaurar tela",
+    "deleteDialog": { "title": "Excluir esta tela?", "description": "“{title}” será movida para Excluídas recentemente e poderá ser restaurada depois.", "cancel": "Cancelar", "confirm": "Mover para Excluídas recentemente" },
+    "permanentDelete": "Excluir permanentemente",
+    "permanentDeleteDialog": { "title": "Excluir esta tela permanentemente?", "description": "O conteúdo local de “{title}” será excluído. Se a sincronização estiver configurada, o arquivo remoto também será removido. Esta ação não pode ser desfeita.", "cancel": "Cancelar", "confirm": "Excluir permanentemente", "deleting": "Excluindo", "error": "Falha na exclusão permanente. Verifique as configurações de sincronização e a rede e tente novamente." },
+    "rename": "Renomear",
+    "loading": "Carregando tela...",
+    "undo": "Desfazer",
+    "redo": "Refazer",
+    "layout": "Organizar",
+    "export": "Exportar",
+    "exportSuccess": "Tela exportada",
+    "exportError": "Falha ao exportar a tela",
+    "aiPreview": "Prévia das alterações da IA",
+    "tools": { "label": "Ferramentas da tela", "select": "Selecionar", "hand": "Mão", "pen": "Caneta", "highlighter": "Marca-texto", "eraser": "Borracha" },
+    "brush": { "penTitle": "Caneta", "highlighterTitle": "Marca-texto", "strokeTitle": "Traço do pincel", "color": "Cor", "size": "Largura do pincel" },
+    "nodes": { "process": "Processo", "decision": "Decisão", "terminator": "Início / Fim", "text": "Texto", "note": "Referência de nota", "image": "Imagem", "link": "Link da web", "todo": "Tarefa", "group": "Grupo" },
+    "linkNode": { "urlPrompt": "Digite o endereço da web", "labelPrompt": "Digite o título do link" },
+    "utilityNodes": { "title": "Nós utilitários", "description": "Adicione imagem, link ou tarefa." },
+    "arrange": { "title": "Alinhar e agrupar", "description": "Organize os nós selecionados.", "alignHorizontal": "Alinhar centros horizontais", "alignVertical": "Alinhar centros verticais", "distributeHorizontal": "Distribuir horizontalmente", "distributeVertical": "Distribuir verticalmente", "group": "Criar grupo" },
+    "group": { "defaultLabel": "Grupo" },
+    "edge": { "title": "Estilo da conexão", "description": "Ajuste o caminho e o rótulo da conexão selecionada.", "orthogonal": "Ortogonal", "straight": "Reta", "curve": "Curva", "editLabel": "Editar rótulo", "labelPrompt": "Digite o rótulo da conexão", "labelDescription": "O rótulo aparece no centro da conexão. Deixe vazio para remover.", "saveLabel": "Salvar rótulo" },
+    "selection": { "style": "Estilo do nó", "color": "Destaque", "customColor": "Cor personalizada", "border": "Borda", "solid": "Sólida", "dashed": "Tracejada", "dotted": "Pontilhada", "borderWidth": "Espessura da borda", "fill": "Fundo", "transparent": "Transparente", "customFill": "Cor de fundo personalizada", "imagePasted": "Imagem colada na tela", "imagePasteError": "Não foi possível colar a imagem" },
+    "layer": { "front": "Trazer para frente", "forward": "Avançar uma camada", "backward": "Recuar uma camada", "back": "Enviar para trás" },
+    "noteNode": { "title": "Adicionar referência de nota", "description": "Escolha uma nota no gerenciador de arquivos. Clique duas vezes no nó para abrir o arquivo original.", "search": "Buscar notas...", "empty": "Nenhuma nota encontrada", "group": "Notas do espaço de trabalho", "added": "Nota “{name}” adicionada" },
+    "footer": {
+      "nodes": "{count} nós",
+      "edges": "{count} conexões",
+      "grid": "Mostrar grade",
+      "snap": "Alinhar à grade",
+      "zoomIn": "Ampliar",
+      "zoomOut": "Reduzir",
+      "fit": "Ajustar visualização",
+      "layout": "Organizar automaticamente",
+      "export": "Exportar PNG",
+      "import": { "title": "Importar", "file": "Escolher arquivo", "content": "Inserir conteúdo", "contentTitle": "Importar conteúdo da tela", "contentDescription": "Aceita NoteGen Canvas JSON ou fluxograma Mermaid. A importação substitui a tela atual.", "contentPlaceholder": "Cole o conteúdo Canvas JSON ou Mermaid…", "confirm": "Importar para a tela atual" },
+      "exportMenu": { "computer": "Salvar no computador", "source": "Arquivos editáveis", "png2x": "PNG · 2× alta resolução", "png4x": "PNG · 4× ultra resolução", "svg": "SVG · vetorial", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Fluxograma Mermaid" }
+    },
+    "contextMenu": { "selectAll": "Selecionar tudo", "copy": "Copiar", "paste": "Colar", "duplicate": "Duplicar", "delete": "Excluir seleção" },
+    "empty": {
+      "title": "Nenhuma tela ainda",
+      "description": "Crie uma tela para organizar ideias com diagramas e desenho livre."
+    }
+  },
   "navigation": {
+    "canvases": "Tela",
     "chat": "Conversa",
     "record": "Registro",
     "quickRecord": "Registro Rápido",
@@ -2527,7 +2584,7 @@
     "showLeftSidebar": "Mostrar Barra Lateral Esquerda",
     "hideRightSidebar": "Ocultar Barra Lateral Direita",
     "showRightSidebar": "Mostrar Barra Lateral Direita",
-    "searchPlaceholder": "Pesquisar notas ou registros...",
+    "searchPlaceholder": "Pesquisar notas, registros ou telas...",
     "showCenterPanel": "Mostrar editor",
     "hideCenterPanel": "Ocultar editor",
     "navigate": "Navegar"
@@ -3143,6 +3200,14 @@
       "polish": "Polir",
       "concise": "Conciso",
       "expand": "Expandir",
+      "generateCanvas": "Gerar tela da seleção",
+      "canvasFlowchart": "Gerar fluxograma",
+      "canvasMindmap": "Gerar mapa mental",
+      "canvasTimeline": "Gerar linha do tempo",
+      "canvasTasks": "Extrair relações de tarefas",
+      "canvasSource": "Markdown selecionado:",
+      "canvasPromptSuffix": "Leia a tela em branco atual e use as ferramentas da tela. Mostre uma prévia e aguarde confirmação antes de aplicar.",
+      "canvasPrompts": { "flowchart": "Transforme o texto selecionado em um fluxograma claro.", "mindmap": "Transforme o texto selecionado em um mapa mental estruturado.", "timeline": "Identifique datas, fases e marcos e gere uma linha do tempo.", "tasks": "Extraia tarefas, dependências e ordem e gere um diagrama de relações." },
       "translate": "Traduzir",
       "translateSubtitle": "Traduzir para",
       "quoteToChat": "Citar no Chat",
@@ -3181,6 +3246,7 @@
       "generating": "Gerando...",
       "abort": "Abortar"
     },
+    "canvasDrop": { "hint": "Solte para inserir a imagem da tela", "generating": "Gerando imagem da tela…", "success": "Tela inserida", "successDescription": "Imagem estática criada: {path}", "failed": "Não foi possível inserir a tela" },
     "image": {
       "insert": "Inserir imagem",
       "uploading": "Enviando...",

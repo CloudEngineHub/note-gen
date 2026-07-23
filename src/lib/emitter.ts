@@ -1,6 +1,7 @@
 import mitt from 'mitt'
 import type { QuickPrompt } from '@/lib/ai/placeholder'
 import type { OnboardingStepId } from '@/app/core/main/editor/onboarding-state'
+import type { CanvasDocument } from '@/types/canvas'
 
 // 定义事件类型
 interface Events {
@@ -129,6 +130,15 @@ interface Events {
   'mobile-editor-toggle-outline': void;
   'editor-can-undo-redo': { resolve: (can: { undo: boolean; redo: boolean }) => void };
   'editor-undo-redo-changed': { undo: boolean; redo: boolean };
+  'canvas-document-replace': { canvasId: string; document: CanvasDocument };
+  'canvas-history-checkpoint': void;
+  'canvas-undo': { canvasId: string };
+  'canvas-redo': { canvasId: string };
+  'canvas-can-undo-redo': { canvasId: string; resolve: (can: { undo: boolean; redo: boolean }) => void };
+  'canvas-undo-redo-changed': { canvasId: string; undo: boolean; redo: boolean };
+  'canvas-agent-preview': { operations: unknown[] };
+  'canvas-agent-preview-clear': void;
+  'canvas-auto-layout': { recordHistory?: boolean };
   'editor-replace': {
     content?: string;
     range?: { from: number; to: number };

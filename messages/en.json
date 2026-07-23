@@ -2496,6 +2496,10 @@
                 "title": "Insert at cursor",
                 "description": "Content will be inserted at the current cursor position."
               },
+              "canvas_apply_operations": {
+                "title": "Modify current canvas",
+                "description": "Preview the node and connection operations AI will apply to the native canvas."
+              },
               "delete_markdown_file": {
                 "title": "Delete file",
                 "description": "The selected file will be permanently deleted."
@@ -2580,13 +2584,14 @@
     }
   },
   "search": {
-    "placeholder": "Search notes and articles...",
+    "placeholder": "Search notes, records, and canvases...",
     "results": "{count} search results",
     "noResults": "No search results",
     "tryDifferentKeywords": "Try using different keywords",
     "item": {
       "record": "Record",
       "article": "Article",
+      "canvas": "Canvas",
       "matches": "{count} matches",
       "scanType": "scan"
     }
@@ -2600,7 +2605,63 @@
       "howToUse": "How to use sync feature?"
     }
   },
+  "canvas": {
+    "new": "New canvas",
+    "chooseTemplate": "Choose a template",
+    "manager": { "title": "Canvas manager", "view": "View", "grid": "Thumbnail view", "list": "List view", "switchToGrid": "Switch to thumbnail view", "switchToList": "Switch to list view", "sort": { "title": "Sort", "updated": "Last modified", "created": "Date created", "name": "Name" }, "pin": "Pin canvas", "unpin": "Unpin canvas", "refreshThumbnails": "Regenerate thumbnails", "closeTrash": "Back to canvas manager", "trashEmpty": "Recently deleted is empty", "trashEmptyDescription": "Deleted canvases will appear here.", "trashCount": "{count} deleted canvases", "sync": { "upload": "Upload", "pending": "Waiting to upload", "clickToUpload": "Waiting to upload. Click to upload now.", "uploading": "Uploading", "synced": "Uploaded", "failed": "Upload failed", "downloadingAll": "Pulling remote canvases", "deleting": "Deleting and syncing", "permanentlyDeleting": "Deleting permanently" }, "count": "{count} canvases" },
+    "templates": { "blank": "Blank canvas", "flowchart": "Flowchart", "mindmap": "Mind map", "timeline": "Timeline", "quadrant": "Four quadrants", "kanban": "Kanban", "swot": "SWOT analysis" },
+    "import": { "action": "Import canvas or Mermaid", "fileType": "Canvas file", "defaultTitle": "Imported canvas", "success": "Canvas imported", "error": "This file could not be imported" },
+    "untitled": "Untitled canvas",
+    "more": "More actions",
+    "duplicate": "Duplicate",
+    "duplicateTitle": "{title} copy",
+    "delete": "Delete canvas",
+    "trash": "Recently deleted",
+    "restore": "Restore canvas",
+    "deleteDialog": { "title": "Delete this canvas?", "description": "“{title}” will move to Recently Deleted and can be restored later.", "cancel": "Cancel", "confirm": "Move to Recently Deleted" },
+    "permanentDelete": "Delete permanently",
+    "permanentDeleteDialog": { "title": "Permanently delete this canvas?", "description": "The local content for “{title}” will be deleted. If sync is configured, its remote sync file will also be removed. This action cannot be undone.", "cancel": "Cancel", "confirm": "Delete permanently", "deleting": "Deleting", "error": "Permanent deletion failed. Check your sync settings and network, then try again." },
+    "rename": "Rename",
+    "loading": "Loading canvas...",
+    "undo": "Undo",
+    "redo": "Redo",
+    "layout": "Arrange",
+    "export": "Export",
+    "exportSuccess": "Canvas exported",
+    "exportError": "Failed to export canvas",
+    "aiPreview": "AI change preview",
+    "tools": { "label": "Canvas tools", "select": "Select", "hand": "Hand", "pen": "Pen", "highlighter": "Highlighter", "eraser": "Eraser" },
+    "brush": { "penTitle": "Pen", "highlighterTitle": "Highlighter", "strokeTitle": "Brush stroke", "color": "Color", "size": "Brush width" },
+    "nodes": { "process": "Process", "decision": "Decision", "terminator": "Start / End", "text": "Text", "note": "Note reference", "image": "Image", "link": "Web link", "todo": "Todo", "group": "Group" },
+    "linkNode": { "urlPrompt": "Enter a web address", "labelPrompt": "Enter a link title" },
+    "utilityNodes": { "title": "Utility nodes", "description": "Add an image, web link, or todo." },
+    "arrange": { "title": "Align and group", "description": "Arrange the selected nodes.", "alignHorizontal": "Align horizontal centers", "alignVertical": "Align vertical centers", "distributeHorizontal": "Distribute horizontally", "distributeVertical": "Distribute vertically", "group": "Create group" },
+    "group": { "defaultLabel": "Group" },
+    "edge": { "title": "Connection style", "description": "Adjust the selected connection path and label.", "orthogonal": "Orthogonal", "straight": "Straight", "curve": "Curve", "editLabel": "Edit label", "labelPrompt": "Enter connection label", "labelDescription": "The label appears at the center of the edge. Leave it empty to remove it.", "saveLabel": "Save label" },
+    "selection": { "style": "Node style", "color": "Accent", "customColor": "Custom color", "border": "Border", "solid": "Solid", "dashed": "Dashed", "dotted": "Dotted", "borderWidth": "Border width", "fill": "Background", "transparent": "Transparent", "customFill": "Custom fill", "imagePasted": "Image pasted onto canvas", "imagePasteError": "Could not paste image" },
+    "layer": { "front": "Bring to front", "forward": "Bring forward", "backward": "Send backward", "back": "Send to back" },
+    "noteNode": { "title": "Add note reference", "description": "Choose a note from the file manager. Double-click the node to open its source file.", "search": "Search notes...", "empty": "No notes found", "group": "Workspace notes", "added": "Added note “{name}”" },
+    "footer": {
+      "nodes": "{count} nodes",
+      "edges": "{count} connections",
+      "grid": "Show grid",
+      "snap": "Snap to grid",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit view",
+      "layout": "Auto arrange",
+      "export": "Export PNG",
+      "import": { "title": "Import", "file": "Choose file", "content": "Enter content", "contentTitle": "Import canvas content", "contentDescription": "Supports NoteGen Canvas JSON or Mermaid flowchart content. Importing replaces the current canvas.", "contentPlaceholder": "Paste Canvas JSON or Mermaid content…", "confirm": "Import into current canvas" },
+      "exportMenu": { "computer": "Save to computer", "source": "Editable files", "png2x": "PNG · 2× high resolution", "png4x": "PNG · 4× ultra resolution", "svg": "SVG · vector", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid flowchart" }
+    },
+    "contextMenu": { "selectAll": "Select all", "copy": "Copy", "paste": "Paste", "duplicate": "Duplicate", "delete": "Delete selection" },
+    "empty": {
+      "title": "No canvases yet",
+      "description": "Create a canvas to organize ideas with diagrams and freehand drawing."
+    }
+  },
   "navigation": {
+    "canvases": "Canvas",
     "chat": "Chat",
     "record": "Record",
     "quickRecord": "Quick Record",
@@ -2629,7 +2690,7 @@
     "hideCenterPanel": "Hide Editor",
     "showRightSidebar": "Show Right Sidebar",
     "hideRightSidebar": "Hide Right Sidebar",
-    "searchPlaceholder": "Search notes or records...",
+    "searchPlaceholder": "Search notes, records, or canvases...",
     "navigate": "Navigate"
   },
   "activity": {
@@ -3284,6 +3345,14 @@
       "polish": "Polish",
       "concise": "Concise",
       "expand": "Expand",
+      "generateCanvas": "Generate canvas from selection",
+      "canvasFlowchart": "Generate flowchart",
+      "canvasMindmap": "Generate mind map",
+      "canvasTimeline": "Generate timeline",
+      "canvasTasks": "Extract task relationships",
+      "canvasSource": "Selected Markdown source:",
+      "canvasPromptSuffix": "Read the current blank canvas, then use canvas tools to generate it. Show an operation preview and wait for confirmation before applying.",
+      "canvasPrompts": { "flowchart": "Turn the selected text into a clear flowchart.", "mindmap": "Turn the selected text into a well-structured mind map.", "timeline": "Identify dates, phases, and milestones and generate a timeline.", "tasks": "Extract tasks, dependencies, and ordering and generate a task relationship diagram." },
       "translate": "Translate",
       "translateSubtitle": "Translate to",
       "quoteToChat": "Quote to Chat",
@@ -3322,6 +3391,7 @@
       "generating": "Generating...",
       "abort": "Abort"
     },
+    "canvasDrop": { "hint": "Drop to insert canvas image", "generating": "Generating canvas image…", "success": "Canvas inserted", "successDescription": "Static image created: {path}", "failed": "Could not insert canvas" },
     "image": {
       "insert": "Insert Image",
       "uploading": "Uploading...",

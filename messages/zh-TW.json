@@ -2487,13 +2487,14 @@
     }
   },
   "search": {
-    "placeholder": "搜尋筆記和文章...",
+    "placeholder": "搜尋筆記、記錄和畫布...",
     "results": "{count} 個搜索結果",
     "noResults": "暫無搜索結果",
     "tryDifferentKeywords": "嘗試使用不同的關鍵字搜索",
     "item": {
       "record": "記錄",
       "article": "文章",
+      "canvas": "畫布",
       "matches": "{count}個匹配項",
       "scanType": "截圖"
     }
@@ -2507,7 +2508,63 @@
       "howToUse": "如何使用同步功能？"
     }
   },
+  "canvas": {
+    "new": "新增畫布",
+    "chooseTemplate": "選擇範本",
+    "manager": { "title": "繪圖管理器", "view": "檢視", "grid": "縮圖檢視", "list": "清單檢視", "switchToGrid": "切換到縮圖檢視", "switchToList": "切換到清單檢視", "sort": { "title": "排序", "updated": "最近修改", "created": "建立時間", "name": "名稱" }, "pin": "置頂畫布", "unpin": "取消置頂", "refreshThumbnails": "重新產生縮圖", "closeTrash": "返回繪圖管理器", "trashEmpty": "最近刪除是空的", "trashEmptyDescription": "刪除的畫布會顯示在這裡。", "trashCount": "共 {count} 個已刪除畫布", "sync": { "upload": "上傳", "pending": "等待上傳", "clickToUpload": "等待上傳，點擊立即上傳", "uploading": "正在上傳", "synced": "已上傳", "failed": "上傳失敗", "downloadingAll": "正在拉取遠端畫布", "deleting": "正在刪除並同步", "permanentlyDeleting": "正在永久刪除" }, "count": "共 {count} 個畫布" },
+    "templates": { "blank": "空白畫布", "flowchart": "流程圖", "mindmap": "心智圖", "timeline": "時間線", "quadrant": "四象限", "kanban": "看板", "swot": "SWOT 分析" },
+    "import": { "action": "匯入畫布或 Mermaid", "fileType": "畫布檔案", "defaultTitle": "匯入的畫布", "success": "畫布匯入成功", "error": "無法匯入這個檔案" },
+    "untitled": "未命名畫布",
+    "more": "更多操作",
+    "duplicate": "建立副本",
+    "duplicateTitle": "{title} 副本",
+    "delete": "刪除畫布",
+    "trash": "最近刪除",
+    "restore": "復原畫布",
+    "deleteDialog": { "title": "刪除這張畫布？", "description": "「{title}」會移到最近刪除，你可以稍後復原。", "cancel": "取消", "confirm": "移到最近刪除" },
+    "permanentDelete": "永久刪除",
+    "permanentDeleteDialog": { "title": "永久刪除這張畫布？", "description": "「{title}」的本機內容會被刪除；如已設定同步，遠端同步檔案也會一併刪除。此操作無法復原。", "cancel": "取消", "confirm": "永久刪除", "deleting": "正在刪除", "error": "永久刪除失敗，請檢查同步設定和網路後重試。" },
+    "rename": "重新命名",
+    "loading": "正在載入畫布...",
+    "undo": "復原",
+    "redo": "重做",
+    "layout": "整理",
+    "export": "匯出",
+    "exportSuccess": "畫布已匯出",
+    "exportError": "匯出畫布失敗",
+    "aiPreview": "AI 修改預覽",
+    "tools": { "label": "畫布工具", "select": "選取", "hand": "抓手", "pen": "畫筆", "highlighter": "螢光筆", "eraser": "橡皮擦" },
+    "brush": { "penTitle": "畫筆", "highlighterTitle": "螢光筆", "strokeTitle": "筆刷樣式", "color": "顏色", "size": "筆刷寬度" },
+    "nodes": { "process": "處理步驟", "decision": "判斷條件", "terminator": "開始 / 結束", "text": "文字", "note": "筆記引用", "image": "圖片", "link": "網頁連結", "todo": "待辦事項", "group": "群組" },
+    "linkNode": { "urlPrompt": "輸入網頁位址", "labelPrompt": "輸入連結標題" },
+    "utilityNodes": { "title": "實用節點", "description": "新增圖片、網頁連結或待辦事項。" },
+    "arrange": { "title": "對齊與群組", "description": "整理目前選取的節點。", "alignHorizontal": "水平置中對齊", "alignVertical": "垂直置中對齊", "distributeHorizontal": "水平平均分布", "distributeVertical": "垂直平均分布", "group": "建立群組" },
+    "group": { "defaultLabel": "群組" },
+    "edge": { "title": "連線樣式", "description": "調整選取連線的路徑和文字。", "orthogonal": "折線", "straight": "直線", "curve": "曲線", "editLabel": "編輯連線文字", "labelPrompt": "輸入連線文字", "labelDescription": "文字會顯示在線段中間，留空即可移除。", "saveLabel": "儲存文字" },
+    "selection": { "style": "節點樣式", "color": "強調色", "customColor": "自訂顏色", "border": "邊框", "solid": "實線", "dashed": "虛線", "dotted": "點線", "borderWidth": "邊框粗細", "fill": "背景填色", "transparent": "透明", "customFill": "自訂填色", "imagePasted": "圖片已貼到畫布", "imagePasteError": "貼上圖片失敗" },
+    "layer": { "front": "置於頂層", "forward": "上移一層", "backward": "下移一層", "back": "置於底層" },
+    "noteNode": { "title": "新增筆記引用", "description": "從檔案管理器選擇一篇筆記，雙擊節點可以開啟原始檔案。", "search": "搜尋筆記...", "empty": "找不到筆記", "group": "工作區筆記", "added": "已新增筆記「{name}」" },
+    "footer": {
+      "nodes": "{count} 個節點",
+      "edges": "{count} 條連線",
+      "grid": "顯示網格",
+      "snap": "吸附到網格",
+      "zoomIn": "放大",
+      "zoomOut": "縮小",
+      "fit": "符合檢視",
+      "layout": "自動整理",
+      "export": "匯出 PNG",
+      "import": { "title": "匯入", "file": "選擇檔案", "content": "輸入內容", "contentTitle": "匯入畫布內容", "contentDescription": "支援 NoteGen Canvas JSON 或 Mermaid 流程圖內容，匯入後會取代目前畫布。", "contentPlaceholder": "貼上 Canvas JSON 或 Mermaid 內容…", "confirm": "匯入目前畫布" },
+      "exportMenu": { "computer": "儲存到電腦", "source": "可編輯檔案", "png2x": "PNG · 2× 高解析", "png4x": "PNG · 4× 超高解析", "svg": "SVG · 向量圖", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid 流程圖" }
+    },
+    "contextMenu": { "selectAll": "全選", "copy": "複製", "paste": "貼上", "duplicate": "建立副本", "delete": "刪除所選內容" },
+    "empty": {
+      "title": "還沒有畫布",
+      "description": "建立畫布，用結構圖和自由繪畫整理想法。"
+    }
+  },
   "navigation": {
+    "canvases": "畫布",
     "chat": "對話",
     "record": "記錄",
     "quickRecord": "快捷記錄",
@@ -2534,7 +2591,7 @@
     "showLeftSidebar": "顯示左側邊欄",
     "hideRightSidebar": "隱藏右側邊欄",
     "showRightSidebar": "顯示右側邊欄",
-    "searchPlaceholder": "搜索筆記或記錄...",
+    "searchPlaceholder": "搜尋筆記、記錄或畫布...",
     "showCenterPanel": "显示编辑器",
     "hideCenterPanel": "隐藏编辑器",
     "navigate": "導覽"
@@ -3183,6 +3240,14 @@
       "polish": "潤色",
       "concise": "精簡",
       "expand": "擴展",
+      "generateCanvas": "從選區產生畫布",
+      "canvasFlowchart": "產生流程圖",
+      "canvasMindmap": "產生心智圖",
+      "canvasTimeline": "產生時間線",
+      "canvasTasks": "提取任務關係",
+      "canvasSource": "以下是 Markdown 選區原文：",
+      "canvasPromptSuffix": "請先讀取目前空白畫布，再使用畫布工具產生內容；先顯示操作預覽，等待確認後套用。",
+      "canvasPrompts": { "flowchart": "把選取文字整理成清晰的流程圖。", "mindmap": "把選取文字整理成層級清晰的心智圖。", "timeline": "識別時間、階段和里程碑，產生時間線畫布。", "tasks": "提取任務、依賴關係和先後順序，產生任務關係圖。" },
       "translate": "翻譯",
       "translateSubtitle": "翻譯為",
       "quoteToChat": "引用到對話",
@@ -3221,6 +3286,7 @@
       "generating": "生成中...",
       "abort": "終止"
     },
+    "canvasDrop": { "hint": "放開以插入畫布圖片", "generating": "正在產生畫布圖片…", "success": "畫布已插入", "successDescription": "已產生靜態圖片：{path}", "failed": "插入畫布失敗" },
     "image": {
       "insert": "插入圖片",
       "uploading": "上傳中...",

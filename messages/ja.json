@@ -2495,7 +2495,63 @@
       "howToUse": "同期機能の使い方は？"
     }
   },
+  "canvas": {
+    "new": "キャンバスを作成",
+    "chooseTemplate": "テンプレートを選択",
+    "manager": { "title": "キャンバスマネージャー", "view": "表示", "grid": "サムネイル表示", "list": "リスト表示", "switchToGrid": "サムネイル表示に切り替え", "switchToList": "リスト表示に切り替え", "sort": { "title": "並び替え", "updated": "更新日時", "created": "作成日時", "name": "名前" }, "pin": "キャンバスを固定", "unpin": "固定を解除", "refreshThumbnails": "サムネイルを再生成", "closeTrash": "キャンバスマネージャーに戻る", "trashEmpty": "最近削除した項目はありません", "trashEmptyDescription": "削除したキャンバスがここに表示されます。", "trashCount": "削除済みキャンバス {count} 件", "sync": { "upload": "アップロード", "pending": "アップロード待ち", "clickToUpload": "アップロード待ち。クリックして今すぐアップロード", "uploading": "アップロード中", "synced": "アップロード済み", "failed": "アップロード失敗", "downloadingAll": "リモートキャンバスを取得中", "deleting": "削除して同期中", "permanentlyDeleting": "完全に削除中" }, "count": "キャンバス {count} 件" },
+    "templates": { "blank": "空白のキャンバス", "flowchart": "フローチャート", "mindmap": "マインドマップ", "timeline": "タイムライン", "quadrant": "4象限", "kanban": "カンバン", "swot": "SWOT 分析" },
+    "import": { "action": "キャンバスまたは Mermaid を読み込む", "fileType": "キャンバスファイル", "defaultTitle": "読み込んだキャンバス", "success": "キャンバスを読み込みました", "error": "このファイルを読み込めません" },
+    "untitled": "無題のキャンバス",
+    "more": "その他の操作",
+    "duplicate": "複製",
+    "duplicateTitle": "{title} のコピー",
+    "delete": "キャンバスを削除",
+    "trash": "最近削除した項目",
+    "restore": "キャンバスを復元",
+    "deleteDialog": { "title": "このキャンバスを削除しますか？", "description": "「{title}」は最近削除した項目に移動し、後で復元できます。", "cancel": "キャンセル", "confirm": "最近削除した項目に移動" },
+    "permanentDelete": "完全に削除",
+    "permanentDeleteDialog": { "title": "このキャンバスを完全に削除しますか？", "description": "「{title}」のローカル内容が削除されます。同期が設定されている場合、リモート同期ファイルも削除されます。この操作は元に戻せません。", "cancel": "キャンセル", "confirm": "完全に削除", "deleting": "削除中", "error": "完全削除に失敗しました。同期設定とネットワークを確認して再試行してください。" },
+    "rename": "名前を変更",
+    "loading": "キャンバスを読み込み中...",
+    "undo": "元に戻す",
+    "redo": "やり直す",
+    "layout": "整列",
+    "export": "書き出す",
+    "exportSuccess": "キャンバスを書き出しました",
+    "exportError": "キャンバスの書き出しに失敗しました",
+    "aiPreview": "AI 変更プレビュー",
+    "tools": { "label": "キャンバスツール", "select": "選択", "hand": "手のひら", "pen": "ペン", "highlighter": "蛍光ペン", "eraser": "消しゴム" },
+    "brush": { "penTitle": "ペン", "highlighterTitle": "蛍光ペン", "strokeTitle": "ブラシストローク", "color": "色", "size": "ブラシ幅" },
+    "nodes": { "process": "処理", "decision": "条件", "terminator": "開始 / 終了", "text": "テキスト", "note": "ノート参照", "image": "画像", "link": "ウェブリンク", "todo": "タスク", "group": "グループ" },
+    "linkNode": { "urlPrompt": "ウェブアドレスを入力", "labelPrompt": "リンクタイトルを入力" },
+    "utilityNodes": { "title": "実用ノード", "description": "画像、ウェブリンク、タスクを追加します。" },
+    "arrange": { "title": "整列とグループ", "description": "選択したノードを整理します。", "alignHorizontal": "水平中央揃え", "alignVertical": "垂直中央揃え", "distributeHorizontal": "水平方向に均等配置", "distributeVertical": "垂直方向に均等配置", "group": "グループを作成" },
+    "group": { "defaultLabel": "グループ" },
+    "edge": { "title": "接続スタイル", "description": "選択した接続の経路とラベルを調整します。", "orthogonal": "折れ線", "straight": "直線", "curve": "曲線", "editLabel": "ラベルを編集", "labelPrompt": "接続ラベルを入力", "labelDescription": "ラベルは接続の中央に表示されます。空欄で削除できます。", "saveLabel": "ラベルを保存" },
+    "selection": { "style": "ノードスタイル", "color": "アクセント", "customColor": "カスタムカラー", "border": "枠線", "solid": "実線", "dashed": "破線", "dotted": "点線", "borderWidth": "枠線の太さ", "fill": "背景", "transparent": "透明", "customFill": "カスタム背景色", "imagePasted": "画像をキャンバスに貼り付けました", "imagePasteError": "画像を貼り付けられませんでした" },
+    "layer": { "front": "最前面へ", "forward": "前面へ移動", "backward": "背面へ移動", "back": "最背面へ" },
+    "noteNode": { "title": "ノート参照を追加", "description": "ファイルマネージャーからノートを選択します。ノードをダブルクリックすると元ファイルを開けます。", "search": "ノートを検索...", "empty": "ノートが見つかりません", "group": "ワークスペースのノート", "added": "ノート「{name}」を追加しました" },
+    "footer": {
+      "nodes": "{count} ノード",
+      "edges": "{count} 接続",
+      "grid": "グリッドを表示",
+      "snap": "グリッドにスナップ",
+      "zoomIn": "拡大",
+      "zoomOut": "縮小",
+      "fit": "全体を表示",
+      "layout": "自動整列",
+      "export": "PNGを書き出す",
+      "import": { "title": "インポート", "file": "ファイルを選択", "content": "内容を入力", "contentTitle": "キャンバス内容をインポート", "contentDescription": "NoteGen Canvas JSON または Mermaid フローチャートに対応しています。現在のキャンバスは置き換えられます。", "contentPlaceholder": "Canvas JSON または Mermaid の内容を貼り付け…", "confirm": "現在のキャンバスにインポート" },
+      "exportMenu": { "computer": "コンピューターに保存", "source": "編集可能なファイル", "png2x": "PNG · 2× 高解像度", "png4x": "PNG · 4× 超高解像度", "svg": "SVG · ベクター", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid フローチャート" }
+    },
+    "contextMenu": { "selectAll": "すべて選択", "copy": "コピー", "paste": "貼り付け", "duplicate": "複製", "delete": "選択項目を削除" },
+    "empty": {
+      "title": "キャンバスはまだありません",
+      "description": "図とフリーハンド描画でアイデアを整理できます。"
+    }
+  },
   "navigation": {
+    "canvases": "キャンバス",
     "chat": "チャット",
     "record": "記録",
     "quickRecord": "クイック記録",
@@ -2522,7 +2578,7 @@
     "showLeftSidebar": "左サイドバーを表示",
     "hideRightSidebar": "右サイドバーを非表示",
     "showRightSidebar": "右サイドバーを表示",
-    "searchPlaceholder": "ノートまたは記録を検索...",
+    "searchPlaceholder": "ノート、記録、キャンバスを検索...",
     "showCenterPanel": "显示编辑器",
     "hideCenterPanel": "隐藏编辑器",
     "navigate": "ナビゲーション"
@@ -2574,13 +2630,14 @@
     "convert_button": "変換"
   },
   "search": {
-    "placeholder": "ノートと記事を検索...",
+    "placeholder": "ノート、記録、キャンバスを検索...",
     "results": "{count} 件の検索結果",
     "noResults": "検索結果がありません",
     "tryDifferentKeywords": "別のキーワードで検索してみてください",
     "item": {
       "record": "記録",
       "article": "記事",
+      "canvas": "キャンバス",
       "matches": "{count}件の一致",
       "scanType": "スキャン"
     }
@@ -3193,6 +3250,14 @@
       "polish": "添削",
       "concise": "簡潔に",
       "expand": "拡張",
+      "generateCanvas": "選択範囲からキャンバスを生成",
+      "canvasFlowchart": "フローチャートを生成",
+      "canvasMindmap": "マインドマップを生成",
+      "canvasTimeline": "タイムラインを生成",
+      "canvasTasks": "タスク関係を抽出",
+      "canvasSource": "選択した Markdown：",
+      "canvasPromptSuffix": "現在の空白キャンバスを読み、キャンバスツールで生成してください。適用前に操作プレビューを表示して確認を待ってください。",
+      "canvasPrompts": { "flowchart": "選択した文章を明確なフローチャートにしてください。", "mindmap": "選択した文章を階層的なマインドマップにしてください。", "timeline": "日付、段階、マイルストーンを抽出してタイムラインを生成してください。", "tasks": "タスク、依存関係、順序を抽出して関係図を生成してください。" },
       "translate": "翻訳",
       "translateSubtitle": "翻訳先",
       "quoteToChat": "チャットに引用",
@@ -3231,6 +3296,7 @@
       "generating": "生成中...",
       "abort": "中止"
     },
+    "canvasDrop": { "hint": "ドロップしてキャンバス画像を挿入", "generating": "キャンバス画像を生成中…", "success": "キャンバスを挿入しました", "successDescription": "静止画像を生成しました：{path}", "failed": "キャンバスを挿入できませんでした" },
     "image": {
       "insert": "画像を挿入",
       "uploading": "アップロード中...",
