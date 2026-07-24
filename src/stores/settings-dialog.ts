@@ -9,6 +9,7 @@ export type SettingSection =
   | 'sync'
   | 'imageHosting'
   | 'ai'
+  | 'webSearch'
   | 'rag'
   | 'mcp'
   | 'skills'
@@ -29,6 +30,7 @@ export const settingSections: SettingSection[] = [
   'sync',
   'imageHosting',
   'ai',
+  'webSearch',
   'rag',
   'mcp',
   'skills',

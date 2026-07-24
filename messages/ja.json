@@ -207,6 +207,31 @@
         "desc": "配置各种工具栏按钮的显示和排序"
       }
     },
+    "webSearch": {
+      "title": "ウェブ検索",
+      "desc": "NoteGen の 3 レイヤーのウェブ検索方式を設定します。AI が検索の必要性を判断します。",
+      "nativeEnabled": "モデルのネイティブ検索を有効化",
+      "thirdPartyEnabled": "外部検索を有効化",
+      "basicEnabled": "キー不要の検索を有効化",
+      "nativeLayerTitle": "モデルのネイティブ検索",
+      "nativeLayerDesc": "現在のモデルが対応している場合、モデル内蔵のウェブ検索を最初に使用します。",
+      "thirdPartyLayerTitle": "外部 API 検索",
+      "thirdPartyLayerDesc": "ネイティブ検索が利用できない場合、設定済みのサービスを下の順序で試します。",
+      "basicLayerTitle": "キー不要の検索",
+      "basicLayerDesc": "最初の 2 レイヤーが利用できない場合、Bing、DuckDuckGo、Sogou、360、Baidu を試します。",
+      "fallbackWhenUnavailable": "前のレイヤーが利用できない場合、自動的にフォールバック",
+      "fallbackWhenNativeDisabled": "モデルのネイティブ検索は無効です。次のレイヤーへ直接フォールバック",
+      "fallbackWhenDisabled": "外部検索は無効です。次のレイヤーへ直接フォールバック",
+      "dragProvider": "{provider} の優先順位をドラッグして変更",
+      "testConnection": "接続をテスト",
+      "testing": "テスト中",
+      "testSuccess": "接続に成功し、{count} 件の検索結果を取得しました。",
+      "testFailed": "接続に失敗しました：{message}",
+      "getApiKey": "Key を取得",
+      "showApiKey": "API キーを表示",
+      "hideApiKey": "API キーを非表示",
+      "providerApiKeyPlaceholder": "{provider} API キーを入力"
+    },
     "rag": {
       "title": "知識庫",
       "desc": "知識庫はベクトル、BM25、あいまい検索を組み合わせ、必要に応じてリランキングモデルで結果順を改善します。",

@@ -17,6 +17,7 @@ import {
   MessageSquare,
   PenTool,
   Brain,
+  Globe2,
 } from "lucide-react"
 
 const baseConfig = [
@@ -53,6 +54,10 @@ const baseConfig = [
   {
     icon: <BotMessageSquare className="size-4" />,
     anchor: 'ai',
+  },
+  {
+    icon: <Globe2 className="size-4" />,
+    anchor: 'webSearch',
   },
   {
     icon: <Book className="size-4" />,
@@ -101,6 +106,9 @@ export default baseConfig
 
 export type ModelType = 'chat' | 'image' | 'video' | 'tts' | 'stt' | 'embedding' | 'rerank';
 export type ProxyMode = 'inherit' | 'direct' | 'custom';
+export type WebSearchProvider = 'auto' | 'zhipu' | 'tavily' | 'brave' | 'exa';
+export type WebSearchApiProvider = Exclude<WebSearchProvider, 'auto'>;
+export type WebSearchApiKeys = Partial<Record<WebSearchApiProvider, string>>;
 
 export interface ModelConfig {
   id: string
@@ -112,6 +120,14 @@ export interface ModelConfig {
   enableStream?: boolean
   maxTokens?: number
   tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
+  enableWebSearch?: boolean
+  enableNativeWebSearch?: boolean
+  enableThirdPartyWebSearch?: boolean
+  enableBasicWebSearch?: boolean
+  webSearchProvider?: WebSearchProvider
+  webSearchApiKey?: string
+  webSearchApiKeys?: WebSearchApiKeys
+  webSearchProviderOrder?: WebSearchApiProvider[]
 }
 
 export interface AiConfig {
@@ -137,6 +153,14 @@ export interface AiConfig {
   enableStream?: boolean
   maxTokens?: number
   tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
+  enableWebSearch?: boolean
+  enableNativeWebSearch?: boolean
+  enableThirdPartyWebSearch?: boolean
+  enableBasicWebSearch?: boolean
+  webSearchProvider?: WebSearchProvider
+  webSearchApiKey?: string
+  webSearchApiKeys?: WebSearchApiKeys
+  webSearchProviderOrder?: WebSearchApiProvider[]
 }
 
 export interface Model {

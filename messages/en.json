@@ -207,6 +207,31 @@
         }
       }
     },
+    "webSearch": {
+      "title": "Web Search",
+      "desc": "Configure NoteGen's three-layer web search strategy. AI decides when a search is needed.",
+      "nativeEnabled": "Enable native model search",
+      "thirdPartyEnabled": "Enable third-party search",
+      "basicEnabled": "Enable no-key search",
+      "nativeLayerTitle": "Native model search",
+      "nativeLayerDesc": "When supported, the current model's built-in web search is used first.",
+      "thirdPartyLayerTitle": "Third-party API search",
+      "thirdPartyLayerDesc": "When native search is unavailable, configured services are tried in the order below.",
+      "basicLayerTitle": "No-key search",
+      "basicLayerDesc": "When the first two layers are unavailable, try Bing, DuckDuckGo, Sogou, 360, and Baidu.",
+      "fallbackWhenUnavailable": "Automatically fall back when the previous layer is unavailable",
+      "fallbackWhenNativeDisabled": "Native model search is disabled; fall back directly",
+      "fallbackWhenDisabled": "Third-party search is disabled; fall back directly",
+      "dragProvider": "Drag to change the priority of {provider}",
+      "testConnection": "Test connection",
+      "testing": "Testing",
+      "testSuccess": "Connection successful with {count} search results.",
+      "testFailed": "Connection failed: {message}",
+      "getApiKey": "Get key",
+      "showApiKey": "Show API key",
+      "hideApiKey": "Hide API key",
+      "providerApiKeyPlaceholder": "Enter {provider} API key"
+    },
     "rag": {
       "title": "Knowledge Base",
       "desc": "The knowledge base combines vector, BM25, and fuzzy retrieval, with an optional reranker to improve result ordering.",

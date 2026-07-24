@@ -661,6 +661,21 @@ export class AgentRuntime {
       attachments: input.attachments,
     }
 
+    const aiConfig = await getAISettings()
+    const validatedBaseURL = await validateAIService(aiConfig?.baseURL)
+    if (!aiConfig || validatedBaseURL === null) {
+      agentDebugLog('ai_service_invalid', { runId })
+      return {
+        runId,
+        content: '',
+        stopped: false,
+        steps,
+        toolCalls,
+        changes,
+        trace: recorder.all(),
+      }
+    }
+
     const mcpToolCatalog = buildMcpAgentToolCatalog(input.selectedMcpServerIds)
 
     agentDebugLog('run_start', {
@@ -680,7 +695,10 @@ export class AgentRuntime {
 
     const ragAgentPolicy = await getRagAgentPolicy()
     const allTools = [...agentToolRegistry.listTools(), ...mcpToolCatalog.directTools]
-      .filter(tool => ragAgentPolicy.automaticSearchEnabled || tool.name !== 'note_search_files')
+      .filter(tool =>
+        (ragAgentPolicy.automaticSearchEnabled || tool.name !== 'note_search_files')
+        && (aiConfig.enableWebSearch === true || tool.category !== 'web')
+      )
     const toolMap = new Map(allTools.map((tool) => [tool.name, tool]))
     let tools = selectToolsForContext(context, allTools, input.permissionMode)
     const customSystemPrompt = await getSystemPromptContent()
@@ -717,21 +735,6 @@ export class AgentRuntime {
       messages: messages.map(summarizeMessage),
     })
     callbacks.onStatus?.('preparing_context')
-
-    const aiConfig = await getAISettings()
-    const validatedBaseURL = await validateAIService(aiConfig?.baseURL)
-    if (!aiConfig || validatedBaseURL === null) {
-      agentDebugLog('ai_service_invalid', { runId })
-      return {
-        runId,
-        content: '',
-        stopped: false,
-        steps,
-        toolCalls,
-        changes,
-        trace: recorder.all(),
-      }
-    }
 
     const client = await createOpenAIClient(aiConfig)
     let editorStateReadLocked = hasInlineCurrentEditorState(context)

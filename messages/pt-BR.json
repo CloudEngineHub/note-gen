@@ -207,6 +207,31 @@
         "desc": "配置各种工具栏按钮的显示和排序"
       }
     },
+    "webSearch": {
+      "title": "Pesquisa na web",
+      "desc": "Configure a estratégia de pesquisa em três camadas do NoteGen. A IA decide quando pesquisar.",
+      "nativeEnabled": "Ativar pesquisa nativa do modelo",
+      "thirdPartyEnabled": "Ativar pesquisa de terceiros",
+      "basicEnabled": "Ativar pesquisa sem chave",
+      "nativeLayerTitle": "Pesquisa nativa do modelo",
+      "nativeLayerDesc": "Quando disponível, a pesquisa integrada do modelo atual é usada primeiro.",
+      "thirdPartyLayerTitle": "Pesquisa por API de terceiros",
+      "thirdPartyLayerDesc": "Quando a pesquisa nativa não está disponível, os serviços configurados são tentados na ordem abaixo.",
+      "basicLayerTitle": "Pesquisa sem chave",
+      "basicLayerDesc": "Quando as duas primeiras camadas não estão disponíveis, tenta Bing, DuckDuckGo, Sogou, 360 e Baidu.",
+      "fallbackWhenUnavailable": "Fallback automático quando a camada anterior não está disponível",
+      "fallbackWhenNativeDisabled": "A pesquisa nativa do modelo está desativada; fallback direto",
+      "fallbackWhenDisabled": "A pesquisa de terceiros está desativada; fallback direto",
+      "dragProvider": "Arraste para alterar a prioridade de {provider}",
+      "testConnection": "Testar conexão",
+      "testing": "Testando",
+      "testSuccess": "Conexão bem-sucedida com {count} resultados de pesquisa.",
+      "testFailed": "Falha na conexão: {message}",
+      "getApiKey": "Obter chave",
+      "showApiKey": "Mostrar chave de API",
+      "hideApiKey": "Ocultar chave de API",
+      "providerApiKeyPlaceholder": "Insira a chave de API do {provider}"
+    },
     "rag": {
       "title": "Base de Conhecimento",
       "desc": "A base de conhecimento combina busca vetorial, BM25 e busca aproximada, com reranking opcional para melhorar a ordem dos resultados.",

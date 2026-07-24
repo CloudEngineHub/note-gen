@@ -207,6 +207,31 @@
         }
       }
     },
+    "webSearch": {
+      "title": "網路搜尋",
+      "desc": "設定 NoteGen 的三層網路搜尋方案，AI 會自行判斷何時需要搜尋。",
+      "nativeEnabled": "啟用模型原生搜尋",
+      "thirdPartyEnabled": "啟用第三方搜尋",
+      "basicEnabled": "啟用免 Key 搜尋",
+      "nativeLayerTitle": "模型原生搜尋",
+      "nativeLayerDesc": "如果目前模型支援網路搜尋，優先直接使用模型本身的能力。",
+      "thirdPartyLayerTitle": "第三方 API 搜尋",
+      "thirdPartyLayerDesc": "模型原生搜尋不可用時，依下方順序嘗試已設定的服務。",
+      "basicLayerTitle": "免 Key 搜尋",
+      "basicLayerDesc": "前兩層均不可用時，嘗試透過 Bing、DuckDuckGo、搜狗、360 和百度取得結果。",
+      "fallbackWhenUnavailable": "上一層不可用時，自動降級",
+      "fallbackWhenNativeDisabled": "模型原生搜尋已關閉，直接降級",
+      "fallbackWhenDisabled": "第三方搜尋已關閉，直接降級",
+      "dragProvider": "拖曳調整 {provider} 的優先順序",
+      "testConnection": "測試連線",
+      "testing": "測試中",
+      "testSuccess": "連線成功，取得 {count} 個搜尋結果。",
+      "testFailed": "連線失敗：{message}",
+      "getApiKey": "申請 Key",
+      "showApiKey": "顯示 API Key",
+      "hideApiKey": "隱藏 API Key",
+      "providerApiKeyPlaceholder": "輸入 {provider} API Key"
+    },
     "rag": {
       "title": "知識庫",
       "desc": "知識庫透過向量、BM25 和模糊比對進行混合檢索，並可使用重排模型改善結果順序。",

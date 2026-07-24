@@ -9,6 +9,7 @@ import {
   AGENT_CORE_PROMPT_VERSION,
   isManagedAgentSystemPrompt,
 } from './system-prompt';
+import { loadWebSearchSettings } from '@/lib/web-search/settings';
 
 /**
  * 获取当前的prompt内容
@@ -64,6 +65,7 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
   if (!modelId || !aiConfigs) {
     return undefined
   }
+  const webSearchSettings = await loadWebSearchSettings(store, { aiConfigs, modelId })
 
   // 在新的数据结构中，需要找到包含指定模型ID的配置
   for (const config of aiConfigs) {
@@ -91,14 +93,40 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
           voice: targetModel.voice,
           enableStream: targetModel.enableStream,
           maxTokens: targetModel.maxTokens,
-          tokenLimitParam: targetModel.tokenLimitParam
+          tokenLimitParam: targetModel.tokenLimitParam,
+          enableWebSearch: webSearchSettings.nativeEnabled
+            || webSearchSettings.thirdPartyEnabled
+            || webSearchSettings.basicEnabled,
+          enableNativeWebSearch: webSearchSettings.nativeEnabled,
+          enableThirdPartyWebSearch: webSearchSettings.thirdPartyEnabled,
+          enableBasicWebSearch: webSearchSettings.basicEnabled,
+          webSearchProvider: webSearchSettings.provider,
+          webSearchApiKey: webSearchSettings.provider === 'auto'
+            ? undefined
+            : webSearchSettings.apiKeys[webSearchSettings.provider],
+          webSearchApiKeys: webSearchSettings.apiKeys,
+          webSearchProviderOrder: webSearchSettings.providerOrder,
         }
         return result
       }
     } else {
       // 向后兼容：处理旧的单模型结构
       if (config.key === modelId) {
-        return config
+        return {
+          ...config,
+          enableWebSearch: webSearchSettings.nativeEnabled
+            || webSearchSettings.thirdPartyEnabled
+            || webSearchSettings.basicEnabled,
+          enableNativeWebSearch: webSearchSettings.nativeEnabled,
+          enableThirdPartyWebSearch: webSearchSettings.thirdPartyEnabled,
+          enableBasicWebSearch: webSearchSettings.basicEnabled,
+          webSearchProvider: webSearchSettings.provider,
+          webSearchApiKey: webSearchSettings.provider === 'auto'
+            ? undefined
+            : webSearchSettings.apiKeys[webSearchSettings.provider],
+          webSearchApiKeys: webSearchSettings.apiKeys,
+          webSearchProviderOrder: webSearchSettings.providerOrder,
+        }
       }
     }
   }

@@ -299,7 +299,10 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
         voice: config.voice,
         enableStream: config.enableStream,
         maxTokens: config.maxTokens,
-        tokenLimitParam: config.tokenLimitParam
+        tokenLimitParam: config.tokenLimitParam,
+        enableWebSearch: config.enableWebSearch,
+        webSearchProvider: config.webSearchProvider,
+        webSearchApiKey: config.webSearchApiKey,
       }
       
       return {

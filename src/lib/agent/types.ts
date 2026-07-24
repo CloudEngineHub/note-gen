@@ -54,6 +54,7 @@ export type AgentToolCategory =
   | 'system'
   | 'attachment'
   | 'canvas'
+  | 'web'
 
 export type AgentToolRisk =
   | 'read'

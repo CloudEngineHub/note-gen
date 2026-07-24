@@ -207,6 +207,31 @@
         }
       }
     },
+    "webSearch": {
+      "title": "网络搜索",
+      "desc": "配置 NoteGen 的三层联网搜索方案，AI 会自行判断何时需要搜索。",
+      "nativeEnabled": "启用模型原生搜索",
+      "thirdPartyEnabled": "启用第三方搜索",
+      "basicEnabled": "启用免 Key 搜索",
+      "nativeLayerTitle": "模型原生搜索",
+      "nativeLayerDesc": "如果当前模型支持联网搜索，优先直接使用模型自身的能力。",
+      "thirdPartyLayerTitle": "第三方 API 搜索",
+      "thirdPartyLayerDesc": "模型原生搜索不可用时，按下方顺序尝试已配置的服务。",
+      "basicLayerTitle": "免 Key 搜索",
+      "basicLayerDesc": "前两层均不可用时，尝试通过 Bing、DuckDuckGo、搜狗、360 和百度获取结果。",
+      "fallbackWhenUnavailable": "上一层不可用时，自动降级",
+      "fallbackWhenNativeDisabled": "模型原生搜索已关闭，直接降级",
+      "fallbackWhenDisabled": "第三方搜索已关闭，直接降级",
+      "dragProvider": "拖拽调整 {provider} 的优先级",
+      "testConnection": "测试连接",
+      "testing": "测试中",
+      "testSuccess": "连接成功，获得 {count} 个搜索结果。",
+      "testFailed": "连接失败：{message}",
+      "getApiKey": "申请 Key",
+      "showApiKey": "显示 API Key",
+      "hideApiKey": "隐藏 API Key",
+      "providerApiKeyPlaceholder": "输入 {provider} API Key"
+    },
     "rag": {
       "title": "知识库",
       "desc": "知识库通过向量、BM25 和模糊匹配进行混合检索，并可使用重排模型优化结果顺序。",
