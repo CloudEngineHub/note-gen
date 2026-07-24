@@ -189,6 +189,7 @@ export interface AgentTraceEvent {
   output?: unknown
   message?: string
   reasoning?: string
+  isIntermediateResponse?: boolean
   streamedTokenCount?: number
   streamedCharacterCount?: number
 }

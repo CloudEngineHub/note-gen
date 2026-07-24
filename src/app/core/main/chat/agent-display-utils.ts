@@ -1,4 +1,4 @@
-import type { AgentRunStatus } from "@/lib/agent/types"
+import type { AgentRunStatus, AgentTraceEvent } from "@/lib/agent/types"
 
 export const agentStatusText: Record<AgentRunStatus, string> = {
   idle: "空闲",
@@ -35,6 +35,81 @@ export function formatAgentToolName(name: string) {
     .replace(/^mcp_/, "MCP · ")
     .replace(/^system_/, "系统 · ")
     .replace(/_/g, " ")
+}
+
+function truncateActivityTarget(value: string, maxLength = 48) {
+  const normalized = value.trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, maxLength - 1)}…`
+}
+
+function getStringInput(input: Record<string, unknown> | undefined, key: string) {
+  const value = input?.[key]
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+function getToolActivityTarget(event: AgentTraceEvent) {
+  const input = event.input
+  const query = getStringInput(input, "query")
+  if (query) {
+    return `“${truncateActivityTarget(query)}”`
+  }
+
+  if (event.toolName === "mcp_call_tool") {
+    const mcpToolName = getStringInput(input, "toolName")
+    if (mcpToolName) {
+      return truncateActivityTarget(mcpToolName)
+    }
+  }
+
+  const skillId = getStringInput(input, "skill_id")
+  if (skillId) {
+    return truncateActivityTarget(skillId)
+  }
+
+  const url = getStringInput(input, "url")
+  if (url) {
+    try {
+      return new URL(url).hostname
+    } catch {
+      return truncateActivityTarget(url)
+    }
+  }
+
+  for (const key of ["filePath", "fileName", "relativePath", "folderPath", "path"]) {
+    const value = getStringInput(input, key)
+    if (value) {
+      return truncateActivityTarget(formatAgentTarget(value))
+    }
+  }
+
+  for (const key of ["filePaths", "relativePaths", "folderPaths", "ids"]) {
+    const value = input?.[key]
+    if (Array.isArray(value) && value.length > 0) {
+      return `${value.length} 项`
+    }
+  }
+
+  return undefined
+}
+
+export function formatAgentToolActivity(event: AgentTraceEvent) {
+  const action = event.title || (event.toolName ? formatAgentToolName(event.toolName) : "执行操作")
+  const target = getToolActivityTarget(event)
+  const description = target ? `${action} · ${target}` : action
+
+  if (event.status === "running") {
+    return `正在${description}`
+  }
+
+  if (event.status === "error") {
+    return `${description}失败`
+  }
+
+  return description
 }
 
 export function formatAgentDuration(duration?: number) {

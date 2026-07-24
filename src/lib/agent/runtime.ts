@@ -946,7 +946,11 @@ export class AgentRuntime {
       return true
     }
 
-    const finalizeInterruptedModelTrace = (status: 'success' | 'error', title: string) => {
+    const finalizeInterruptedModelTrace = (
+      status: 'success' | 'error',
+      title: string,
+      isIntermediateResponse = false
+    ) => {
       if (!activeModelTraceId) {
         return
       }
@@ -958,6 +962,7 @@ export class AgentRuntime {
         duration: Date.now() - activeModelStartedAt,
         output: activeModelContent || undefined,
         reasoning: activeModelReasoning || undefined,
+        isIntermediateResponse: isIntermediateResponse && Boolean(activeModelContent),
         streamedTokenCount: activeModelStreamedTokenCount,
       })
       if (interruptedTrace) callbacks.onTrace?.(interruptedTrace)
@@ -1163,7 +1168,7 @@ export class AgentRuntime {
           return rewritten
         })
         if (steeringInterrupted) {
-          finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导')
+          finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导', true)
           if (assistantContent) {
             messages.push({ role: 'assistant', content: assistantContent })
           }
@@ -1202,6 +1207,7 @@ export class AgentRuntime {
           duration: Date.now() - modelTrace.timestamp,
           output: modelTraceOutput,
           reasoning: assistantReasoning || undefined,
+          isIntermediateResponse: toolUses.length > 0 && Boolean(assistantContent),
           streamedTokenCount,
         })
         if (responseTrace) callbacks.onTrace?.(responseTrace)

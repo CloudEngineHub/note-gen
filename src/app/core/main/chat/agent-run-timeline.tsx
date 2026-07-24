@@ -14,8 +14,14 @@ import type { AgentRunStatus, AgentSkillSummary, AgentTraceEvent, ToolCall } fro
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
 import { AgentContextTray, type RagSourceDetail } from "./agent-context-tray"
-import { agentStatusText, formatAgentDuration, formatAgentToolName } from "./agent-display-utils"
+import {
+  agentStatusText,
+  formatAgentDuration,
+  formatAgentToolActivity,
+  formatAgentToolName,
+} from "./agent-display-utils"
 import { estimateTokens } from "@/lib/ai/token-counter"
+import ChatPreview from "./chat-preview"
 
 interface AgentRunTimelineProps {
   status?: AgentRunStatus
@@ -72,7 +78,11 @@ function hasMeaningfulTraceDetail(value: unknown) {
 
 function shouldShowTraceEvent(event: AgentTraceEvent) {
   if (event.type === "model_call" || event.type === "model_response") {
-    return event.status === "running"
+    return event.status === "running" || Boolean(
+      event.isIntermediateResponse &&
+      typeof event.output === "string" &&
+      event.output.trim()
+    )
   }
 
   if (event.type === "final") {
@@ -350,6 +360,9 @@ export function AgentRunTimeline({
           {events.map((event) => {
             const storedExpanded = expandedEvents.includes(event.id)
             const isModelEvent = event.type === "model_call" || event.type === "model_response"
+            const eventLabel = event.toolName
+              ? formatAgentToolActivity(event)
+              : event.title
             const visibleMessage = shouldShowEventMessage(event) ? event.message : undefined
             const modelResponseContent = getModelResponseContent(event)
             const modelReasoningContent = getModelReasoningContent(event)
@@ -384,7 +397,7 @@ export function AgentRunTimeline({
                     <MarkerContent className="flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className={expanded ? "min-w-0 break-words [overflow-wrap:anywhere]" : "truncate"}>
-                        {event.toolName ? formatAgentToolName(event.toolName) : event.title}
+                        {eventLabel}
                       </span>
                       {displayDuration !== undefined && (
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -416,6 +429,15 @@ export function AgentRunTimeline({
                     <div className="max-h-48 overflow-y-auto rounded bg-muted/60 p-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-muted-foreground">
                       {modelReasoningContent}
                     </div>
+                  </div>
+                )}
+
+                {modelResponseContent && event.isIntermediateResponse && event.status !== "running" && (
+                  <div className="pb-2">
+                    <ChatPreview
+                      text={modelResponseContent}
+                      containerClassName="max-w-full md:max-w-full"
+                    />
                   </div>
                 )}
 
