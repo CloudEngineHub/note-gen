@@ -7,7 +7,7 @@ import {
   Strikethrough,
   Underline,
   Code,
-  Link,
+  ExternalLink,
   Highlighter,
   Quote,
   List,
@@ -50,6 +50,14 @@ function ToolbarButton({
   return <Button type="button" variant={active ? "secondary" : "ghost"} size="icon-sm" {...props} />
 }
 
+function ToolbarSeparator() {
+  return (
+    <div className="mx-1 flex h-5 items-center">
+      <Separator orientation="vertical" className="h-full" />
+    </div>
+  )
+}
+
 const KEYBOARD_SELECTION_KEYS = new Set([
   'ArrowLeft',
   'ArrowRight',
@@ -88,6 +96,18 @@ function hasTextSelection(editor: Editor): boolean {
   }
 
   return getSelectedText(editor).trim().length > 0
+}
+
+function getEditableLinkSourceElement(editor: Editor): HTMLElement | null {
+  return editor.view.dom.querySelector<HTMLElement>('.tiptap-editable-link-source')
+}
+
+function getCurrentLinkHref(editor: Editor): string {
+  const editableHref = getEditableLinkSourceElement(editor)?.dataset.linkHref?.trim()
+  if (editableHref) return editableHref
+
+  const href = editor.getAttributes('link').href
+  return typeof href === 'string' ? href.trim() : ''
 }
 
 function isKeyboardSelectionIntent(event: KeyboardEvent): boolean {
@@ -177,19 +197,20 @@ export function BubbleMenu({
   const updatePosition = useCallback(() => {
     const { selection } = editor.state
     const { from, to } = selection
+    const editableLinkSource = getEditableLinkSourceElement(editor)
 
     if (isComposingRef.current) {
       hideMenu()
       return false
     }
 
-    if (isPointerSelectingRef.current) {
+    if (isPointerSelectingRef.current && !editableLinkSource) {
       hideMenu()
       return false
     }
 
     // 应用启动或文件恢复时可能会还原一个非空选区，但这不是用户本次主动选择的文本。
-    if (!hasUserSelectionIntentRef.current) {
+    if (!editableLinkSource && !hasUserSelectionIntentRef.current) {
       if (hasTextSelection(editor)) {
         collapseSelection()
       }
@@ -198,7 +219,7 @@ export function BubbleMenu({
     }
 
     // 检查选区是否有效（空选区、光标位置、无实际文本内容都不显示）
-    if (!hasTextSelection(editor)) {
+    if (!editableLinkSource && !hasTextSelection(editor)) {
       hideMenu()
       return false
     }
@@ -208,7 +229,7 @@ export function BubbleMenu({
       return false
     }
 
-    const node = editor.state.doc.nodeAt(from)
+    const node = editableLinkSource ? null : editor.state.doc.nodeAt(from)
 
     // 检查是否是图片节点
     if (node?.type.name === 'image') {
@@ -231,8 +252,8 @@ export function BubbleMenu({
     }
 
     try {
-      // 获取选区坐标（视口坐标）
-      const coords = editor.view.coordsAtPos(from)
+      const sourceBounds = editableLinkSource?.getBoundingClientRect()
+      const coords = sourceBounds ?? editor.view.coordsAtPos(from)
       const containerBounds = scrollContainer.getBoundingClientRect()
 
       // 转换为滚动容器内的相对坐标
@@ -280,7 +301,14 @@ export function BubbleMenu({
       isComposingRef.current = false
     }
 
-    const handlePointerStart = () => {
+    const handlePointerStart = (event: MouseEvent | TouchEvent) => {
+      if ((event.target as HTMLElement | null)?.closest('.tiptap-editable-link-source')) {
+        isPointerSelectingRef.current = false
+        hasUserSelectionIntentRef.current = true
+        requestAnimationFrame(updatePosition)
+        return
+      }
+
       isPointerSelectingRef.current = true
       hasUserSelectionIntentRef.current = false
       if (hasTextSelection(editor)) {
@@ -290,6 +318,13 @@ export function BubbleMenu({
     }
 
     const finishPointerSelection = () => {
+      if (getEditableLinkSourceElement(editor)) {
+        isPointerSelectingRef.current = false
+        hasUserSelectionIntentRef.current = true
+        requestAnimationFrame(updatePosition)
+        return
+      }
+
       if (!isPointerSelectingRef.current) {
         return
       }
@@ -448,8 +483,8 @@ export function BubbleMenu({
   useEffect(() => {
     const updateHandler = () => updatePosition()
 
-    // 只有在有实际选中文本时才显示工具栏
-    if (hasTextSelection(editor)) {
+    // 文本选区或正在编辑的 Markdown 链接源码都显示工具栏。
+    if (hasTextSelection(editor) || getEditableLinkSourceElement(editor)) {
       updatePosition()
     } else {
       hideMenu()
@@ -506,26 +541,52 @@ export function BubbleMenu({
     }
   }, [editor, linkUrl, showLinkInput])
 
-  const toggleBold = () => editor.chain().focus().toggleBold().run()
-  const toggleItalic = () => editor.chain().focus().toggleItalic().run()
-  const toggleStrike = () => editor.chain().focus().toggleStrike().run()
-  const toggleUnderline = () => editor.chain().focus().toggleUnderline().run()
-  const toggleCode = () => editor.chain().focus().toggleCode().run()
-  const toggleHighlight = () => editor.chain().focus().toggleHighlight().run()
+  const toggleEditableLinkMark = (mark: string, fallback: () => void) => {
+    if (!getEditableLinkSourceElement(editor)) {
+      fallback()
+      return
+    }
+
+    document.dispatchEvent(new CustomEvent('tiptap-editable-link-toggle-mark', {
+      detail: { mark },
+    }))
+  }
+
+  const toggleBold = () => toggleEditableLinkMark('bold', () => editor.chain().focus().toggleBold().run())
+  const toggleItalic = () => toggleEditableLinkMark('italic', () => editor.chain().focus().toggleItalic().run())
+  const toggleStrike = () => toggleEditableLinkMark('strike', () => editor.chain().focus().toggleStrike().run())
+  const toggleUnderline = () => toggleEditableLinkMark('underline', () => editor.chain().focus().toggleUnderline().run())
+  const toggleCode = () => toggleEditableLinkMark('code', () => editor.chain().focus().toggleCode().run())
+  const toggleHighlight = () => toggleEditableLinkMark('highlight', () => editor.chain().focus().toggleHighlight().run())
   const toggleBlockquote = () => editor.chain().focus().toggleBlockquote().run()
   const toggleBulletList = () => editor.chain().focus().toggleBulletList().run()
   const toggleOrderedList = () => editor.chain().focus().toggleOrderedList().run()
   const toggleTaskList = () => editor.chain().focus().toggleTaskList().run()
   const toggleCodeBlock = () => editor.chain().focus().toggleCodeBlock().run()
 
-  const isActive = (name: string, attrs?: Record<string, unknown>) =>
-    editor.isActive(name, attrs)
+  const isActive = (name: string, attrs?: Record<string, unknown>) => {
+    const editableLinkSource = getEditableLinkSourceElement(editor)
+    if (editableLinkSource) {
+      if (name === 'link') return true
+      if (editableLinkSource.dataset.linkMarks?.split(' ').includes(name)) return true
+    }
+    return editor.isActive(name, attrs)
+  }
+
+  const currentLinkHref = getCurrentLinkHref(editor)
+  const openCurrentLink = () => {
+    if (!currentLinkHref) return
+    document.dispatchEvent(new CustomEvent('tiptap-current-link-open', {
+      detail: { href: currentLinkHref },
+    }))
+  }
 
   if (!show) return null
 
   return (
     <div
       ref={menuRef}
+      data-editor-bubble-menu
       className="absolute z-50 transition-[top,left] duration-150 ease-out"
       style={{
         top: position.top,
@@ -613,7 +674,7 @@ export function BubbleMenu({
           )}
         </div>
 
-        <Separator orientation="vertical" className="mx-1 h-5" />
+        <ToolbarSeparator />
 
         {/* 文本格式化 */}
         <div className="flex gap-0.5">
@@ -625,22 +686,20 @@ export function BubbleMenu({
           <ToolbarButton active={isActive('highlight')} onClick={toggleHighlight} title={t('bubbleMenu.highlight')}><Highlighter /></ToolbarButton>
         </div>
 
-        <Separator orientation="vertical" className="mx-1 h-5" />
+        <ToolbarSeparator />
 
-        {/* 链接 */}
-        <div className="relative">
-          {showLinkInput ? (
-            <div className="flex items-center gap-1 px-1">
-              <Input type="url" placeholder={t('bubbleMenu.linkPlaceholder')} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setLink() } else if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl('') } }} className="w-32" autoFocus />
-              <Button type="button" variant="ghost" size="xs" onClick={setLink}>{t('bubbleMenu.confirm')}</Button>
-              <Button type="button" variant="ghost" size="xs" onClick={() => { setShowLinkInput(false); setLinkUrl('') }}>{t('bubbleMenu.cancel')}</Button>
+        {showLinkInput && (
+          <>
+            <div className="relative">
+              <div className="flex items-center gap-1 px-1">
+                <Input type="url" placeholder={t('bubbleMenu.linkPlaceholder')} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setLink() } else if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl('') } }} className="w-32" autoFocus />
+                <Button type="button" variant="ghost" size="xs" onClick={setLink}>{t('bubbleMenu.confirm')}</Button>
+                <Button type="button" variant="ghost" size="xs" onClick={() => { setShowLinkInput(false); setLinkUrl('') }}>{t('bubbleMenu.cancel')}</Button>
+              </div>
             </div>
-          ) : (
-            <ToolbarButton active={isActive('link')} onClick={setLink} title={t('bubbleMenu.link')}><Link /></ToolbarButton>
-          )}
-        </div>
-
-        <Separator orientation="vertical" className="mx-1 h-5" />
+            <ToolbarSeparator />
+          </>
+        )}
 
         {/* 块级元素 */}
         <div className="flex gap-0.5">
@@ -650,6 +709,13 @@ export function BubbleMenu({
           <ToolbarButton active={isActive('taskList')} onClick={toggleTaskList} title={t('bubbleMenu.taskList')}><CheckSquare /></ToolbarButton>
           <ToolbarButton active={isActive('codeBlock')} onClick={toggleCodeBlock} title={t('bubbleMenu.codeBlock')}><Code /></ToolbarButton>
         </div>
+
+        {currentLinkHref && (
+          <>
+            <ToolbarSeparator />
+            <ToolbarButton onClick={openCurrentLink} title={t('bubbleMenu.openLink')}><ExternalLink /></ToolbarButton>
+          </>
+        )}
       </div>
     </div>
   )

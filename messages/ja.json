@@ -3216,6 +3216,14 @@
   },
   "editor": {
     "placeholder": "「/」を入力してメニューを開くか、直接書き始める...",
+    "smartFileLink": {
+      "fileMatches": "ファイル候補",
+      "pathMatches": "パス候補",
+      "enhancedResults": "高精度検索結果",
+      "actions": "操作",
+      "enhance": "高精度で検索",
+      "searching": "関連ファイルを検索中..."
+    },
     "outline": {
       "title": "アウトライン",
       "open": "アウトラインを開く",
@@ -3262,6 +3270,7 @@
       "translateSubtitle": "翻訳先",
       "quoteToChat": "チャットに引用",
       "link": "リンク",
+      "openLink": "リンクを開く",
       "linkPlaceholder": "リンクURLを入力",
       "confirm": "確認",
       "cancel": "キャンセル",

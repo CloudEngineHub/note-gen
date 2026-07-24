@@ -825,6 +825,16 @@
   text-decoration: line-through;
 }
 
+.tiptap-editor .ProseMirror .tiptap-editable-link-source {
+  border-radius: calc(var(--radius) - 2px);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  box-decoration-break: clone;
+  font-family: var(--font-mono);
+  padding: 1px 3px;
+  text-decoration: none;
+}
+
 /* 引用标记 */
 .tiptap-editor .ProseMirror .tiptap-quote-mark,
 .tiptap-quote-mark {

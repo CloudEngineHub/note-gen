@@ -3206,6 +3206,14 @@
   },
   "editor": {
     "placeholder": "輸入 / 叫出選單，或直接開始寫作...",
+    "smartFileLink": {
+      "fileMatches": "檔案匹配",
+      "pathMatches": "路徑匹配",
+      "enhancedResults": "增強搜尋結果",
+      "actions": "操作",
+      "enhance": "增強搜尋",
+      "searching": "正在搜尋相關檔案..."
+    },
     "outline": {
       "title": "大綱",
       "open": "打開大綱",
@@ -3252,6 +3260,7 @@
       "translateSubtitle": "翻譯為",
       "quoteToChat": "引用到對話",
       "link": "連結",
+      "openLink": "打開連結",
       "linkPlaceholder": "輸入連結地址",
       "confirm": "確認",
       "cancel": "取消",

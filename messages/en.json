@@ -3311,6 +3311,14 @@
   },
   "editor": {
     "placeholder": "Type / to open menu, or start writing...",
+    "smartFileLink": {
+      "fileMatches": "File matches",
+      "pathMatches": "Path matches",
+      "enhancedResults": "Enhanced results",
+      "actions": "Actions",
+      "enhance": "Enhance search",
+      "searching": "Searching related files..."
+    },
     "outline": {
       "title": "Outline",
       "open": "Open Outline",
@@ -3357,6 +3365,7 @@
       "translateSubtitle": "Translate to",
       "quoteToChat": "Quote to Chat",
       "link": "Link",
+      "openLink": "Open link",
       "linkPlaceholder": "Enter link URL",
       "confirm": "Confirm",
       "cancel": "Cancel",

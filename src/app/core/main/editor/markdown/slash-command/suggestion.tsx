@@ -850,6 +850,11 @@ function findSlashMatch(config: {
     return null
   }
 
+  // Markdown 链接或图片的目标地址由文件路径推荐处理，不能触发 Slash Command。
+  if (/\[[^\]\n]+\]\([^)\n]*$/.test(text)) {
+    return null
+  }
+
   // Slash command should only activate when the slash is at the start of the
   // current text block or after whitespace / sentence punctuation, and the
   // cursor is still directly after the query text.

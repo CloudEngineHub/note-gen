@@ -3195,6 +3195,14 @@
     }
   },
   "editor": {
+    "smartFileLink": {
+      "fileMatches": "Arquivos correspondentes",
+      "pathMatches": "Caminhos correspondentes",
+      "enhancedResults": "Resultados aprimorados",
+      "actions": "Ações",
+      "enhance": "Aprimorar busca",
+      "searching": "Buscando arquivos relacionados..."
+    },
     "bubbleMenu": {
       "ai": "IA",
       "polish": "Polir",
@@ -3212,6 +3220,7 @@
       "translateSubtitle": "Traduzir para",
       "quoteToChat": "Citar no Chat",
       "link": "Link",
+      "openLink": "Abrir link",
       "linkPlaceholder": "Digite a URL do link",
       "confirm": "Confirmar",
       "cancel": "Cancelar",

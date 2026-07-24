@@ -3311,6 +3311,14 @@
   },
   "editor": {
     "placeholder": "输入 / 唤起菜单，或直接开始写作...",
+    "smartFileLink": {
+      "fileMatches": "文件匹配",
+      "pathMatches": "路径匹配",
+      "enhancedResults": "增强搜索结果",
+      "actions": "操作",
+      "enhance": "增强搜索",
+      "searching": "正在搜索相关文件..."
+    },
     "outline": {
       "title": "大纲",
       "open": "打开大纲",
@@ -3357,6 +3365,7 @@
       "translateSubtitle": "翻译为",
       "quoteToChat": "引用到对话",
       "link": "链接",
+      "openLink": "打开链接",
       "linkPlaceholder": "输入链接地址",
       "confirm": "确认",
       "cancel": "取消",

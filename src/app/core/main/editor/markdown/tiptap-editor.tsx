@@ -21,7 +21,8 @@ import Image from '@tiptap/extension-image'
 import { common, createLowlight } from 'lowlight'
 import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
-import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
+import { Extension, getMarkRange, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
+import type { Mark as ProseMirrorMark } from '@tiptap/pm/model'
 import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
@@ -99,6 +100,7 @@ import type { EditorShortcutCommandId } from '@/config/editor-shortcuts'
 import { isAiSuggestionShortcutVisible } from '@/lib/ai-suggestion-shortcut-state'
 import { getFileManagerDragPath, hasFileManagerDragData } from '@/app/core/main/file/file-dnd'
 import { getMarkLocalAssetPath, type Mark } from '@/db/marks'
+import { SmartFileLink } from './smart-file-link'
 import './style.css'
 
 const lowlight = createLowlight(common)
@@ -116,6 +118,55 @@ const IMAGE_RESIZE_DIRECTIONS: ResizableNodeViewDirection[] = [
 
 const AI_GENERATION_LOADING_TEXT = '···'
 const MOBILE_SCROLL_TOP_THRESHOLD = 160
+const editableLinkSourcePluginKey = new PluginKey<EditableLinkSourceRange>('editableLinkSource')
+
+type EditableLinkSourceRange = {
+  from: number
+  to: number
+  marks: readonly ProseMirrorMark[]
+} | null
+
+const EditableLinkSource = Extension.create({
+  name: 'editableLinkSource',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<EditableLinkSourceRange>({
+        key: editableLinkSourcePluginKey,
+        state: {
+          init: () => null,
+          apply(transaction, previousRange) {
+            const nextRange = transaction.getMeta(editableLinkSourcePluginKey) as EditableLinkSourceRange | undefined
+            if (nextRange !== undefined) return nextRange
+            if (!previousRange || !transaction.docChanged) return previousRange
+
+            return {
+              ...previousRange,
+              from: transaction.mapping.map(previousRange.from, -1),
+              to: transaction.mapping.map(previousRange.to, 1),
+            }
+          },
+        },
+        props: {
+          decorations(state) {
+            const range = editableLinkSourcePluginKey.getState(state)
+            if (!range || range.from >= range.to || range.to > state.doc.content.size) return null
+            const source = state.doc.textBetween(range.from, range.to, undefined, '\ufffc')
+            const href = parseMarkdownLinkSource(source)?.href ?? ''
+
+            return DecorationSet.create(state.doc, [
+              Decoration.inline(range.from, range.to, {
+                class: 'tiptap-editable-link-source',
+                'data-link-href': href,
+                'data-link-marks': range.marks.map(mark => mark.type.name).join(' '),
+              }),
+            ])
+          },
+        },
+      }),
+    ]
+  },
+})
 
 function createDragHandleElement(): HTMLElement {
   const element = document.createElement('div')
@@ -413,6 +464,36 @@ function escapeMarkdownText(text: string): string {
 
 function createMarkdownLink(href: string, label: string): string {
   return `[${escapeMarkdownLinkText(label)}](${href})`
+}
+
+function unescapeMarkdownLinkValue(value: string): string {
+  return value.replace(/\\([\\[\]()])/g, '$1')
+}
+
+function parseMarkdownLinkSource(source: string): { label: string; href: string } | null {
+  if (!source.startsWith('[') || !source.endsWith(')')) return null
+
+  let separatorIndex = -1
+  for (let index = 1; index < source.length - 2; index++) {
+    if (source[index] !== ']' || source[index + 1] !== '(') continue
+
+    let backslashCount = 0
+    for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor--) {
+      backslashCount++
+    }
+    if (backslashCount % 2 === 0) {
+      separatorIndex = index
+      break
+    }
+  }
+
+  if (separatorIndex < 0) return null
+
+  const label = unescapeMarkdownLinkValue(source.slice(1, separatorIndex))
+  const href = unescapeMarkdownLinkValue(source.slice(separatorIndex + 2, -1)).trim()
+  if (!label || !href || /[\r\n]/.test(href)) return null
+
+  return { label, href }
 }
 
 function getDroppedFilePath(file: File): string | null {
@@ -1207,6 +1288,7 @@ export function TipTapEditor({
         openOnClick: false,
         protocols: ['file'],
       }),
+      EditableLinkSource,
       TaskList,
       TaskItem.configure({
         nested: true,
@@ -2020,7 +2102,7 @@ export function TipTapEditor({
     }
   }, [editor, isMobile, scrollMobileSelectionIntoView])
 
-  // 处理编辑器内链接点击
+  // 普通点击编辑链接源码；组合键点击打开链接。
   useEffect(() => {
     if (!editor || !editorContainerRef.current) return
 
@@ -2030,66 +2112,259 @@ export function TipTapEditor({
       await useArticleStore.getState().setActiveFilePath(path)
     }
 
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      const anchor = target.closest('a')
+    const finishEditingLink = (moveCursorAfterLink = false) => {
+      const range = editableLinkSourcePluginKey.getState(editor.state)
+      if (!range) return false
 
-      if (!anchor) return
+      const source = editor.state.doc.textBetween(range.from, range.to, undefined, '\ufffc')
+      const parsed = parseMarkdownLinkSource(source)
+      if (!parsed) {
+        editor.view.dispatch(editor.state.tr.setMeta(editableLinkSourcePluginKey, null))
+        return false
+      }
 
-      const href = anchor.getAttribute('href')?.trim()
-      if (!href) return
+      const linkMark = editor.state.schema.marks.link
+      if (!linkMark) return false
+
+      const linkedText = editor.state.schema.text(parsed.label, [
+        ...range.marks,
+        linkMark.create({ href: parsed.href }),
+      ])
+      const transaction = editor.state.tr
+        .replaceWith(range.from, range.to, linkedText)
+        .setMeta(editableLinkSourcePluginKey, null)
+
+      if (moveCursorAfterLink) {
+        transaction.setSelection(TextSelection.near(transaction.doc.resolve(range.from + linkedText.nodeSize)))
+      }
+
+      editor.view.dispatch(transaction)
+      return true
+    }
+
+    const startEditingLinkRange = (from: number, to: number, label: string, href: string) => {
+      finishEditingLink()
+
+      if (!label) return
+
+      if (from < 0 || to > editor.state.doc.content.size) return
+
+      const source = createMarkdownLink(href, label)
+      const existingMarks = (editor.state.doc.nodeAt(from)?.marks ?? editor.state.doc.resolve(from).marks())
+        .filter(mark => mark.type.name !== 'link')
+      const targetStart = source.indexOf('](') + 2
+      const targetFrom = from + Math.max(targetStart, 1)
+      const transaction = editor.state.tr
+        .replaceWith(from, to, editor.state.schema.text(source))
+        .setMeta(editableLinkSourcePluginKey, {
+          from,
+          to: from + source.length,
+          marks: existingMarks,
+        } satisfies Exclude<EditableLinkSourceRange, null>)
+
+      transaction.setSelection(TextSelection.create(transaction.doc, targetFrom, targetFrom + href.length))
+      editor.view.dispatch(transaction)
+    }
+
+    const startEditingLink = (anchor: HTMLAnchorElement, href: string) => {
+      const label = anchor.textContent ?? ''
+      if (!label) return
+
+      const from = editor.view.posAtDOM(anchor, 0)
+      startEditingLinkRange(from, from + label.length, label, href)
+    }
+
+    const expandLinkAtCaret = () => {
+      if (isMobile || editableLinkSourcePluginKey.getState(editor.state)) return
+
+      const { selection } = editor.state
+      const linkMarkType = editor.state.schema.marks.link
+      if (!selection.empty || !linkMarkType) return
+
+      const range = getMarkRange(selection.$from, linkMarkType)
+      if (!range) return
+
+      const linkMark = editor.state.doc.nodeAt(range.from)?.marks.find(mark => mark.type === linkMarkType)
+      const href = typeof linkMark?.attrs.href === 'string' ? linkMark.attrs.href.trim() : ''
+      const label = editor.state.doc.textBetween(range.from, range.to, undefined, '\ufffc')
+      if (!href || !label) return
+
+      startEditingLinkRange(range.from, range.to, label, href)
+    }
+
+    const openLink = async (href: string) => {
       if (href.startsWith('#')) return
 
-      // 阻止默认行为
+      const protocol = getLinkProtocol(href)
+
+      if (protocol === 'file') {
+        const filePath = normalizeLocalFilePath(getFilePathFromFileUrl(href))
+
+        if (!filePath) return
+
+        if (isInternalFilePath(filePath)) {
+          await openFileInApp(filePath)
+          return
+        }
+
+        await openLocalPathWithDefaultApp(filePath)
+        return
+      }
+
+      if (protocol) {
+        await openUrl(href)
+        return
+      }
+
+      const localPath = resolveLocalLinkPath(href, useArticleStore.getState().activeFilePath)
+
+      if (!localPath) return
+
+      if (isInternalFilePath(localPath)) {
+        await openFileInApp(localPath)
+        return
+      }
+
+      await openLocalPathWithDefaultApp(localPath)
+    }
+
+    let modifiedPointerHandled = false
+
+    const getLinkHrefFromTarget = (target: HTMLElement): string | null => {
+      const anchor = target.closest<HTMLAnchorElement>('a')
+      const anchorHref = anchor?.getAttribute('href')?.trim()
+      if (anchorHref) return anchorHref
+
+      if (!target.closest('.tiptap-editable-link-source')) return null
+
+      const range = editableLinkSourcePluginKey.getState(editor.state)
+      if (!range) return null
+
+      const source = editor.state.doc.textBetween(range.from, range.to, undefined, '\ufffc')
+      return parseMarkdownLinkSource(source)?.href ?? null
+    }
+
+    const handleModifiedMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0 || (!event.metaKey && !event.ctrlKey)) return
+
+      const href = getLinkHrefFromTarget(event.target as HTMLElement)
+      if (!href || href.startsWith('#')) return
+
       event.preventDefault()
-      // 阻止事件冒泡，防止其他处理器触发
+      event.stopPropagation()
+      modifiedPointerHandled = true
+      void openLink(href).catch(() => {})
+    }
+
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const modifiedClick = event.metaKey || event.ctrlKey
+
+      if (modifiedClick) {
+        const href = getLinkHrefFromTarget(target)
+        if (!href || href.startsWith('#')) return
+
+        event.preventDefault()
+        event.stopPropagation()
+
+        if (!modifiedPointerHandled) {
+          void openLink(href).catch(() => {})
+        }
+        modifiedPointerHandled = false
+        return
+      }
+
+      const anchor = target.closest<HTMLAnchorElement>('a')
+      const href = anchor?.getAttribute('href')?.trim()
+      if (!anchor || !href) return
+
+      if (isMobile && href.startsWith('#')) return
+
+      event.preventDefault()
       event.stopPropagation()
 
-      void (async () => {
-        const protocol = getLinkProtocol(href)
-
-        if (protocol === 'file') {
-          const filePath = normalizeLocalFilePath(getFilePathFromFileUrl(href))
-
-          if (!filePath) {
-            return
-          }
-
-          if (isInternalFilePath(filePath)) {
-            await openFileInApp(filePath)
-            return
-          }
-
-          await openLocalPathWithDefaultApp(filePath)
-          return
-        }
-
-        if (protocol) {
-          await openUrl(href)
-          return
-        }
-
-        const localPath = resolveLocalLinkPath(href, useArticleStore.getState().activeFilePath)
-
-        if (!localPath) {
-          return
-        }
-
-        if (isInternalFilePath(localPath)) {
-          await openFileInApp(localPath)
-          return
-        }
-
-        await openLocalPathWithDefaultApp(localPath)
-      })().catch(() => {})
+      if (isMobile) {
+        void openLink(href).catch(() => {})
+      } else if (editableLinkSourcePluginKey.getState(editor.state)) {
+        return
+      } else {
+        startEditingLink(anchor, href)
+      }
     }
 
+    const handleTransaction = () => {
+      const range = editableLinkSourcePluginKey.getState(editor.state)
+      if (!range) return
+
+      const { from, to } = editor.state.selection
+      if (from < range.from || to > range.to) {
+        finishEditingLink()
+      }
+    }
+
+    const handleBlur = () => {
+      requestAnimationFrame(() => {
+        const activeElement = document.activeElement
+        if (activeElement instanceof HTMLElement && activeElement.closest('[data-editor-bubble-menu]')) {
+          return
+        }
+        finishEditingLink()
+      })
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !editableLinkSourcePluginKey.getState(editor.state)) return
+
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      finishEditingLink(true)
+    }
+
+    const handleEditableLinkMarkToggle = (event: Event) => {
+      const markName = (event as CustomEvent<{ mark?: unknown }>).detail?.mark
+      if (typeof markName !== 'string') return
+
+      const range = editableLinkSourcePluginKey.getState(editor.state)
+      const markType = editor.state.schema.marks[markName]
+      if (!range || !markType) return
+
+      const hasMark = range.marks.some(mark => mark.type === markType)
+      const marks = hasMark
+        ? range.marks.filter(mark => mark.type !== markType)
+        : [...range.marks, markType.create()]
+
+      editor.view.dispatch(editor.state.tr.setMeta(editableLinkSourcePluginKey, {
+        ...range,
+        marks,
+      } satisfies Exclude<EditableLinkSourceRange, null>))
+    }
+
+    const handleCurrentLinkOpen = (event: Event) => {
+      const href = (event as CustomEvent<{ href?: unknown }>).detail?.href
+      if (typeof href !== 'string' || !href.trim()) return
+      void openLink(href.trim()).catch(() => {})
+    }
+
+    editorElement.addEventListener('mousedown', handleModifiedMouseDown, true)
     editorElement.addEventListener('click', handleClick)
+    document.addEventListener('keydown', handleEscape, true)
+    document.addEventListener('tiptap-editable-link-toggle-mark', handleEditableLinkMarkToggle)
+    document.addEventListener('tiptap-current-link-open', handleCurrentLinkOpen)
+    editor.on('transaction', handleTransaction)
+    editor.on('selectionUpdate', expandLinkAtCaret)
+    editor.on('blur', handleBlur)
 
     return () => {
+      editorElement.removeEventListener('mousedown', handleModifiedMouseDown, true)
       editorElement.removeEventListener('click', handleClick)
+      document.removeEventListener('keydown', handleEscape, true)
+      document.removeEventListener('tiptap-editable-link-toggle-mark', handleEditableLinkMarkToggle)
+      document.removeEventListener('tiptap-current-link-open', handleCurrentLinkOpen)
+      editor.off('transaction', handleTransaction)
+      editor.off('selectionUpdate', expandLinkAtCaret)
+      editor.off('blur', handleBlur)
     }
-  }, [editor])
+  }, [editor, isMobile])
 
   const restoreMobileContextSelection = useCallback((context: MobileSelectionContext = mobileContext) => {
     if (!editor || !context) {
@@ -4845,6 +5120,8 @@ export function TipTapEditor({
           }
         >
         <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
+          <SmartFileLink editor={editor} activeFilePath={activeFilePath} />
+
           {!isMobile && <ImageBubbleMenu editor={editor} />}
 
           <AISuggestionFloating editor={editor} />
