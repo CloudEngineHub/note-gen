@@ -60,7 +60,7 @@ export function SkillCard({ skill, onRefresh }: SkillCardProps) {
 
   const handleDelete = async () => {
     try {
-      await deleteSkill(skill.id)
+      await deleteSkill(skill.id, skill.scope)
       onRefresh()
     } catch (error) {
       console.error('Failed to delete skill:', error)

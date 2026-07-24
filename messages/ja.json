@@ -2353,6 +2353,7 @@
             "session": "このセッションで許可",
             "params": {
               "name": "Skill 名",
+              "skill_id": "Skill ID",
               "source": "提供元",
               "revision": "固定リビジョン",
               "scope": "インストール先",
@@ -2361,6 +2362,10 @@
               "replaceExisting": "既存の Skill を置換"
             },
             "tools": {
+              "uninstall_skill": {
+                "title": "Skill の削除を確認",
+                "description": "この Skill、サードパーティーのインストール記録、隔離された実行環境を完全に削除します。"
+              },
               "install_remote_skill": {
                 "title": "サードパーティ Skill をインストールしますか？",
                 "description": "提供元、固定リビジョン、リスク情報を確認してからインストールしてください。",

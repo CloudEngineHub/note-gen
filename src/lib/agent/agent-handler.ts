@@ -305,6 +305,7 @@ export class AgentHandler {
           id: skill.metadata.id,
           name: skill.metadata.name,
           description: skill.metadata.description,
+          scope: skill.metadata.scope,
         }))]
     } catch (error) {
       console.error('[Agent Handler] Failed to load skills:', error)

@@ -2500,6 +2500,7 @@
               "scriptName": "Script name",
               "command": "Command",
               "name": "Skill name",
+              "skill_id": "Skill ID",
               "source": "Source",
               "revision": "Pinned revision",
               "scope": "Install location",
@@ -2551,6 +2552,10 @@
               "install_skill_python_dependencies": {
                 "title": "Install Skill Python dependencies",
                 "description": "The listed PyPI wheels will be installed into this Skill's isolated environment. Review every package before continuing."
+              },
+              "uninstall_skill": {
+                "title": "Confirm Skill removal",
+                "description": "This permanently deletes the Skill, its third-party install receipt, and its isolated runtime."
               },
               "install_remote_skill": {
                 "title": "Install third-party Skill?",

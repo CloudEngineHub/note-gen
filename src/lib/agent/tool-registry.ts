@@ -18,6 +18,7 @@ import {
   installRemoteSkill,
   searchRemoteSkills,
 } from '@/lib/skills/remote'
+import { uninstallSkill } from '@/lib/skills/uninstall'
 import {
   getEditorContentTool,
   getEditorSelectionTool,
@@ -1137,32 +1138,39 @@ const editorApplyTransactionTool: AgentTool = {
 function buildSkillListTool(): AgentTool {
   return {
     name: 'skill_list',
-    title: '列出 Skills',
-    description: 'List available skills with descriptions.',
+    title: '列出已安装 Skills',
+    description: 'List every installed Skill, including disabled entries, with the exact skill_id and scope required by skill_uninstall. Call this before uninstalling when the target is unclear or the user asks to remove multiple or all Skills. Entries with removable=false must never be uninstalled.',
     category: 'skill',
     risk: 'read',
     inputSchema: EMPTY_SCHEMA,
     execute: async () => {
-      const enabledSkills = await skillManager.getEnabledSkills()
+      await useSkillsStore.getState().initSkills()
+      const installedSkills = skillManager.getAllInstalledSkills()
       const skills = [
         {
-          id: BUILTIN_SKILL_CREATOR.id,
+          skill_id: BUILTIN_SKILL_CREATOR.id,
           name: BUILTIN_SKILL_CREATOR.name,
           description: BUILTIN_SKILL_CREATOR.description,
+          scope: 'built-in',
+          enabled: true,
           builtIn: true,
+          removable: false,
         },
-        ...enabledSkills
+        ...installedSkills
           .filter((skill) => skill.metadata.id !== BUILTIN_SKILL_CREATOR.id)
           .map((skill) => ({
-            id: skill.metadata.id,
+            skill_id: skill.metadata.id,
             name: skill.metadata.name,
             description: skill.metadata.description,
+            scope: skill.metadata.scope,
+            enabled: skill.metadata.enabled !== false,
             builtIn: false,
+            removable: true,
           })),
       ]
       return {
         ok: true,
-        message: `找到 ${skills.length} 个可用 Skills`,
+        message: `Found ${installedSkills.length} installed Skill(s). Use each entry's exact skill_id and scope for skill_uninstall; do not infer IDs from names.`,
         data: skills,
       }
     },
@@ -1566,6 +1574,76 @@ function buildRemoteSkillInstallTool(): AgentTool {
           ok: false,
           message: error instanceof Error ? error.message : String(error),
           error: 'REMOTE_SKILL_INSTALL_FAILED',
+        }
+      }
+    },
+  }
+}
+
+function buildSkillUninstallTool(): AgentTool {
+  return {
+    name: 'skill_uninstall',
+    title: '移除 Skill',
+    description: 'Remove one exact installed Skill after the app shows its inline confirmation panel. Use only when the user explicitly asks to remove or uninstall a Skill. Pass the exact skill_id and scope from the prompt catalog or skill_list; do not infer IDs from display names. Never ask the user to provide an ID or type a confirmation. Entries with removable=false cannot be removed.',
+    category: 'skill',
+    risk: 'delete',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        skill_id: {
+          type: 'string',
+          description: 'Exact installed Skill ID.',
+        },
+        scope: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description: 'Exact installed Skill scope.',
+        },
+      },
+      required: ['skill_id', 'scope'],
+      additionalProperties: false,
+    },
+    execute: async (input) => {
+      const skillId = asString(input.skill_id)
+      const scope = input.scope === 'project' ? 'project' : 'global'
+      if (skillId === BUILTIN_SKILL_CREATOR.id) {
+        return {
+          ok: false,
+          message: 'The built-in Skill creator cannot be removed.',
+          error: 'BUILTIN_SKILL_CANNOT_BE_REMOVED',
+        }
+      }
+
+      await useSkillsStore.getState().initSkills()
+      const skill = skillManager
+        .getSkillsByScope(scope)
+        .find(candidate => candidate.metadata.id === skillId)
+      if (!skill) {
+        return {
+          ok: false,
+          message: `Installed Skill not found in ${scope} scope: ${skillId}`,
+          error: 'SKILL_NOT_FOUND',
+        }
+      }
+      try {
+        const result = await uninstallSkill(skillId, scope)
+        await useSkillsStore.getState().refreshSkills()
+        return {
+          ok: true,
+          message: `Removed Skill "${skill.metadata.name}" from ${scope} scope.${result.warnings.length > 0 ? ` Cleanup warning(s): ${result.warnings.join('; ')}` : ''}`,
+          data: result,
+          changes: [buildStructuralChange({
+            type: 'folder',
+            target: `${scope}:skills/${skillId}`,
+            summary: `移除 Skill ${skill.metadata.name}`,
+            reversible: false,
+          })],
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'SKILL_UNINSTALL_FAILED',
         }
       }
     },
@@ -2222,6 +2300,7 @@ function buildTools(): AgentTool[] {
     buildRemoteSkillSearchTool(),
     buildRemoteSkillInspectTool(),
     buildRemoteSkillInstallTool(),
+    buildSkillUninstallTool(),
     adaptLegacyTool({
       name: 'skill_execute_script',
       title: '执行 Skill 脚本',

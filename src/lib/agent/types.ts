@@ -112,6 +112,7 @@ export interface AgentSkillSummary {
   id: string
   name: string
   description?: string
+  scope?: 'global' | 'project'
 }
 
 export interface AgentToolExecutionContext {

@@ -2359,6 +2359,7 @@
             "session": "本次對話允許",
             "params": {
               "name": "Skill 名稱",
+              "skill_id": "Skill ID",
               "source": "來源",
               "revision": "固定版本",
               "scope": "安裝位置",
@@ -2367,6 +2368,10 @@
               "replaceExisting": "取代現有 Skill"
             },
             "tools": {
+              "uninstall_skill": {
+                "title": "確認移除 Skill",
+                "description": "將永久刪除此 Skill、第三方安裝記錄和隔離執行環境。"
+              },
               "install_remote_skill": {
                 "title": "確認安裝第三方 Skill",
                 "description": "請檢查來源、固定版本和風險資訊，然後決定是否安裝。",

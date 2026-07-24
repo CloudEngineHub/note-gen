@@ -105,6 +105,11 @@ const TOOL_CONFIRMATION_DISPLAY: Record<string, ToolConfirmationDisplayConfig> =
     descriptionKey: 'record.chat.input.agent.confirmation.tools.install_remote_skill.description',
     summaryFields: ['name', 'source', 'revision', 'scope', 'warnings', 'replaceExisting'],
   },
+  skill_uninstall: {
+    titleKey: 'record.chat.input.agent.confirmation.tools.uninstall_skill.title',
+    descriptionKey: 'record.chat.input.agent.confirmation.tools.uninstall_skill.description',
+    summaryFields: ['skill_id', 'scope'],
+  },
   create_files_batch: {
     titleKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.title',
     descriptionKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.description',

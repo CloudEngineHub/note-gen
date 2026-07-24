@@ -2427,6 +2427,7 @@
             "session": "Permitir nesta sessão",
             "params": {
               "name": "Nome do Skill",
+              "skill_id": "ID do Skill",
               "source": "Origem",
               "revision": "Revisão fixada",
               "scope": "Local de instalação",
@@ -2435,6 +2436,10 @@
               "replaceExisting": "Substituir Skill existente"
             },
             "tools": {
+              "uninstall_skill": {
+                "title": "Confirmar remoção do Skill",
+                "description": "Isso exclui permanentemente o Skill, o registro de instalação de terceiros e o ambiente isolado."
+              },
               "install_remote_skill": {
                 "title": "Instalar Skill de terceiros?",
                 "description": "Revise a origem, a revisão fixada e os riscos antes de instalar.",

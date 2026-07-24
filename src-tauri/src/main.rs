@@ -49,7 +49,9 @@ use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
     SkillProcessManager,
 };
-use skills::{import_skill, import_skill_zip, install_skill_package, validate_skill_package};
+use skills::{
+    import_skill, import_skill_zip, install_skill_package, uninstall_skill, validate_skill_package,
+};
 use tray::update_tray_record_toolbar_config;
 
 fn main() {
@@ -95,6 +97,7 @@ fn main() {
             import_skill_zip,
             validate_skill_package,
             install_skill_package,
+            uninstall_skill,
             search_remote_skills,
             inspect_remote_skill,
             install_remote_skill,

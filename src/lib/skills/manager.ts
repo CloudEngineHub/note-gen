@@ -47,6 +47,7 @@ import { Store } from '@tauri-apps/plugin-store'
  */
 class SkillManager {
   private skills: Map<string, SkillContent> = new Map()
+  private installedSkills: Map<string, SkillContent> = new Map()
   private skillFiles: Map<string, SkillFileInfo> = new Map()
   private enabledOverrides: Record<string, boolean> = {}
   private initialized = false
@@ -88,6 +89,7 @@ class SkillManager {
    */
   async reload(): Promise<void> {
     this.skills.clear()
+    this.installedSkills.clear()
     this.skillFiles.clear()
     this.initialized = false
     await this.initialize()
@@ -575,6 +577,10 @@ class SkillManager {
    * 注册 Skill
    */
   registerSkill(skill: SkillContent): void {
+    this.installedSkills.set(
+      `${skill.metadata.scope}:${skill.metadata.id}`,
+      skill
+    )
     this.skills.set(skill.metadata.id, skill)
   }
 
@@ -583,6 +589,11 @@ class SkillManager {
    */
   unregisterSkill(skillId: string): void {
     this.skills.delete(skillId)
+    for (const key of this.installedSkills.keys()) {
+      if (key.endsWith(`:${skillId}`)) {
+        this.installedSkills.delete(key)
+      }
+    }
     this.skillFiles.delete(skillId)
   }
 
@@ -598,10 +609,17 @@ class SkillManager {
   }
 
   /**
+   * 获取所有作用域中实际安装的 Skills，包括被同名项目 Skill 覆盖的全局 Skill。
+   */
+  getAllInstalledSkills(): SkillContent[] {
+    return Array.from(this.installedSkills.values())
+  }
+
+  /**
    * 获取指定作用域的 Skills
    */
   getSkillsByScope(scope: SkillScope): SkillContent[] {
-    return this.getAllSkills().filter(
+    return this.getAllInstalledSkills().filter(
       (skill) => skill.metadata.scope === scope
     )
   }
@@ -995,6 +1013,7 @@ export const skillManager = new SkillManager()
 // 重置管理器（主要用于测试）
 export function resetSkillManager(): void {
   ;(skillManager as any).skills.clear()
+  ;(skillManager as any).installedSkills.clear()
   ;(skillManager as any).skillFiles.clear()
   ;(skillManager as any).initialized = false
 }

@@ -55,9 +55,10 @@ function formatSkills(context: AgentContextSnapshot) {
 
   return [
     '## Skills',
-    'Skills are guidance documents with read-only installed resources. When one matches the request, call skill_load exactly once. It returns the complete instructions, resource index, and registered script IDs. Do not call skill_list, recreate Skill files in the note workspace, or guess script names.',
+    'Skills are guidance documents with read-only installed resources. When one matches the request, call skill_load exactly once. It returns the complete instructions, resource index, and registered script IDs. Do not call skill_list merely to rediscover this catalog, recreate Skill files in the note workspace, or guess script names.',
     'When the user asks to find or install a third-party Skill, use skill_search_remote unless they already provided a source URL, then call skill_inspect_source. If installation was requested, call skill_install_source immediately after inspection so the app opens its confirmation panel; never ask the user to type or reply with confirmation. Install only the returned immutable preview with skill_install_source. Copy warnings, skippedSymlinks, and every other display field exactly into the install call. Warnings such as large files, deep paths, scripts, or skipped symbolic links are decided by the user in that panel and are not reasons to stop before calling skill_install_source. Never invent, rewrite, or silently substitute a remote source URL.',
-    ...skills.map((skill) => `- ${skill.id}: ${skill.name}${skill.description ? ` - ${skill.description}` : ''}`),
+    'When the user explicitly asks to remove an installed Skill, use the exact skill_id and scope shown below. If the target is unclear, disabled, or the user asks to remove multiple/all Skills, call skill_list first; it returns every installed Skill with exact uninstall arguments. Then call skill_uninstall so the app opens its confirmation panel. Never ask the user to provide IDs or type a confirmation, and never try to remove an entry whose removable field is false.',
+    ...skills.map((skill) => `- ${skill.id}${skill.scope ? ` [${skill.scope}]` : ' [built-in]'}: ${skill.name}${skill.description ? ` - ${skill.description}` : ''}`),
   ].join('\n')
 }
 

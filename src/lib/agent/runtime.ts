@@ -560,13 +560,6 @@ function selectToolsForContext(
     selectedTools = selectedTools.filter((tool) => tool.category !== 'attachment')
   }
 
-  // The complete catalog is already present in the system prompt. Exposing a
-  // second listing tool encourages models to enumerate it repeatedly instead
-  // of loading the one matching Skill.
-  if ((context.availableSkills?.length || 0) > 0) {
-    selectedTools = selectedTools.filter((tool) => tool.name !== 'skill_list')
-  }
-
   return selectedTools
 }
 

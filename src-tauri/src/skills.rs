@@ -1,3 +1,4 @@
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -103,6 +104,24 @@ pub struct SkillPackageInstallResult {
 }
 
 #[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UninstallSkillRequest {
+    skill_id: String,
+    scope: SkillImportScope,
+    workspace_root: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UninstallSkillResult {
+    skill_id: String,
+    scope: String,
+    removed_receipt: bool,
+    removed_runtime: bool,
+    warnings: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SkillImportSourceKind {
     Zip,
@@ -131,6 +150,132 @@ fn resolve_skills_dir(
             Some(root) if !root.trim().is_empty() => PathBuf::from(root).join("skills"),
             _ => app_data_dir.join("article").join("skills"),
         },
+    })
+}
+
+fn remove_skill_directory(skills_dir: &Path, skill_id: &str) -> Result<(), String> {
+    if !is_safe_skill_name(skill_id) {
+        return Err(
+            "INVALID_SKILL_ID: Skill ID must contain only lowercase letters, numbers, and hyphens"
+                .to_string(),
+        );
+    }
+
+    let target = skills_dir.join(skill_id);
+    let metadata = fs::symlink_metadata(&target).map_err(|error| {
+        format!("SKILL_NOT_FOUND: Failed to find Skill \"{skill_id}\": {error}")
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("UNSAFE_SKILL_PATH: Skill target must be a regular directory".to_string());
+    }
+
+    let manifest = target.join("SKILL.md");
+    let manifest_metadata = fs::symlink_metadata(&manifest)
+        .map_err(|error| format!("INVALID_SKILL: SKILL.md is missing: {error}"))?;
+    if manifest_metadata.file_type().is_symlink() || !manifest_metadata.is_file() {
+        return Err("UNSAFE_SKILL_PATH: SKILL.md must be a regular file".to_string());
+    }
+
+    let canonical_parent = skills_dir
+        .canonicalize()
+        .map_err(|error| format!("Failed to verify Skills directory: {error}"))?;
+    let canonical_target = target
+        .canonicalize()
+        .map_err(|error| format!("Failed to verify Skill directory: {error}"))?;
+    if canonical_target.parent() != Some(canonical_parent.as_path()) {
+        return Err(
+            "UNSAFE_SKILL_PATH: Skill directory escapes the configured Skills directory"
+                .to_string(),
+        );
+    }
+
+    let tombstone = skills_dir.join(format!(".delete-{skill_id}-{}", uuid::Uuid::new_v4()));
+    fs::rename(&target, &tombstone)
+        .map_err(|error| format!("Failed to prepare Skill removal: {error}"))?;
+    if let Err(error) = fs::remove_dir_all(&tombstone) {
+        if !target.exists() {
+            let _ = fs::rename(&tombstone, &target);
+        }
+        return Err(format!("Failed to remove Skill: {error}"));
+    }
+    Ok(())
+}
+
+fn remove_remote_skill_receipt(
+    app_data_dir: &Path,
+    scope: &str,
+    workspace_root: Option<&str>,
+    skill_id: &str,
+) -> Result<bool, String> {
+    let key = Sha256::digest(
+        format!("{scope}:{}:{skill_id}", workspace_root.unwrap_or_default()).as_bytes(),
+    );
+    let receipt = app_data_dir
+        .join("remote-skill-receipts")
+        .join(format!("{key:x}.json"));
+    if !receipt.exists() {
+        return Ok(false);
+    }
+    fs::remove_file(receipt).map_err(|error| {
+        format!("Skill was removed, but its install receipt could not be removed: {error}")
+    })?;
+    Ok(true)
+}
+
+#[command]
+pub async fn uninstall_skill(
+    app_handle: AppHandle,
+    request: UninstallSkillRequest,
+) -> Result<UninstallSkillResult, String> {
+    let scope_name = match request.scope {
+        SkillImportScope::Global => "global",
+        SkillImportScope::Project => "project",
+    };
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to get app data directory: {error}"))?;
+    let skills_dir = resolve_skills_dir(
+        &app_handle,
+        request.scope,
+        request.workspace_root.as_deref(),
+    )?;
+
+    remove_skill_directory(&skills_dir, &request.skill_id)?;
+    let mut warnings = Vec::new();
+    let removed_receipt = match remove_remote_skill_receipt(
+        &app_data_dir,
+        scope_name,
+        request.workspace_root.as_deref(),
+        &request.skill_id,
+    ) {
+        Ok(removed) => removed,
+        Err(error) => {
+            warnings.push(error);
+            false
+        }
+    };
+    let runtime_dir = app_data_dir.join("skill-runtimes").join(&request.skill_id);
+    let removed_runtime = if runtime_dir.exists() {
+        match fs::remove_dir_all(&runtime_dir) {
+            Ok(()) => true,
+            Err(error) => {
+                warnings.push(format!(
+                    "Skill was removed, but its runtime could not be removed: {error}"
+                ));
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    Ok(UninstallSkillResult {
+        skill_id: request.skill_id,
+        scope: scope_name.to_string(),
+        removed_receipt,
+        removed_runtime,
+        warnings,
     })
 }
 
@@ -1190,6 +1335,54 @@ mod tests {
         assert!(!is_safe_skill_name("../secure-skill"));
         assert!(!is_safe_skill_name("-secure"));
         assert!(!is_safe_skill_name("secure--skill"));
+    }
+
+    #[test]
+    fn removes_only_the_requested_skill_directory() {
+        let root = test_directory("skill-uninstall");
+        let target = root.join("writing");
+        let sibling = root.join("summarizing");
+        fs::create_dir_all(&target).unwrap();
+        fs::create_dir_all(&sibling).unwrap();
+        fs::write(target.join("SKILL.md"), "# Writing").unwrap();
+        fs::write(sibling.join("SKILL.md"), "# Summarizing").unwrap();
+
+        remove_skill_directory(&root, "writing").unwrap();
+
+        assert!(!target.exists());
+        assert!(sibling.join("SKILL.md").is_file());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_unsafe_skill_uninstall_id() {
+        let root = test_directory("unsafe-skill-uninstall");
+        fs::create_dir_all(&root).unwrap();
+
+        let error = remove_skill_directory(&root, "../outside").unwrap_err();
+
+        assert!(error.contains("INVALID_SKILL_ID"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlinked_skill_directory_during_uninstall() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_directory("symlinked-skill-uninstall");
+        let outside = test_directory("symlinked-skill-target");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("SKILL.md"), "# Outside").unwrap();
+        symlink(&outside, root.join("writing")).unwrap();
+
+        let error = remove_skill_directory(&root, "writing").unwrap_err();
+
+        assert!(error.contains("UNSAFE_SKILL_PATH"));
+        assert!(outside.join("SKILL.md").is_file());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
     }
 
     fn generated_request(name: &str, replace_existing: bool) -> SkillPackageRequest {

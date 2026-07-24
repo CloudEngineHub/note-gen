@@ -2414,6 +2414,7 @@
               "scriptName": "脚本名称",
               "command": "命令",
               "name": "Skill 名称",
+              "skill_id": "Skill ID",
               "source": "来源",
               "revision": "固定版本",
               "scope": "安装位置",
@@ -2465,6 +2466,10 @@
               "install_skill_python_dependencies": {
                 "title": "安装 Skill Python 依赖",
                 "description": "将把列出的 PyPI wheel 安装到此 Skill 的隔离环境中，请逐项确认。"
+              },
+              "uninstall_skill": {
+                "title": "确认移除 Skill",
+                "description": "将永久删除此 Skill、第三方安装记录和隔离运行环境。"
               },
               "install_remote_skill": {
                 "title": "确认安装第三方 Skill",

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { Store } from '@tauri-apps/plugin-store'
 import type { SkillMetadata, SkillContent, SkillExecutionRecord } from '@/lib/skills/types'
 import { skillManager } from '@/lib/skills/manager'
+import { uninstallSkill } from '@/lib/skills/uninstall'
 
 interface SkillsState {
   // 配置
@@ -31,7 +32,7 @@ interface SkillsState {
 
   // Skill 管理方法
   toggleSkill: (id: string) => Promise<void>
-  deleteSkill: (id: string) => Promise<void>
+  deleteSkill: (id: string, scope?: 'global' | 'project') => Promise<void>
   refreshSkills: () => Promise<void>
 
   // 获取方法
@@ -184,30 +185,13 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   },
 
   // 删除 Skill
-  deleteSkill: async (id: string) => {
-    const skill = skillManager.getSkill(id)
-    const fileInfo = skillManager.getSkillFileInfo(id)
-    if (!skill || !fileInfo) return
+  deleteSkill: async (id: string, scope?: 'global' | 'project') => {
+    const skill = scope
+      ? skillManager.getSkillsByScope(scope).find(candidate => candidate.metadata.id === id)
+      : skillManager.getSkill(id)
+    if (!skill) return
 
-    // 删除目录
-    const { remove } = await import('@tauri-apps/plugin-fs')
-    const { BaseDirectory } = await import('@tauri-apps/plugin-fs')
-
-    if (skill.metadata.scope === 'global') {
-      // fileInfo.directory 已经是完整路径（如 skills/style-detector）
-      await remove(fileInfo.directory, { baseDir: BaseDirectory.AppData, recursive: true })
-    } else {
-      const { getFilePathOptions } = await import('@/lib/workspace')
-      const options = await getFilePathOptions(fileInfo.directory)
-      if (options.baseDir) {
-        await remove(options.path, { baseDir: options.baseDir, recursive: true })
-      } else {
-        await remove(options.path, { recursive: true })
-      }
-    }
-
-    // 从管理器中注销 Skill
-    skillManager.unregisterSkill(id)
+    await uninstallSkill(id, skill.metadata.scope)
 
     // 更新状态
     await get().refreshSkills()
