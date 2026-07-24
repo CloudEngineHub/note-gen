@@ -3,6 +3,7 @@
 import * as React from "react"
 import { CheckCircle2, ChevronDown, ChevronRight, ShieldAlert, XCircle } from "lucide-react"
 import { useTranslations } from "next-intl"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { formatConfirmationPreview } from "@/lib/agent/tool-confirmation-display"
 import emitter from "@/lib/emitter"
@@ -27,6 +28,20 @@ interface AgentApprovalPanelProps {
   pendingConfirmation?: PendingAgentConfirmation
   onConfirm?: (scope?: "once" | "conversation") => void
   onCancel?: () => void
+}
+
+interface RemoteSkillRiskWarning {
+  code: string
+  actual: number
+  recommended: number
+  paths: string[]
+}
+
+function formatRiskBytes(value: number) {
+  if (value >= 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`
+  }
+  return `${Math.ceil(value / (1024 * 1024))} MB`
 }
 
 export function AgentApprovalPanel({
@@ -125,6 +140,39 @@ export function AgentApprovalPanel({
     "Agent 请求执行需要确认的操作。"
   )
   const hasDetails = approvalPreview.fields.length > 0
+  const isRemoteSkillInstall = pendingConfirmation.toolName === "skill_install_source"
+  const riskWarnings = Array.isArray(pendingConfirmation.params.warnings)
+    ? pendingConfirmation.params.warnings.filter(
+        (value): value is RemoteSkillRiskWarning => (
+          typeof value === "object"
+          && value !== null
+          && typeof (value as RemoteSkillRiskWarning).code === "string"
+          && typeof (value as RemoteSkillRiskWarning).actual === "number"
+          && typeof (value as RemoteSkillRiskWarning).recommended === "number"
+          && Array.isArray((value as RemoteSkillRiskWarning).paths)
+        )
+      )
+    : []
+  const visibleFields = isRemoteSkillInstall
+    ? approvalPreview.fields.filter(
+        (field) => !["preview_id", "warnings", "skipped_symlinks"].includes(field.name)
+      )
+    : approvalPreview.fields
+
+  const formatRiskWarning = (warning: RemoteSkillRiskWarning) => {
+    const key = `record.chat.input.agent.confirmation.tools.install_remote_skill.risks.${warning.code}`
+    const values = {
+      actual: warning.actual,
+      recommended: warning.recommended,
+      actualSize: formatRiskBytes(warning.actual),
+      recommendedSize: formatRiskBytes(warning.recommended),
+      count: warning.actual,
+    }
+    if (t.has(key)) {
+      return t(key, values)
+    }
+    return warning.code
+  }
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-md border bg-background p-2 shadow-sm">
@@ -170,7 +218,17 @@ export function AgentApprovalPanel({
           onClick={() => onConfirm?.("once")}
         >
           <CheckCircle2 data-icon="inline-start" />
-          {t("record.chat.input.agent.confirmation.confirm")}
+          {isRemoteSkillInstall
+            ? riskWarnings.length > 0
+              ? translateKey(
+                  "record.chat.input.agent.confirmation.tools.install_remote_skill.continue",
+                  "继续安装"
+                )
+              : translateKey(
+                  "record.chat.input.agent.confirmation.tools.install_remote_skill.confirm",
+                  "确认安装"
+                )
+            : t("record.chat.input.agent.confirmation.confirm")}
         </Button>
         {pendingConfirmation.canApproveForSession && (
           <Button
@@ -186,9 +244,35 @@ export function AgentApprovalPanel({
 
       {expanded && hasDetails && (
         <div className="mt-2 border-t pt-2">
-          {approvalPreview.fields.length > 0 && (
+          {isRemoteSkillInstall && riskWarnings.length > 0 && (
+            <Alert variant="destructive" className="mb-2">
+              <ShieldAlert />
+              <AlertTitle>
+                {translateKey(
+                  "record.chat.input.agent.confirmation.tools.install_remote_skill.warningTitle",
+                  "检测到安装风险"
+                )}
+              </AlertTitle>
+              <AlertDescription>
+                <ul className="list-inside list-disc">
+                  {riskWarnings.map((warning, index) => (
+                    <li key={`${warning.code}-${index}`}>
+                      {formatRiskWarning(warning)}
+                      {warning.paths.length > 0 && (
+                        <span className="block break-all pl-4 text-xs">
+                          {warning.paths.slice(0, 5).join(", ")}
+                          {warning.paths.length > 5 ? ` (+${warning.paths.length - 5})` : ""}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          {visibleFields.length > 0 && (
             <div className="mt-2 flex max-h-56 flex-col gap-2 overflow-auto text-xs">
-              {approvalPreview.fields.map((field) => {
+              {visibleFields.map((field) => {
                 const formattedValue = formatFieldValue(field.value)
 
                 return (

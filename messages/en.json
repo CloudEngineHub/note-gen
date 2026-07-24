@@ -2498,7 +2498,14 @@
               "files": "Files",
               "newName": "New name",
               "scriptName": "Script name",
-              "command": "Command"
+              "command": "Command",
+              "name": "Skill name",
+              "source": "Source",
+              "revision": "Pinned revision",
+              "scope": "Install location",
+              "has_scripts": "Contains scripts",
+              "skipped_symlinks": "Skipped symbolic links",
+              "replaceExisting": "Replace existing Skill"
             },
             "tools": {
               "create_file": {
@@ -2544,6 +2551,23 @@
               "install_skill_python_dependencies": {
                 "title": "Install Skill Python dependencies",
                 "description": "The listed PyPI wheels will be installed into this Skill's isolated environment. Review every package before continuing."
+              },
+              "install_remote_skill": {
+                "title": "Install third-party Skill?",
+                "description": "Review the source, pinned revision, and risk information before installing.",
+                "warningTitle": "Installation risk detected",
+                "symlinkWarning": "This Skill contains symbolic links. They will be skipped and will not be written locally if you continue.",
+                "confirm": "Install",
+                "continue": "Continue installation",
+                "risks": {
+                  "large-archive": "The download is {actualSize}, above the recommended limit of {recommendedSize}.",
+                  "large-files": "{count} file(s) exceed the recommended per-file limit of {recommendedSize}.",
+                  "large-uncompressed-size": "The extracted size is {actualSize}, above the recommended limit of {recommendedSize}.",
+                  "many-files": "The Skill contains {actual} files, above the recommended count of {recommended}.",
+                  "deep-paths": "The directory depth is {actual}, above the recommended depth of {recommended}.",
+                  "executable-scripts": "The Skill contains executable scripts. Running them will still require separate confirmation.",
+                  "symbolic-links": "The Skill contains {count} symbolic link(s). They will be skipped if installation continues."
+                }
               }
             }
           }

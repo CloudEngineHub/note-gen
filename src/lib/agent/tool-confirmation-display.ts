@@ -100,6 +100,11 @@ const TOOL_CONFIRMATION_DISPLAY: Record<string, ToolConfirmationDisplayConfig> =
     summaryFields: ['name', 'scope', 'description', 'replaceExisting', 'removeFiles', 'files', 'instructions'],
     contentFields: ['files', 'instructions'],
   },
+  skill_install_source: {
+    titleKey: 'record.chat.input.agent.confirmation.tools.install_remote_skill.title',
+    descriptionKey: 'record.chat.input.agent.confirmation.tools.install_remote_skill.description',
+    summaryFields: ['name', 'source', 'revision', 'scope', 'warnings', 'replaceExisting'],
+  },
   create_files_batch: {
     titleKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.title',
     descriptionKey: 'record.chat.input.agent.confirmation.tools.create_files_batch.description',

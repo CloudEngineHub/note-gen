@@ -12,6 +12,7 @@ mod mcp_runtime;
 mod mobile_system_bars;
 mod ocr_packages;
 mod printing;
+mod remote_skills;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod skill_runtime;
 mod skills;
@@ -31,6 +32,10 @@ use mcp_runtime::{
     cancel_mcp_runtime_install, inspect_mcp_runtime, install_mcp_runtime, RuntimeInstallManager,
 };
 use ocr_packages::{list_ocr_providers, run_ocr_provider};
+use remote_skills::{
+    cancel_remote_skill_download, inspect_remote_skill, install_remote_skill, search_remote_skills,
+    RemoteSkillManager,
+};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
@@ -50,7 +55,8 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(McpServerManager::new())
         .manage(RuntimeInstallManager::new())
-        .manage(AiRequestManager::new());
+        .manage(AiRequestManager::new())
+        .manage(RemoteSkillManager::default());
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.manage(SkillProcessManager::default());
@@ -81,6 +87,10 @@ pub fn run() {
             import_skill_zip,
             validate_skill_package,
             install_skill_package,
+            search_remote_skills,
+            inspect_remote_skill,
+            install_remote_skill,
+            cancel_remote_skill_download,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             run_skill_script,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]

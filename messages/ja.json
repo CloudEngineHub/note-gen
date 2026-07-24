@@ -2350,7 +2350,35 @@
             "confirm": "確認",
             "confirmed": "確認済み",
             "cancelled": "キャンセル済み",
-            "session": "このセッションで許可"
+            "session": "このセッションで許可",
+            "params": {
+              "name": "Skill 名",
+              "source": "提供元",
+              "revision": "固定リビジョン",
+              "scope": "インストール先",
+              "has_scripts": "スクリプトを含む",
+              "skipped_symlinks": "スキップするシンボリックリンク",
+              "replaceExisting": "既存の Skill を置換"
+            },
+            "tools": {
+              "install_remote_skill": {
+                "title": "サードパーティ Skill をインストールしますか？",
+                "description": "提供元、固定リビジョン、リスク情報を確認してからインストールしてください。",
+                "warningTitle": "インストール上のリスクを検出しました",
+                "symlinkWarning": "この Skill にはシンボリックリンクが含まれます。続行するとリンクはスキップされ、ローカルには書き込まれません。",
+                "confirm": "インストール",
+                "continue": "インストールを続行",
+                "risks": {
+                  "large-archive": "ダウンロードサイズは {actualSize} で、推奨上限 {recommendedSize} を超えています。",
+                  "large-files": "{count} 個のファイルが推奨上限 {recommendedSize} を超えています。",
+                  "large-uncompressed-size": "展開後のサイズは {actualSize} で、推奨上限 {recommendedSize} を超えています。",
+                  "many-files": "{actual} 個のファイルが含まれ、推奨数 {recommended} を超えています。",
+                  "deep-paths": "ディレクトリの深さは {actual} で、推奨値 {recommended} を超えています。",
+                  "executable-scripts": "実行可能なスクリプトが含まれます。実行時には別途確認が必要です。",
+                  "symbolic-links": "{count} 個のシンボリックリンクが含まれます。続行するとスキップされます。"
+                }
+              }
+            }
           }
         },
         "imageSelector": {

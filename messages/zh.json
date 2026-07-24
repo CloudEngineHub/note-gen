@@ -2412,7 +2412,14 @@
               "files": "文件列表",
               "newName": "新名称",
               "scriptName": "脚本名称",
-              "command": "命令"
+              "command": "命令",
+              "name": "Skill 名称",
+              "source": "来源",
+              "revision": "固定版本",
+              "scope": "安装位置",
+              "has_scripts": "包含脚本",
+              "skipped_symlinks": "跳过的符号链接",
+              "replaceExisting": "替换已有 Skill"
             },
             "tools": {
               "create_file": {
@@ -2458,6 +2465,23 @@
               "install_skill_python_dependencies": {
                 "title": "安装 Skill Python 依赖",
                 "description": "将把列出的 PyPI wheel 安装到此 Skill 的隔离环境中，请逐项确认。"
+              },
+              "install_remote_skill": {
+                "title": "确认安装第三方 Skill",
+                "description": "请检查来源、固定版本和风险信息，然后决定是否安装。",
+                "warningTitle": "检测到安装风险",
+                "symlinkWarning": "该 Skill 包含符号链接。继续安装时将跳过这些链接，不会将其写入本地。",
+                "confirm": "确认安装",
+                "continue": "继续安装",
+                "risks": {
+                  "large-archive": "下载包大小为 {actualSize}，超过建议上限 {recommendedSize}。",
+                  "large-files": "有 {count} 个文件超过建议的单文件上限 {recommendedSize}。",
+                  "large-uncompressed-size": "解压后大小为 {actualSize}，超过建议上限 {recommendedSize}。",
+                  "many-files": "包含 {actual} 个文件，超过建议数量 {recommended}。",
+                  "deep-paths": "目录深度为 {actual} 层，超过建议深度 {recommended} 层。",
+                  "executable-scripts": "包含可执行脚本；安装后运行脚本仍会单独请求确认。",
+                  "symbolic-links": "包含 {count} 个符号链接；继续安装时会跳过这些链接。"
+                }
               }
             }
           }

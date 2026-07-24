@@ -2356,7 +2356,35 @@
             "confirm": "確認",
             "confirmed": "已確認",
             "cancelled": "已取消",
-            "session": "本次對話允許"
+            "session": "本次對話允許",
+            "params": {
+              "name": "Skill 名稱",
+              "source": "來源",
+              "revision": "固定版本",
+              "scope": "安裝位置",
+              "has_scripts": "包含腳本",
+              "skipped_symlinks": "略過的符號連結",
+              "replaceExisting": "取代現有 Skill"
+            },
+            "tools": {
+              "install_remote_skill": {
+                "title": "確認安裝第三方 Skill",
+                "description": "請檢查來源、固定版本和風險資訊，然後決定是否安裝。",
+                "warningTitle": "偵測到安裝風險",
+                "symlinkWarning": "此 Skill 包含符號連結。繼續安裝時將略過這些連結，不會寫入本機。",
+                "confirm": "確認安裝",
+                "continue": "繼續安裝",
+                "risks": {
+                  "large-archive": "下載包大小為 {actualSize}，超過建議上限 {recommendedSize}。",
+                  "large-files": "有 {count} 個檔案超過建議的單一檔案上限 {recommendedSize}。",
+                  "large-uncompressed-size": "解壓縮後大小為 {actualSize}，超過建議上限 {recommendedSize}。",
+                  "many-files": "包含 {actual} 個檔案，超過建議數量 {recommended}。",
+                  "deep-paths": "目錄深度為 {actual} 層，超過建議深度 {recommended} 層。",
+                  "executable-scripts": "包含可執行指令碼；安裝後執行時仍會另外要求確認。",
+                  "symbolic-links": "包含 {count} 個符號連結；繼續安裝時會略過這些連結。"
+                }
+              }
+            }
           }
         },
         "fileLink": {

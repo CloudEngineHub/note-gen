@@ -5,11 +5,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{command, AppHandle, Manager};
 use zip::ZipArchive;
 
-const MAX_ZIP_BYTES: u64 = 50 * 1024 * 1024;
+pub(crate) const MAX_ZIP_BYTES: u64 = 50 * 1024 * 1024;
+pub(crate) const MAX_REMOTE_ZIP_BYTES: u64 = 500 * 1024 * 1024;
 const MAX_ENTRY_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 200 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRIES: usize = 1_000;
 const MAX_PATH_DEPTH: usize = 20;
+const MAX_REMOTE_ENTRY_BYTES: u64 = 500 * 1024 * 1024;
+const MAX_REMOTE_UNCOMPRESSED_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_REMOTE_ARCHIVE_ENTRIES: usize = 10_000;
+const MAX_REMOTE_PATH_DEPTH: usize = 50;
 const MAX_GENERATED_FILES: usize = 100;
 const MAX_GENERATED_FILE_BYTES: usize = 1024 * 1024;
 const MAX_GENERATED_PACKAGE_BYTES: usize = 10 * 1024 * 1024;
@@ -18,6 +23,38 @@ const MAX_GENERATED_PACKAGE_BYTES: usize = 10 * 1024 * 1024;
 struct SkillFrontmatter {
     name: String,
     description: String,
+}
+
+pub(crate) struct RemoteSkillInspection {
+    pub name: String,
+    pub description: String,
+    pub root: PathBuf,
+    pub files: Vec<String>,
+    pub total_bytes: u64,
+    pub has_scripts: bool,
+    pub skipped_symlinks: Vec<String>,
+    pub warnings: Vec<RemoteSkillWarning>,
+}
+
+#[derive(Clone, Copy)]
+enum ArchiveSymlinkPolicy {
+    Reject,
+    Skip,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RemoteSkillWarning {
+    pub code: String,
+    pub actual: u64,
+    pub recommended: u64,
+    pub paths: Vec<String>,
+}
+
+#[derive(Default)]
+struct ArchiveExtractionReport {
+    skipped_symlinks: Vec<String>,
+    warnings: Vec<RemoteSkillWarning>,
 }
 
 #[derive(serde::Deserialize)]
@@ -72,7 +109,7 @@ pub enum SkillImportSourceKind {
     Directory,
 }
 
-#[derive(serde::Deserialize, Clone, Copy)]
+#[derive(Debug, serde::Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum SkillImportScope {
     Global,
@@ -278,7 +315,7 @@ fn import_skill_directory_inner(
 
     let mut roots = Vec::new();
     collect_skill_roots(source, 0, &mut roots)?;
-    install_discovered_skill(roots, source, source_path, skills_dir, nonce)
+    install_discovered_skill(roots, source, source_path, skills_dir, nonce, true)
 }
 
 fn import_skill_zip_inner(
@@ -287,18 +324,46 @@ fn import_skill_zip_inner(
     skills_dir: &Path,
     nonce: u128,
 ) -> Result<String, String> {
+    extract_skill_archive(
+        Path::new(zip_path),
+        temp_dir,
+        None,
+        ArchiveSymlinkPolicy::Reject,
+    )?;
+
+    let mut roots = Vec::new();
+    collect_skill_roots(temp_dir, 0, &mut roots)?;
+    install_discovered_skill(roots, temp_dir, zip_path, skills_dir, nonce, true)
+}
+
+fn extract_skill_archive(
+    zip_path: &Path,
+    temp_dir: &Path,
+    requested_path: Option<&Path>,
+    symlink_policy: ArchiveSymlinkPolicy,
+) -> Result<ArchiveExtractionReport, String> {
     let file =
         fs::File::open(zip_path).map_err(|error| format!("Failed to open zip file: {error}"))?;
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("Failed to read zip archive: {error}"))?;
 
-    if archive.len() > MAX_ARCHIVE_ENTRIES {
-        return Err(format!(
-            "Skill archive contains more than {MAX_ARCHIVE_ENTRIES} entries"
-        ));
+    if requested_path.is_none() {
+        let archive_limit = match symlink_policy {
+            ArchiveSymlinkPolicy::Reject => MAX_ARCHIVE_ENTRIES,
+            ArchiveSymlinkPolicy::Skip => MAX_REMOTE_ARCHIVE_ENTRIES,
+        };
+        if archive.len() > archive_limit {
+            return Err(format!(
+                "Skill archive contains more than {archive_limit} entries"
+            ));
+        }
     }
 
+    let mut selected_entries = 0_usize;
     let mut total_uncompressed = 0_u64;
+    let mut skipped_symlinks = Vec::new();
+    let mut oversized_entries = Vec::new();
+    let mut maximum_depth = 0_usize;
     for index in 0..archive.len() {
         let mut entry = archive
             .by_index(index)
@@ -307,33 +372,74 @@ fn import_skill_zip_inner(
             .enclosed_name()
             .ok_or_else(|| format!("Unsafe path in Skill archive: {}", entry.name()))?
             .to_path_buf();
+        if requested_path
+            .map(|requested| !archive_path_matches_requested(&relative_path, requested))
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        selected_entries += 1;
+        let entry_limit = match symlink_policy {
+            ArchiveSymlinkPolicy::Reject => MAX_ARCHIVE_ENTRIES,
+            ArchiveSymlinkPolicy::Skip => MAX_REMOTE_ARCHIVE_ENTRIES,
+        };
+        if selected_entries > entry_limit {
+            return Err(format!(
+                "Selected Skill contains more than {entry_limit} entries"
+            ));
+        }
 
-        if relative_path.components().count() > MAX_PATH_DEPTH {
+        let path_depth = relative_path.components().count();
+        maximum_depth = maximum_depth.max(path_depth);
+        let depth_limit = match symlink_policy {
+            ArchiveSymlinkPolicy::Reject => MAX_PATH_DEPTH,
+            ArchiveSymlinkPolicy::Skip => MAX_REMOTE_PATH_DEPTH,
+        };
+        if path_depth > depth_limit {
             return Err(format!(
                 "Skill archive path is nested too deeply: {}",
                 entry.name()
             ));
         }
         if is_symlink(&entry) {
-            return Err(format!(
-                "Symbolic links are not allowed in Skill archives: {}",
-                entry.name()
-            ));
+            match symlink_policy {
+                ArchiveSymlinkPolicy::Reject => {
+                    return Err(format!(
+                        "Symbolic links are not allowed in Skill archives: {}",
+                        entry.name()
+                    ));
+                }
+                ArchiveSymlinkPolicy::Skip => {
+                    skipped_symlinks.push(relative_path.to_string_lossy().to_string());
+                    continue;
+                }
+            }
         }
-        if entry.size() > MAX_ENTRY_BYTES {
+        let entry_size_limit = match symlink_policy {
+            ArchiveSymlinkPolicy::Reject => MAX_ENTRY_BYTES,
+            ArchiveSymlinkPolicy::Skip => MAX_REMOTE_ENTRY_BYTES,
+        };
+        if entry.size() > entry_size_limit {
             return Err(format!(
                 "Skill archive entry exceeds the size limit: {}",
                 entry.name()
             ));
         }
+        if matches!(symlink_policy, ArchiveSymlinkPolicy::Skip) && entry.size() > MAX_ENTRY_BYTES {
+            oversized_entries.push(relative_path.to_string_lossy().to_string());
+        }
 
         total_uncompressed = total_uncompressed
             .checked_add(entry.size())
             .ok_or("Skill archive size overflow")?;
-        if total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+        let uncompressed_limit = match symlink_policy {
+            ArchiveSymlinkPolicy::Reject => MAX_UNCOMPRESSED_BYTES,
+            ArchiveSymlinkPolicy::Skip => MAX_REMOTE_UNCOMPRESSED_BYTES,
+        };
+        if total_uncompressed > uncompressed_limit {
             return Err(format!(
                 "Uncompressed Skill archive exceeds the {} MB limit",
-                MAX_UNCOMPRESSED_BYTES / 1024 / 1024
+                uncompressed_limit / 1024 / 1024
             ));
         }
 
@@ -354,9 +460,54 @@ fn import_skill_zip_inner(
             .map_err(|error| format!("Failed to extract archive file: {error}"))?;
     }
 
-    let mut roots = Vec::new();
-    collect_skill_roots(temp_dir, 0, &mut roots)?;
-    install_discovered_skill(roots, temp_dir, zip_path, skills_dir, nonce)
+    let mut warnings = Vec::new();
+    if matches!(symlink_policy, ArchiveSymlinkPolicy::Skip) {
+        if selected_entries > MAX_ARCHIVE_ENTRIES {
+            warnings.push(RemoteSkillWarning {
+                code: "many-files".to_string(),
+                actual: selected_entries as u64,
+                recommended: MAX_ARCHIVE_ENTRIES as u64,
+                paths: Vec::new(),
+            });
+        }
+        if maximum_depth > MAX_PATH_DEPTH {
+            warnings.push(RemoteSkillWarning {
+                code: "deep-paths".to_string(),
+                actual: maximum_depth as u64,
+                recommended: MAX_PATH_DEPTH as u64,
+                paths: Vec::new(),
+            });
+        }
+        if !oversized_entries.is_empty() {
+            warnings.push(RemoteSkillWarning {
+                code: "large-files".to_string(),
+                actual: oversized_entries.len() as u64,
+                recommended: MAX_ENTRY_BYTES,
+                paths: oversized_entries,
+            });
+        }
+        if total_uncompressed > MAX_UNCOMPRESSED_BYTES {
+            warnings.push(RemoteSkillWarning {
+                code: "large-uncompressed-size".to_string(),
+                actual: total_uncompressed,
+                recommended: MAX_UNCOMPRESSED_BYTES,
+                paths: Vec::new(),
+            });
+        }
+    }
+
+    Ok(ArchiveExtractionReport {
+        skipped_symlinks,
+        warnings,
+    })
+}
+
+fn archive_path_matches_requested(archive_path: &Path, requested_path: &Path) -> bool {
+    if archive_path.starts_with(requested_path) {
+        return true;
+    }
+    let without_archive_root = archive_path.iter().skip(1).collect::<PathBuf>();
+    without_archive_root.starts_with(requested_path)
 }
 
 fn install_discovered_skill(
@@ -365,6 +516,7 @@ fn install_discovered_skill(
     source_path: &str,
     skills_dir: &Path,
     nonce: u128,
+    replace_existing: bool,
 ) -> Result<String, String> {
     if roots.is_empty() {
         return Err(
@@ -400,16 +552,241 @@ fn install_discovered_skill(
     }
     validate_skill_directory(&skill_root, &skill_name)?;
 
-    let destination = skills_dir.join(&skill_name);
+    install_skill_root(
+        &skill_root,
+        &skill_name,
+        skills_dir,
+        nonce,
+        replace_existing,
+    )
+}
+
+fn install_skill_root(
+    skill_root: &Path,
+    skill_name: &str,
+    skills_dir: &Path,
+    nonce: u128,
+    replace_existing: bool,
+) -> Result<String, String> {
+    let destination = skills_dir.join(skill_name);
     let staged = skills_dir.join(format!(".import-{skill_name}-{nonce}"));
     let backup = skills_dir.join(format!(".backup-{skill_name}-{nonce}"));
-    if let Err(error) = copy_dir_recursive(&skill_root, &staged) {
+    if let Err(error) = copy_dir_recursive(skill_root, &staged) {
         let _ = fs::remove_dir_all(&staged);
         return Err(format!("Failed to stage Skill import: {error}"));
     }
-    activate_staged_skill(&staged, &destination, &backup, true)?;
+    activate_staged_skill(&staged, &destination, &backup, replace_existing)?;
+    Ok(skill_name.to_string())
+}
 
-    Ok(skill_name)
+pub(crate) fn inspect_remote_skill_archive(
+    zip_path: &Path,
+    temp_dir: &Path,
+    requested_path: Option<&str>,
+) -> Result<RemoteSkillInspection, String> {
+    let archive_bytes = fs::metadata(zip_path)
+        .map_err(|error| format!("Failed to inspect remote Skill archive: {error}"))?
+        .len();
+    if archive_bytes > MAX_REMOTE_ZIP_BYTES {
+        return Err(format!(
+            "Remote Skill archive exceeds the absolute {} MB limit",
+            MAX_REMOTE_ZIP_BYTES / 1024 / 1024
+        ));
+    }
+    fs::create_dir_all(temp_dir)
+        .map_err(|error| format!("Failed to create Skill preview directory: {error}"))?;
+    let requested_path = requested_path
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| PathBuf::from(value.trim_matches('/')));
+    if requested_path.as_ref().is_some_and(|requested| {
+        requested
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    }) {
+        return Err("Requested Skill path is unsafe".to_string());
+    }
+    let archive_report = extract_skill_archive(
+        zip_path,
+        temp_dir,
+        requested_path.as_deref(),
+        ArchiveSymlinkPolicy::Skip,
+    )?;
+
+    let mut roots = Vec::new();
+    collect_skill_roots(temp_dir, 0, &mut roots)?;
+    if let Some(requested) = requested_path.as_deref() {
+        roots.retain(|root| {
+            root.strip_prefix(temp_dir)
+                .map(|relative| relative.ends_with(requested))
+                .unwrap_or(false)
+        });
+    }
+
+    if roots.is_empty() {
+        return Err("No SKILL.md was found at the requested source path".to_string());
+    }
+    if roots.len() != 1 {
+        let candidates = roots
+            .iter()
+            .filter_map(|root| root.strip_prefix(temp_dir).ok())
+            .map(|root| root.to_string_lossy().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "The source contains multiple Skills. Provide a direct Skill path. Candidates: {candidates}"
+        ));
+    }
+
+    let root = roots.remove(0);
+    let root_relative = root.strip_prefix(temp_dir).unwrap_or(&root);
+    let skipped_symlinks = archive_report
+        .skipped_symlinks
+        .into_iter()
+        .map(|path| {
+            let path = PathBuf::from(path);
+            path.strip_prefix(root_relative)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .to_string()
+        })
+        .filter(|path| !path.is_empty())
+        .collect::<Vec<_>>();
+    let content = fs::read_to_string(root.join("SKILL.md"))
+        .map_err(|error| format!("Failed to read remote SKILL.md: {error}"))?;
+    let metadata = parse_skill_frontmatter(&content)?;
+    validate_skill_directory(&root, &metadata.name)?;
+    let mut entry_count = 0;
+    let mut total_bytes = 0;
+    validate_directory_tree_with_limits(
+        &root,
+        0,
+        &mut entry_count,
+        &mut total_bytes,
+        MAX_REMOTE_PATH_DEPTH,
+        MAX_REMOTE_ARCHIVE_ENTRIES,
+        MAX_REMOTE_ENTRY_BYTES,
+        MAX_REMOTE_UNCOMPRESSED_BYTES,
+    )?;
+    let mut files = Vec::new();
+    collect_relative_files(&root, &root, &mut files)?;
+    files.sort();
+    let has_scripts = files
+        .iter()
+        .any(|path| path == "scripts" || path.starts_with("scripts/"));
+    let mut warnings = archive_report.warnings;
+    for warning in &mut warnings {
+        warning.paths = warning
+            .paths
+            .iter()
+            .map(|path| {
+                let path = PathBuf::from(path);
+                path.strip_prefix(root_relative)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .filter(|path| !path.is_empty())
+            .collect();
+    }
+    if archive_bytes > MAX_ZIP_BYTES {
+        warnings.push(RemoteSkillWarning {
+            code: "large-archive".to_string(),
+            actual: archive_bytes,
+            recommended: MAX_ZIP_BYTES,
+            paths: Vec::new(),
+        });
+    }
+    if !skipped_symlinks.is_empty() {
+        warnings.push(RemoteSkillWarning {
+            code: "symbolic-links".to_string(),
+            actual: skipped_symlinks.len() as u64,
+            recommended: 0,
+            paths: skipped_symlinks.clone(),
+        });
+    }
+    if has_scripts {
+        warnings.push(RemoteSkillWarning {
+            code: "executable-scripts".to_string(),
+            actual: 1,
+            recommended: 0,
+            paths: files
+                .iter()
+                .filter(|path| *path == "scripts" || path.starts_with("scripts/"))
+                .cloned()
+                .collect(),
+        });
+    }
+
+    Ok(RemoteSkillInspection {
+        name: metadata.name,
+        description: metadata.description,
+        root,
+        files,
+        total_bytes,
+        has_scripts,
+        skipped_symlinks,
+        warnings,
+    })
+}
+
+pub(crate) fn install_remote_skill_directory(
+    app_handle: &AppHandle,
+    skill_root: &Path,
+    skill_name: &str,
+    scope: SkillImportScope,
+    workspace_root: Option<&str>,
+    replace_existing: bool,
+) -> Result<(String, bool), String> {
+    let skills_dir = resolve_skills_dir(app_handle, scope, workspace_root)?;
+    fs::create_dir_all(&skills_dir)
+        .map_err(|error| format!("Failed to create Skills directory: {error}"))?;
+    validate_skill_directory(skill_root, skill_name)?;
+    let replacing = skills_dir.join(skill_name).exists();
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("System clock error: {error}"))?
+        .as_millis();
+    let installed =
+        install_skill_root(skill_root, skill_name, &skills_dir, nonce, replace_existing)?;
+    Ok((installed, replacing))
+}
+
+pub(crate) fn parse_remote_skill_metadata(content: &str) -> Result<(String, String), String> {
+    let metadata = parse_skill_frontmatter(content)?;
+    Ok((metadata.name, metadata.description))
+}
+
+fn collect_relative_files(
+    root: &Path,
+    current: &Path,
+    files: &mut Vec<String>,
+) -> Result<(), String> {
+    for entry in
+        fs::read_dir(current).map_err(|error| format!("Failed to read Skill directory: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("Failed to read Skill entry: {error}"))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("Failed to inspect Skill entry: {error}"))?;
+        if file_type.is_symlink() {
+            return Err(format!(
+                "Symbolic links are not allowed: {}",
+                path.display()
+            ));
+        }
+        if file_type.is_dir() {
+            collect_relative_files(root, &path, files)?;
+        } else if file_type.is_file() {
+            let relative = path
+                .strip_prefix(root)
+                .map_err(|error| format!("Failed to normalize Skill path: {error}"))?
+                .to_string_lossy()
+                .replace('\\', "/");
+            files.push(relative);
+        }
+    }
+    Ok(())
 }
 
 fn activate_staged_skill(
@@ -631,7 +1008,30 @@ fn validate_directory_tree(
     entry_count: &mut usize,
     total_bytes: &mut u64,
 ) -> Result<(), String> {
-    if depth > MAX_PATH_DEPTH {
+    validate_directory_tree_with_limits(
+        root,
+        depth,
+        entry_count,
+        total_bytes,
+        MAX_PATH_DEPTH,
+        MAX_ARCHIVE_ENTRIES,
+        MAX_ENTRY_BYTES,
+        MAX_UNCOMPRESSED_BYTES,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_directory_tree_with_limits(
+    root: &Path,
+    depth: usize,
+    entry_count: &mut usize,
+    total_bytes: &mut u64,
+    max_depth: usize,
+    max_entries: usize,
+    max_entry_bytes: u64,
+    max_total_bytes: u64,
+) -> Result<(), String> {
+    if depth > max_depth {
         return Err("Skill folder nesting exceeds the allowed depth".to_string());
     }
 
@@ -640,9 +1040,9 @@ fn validate_directory_tree(
     {
         let entry = entry.map_err(|error| format!("Failed to read Skill folder entry: {error}"))?;
         *entry_count += 1;
-        if *entry_count > MAX_ARCHIVE_ENTRIES {
+        if *entry_count > max_entries {
             return Err(format!(
-                "Skill folder contains more than {MAX_ARCHIVE_ENTRIES} entries"
+                "Skill folder contains more than {max_entries} entries"
             ));
         }
 
@@ -655,7 +1055,7 @@ fn validate_directory_tree(
             ));
         }
         if metadata.is_file() {
-            if metadata.len() > MAX_ENTRY_BYTES {
+            if metadata.len() > max_entry_bytes {
                 return Err(format!(
                     "Skill file exceeds the size limit: {}",
                     entry.path().display()
@@ -664,14 +1064,23 @@ fn validate_directory_tree(
             *total_bytes = total_bytes
                 .checked_add(metadata.len())
                 .ok_or("Skill folder size overflow")?;
-            if *total_bytes > MAX_UNCOMPRESSED_BYTES {
+            if *total_bytes > max_total_bytes {
                 return Err(format!(
                     "Skill folder exceeds the {} MB limit",
-                    MAX_UNCOMPRESSED_BYTES / 1024 / 1024
+                    max_total_bytes / 1024 / 1024
                 ));
             }
         } else if metadata.is_dir() {
-            validate_directory_tree(&entry.path(), depth + 1, entry_count, total_bytes)?;
+            validate_directory_tree_with_limits(
+                &entry.path(),
+                depth + 1,
+                entry_count,
+                total_bytes,
+                max_depth,
+                max_entries,
+                max_entry_bytes,
+                max_total_bytes,
+            )?;
         }
     }
     Ok(())
@@ -697,7 +1106,7 @@ fn is_safe_skill_name(name: &str) -> bool {
 }
 
 fn collect_skill_roots(root: &Path, depth: usize, roots: &mut Vec<PathBuf>) -> Result<(), String> {
-    if depth > MAX_PATH_DEPTH {
+    if depth > MAX_REMOTE_PATH_DEPTH {
         return Err("Skill archive directory nesting exceeds the allowed depth".to_string());
     }
     if root.join("SKILL.md").is_file() {
@@ -933,6 +1342,207 @@ mod tests {
         assert!(skills_dir
             .join("folder-skill/references/guide.md")
             .is_file());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn inspects_one_requested_skill_inside_repository_archive() {
+        let root = test_directory("remote-preview");
+        let archive_path = root.join("repository.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        write_test_archive(
+            &archive_path,
+            &[
+                (
+                    "repo-sha/skills/weekly-report/SKILL.md",
+                    "---\nname: weekly-report\ndescription: Create weekly reports\n---\n",
+                ),
+                (
+                    "repo-sha/skills/weekly-report/references/format.md",
+                    "# Format\n",
+                ),
+                (
+                    "repo-sha/skills/other/SKILL.md",
+                    "---\nname: other\ndescription: Another Skill\n---\n",
+                ),
+            ],
+        );
+
+        let inspection =
+            inspect_remote_skill_archive(&archive_path, &extract_dir, Some("skills/weekly-report"))
+                .unwrap();
+
+        assert_eq!(inspection.name, "weekly-report");
+        assert_eq!(inspection.description, "Create weekly reports");
+        assert_eq!(inspection.files, vec!["SKILL.md", "references/format.md"]);
+        assert!(!inspection.has_scripts);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn ignores_unrelated_repository_symlinks_for_requested_skill() {
+        let root = test_directory("remote-filtered-symlink-preview");
+        let archive_path = root.join("repository.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        let file = fs::File::create(&archive_path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        writer
+            .start_file("repo-sha/skills/writing/SKILL.md", options)
+            .unwrap();
+        writer
+            .write_all(b"---\nname: writing\ndescription: Writing Skill\n---\n")
+            .unwrap();
+        writer
+            .add_symlink(
+                "repo-sha/AGENTS.md",
+                "instructions/AGENTS.md",
+                SimpleFileOptions::default(),
+            )
+            .unwrap();
+        writer.finish().unwrap();
+
+        let inspection =
+            inspect_remote_skill_archive(&archive_path, &extract_dir, Some("skills/writing"))
+                .unwrap();
+
+        assert_eq!(inspection.name, "writing");
+        assert_eq!(inspection.files, vec!["SKILL.md"]);
+        assert!(inspection.skipped_symlinks.is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reports_and_skips_symlinks_inside_remote_skill() {
+        let root = test_directory("remote-selected-symlink-preview");
+        let archive_path = root.join("repository.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        let file = fs::File::create(&archive_path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        writer
+            .start_file("repo-sha/skills/writing/SKILL.md", options)
+            .unwrap();
+        writer
+            .write_all(b"---\nname: writing\ndescription: Writing Skill\n---\n")
+            .unwrap();
+        writer
+            .add_symlink(
+                "repo-sha/skills/writing/references/shared.md",
+                "../../../shared.md",
+                SimpleFileOptions::default(),
+            )
+            .unwrap();
+        writer.finish().unwrap();
+
+        let inspection =
+            inspect_remote_skill_archive(&archive_path, &extract_dir, Some("skills/writing"))
+                .unwrap();
+
+        assert_eq!(inspection.name, "writing");
+        assert_eq!(inspection.files, vec!["SKILL.md"]);
+        assert_eq!(inspection.skipped_symlinks, vec!["references/shared.md"]);
+        assert!(inspection
+            .warnings
+            .iter()
+            .any(|warning| warning.code == "symbolic-links"));
+        assert!(!extract_dir
+            .join("repo-sha/skills/writing/references/shared.md")
+            .exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reports_remote_archives_above_recommended_entry_count() {
+        let root = test_directory("remote-many-files-preview");
+        let archive_path = root.join("repository.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        let file = fs::File::create(&archive_path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        writer
+            .start_file("repo-sha/skills/writing/SKILL.md", options)
+            .unwrap();
+        writer
+            .write_all(b"---\nname: writing\ndescription: Writing Skill\n---\n")
+            .unwrap();
+        for index in 0..MAX_ARCHIVE_ENTRIES {
+            writer
+                .start_file(
+                    format!("repo-sha/skills/writing/references/{index}.md"),
+                    options,
+                )
+                .unwrap();
+        }
+        writer.finish().unwrap();
+
+        let inspection =
+            inspect_remote_skill_archive(&archive_path, &extract_dir, Some("skills/writing"))
+                .unwrap();
+
+        let warning = inspection
+            .warnings
+            .iter()
+            .find(|warning| warning.code == "many-files")
+            .unwrap();
+        assert_eq!(warning.actual, (MAX_ARCHIVE_ENTRIES + 1) as u64);
+        assert_eq!(warning.recommended, MAX_ARCHIVE_ENTRIES as u64);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn inspects_direct_zip_with_skill_at_archive_root() {
+        let root = test_directory("remote-root-preview");
+        let archive_path = root.join("download.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        write_test_archive(
+            &archive_path,
+            &[
+                (
+                    "SKILL.md",
+                    "---\nname: direct-skill\ndescription: Direct ZIP Skill\n---\n",
+                ),
+                ("references/guide.md", "# Guide\n"),
+            ],
+        );
+
+        let inspection = inspect_remote_skill_archive(&archive_path, &extract_dir, None).unwrap();
+
+        assert_eq!(inspection.name, "direct-skill");
+        assert_eq!(inspection.description, "Direct ZIP Skill");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn inspects_repository_root_skill_with_commit_archive_directory() {
+        let root = test_directory("remote-repository-root-preview");
+        let archive_path = root.join("repository.zip");
+        let extract_dir = root.join("extract");
+        fs::create_dir_all(&root).unwrap();
+        write_test_archive(
+            &archive_path,
+            &[
+                (
+                    "web-access-7af34af/SKILL.md",
+                    "---\nname: web-access\ndescription: Web access Skill\n---\n",
+                ),
+                ("web-access-7af34af/references/guide.md", "# Guide\n"),
+            ],
+        );
+
+        let inspection = inspect_remote_skill_archive(&archive_path, &extract_dir, None).unwrap();
+
+        assert_eq!(inspection.name, "web-access");
+        assert_eq!(inspection.description, "Web access Skill");
+        assert_eq!(inspection.files, vec!["SKILL.md", "references/guide.md"]);
         fs::remove_dir_all(root).unwrap();
     }
 }

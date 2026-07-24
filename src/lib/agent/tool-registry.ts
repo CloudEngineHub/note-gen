@@ -14,6 +14,11 @@ import {
 } from '@/lib/skills/creator'
 import { useSkillsStore } from '@/stores/skills'
 import {
+  inspectRemoteSkill,
+  installRemoteSkill,
+  searchRemoteSkills,
+} from '@/lib/skills/remote'
+import {
   getEditorContentTool,
   getEditorSelectionTool,
   replaceEditorContentTool,
@@ -1388,6 +1393,185 @@ function buildSkillInstallPackageTool(): AgentTool {
   }
 }
 
+function buildRemoteSkillSearchTool(): AgentTool {
+  return {
+    name: 'skill_search_remote',
+    title: '搜索第三方 Skill',
+    description: 'Search public GitHub repositories for Agent Skills whose SKILL.md name or description matches the user request. GitHub must be connected. Use this only when the user asks to find or install a third-party Skill and has not already provided a source URL.',
+    category: 'skill',
+    risk: 'read',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Concise English search terms describing the desired capability.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum candidates to return, from 1 to 15.',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    execute: async (input) => {
+      try {
+        const results = await searchRemoteSkills(
+          asString(input.query),
+          typeof input.limit === 'number' ? input.limit : 8,
+        )
+        const usedCache = results.some(result => result.cached)
+        return {
+          ok: true,
+          message: results.length > 0
+            ? `Found ${results.length} remote Skills${usedCache ? ' from the local search cache because GitHub was unavailable' : ''}. Present the best matches and inspect the selected source before installation.`
+            : 'No matching remote Skills were found. Refine the query or offer to create a new Skill.',
+          data: results,
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'REMOTE_SKILL_SEARCH_FAILED',
+        }
+      }
+    },
+  }
+}
+
+function buildRemoteSkillInspectTool(): AgentTool {
+  return {
+    name: 'skill_inspect_source',
+    title: '检查第三方 Skill',
+    description: 'Download a GitHub, GitLab, Gitee, Codeberg/Gitea, or direct HTTPS ZIP source into an isolated cache, pin repository sources to a commit, validate the archive, and return an installation preview. Always call this before skill_install_source. The source may come from skill_search_remote or an explicit user-provided URL.',
+    category: 'skill',
+    risk: 'read',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          description: 'Exact sourceUrl returned by skill_search_remote, a supported repository Skill URL, owner/repository shorthand, or an explicit HTTPS ZIP URL from the user.',
+        },
+      },
+      required: ['source'],
+      additionalProperties: false,
+    },
+    execute: async (input, context) => {
+      try {
+        const preview = await inspectRemoteSkill(asString(input.source), context.signal)
+        return {
+          ok: true,
+          message: `Inspected remote Skill "${preview.name}" from ${preview.provider} at revision ${preview.revision}. It contains ${preview.files.length} files${preview.hasScripts ? ' including executable scripts' : ' and no executable scripts'}${preview.warnings.length > 0 ? ` and ${preview.warnings.length} risk warning(s) that require user confirmation` : ''}. If the user asked to install it, call skill_install_source immediately with the exact preview fields so the app opens its confirmation panel. Never ask the user to type or reply with confirmation.`,
+          data: preview,
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'REMOTE_SKILL_INSPECTION_FAILED',
+        }
+      }
+    },
+  }
+}
+
+function buildRemoteSkillInstallTool(): AgentTool {
+  return {
+    name: 'skill_install_source',
+    title: '安装第三方 Skill',
+    description: 'Open the app confirmation dialog, then install the exact immutable package represented by a recent skill_inspect_source preview. When the user has asked to install a Skill, call this tool immediately after inspection; never ask them to type or reply with confirmation. The runtime trusts only preview_id; the other fields exist solely to show the user what they are approving. This action always requires explicit approval in the dialog.',
+    category: 'skill',
+    risk: 'skill-install',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        preview_id: {
+          type: 'string',
+          description: 'Opaque previewId returned by skill_inspect_source.',
+        },
+        scope: {
+          type: 'string',
+          enum: ['global', 'project'],
+          description: 'Use global for personal reusable Skills and project for the current workspace.',
+        },
+        replaceExisting: {
+          type: 'boolean',
+          description: 'Set true only when the user explicitly asks to replace or update an existing Skill.',
+        },
+        name: {
+          type: 'string',
+          description: 'Display-only Skill name copied from the preview.',
+        },
+        source: {
+          type: 'string',
+          description: 'Display-only source URL copied from the preview.',
+        },
+        revision: {
+          type: 'string',
+          description: 'Display-only pinned revision copied from the preview.',
+        },
+        has_scripts: {
+          type: 'boolean',
+          description: 'Display-only script risk copied from the preview.',
+        },
+        skipped_symlinks: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Display-only list of symbolic links that will be skipped, copied from skippedSymlinks in the preview.',
+        },
+        warnings: {
+          type: 'array',
+          description: 'Display-only risk warnings copied exactly from the preview.',
+          items: {
+            type: 'object',
+            properties: {
+              code: { type: 'string' },
+              actual: { type: 'number' },
+              recommended: { type: 'number' },
+              paths: {
+                type: 'array',
+                items: { type: 'string' },
+              },
+            },
+            required: ['code', 'actual', 'recommended', 'paths'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['preview_id', 'scope', 'name', 'source', 'revision', 'has_scripts', 'skipped_symlinks', 'warnings'],
+      additionalProperties: false,
+    },
+    execute: async (input) => {
+      try {
+        const result = await installRemoteSkill({
+          previewId: asString(input.preview_id),
+          scope: input.scope === 'project' ? 'project' : 'global',
+          replaceExisting: input.replaceExisting === true,
+        })
+        await useSkillsStore.getState().refreshSkills()
+        return {
+          ok: true,
+          message: `${result.replaced ? 'Updated' : 'Installed'} remote Skill "${result.name}" from ${result.provider} revision ${result.revision}${result.skippedSymlinks.length > 0 ? `. Skipped ${result.skippedSymlinks.length} symbolic link(s) for safety` : ''}${result.hasScripts ? '. Executable scripts still require separate approval' : ''}.`,
+          data: result,
+          changes: [buildStructuralChange({
+            type: 'folder',
+            target: `${result.scope}:skills/${result.name}`,
+            summary: `${result.replaced ? '更新' : '安装'}第三方 Skill ${result.name}`,
+          })],
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          error: 'REMOTE_SKILL_INSTALL_FAILED',
+        }
+      }
+    },
+  }
+}
+
 function buildSkillReadResourceTool(): AgentTool {
   return {
     name: 'skill_read_resource',
@@ -2035,6 +2219,9 @@ function buildTools(): AgentTool[] {
     buildSkillReadResourceTool(),
     buildSkillValidatePackageTool(),
     buildSkillInstallPackageTool(),
+    buildRemoteSkillSearchTool(),
+    buildRemoteSkillInspectTool(),
+    buildRemoteSkillInstallTool(),
     adaptLegacyTool({
       name: 'skill_execute_script',
       title: '执行 Skill 脚本',

@@ -16,6 +16,7 @@ mod mcp;
 mod mcp_runtime;
 mod ocr_packages;
 mod printing;
+mod remote_skills;
 mod screenshot;
 mod skill_runtime;
 mod skills;
@@ -39,6 +40,10 @@ use mcp_runtime::{
     cancel_mcp_runtime_install, inspect_mcp_runtime, install_mcp_runtime, RuntimeInstallManager,
 };
 use ocr_packages::{list_ocr_providers, run_ocr_provider};
+use remote_skills::{
+    cancel_remote_skill_download, inspect_remote_skill, install_remote_skill, search_remote_skills,
+    RemoteSkillManager,
+};
 use screenshot::{cleanup_temp_screenshot_dir, screenshot};
 use skill_runtime::{
     cancel_skill_script, inspect_skill_python, install_skill_python_dependencies, run_skill_script,
@@ -63,6 +68,7 @@ fn main() {
         .manage(RuntimeInstallManager::new())
         .manage(AiRequestManager::new())
         .manage(SkillProcessManager::default())
+        .manage(RemoteSkillManager::default())
         // 系统级插件
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
@@ -89,6 +95,10 @@ fn main() {
             import_skill_zip,
             validate_skill_package,
             install_skill_package,
+            search_remote_skills,
+            inspect_remote_skill,
+            install_remote_skill,
+            cancel_remote_skill_download,
             run_skill_script,
             cancel_skill_script,
             inspect_skill_python,

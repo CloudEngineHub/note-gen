@@ -2424,7 +2424,35 @@
             "confirm": "Confirmar",
             "confirmed": "Confirmado",
             "cancelled": "Cancelado",
-            "session": "Permitir nesta sessão"
+            "session": "Permitir nesta sessão",
+            "params": {
+              "name": "Nome do Skill",
+              "source": "Origem",
+              "revision": "Revisão fixada",
+              "scope": "Local de instalação",
+              "has_scripts": "Contém scripts",
+              "skipped_symlinks": "Links simbólicos ignorados",
+              "replaceExisting": "Substituir Skill existente"
+            },
+            "tools": {
+              "install_remote_skill": {
+                "title": "Instalar Skill de terceiros?",
+                "description": "Revise a origem, a revisão fixada e os riscos antes de instalar.",
+                "warningTitle": "Risco de instalação detectado",
+                "symlinkWarning": "Este Skill contém links simbólicos. Eles serão ignorados e não serão gravados localmente se você continuar.",
+                "confirm": "Instalar",
+                "continue": "Continuar instalação",
+                "risks": {
+                  "large-archive": "O download tem {actualSize}, acima do limite recomendado de {recommendedSize}.",
+                  "large-files": "{count} arquivo(s) excedem o limite recomendado de {recommendedSize} por arquivo.",
+                  "large-uncompressed-size": "O tamanho extraído é {actualSize}, acima do limite recomendado de {recommendedSize}.",
+                  "many-files": "O Skill contém {actual} arquivos, acima da quantidade recomendada de {recommended}.",
+                  "deep-paths": "A profundidade de diretórios é {actual}, acima da recomendada de {recommended}.",
+                  "executable-scripts": "O Skill contém scripts executáveis. A execução ainda exigirá confirmação separada.",
+                  "symbolic-links": "O Skill contém {count} link(s) simbólico(s). Eles serão ignorados se a instalação continuar."
+                }
+              }
+            }
           }
         },
         "imageSelector": {
