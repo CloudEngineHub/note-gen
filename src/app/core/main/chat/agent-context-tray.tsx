@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   ChevronRight,
   Database,
@@ -30,6 +31,7 @@ export function AgentContextTray({
   ragSourceDetails = [],
   loadedSkills = [],
 }: AgentContextTrayProps) {
+  const t = useTranslations('record.chat.ragSources')
   const [showRag, setShowRag] = React.useState(false)
   const [showSkills, setShowSkills] = React.useState(false)
   const [expandedSkillDescriptions, setExpandedSkillDescriptions] = React.useState<string[]>([])
@@ -69,7 +71,7 @@ export function AgentContextTray({
               onClick={() => setShowRag((value) => !value)}
             >
               <MarkerIcon><Database /></MarkerIcon>
-              <MarkerContent className="flex-1 truncate">已检索 {ragSources.length} 个文件</MarkerContent>
+              <MarkerContent className="flex-1 truncate">{t('label', { count: ragSources.length })}</MarkerContent>
               <MarkerIcon>
                 <ChevronRight className={cn("transition-transform", showRag && "rotate-90")} />
               </MarkerIcon>
@@ -91,7 +93,7 @@ export function AgentContextTray({
                           className="shrink-0 text-primary hover:underline"
                           onClick={() => openRagFile(detail.filepath)}
                         >
-                          打开
+                          {t('openFile')}
                         </button>
                       )}
                     </Marker>

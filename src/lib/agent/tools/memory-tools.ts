@@ -56,16 +56,9 @@ Returns memory ID, content, and type (preference/memory).`,
  */
 export const deleteMemoryTool: Tool = {
   name: 'delete_memory',
-  description: `Delete a specific memory.
+  description: `Delete one saved memory by ID when the user explicitly asks to remove it.
 
-IMPORTANT: After deletion, you MUST call save_memory to save the new memory. Do not just delete without saving.
-
-Use cases:
-- When replacing a conflicting memory, first delete the old one, then MUST call save_memory to save the new one
-- When user explicitly requests to delete a specific memory
-
-Parameters:
-- id: Memory ID (obtained from list_memories result)`,
+Deletion is complete on its own. Save a replacement only when the user separately and explicitly asks to remember replacement information.`,
   category: 'system',
   requiresConfirmation: true,
   parameters: [
@@ -106,24 +99,18 @@ Parameters:
  */
 export const saveMemoryTool: Tool = {
   name: 'save_memory',
-  description: `Save or update a memory. MUST call this tool when user says "remember...", "in English", etc.
+  description: `Save or update a memory only when the user expresses clear persistent intent, such as explicitly asking NoteGen to remember something for future conversations.
 
-IMPORTANT WORKFLOW:
-1. When user wants to remember something, first use list_memories to check existing memories
-2. If conflict found (e.g., existing "answer in Japanese", now changing to "answer in English"):
-   - First call delete_memory to remove old memory (requires user confirmation)
-   - After deletion completes, MUST call this tool (save_memory) to save the new memory
-3. If no conflict, directly call this tool to save
+Do not persist one-turn instructions merely because they mention a language, format, tone, or temporary preference. If a persistent request conflicts with an existing memory, inspect existing memories and update only what the user asked to change.
 
 Supports two types:
 - preference: User preferences like language, format, style - always included in conversations
 - memory: User's facts, experience, expertise - matched intelligently via context
 
 Examples:
-- "Please answer in English" -> save as preference
-- "Remember I'm a React expert" -> save as memory
-- "I prefer English" -> save as preference
-- "Use Japanese" -> save as preference`,
+- "Remember that I prefer concise English answers in future conversations" -> preference
+- "Remember that I maintain a React library" -> memory
+- "Answer this message in English" -> do not save`,
   category: 'system',
   requiresConfirmation: false,
   parameters: [

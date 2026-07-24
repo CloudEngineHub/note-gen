@@ -2,9 +2,17 @@ import { create } from 'zustand';
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from '@/hooks/use-toast';
 import { DEFAULT_EXCLUDED_RAG_PATHS } from '@/lib/rag-retrieval-policy';
+import {
+  DEFAULT_RAG_AGENT_POLICY,
+  type RagAgentStrategy,
+} from '@/lib/rag-agent-policy';
 
 // RAG 设置参数接口
 export interface RagSettings {
+  // 是否允许 AI 根据问题自动检索笔记
+  automaticSearchEnabled: boolean;
+  // Agent 自动检索时采用的速度与深度策略
+  agentStrategy: RagAgentStrategy;
   // 文本分块的最大字符数
   chunkSize: number;
   // 分块之间的重叠字符数
@@ -23,6 +31,8 @@ export type RagPreset = 'precision' | 'balanced' | 'recall';
 
 // 默认参数值
 export const DEFAULT_RAG_SETTINGS: RagSettings = {
+  automaticSearchEnabled: DEFAULT_RAG_AGENT_POLICY.automaticSearchEnabled,
+  agentStrategy: DEFAULT_RAG_AGENT_POLICY.strategy,
   chunkSize: 1000,
   chunkOverlap: 200,
   resultCount: 5,
@@ -56,6 +66,13 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       const store = await Store.load('store.json');
       
       // 从存储中读取各个设置项，如果不存在则使用默认值
+      const storedAutomaticSearchEnabled = await store.get<boolean>('ragAutomaticSearchEnabled');
+      const legacyRagEnabled = await store.get<boolean>('isRagEnabled');
+      const automaticSearchEnabled = storedAutomaticSearchEnabled ?? legacyRagEnabled ?? DEFAULT_RAG_SETTINGS.automaticSearchEnabled;
+      const storedAgentStrategy = await store.get<string>('ragAgentStrategy');
+      const agentStrategy = storedAgentStrategy === 'fast' || storedAgentStrategy === 'balanced' || storedAgentStrategy === 'deep'
+        ? storedAgentStrategy
+        : DEFAULT_RAG_SETTINGS.agentStrategy;
       const chunkSize = await store.get<number>('ragChunkSize') ?? DEFAULT_RAG_SETTINGS.chunkSize;
       const chunkOverlap = await store.get<number>('ragChunkOverlap') ?? DEFAULT_RAG_SETTINGS.chunkOverlap;
       const resultCount = await store.get<number>('ragResultCount') ?? DEFAULT_RAG_SETTINGS.resultCount;
@@ -65,6 +82,8 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       const indexNeedsRebuild = await store.get<boolean>('ragIndexNeedsRebuild') ?? false;
       
       set({
+        automaticSearchEnabled,
+        agentStrategy,
         chunkSize,
         chunkOverlap,
         resultCount,
@@ -150,6 +169,8 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       // 保存到存储
       const store = await Store.load('store.json');
       await store.set('ragChunkSize', DEFAULT_RAG_SETTINGS.chunkSize);
+      await store.set('ragAutomaticSearchEnabled', DEFAULT_RAG_SETTINGS.automaticSearchEnabled);
+      await store.set('ragAgentStrategy', DEFAULT_RAG_SETTINGS.agentStrategy);
       await store.set('ragChunkOverlap', DEFAULT_RAG_SETTINGS.chunkOverlap);
       await store.set('ragResultCount', DEFAULT_RAG_SETTINGS.resultCount);
       await store.set('ragSimilarityThreshold', DEFAULT_RAG_SETTINGS.similarityThreshold);

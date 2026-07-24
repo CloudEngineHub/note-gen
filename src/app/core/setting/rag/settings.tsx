@@ -5,6 +5,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { useTranslations } from 'next-intl';
 import {
   AlertTriangle,
+  BrainCircuit,
   ChevronDown,
   FileSearch,
   FileText,
@@ -14,22 +15,27 @@ import {
   RefreshCw,
   Search,
   Shield,
+  Sparkles,
   Target,
   Trash
 } from "lucide-react";
 import useRagSettingsStore, { DEFAULT_RAG_SETTINGS, type RagPreset } from "@/stores/ragSettings";
+import type { RagAgentStrategy } from "@/lib/rag-agent-policy";
 import useVectorStore from "@/stores/vector";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Item, ItemGroup, ItemMedia, ItemContent, ItemTitle, ItemActions, ItemDescription, ItemFooter } from '@/components/ui/item';
 import { SettingSection } from '@/app/core/setting/components/setting-base';
 import { clearVectorDb, initVectorDb } from "@/db/vector";
 import { getContextForQuery, initBM25Search, type Keyword, type RagDiagnosticResult } from '@/lib/rag';
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface NumericSetting {
   key: 'chunkSize' | 'chunkOverlap' | 'resultCount' | 'similarityThreshold' | 'rerankThreshold';
@@ -57,6 +63,8 @@ function isInvalidExcludedPath(path: string): boolean {
 export function Settings() {
   const t = useTranslations('settings.rag');
   const {
+    automaticSearchEnabled,
+    agentStrategy,
     chunkSize,
     chunkOverlap,
     resultCount,
@@ -307,12 +315,65 @@ export function Settings() {
       </SettingSection>
 
       <SettingSection title={t('basicSettingsTitle')} desc={t('basicSettingsDesc')}>
+        <ItemGroup className="gap-4">
+          <Item variant="outline">
+            <ItemMedia variant="icon"><Sparkles /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('automaticSearchTitle')}</ItemTitle>
+              <ItemDescription>{t('automaticSearchDesc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                checked={automaticSearchEnabled}
+                aria-label={t('automaticSearchTitle')}
+                onCheckedChange={checked => void updateSetting('automaticSearchEnabled', checked)}
+              />
+            </ItemActions>
+          </Item>
+          <Item variant="outline" className={cn(!automaticSearchEnabled && "opacity-60")}>
+            <ItemMedia variant="icon"><BrainCircuit /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('agentStrategyTitle')}</ItemTitle>
+              <ItemDescription>{t(`agentStrategies.${agentStrategy}.desc`)}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={agentStrategy}
+                disabled={!automaticSearchEnabled}
+                aria-label={t('agentStrategyTitle')}
+                onValueChange={value => {
+                  if (value) void updateSetting('agentStrategy', value as RagAgentStrategy)
+                }}
+              >
+                {(['fast', 'balanced', 'deep'] as RagAgentStrategy[]).map(strategy => (
+                  <ToggleGroupItem key={strategy} value={strategy}>
+                    {t(`agentStrategies.${strategy}.title`)}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
         <div className="flex flex-wrap gap-2">
-          {(['precision', 'balanced', 'recall'] as RagPreset[]).map(preset => (
-            <Button key={preset} size="sm" variant={isPresetActive(preset) ? 'default' : 'outline'} onClick={() => void applyPreset(preset)}>
-              {t(`presets.${preset}.title`)}
-            </Button>
-          ))}
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={(['precision', 'balanced', 'recall'] as RagPreset[]).find(isPresetActive) || ''}
+            aria-label={t('presetDesc')}
+            onValueChange={value => {
+              if (value) void applyPreset(value as RagPreset)
+            }}
+          >
+            {(['precision', 'balanced', 'recall'] as RagPreset[]).map(preset => (
+              <ToggleGroupItem key={preset} value={preset}>
+                {t(`presets.${preset}.title`)}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
           <span className="self-center text-xs text-muted-foreground">{t('presetDesc')}</span>
         </div>
         <ItemGroup className="gap-4">{basicSettings.map(renderNumericSetting)}</ItemGroup>

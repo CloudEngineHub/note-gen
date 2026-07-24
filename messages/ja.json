@@ -230,7 +230,15 @@
       "rebuildingIndex": "構築中",
       "lexicalIndexRebuilt": "ローカル BM25 インデックスを再構築しました",
       "basicSettingsTitle": "基本設定",
-      "basicSettingsDesc": "検索プリセットと AI に渡すコンテキストチャンク数を設定します。",
+      "basicSettingsDesc": "AI が他のノートを参照すべきか判断し、検索の深さと照合範囲を調整できます。",
+      "automaticSearchTitle": "AI に他のノートの参照を許可",
+      "automaticSearchDesc": "質問が自分の記録に依存する場合、AI が関連ノートを自動的に探します。一般的な質問や現在のノートだけで十分な場合は検索しません。",
+      "agentStrategyTitle": "自動検索戦略",
+      "agentStrategies": {
+        "fast": { "title": "高速", "desc": "検索は最大 1 回で、応答時間を優先します。" },
+        "balanced": { "title": "標準", "desc": "最大 2 回検索し、速度とノート横断検索のバランスを取ります。" },
+        "deep": { "title": "詳細", "desc": "最大 3 回検索し、比較、経緯の確認、複数ノートの統合に適しています。" }
+      },
       "presetDesc": "プリセットは結果数としきい値のみ変更します。",
       "presets": {
         "precision": { "title": "精度優先" },
@@ -520,14 +528,14 @@
       "optimizeFailed": "プロンプトの最適化に失敗しました。後でもう一度お試しください",
       "noContentToOptimize": "まずプロンプト内容を入力してください",
       "systemPrompt": {
-        "title": "システムプロンプト",
-        "desc": "高度な設定：Agent システムプロンプトの静的ルール部分を編集します。頻繁な変更は推奨されません。",
-        "label": "システムプロンプト内容",
-        "placeholder": "Agent の身分定義、ツール呼び出し制約、Core Rules を入力してください。",
-        "help": "この高度な設定は Agent の動作境界に影響します。ツール一覧、現在のファイル、選択範囲、Skills、MCP コンテキストは引き続きシステムが動的に追加します。",
-        "reset": "デフォルトに戻す",
-        "saveSuccess": "システムプロンプトを保存しました",
-        "resetSuccess": "システムプロンプトをデフォルトに戻しました"
+        "title": "Agent カスタム指示",
+        "desc": "システムのコアルールを置き換えずに、追加の応答設定を指定します。",
+        "label": "カスタム指示",
+        "placeholder": "例：既定では簡潔な日本語で回答する。空欄の場合はコアルールのみを使用します。",
+        "help": "バージョン管理されたシステムコアプロンプトは常に有効です。ツール定義、権限、安全境界、コアルールを上書きすることはできません。",
+        "reset": "カスタム指示を消去",
+        "saveSuccess": "Agent カスタム指示を保存しました",
+        "resetSuccess": "Agent カスタム指示を消去しました"
       }
     },
     "memories": {
@@ -2372,7 +2380,7 @@
         "copied": "コピーしました"
       },
       "ragSources": {
-        "label": "ナレッジベースで {count} 件のメモを検索",
+        "label": "{count} 件のノートを参照",
         "openFile": "ファイルを開く"
       },
       "preview": {

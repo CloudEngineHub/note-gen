@@ -230,7 +230,15 @@
       "rebuildingIndex": "Rebuilding",
       "lexicalIndexRebuilt": "Local BM25 index rebuilt",
       "basicSettingsTitle": "Basic settings",
-      "basicSettingsDesc": "Choose a retrieval preset and control how many context chunks are sent to AI.",
+      "basicSettingsDesc": "AI decides when other notes are useful; you can tune how deeply it searches and how broadly it matches.",
+      "automaticSearchTitle": "Allow AI to reference other notes",
+      "automaticSearchDesc": "When a question depends on your records, AI finds relevant notes automatically. It skips search for general questions or when the current note is sufficient.",
+      "agentStrategyTitle": "Automatic search strategy",
+      "agentStrategies": {
+        "fast": { "title": "Fast", "desc": "Search at most once to minimize response time." },
+        "balanced": { "title": "Standard", "desc": "Search up to twice for a balance between speed and cross-note discovery." },
+        "deep": { "title": "Deep", "desc": "Search up to three times for comparisons, history, and cross-note synthesis." }
+      },
       "presetDesc": "Presets only adjust result count and thresholds.",
       "presets": {
         "precision": { "title": "Precision" },
@@ -835,14 +843,14 @@
       "optimizeFailed": "Failed to optimize prompt, please try again later",
       "noContentToOptimize": "Please enter prompt content first",
       "systemPrompt": {
-        "title": "System Prompt",
-        "desc": "Advanced option: edit the static rules section of the Agent system prompt. Frequent changes are not recommended.",
-        "label": "System prompt content",
-        "placeholder": "Enter the Agent identity, tool-call constraints, and Core Rules.",
-        "help": "This advanced setting affects the Agent behavior boundary. Tool lists, current file, selection, Skills, and MCP context are still appended dynamically by the system.",
-        "reset": "Reset to default",
-        "saveSuccess": "System prompt saved",
-        "resetSuccess": "System prompt reset to default"
+        "title": "Custom Agent Guidance",
+        "desc": "Add preferences alongside the system core rules without replacing safety or tool constraints.",
+        "label": "Custom guidance",
+        "placeholder": "For example: Answer concisely in English. Leave blank to use only the system core rules.",
+        "help": "The versioned system core prompt always remains active and updates with the app. This guidance cannot override tool schemas, permissions, safety boundaries, or core rules.",
+        "reset": "Clear custom guidance",
+        "saveSuccess": "Custom Agent guidance saved",
+        "resetSuccess": "Custom Agent guidance cleared"
       }
     },
     "sync": {
@@ -2559,7 +2567,7 @@
         "copied": "Copied"
       },
       "ragSources": {
-        "label": "Found {count} notes in knowledge base",
+        "label": "Referenced {count} notes",
         "openFile": "Open file"
       },
       "preview": {

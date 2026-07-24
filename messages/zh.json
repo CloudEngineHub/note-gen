@@ -230,7 +230,15 @@
       "rebuildingIndex": "正在构建",
       "lexicalIndexRebuilt": "本地 BM25 索引已重新构建",
       "basicSettingsTitle": "基础设置",
-      "basicSettingsDesc": "选择检索预设并控制最终提供给 AI 的上下文片段数量。",
+      "basicSettingsDesc": "AI 会自行判断是否需要参考其他笔记；你也可以调整自动检索的深度和匹配范围。",
+      "automaticSearchTitle": "允许 AI 参考其他笔记",
+      "automaticSearchDesc": "问题依赖你的记录时，AI 会自行查找相关笔记；普通问题和当前笔记内容足够时不会检索。",
+      "agentStrategyTitle": "自动检索策略",
+      "agentStrategies": {
+        "fast": { "title": "快速", "desc": "最多搜索 1 轮，优先降低等待时间。" },
+        "balanced": { "title": "标准", "desc": "最多搜索 2 轮，在速度和跨笔记查找能力之间取得平衡。" },
+        "deep": { "title": "深入", "desc": "最多搜索 3 轮，适合比较、追溯和跨笔记综合分析。" }
+      },
       "presetDesc": "预设只调整检索数量和阈值。",
       "presets": {
         "precision": { "title": "精准优先" },
@@ -583,14 +591,14 @@
       "optimizeFailed": "提示词优化失败，请稍后重试",
       "noContentToOptimize": "请先输入提示词内容",
       "systemPrompt": {
-        "title": "系统提示词",
-        "desc": "高级选项：编辑 Agent 系统提示词的静态规则部分，不建议频繁修改。",
-        "label": "系统提示词内容",
-        "placeholder": "输入 Agent 的身份定义、工具调用约束和 Core Rules。",
-        "help": "这是高级配置，会影响 Agent 的行为边界。工具列表、当前文件、选区、Skills 和 MCP 上下文仍由系统动态追加。",
-        "reset": "恢复默认",
-        "saveSuccess": "系统提示词已保存",
-        "resetSuccess": "系统提示词已恢复默认"
+        "title": "Agent 自定义指引",
+        "desc": "在系统核心规则之外追加你的偏好，不会替换安全与工具约束。",
+        "label": "自定义指引",
+        "placeholder": "例如：默认使用简洁中文回答。留空则只使用系统核心规则。",
+        "help": "版本化的系统核心提示词始终生效并随应用升级。这里的内容不能覆盖工具参数、权限、安全边界或核心规则。",
+        "reset": "清空自定义指引",
+        "saveSuccess": "Agent 自定义指引已保存",
+        "resetSuccess": "Agent 自定义指引已清空"
       }
     },
     "memories": {
@@ -2473,7 +2481,7 @@
         "copied": "已复制"
       },
       "ragSources": {
-        "label": "知识库检索到 {count} 篇笔记",
+        "label": "参考了 {count} 篇笔记",
         "openFile": "打开文件"
       },
       "preview": {

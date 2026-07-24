@@ -263,7 +263,6 @@ const useChatStore = create<ChatState>((set, get) => ({
   },
 
   resetAgentState: () => {
-    const currentState = get().agentState
     set({
       agentState: {
         activeChatId: undefined,
@@ -286,9 +285,9 @@ const useChatStore = create<ChatState>((set, get) => ({
         loadedSkills: undefined,
         selectedSkills: undefined,
         currentStepStartTime: undefined,
-        // 保留 RAG 字段，因为它们应该在整个 Agent 执行期间显示
-        ragSources: currentState.ragSources,
-        ragSourceDetails: currentState.ragSourceDetails,
+        // 每次运行由 Agent 按需检索，不能沿用上一轮的参考笔记。
+        ragSources: undefined,
+        ragSourceDetails: undefined,
         // 重置 Final Answer 模式
         isFinalAnswerMode: false,
         finalAnswerContent: undefined,

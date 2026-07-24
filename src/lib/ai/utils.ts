@@ -5,7 +5,10 @@ import { AiConfig } from "@/app/core/setting/config";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { platform } from "@tauri-apps/plugin-os";
 import { createTauriOpenAIClient, type OpenAICompatibleClient } from "./tauri-client";
-import { DEFAULT_SYSTEM_PROMPT } from './system-prompt';
+import {
+  AGENT_CORE_PROMPT_VERSION,
+  isManagedAgentSystemPrompt,
+} from './system-prompt';
 
 /**
  * 获取当前的prompt内容
@@ -33,9 +36,21 @@ export async function getPromptContent(): Promise<string> {
  */
 export async function getSystemPromptContent(): Promise<string> {
   const store = await Store.load('store.json')
-  const systemPrompt = await store.get<string>('systemPrompt')
+  const extension = await store.get<string>('agentSystemPromptExtension')
+  if (typeof extension === 'string') {
+    return extension.trim()
+  }
 
-  return typeof systemPrompt === 'string' ? systemPrompt.trim() : DEFAULT_SYSTEM_PROMPT
+  const legacySystemPrompt = await store.get<string>('systemPrompt')
+  const migratedExtension = typeof legacySystemPrompt === 'string'
+    && !isManagedAgentSystemPrompt(legacySystemPrompt)
+    ? legacySystemPrompt.trim()
+    : ''
+
+  await store.set('agentSystemPromptExtension', migratedExtension)
+  await store.set('agentCorePromptVersion', AGENT_CORE_PROMPT_VERSION)
+  await store.save()
+  return migratedExtension
 }
 
 /**

@@ -11,6 +11,7 @@ import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
 import { skillManager } from '@/lib/skills'
 import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
 import { agentDebugLog, previewText } from './debug-log'
+import { getRagAgentPolicy } from '@/lib/rag-agent-policy'
 import type {
   AgentChange,
   AgentContextSnapshot,
@@ -28,7 +29,6 @@ import type {
 
 const ABSOLUTE_MAX_MODEL_ROUNDS = 30
 const MAX_CONSECUTIVE_NO_PROGRESS_ROUNDS = 2
-const MAX_INVALID_QUOTED_WRITE_REPAIRS = 2
 const MAX_IDENTICAL_READ_RESULT_REPEATS = 2
 const MUTATING_TOOL_RISKS = new Set(['editor-write', 'file-create', 'file-update', 'delete', 'medium'])
 
@@ -271,30 +271,13 @@ function repairAttachmentToolArgs(
   }
 }
 
-function getRequiredAttachmentReadIds(context: AgentContextSnapshot) {
-  return (context.attachments || [])
-    .filter((attachment) => attachment.kind === 'file' && attachment.readable)
-    .map((attachment) => attachment.id)
-}
-
-function getRequiredAttachmentListIds(context: AgentContextSnapshot) {
-  return (context.attachments || [])
-    .filter((attachment) => attachment.kind === 'folder')
-    .map((attachment) => attachment.id)
-}
-
-function getStringArg(args: Record<string, unknown>, key: string) {
-  const value = args[key]
-  return typeof value === 'string' ? value : ''
-}
-
 function getNumberArg(args: Record<string, unknown>, key: string) {
   const value = args[key]
   return typeof value === 'number' ? value : undefined
 }
 
-function normalizeForNoOpCheck(text: string) {
-  return text.replace(/\r\n/g, '\n').trim()
+function claimsUserNoteEvidence(content: string) {
+  return /根据(?:您|你).{0,12}(?:笔记|记录)|(?:according to|based on).{0,24}(?:your|the user's).{0,16}(?:notes?|records?)|(?:あなた|ユーザー).{0,16}(?:ノート|記録)|segundo.{0,24}(?:suas?|os seus).{0,16}(?:notas?|registros?)/i.test(content)
 }
 
 function validateQuotedEditorWrite(
@@ -310,53 +293,11 @@ function validateQuotedEditorWrite(
   if (toolName === 'editor_replace_range' && quote.from >= 0 && quote.to >= quote.from) {
     const from = getNumberArg(args, 'from')
     const to = getNumberArg(args, 'to')
-    const content = getStringArg(args, 'content')
-    const selectedText = quote.fullContent || ''
-    const selectedIsSingleLine = quote.startLine === quote.endLine
-
     if (from !== quote.from || to !== quote.to) {
       return {
         ok: false,
         message: `工具参数越界：当前请求只能替换用户选区 from=${quote.from}, to=${quote.to}，请用这个精确范围重试。`,
         error: 'INVALID_QUOTED_RANGE',
-      }
-    }
-
-    if (!content.trim()) {
-      return {
-        ok: false,
-        message: '工具参数无效：content 不能为空，请只传入改写后的选中文本。',
-        error: 'EMPTY_REPLACEMENT_CONTENT',
-      }
-    }
-
-    const effectiveReplacement = selectedIsSingleLine && content.includes('\n')
-      ? extractSingleLineReplacement(content) || content
-      : content
-    if (
-      normalizeForNoOpCheck(effectiveReplacement) &&
-      normalizeForNoOpCheck(effectiveReplacement) === normalizeForNoOpCheck(selectedText)
-    ) {
-      return {
-        ok: false,
-        message: '工具参数无效：改写结果与选中文本完全相同。请根据用户要求给出真正改写后的选中文本，不要返回原文、标题或相邻段落。',
-        error: 'NO_OP_REPLACEMENT_CONTENT',
-      }
-    }
-
-    if (selectedIsSingleLine && content.includes('\n')) {
-      return {
-        ok: false,
-        message: '工具参数越界：用户只选中了一行内的文本，content 只能是替换这段选中文本的单行内容，不能包含标题、段落或换行。',
-        error: 'REPLACEMENT_EXPANDS_SELECTION',
-      }
-    }
-
-    if (!/^#{1,6}\s/m.test(selectedText) && /^#{1,6}\s/m.test(content)) {
-      return {
-        ok: false,
-        message: '工具参数越界：用户没有选中 Markdown 标题，content 不能包含标题。请只返回选中文本本身的正式改写。',
-        error: 'REPLACEMENT_INCLUDES_UNSELECTED_HEADING',
       }
     }
   }
@@ -594,74 +535,6 @@ function repairEditorWriteArgs(
   return repaired ? { ...repairedArgs, operations } : repairedArgs
 }
 
-function extractSingleLineReplacement(content: string) {
-  const lines = content
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => !/^#{1,6}\s/.test(line))
-    .filter((line) => !/^---+$/.test(line))
-
-  if (lines.length !== 1) {
-    return ''
-  }
-
-  return lines[0]
-}
-
-function stripUnselectedHeadingMarker(selectedText: string, content: string) {
-  if (/^#{1,6}\s/.test(selectedText) || !/^#{1,6}\s/.test(content)) {
-    return content
-  }
-
-  return content.replace(/^#{1,6}\s+/, '')
-}
-
-function repairQuotedEditorWriteArgs(
-  context: AgentContextSnapshot,
-  toolName: string,
-  args: Record<string, unknown>
-): Record<string, unknown> | null {
-  const quote = context.currentQuote
-  if (!quote || toolName !== 'editor_replace_range') {
-    return null
-  }
-
-  if (quote.startLine !== quote.endLine) {
-    return null
-  }
-
-  const from = getNumberArg(args, 'from')
-  const to = getNumberArg(args, 'to')
-  const content = getStringArg(args, 'content')
-  if (from !== quote.from || to !== quote.to) {
-    return null
-  }
-
-  const singleLineContent = content.includes('\n')
-    ? extractSingleLineReplacement(content)
-    : content
-  const repairedContent = stripUnselectedHeadingMarker(
-    quote.fullContent || '',
-    singleLineContent
-  )
-  if (!repairedContent || repairedContent === content) {
-    return null
-  }
-
-  const repairedArgs = {
-    ...args,
-    content: repairedContent,
-  }
-
-  if (validateQuotedEditorWrite(context, toolName, repairedArgs)) {
-    return null
-  }
-
-  return repairedArgs
-}
-
 function selectToolsForContext(
   context: AgentContextSnapshot,
   tools: AgentTool[],
@@ -805,7 +678,9 @@ export class AgentRuntime {
       mcpSchemaTokens: mcpToolCatalog.schemaTokens,
     })
 
+    const ragAgentPolicy = await getRagAgentPolicy()
     const allTools = [...agentToolRegistry.listTools(), ...mcpToolCatalog.directTools]
+      .filter(tool => ragAgentPolicy.automaticSearchEnabled || tool.name !== 'note_search_files')
     const toolMap = new Map(allTools.map((tool) => [tool.name, tool]))
     let tools = selectToolsForContext(context, allTools, input.permissionMode)
     const customSystemPrompt = await getSystemPromptContent()
@@ -862,7 +737,6 @@ export class AgentRuntime {
     let editorStateReadLocked = hasInlineCurrentEditorState(context)
     let editorSelectionReadLocked = hasInlineCurrentEditorSelection(context)
     let finalContent = ''
-    let invalidQuotedWriteRepairCount = 0
     let writeActionCompleted = false
     const readToolResultHistory = new Map<string, {
       result: string
@@ -874,6 +748,31 @@ export class AgentRuntime {
     }>()
     const successfulMutationCalls = new Set<string>()
     const toolResultEvidence = new Set<string>()
+    let noteSearchCount = 0
+    let directAnswerEvidenceChecked = false
+    const executeToolWithBudget = async (
+      tool: AgentTool,
+      args: Record<string, unknown>
+    ): Promise<AgentToolResult> => {
+      if (tool.name === 'note_search_files') {
+        if (noteSearchCount >= ragAgentPolicy.maxSearchRounds) {
+          return {
+            ok: false,
+            message: `本次任务已达到“${ragAgentPolicy.strategy}”策略允许的 ${ragAgentPolicy.maxSearchRounds} 轮笔记搜索上限。请基于已有证据完成回答。`,
+            error: 'NOTE_SEARCH_BUDGET_EXHAUSTED',
+          }
+        }
+        noteSearchCount += 1
+      }
+
+      return executeAgentTool(
+        tool,
+        args,
+        runId,
+        this.abortController?.signal,
+        context
+      )
+    }
     const appendToolResult = (
       toolCallId: string,
       toolName: string,
@@ -900,10 +799,6 @@ export class AgentRuntime {
     let activeModelReasoning = ''
     let activeModelContent = ''
     let activeModelStreamedTokenCount = 0
-    let requiredAttachmentReadIds = getRequiredAttachmentReadIds(context)
-    let requiredAttachmentReadId = requiredAttachmentReadIds.shift()
-    let requiredAttachmentListIds = getRequiredAttachmentListIds(context)
-    let requiredAttachmentListId = requiredAttachmentListIds.shift()
     const discoveredFolderFiles = new Map<string, Set<string>>()
     const readFolderFiles = new Map<string, Set<string>>()
 
@@ -1034,18 +929,14 @@ export class AgentRuntime {
       context.userInput = latest.text
       context.currentQuote = latest.currentQuote
       context.attachments = latest.attachments ?? context.attachments
-      requiredAttachmentReadIds = getRequiredAttachmentReadIds(context)
-      requiredAttachmentReadId = requiredAttachmentReadIds.shift()
-      requiredAttachmentListIds = getRequiredAttachmentListIds(context)
-      requiredAttachmentListId = requiredAttachmentListIds.shift()
       context.currentEditorState = undefined
       tools = selectToolsForContext(context, allTools, input.permissionMode)
       editorStateReadLocked = false
       editorSelectionReadLocked = hasInlineCurrentEditorSelection(context)
-      invalidQuotedWriteRepairCount = 0
       consecutiveNoProgressRounds = 0
       forceFinalResponseReason = undefined
       successfulMutationCalls.clear()
+      directAnswerEvidenceChecked = false
       systemPrompt = this.promptAssembler.assemble(context, tools, customSystemPrompt)
       messages[0] = { role: 'system', content: systemPrompt }
 
@@ -1141,20 +1032,10 @@ export class AgentRuntime {
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
         const openAITools = agentToolRegistry.toOpenAITools(offeredTools, loadedSkillIds)
-        const requiredAttachmentToolName = requiredAttachmentReadId
-          ? 'attachment_read'
-          : requiredAttachmentListId
-            ? 'attachment_list'
-            : undefined
-        const shouldRequireAttachmentTool = Boolean(
-          requiredAttachmentToolName && offeredToolNames.has(requiredAttachmentToolName)
-        )
         const toolParams = openAITools.length > 0
           ? {
               tools: openAITools,
-              tool_choice: shouldRequireAttachmentTool
-                ? { type: 'function' as const, function: { name: requiredAttachmentToolName! } }
-                : 'auto' as const,
+              tool_choice: 'auto' as const,
             }
           : {}
         const stream = await this.recoveryManager.withRetry(() =>
@@ -1285,27 +1166,6 @@ export class AgentRuntime {
           }
           return rewritten
         })
-        if (toolUses.length === 0 && requiredAttachmentToolName) {
-          const ignoredContent = assistantContent
-          const attachmentId = requiredAttachmentReadId || requiredAttachmentListId!
-          const syntheticToolCall = {
-            id: createAgentId('tool-call'),
-            type: 'function' as const,
-            function: {
-              name: requiredAttachmentToolName,
-              arguments: JSON.stringify({ attachmentId }),
-            },
-          }
-          toolUses.push(syntheticToolCall)
-          assistantContent = ''
-          agentDebugLog('attachment_tool_forced_after_missing_tool_call', {
-            runId,
-            toolCallId: syntheticToolCall.id,
-            ignoredContent,
-            toolName: requiredAttachmentToolName,
-            attachmentId,
-          })
-        }
         if (steeringInterrupted) {
           finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导')
           if (assistantContent) {
@@ -1363,6 +1223,31 @@ export class AgentRuntime {
           const resolvedContent = assistantContent || finalContent
           if (!resolvedContent) {
             throw new Error('AI response did not include a message')
+          }
+          if (
+            !forceFinalResponseReason
+            && !directAnswerEvidenceChecked
+            && noteSearchCount === 0
+            && toolCalls.length === 0
+            && offeredToolNames.has('note_search_files')
+            && claimsUserNoteEvidence(resolvedContent)
+          ) {
+            directAnswerEvidenceChecked = true
+            callbacks.onCandidateAnswerClear?.()
+            messages.push(
+              { role: 'assistant', content: resolvedContent },
+              {
+                role: 'user',
+                content: [
+                  '## App Context',
+                  'The draft above claims that its answer is supported by the user\'s notes or records, but no note search occurred in this run.',
+                  'Verify that attribution semantically, without relying on required keywords or fixed business fields. Do not treat the draft itself as evidence.',
+                  'If the claimed fact is not already supported by the conversation, current editor context, or saved memory context, call note_search_files now. If the existing context really supports it, return the final answer directly.',
+                  'Do not mention this internal evidence-attribution check.',
+                ].join('\n'),
+              }
+            )
+            continue
           }
           agentDebugLog('final_answer', {
             runId,
@@ -1462,30 +1347,6 @@ export class AgentRuntime {
               reason: 'Normalized editor line replacement arguments and preserved Markdown structure.',
             })
             args = repairedEditorArgs
-          }
-
-          if (toolName === 'attachment_read' && requiredAttachmentReadId) {
-            const originalArgs = args
-            args = { attachmentId: requiredAttachmentReadId }
-            requiredAttachmentReadId = requiredAttachmentReadIds.shift()
-            agentDebugLog('attachment_read_args_auto_repaired', {
-              runId,
-              toolCallId: toolUse.id,
-              originalArgs,
-              repairedArgs: args,
-            })
-          }
-
-          if (toolName === 'attachment_list' && requiredAttachmentListId) {
-            const originalArgs = args
-            args = { attachmentId: requiredAttachmentListId }
-            requiredAttachmentListId = requiredAttachmentListIds.shift()
-            agentDebugLog('attachment_list_args_auto_repaired', {
-              runId,
-              toolCallId: toolUse.id,
-              originalArgs,
-              repairedArgs: args,
-            })
           }
 
           const repairedAttachmentArgs = repairAttachmentToolArgs(toolName, args, context)
@@ -1628,49 +1489,18 @@ export class AgentRuntime {
 
           const invalidQuotedWrite = validateQuotedEditorWrite(context, toolName, args)
           if (invalidQuotedWrite) {
-            const repairedArgs = repairQuotedEditorWriteArgs(context, toolName, args)
-            if (repairedArgs) {
-              agentDebugLog('tool_args_auto_repaired', {
-                runId,
-                toolName,
-                originalArgs: args,
-                repairedArgs,
-                reason: invalidQuotedWrite.message,
-                error: invalidQuotedWrite.error,
-              })
-              args = repairedArgs
-              toolCall.params = args
-              callbacks.onToolCall?.(toolCall)
-            } else {
-              invalidQuotedWriteRepairCount += 1
-              agentDebugLog('tool_args_rejected', {
-                runId,
-                toolName,
-                args,
-                reason: invalidQuotedWrite.message,
-                error: invalidQuotedWrite.error,
-                retryCount: invalidQuotedWriteRepairCount,
-              })
-              toolCall.status = 'error'
-              toolCall.result = toolResultToLegacy(invalidQuotedWrite)
-              callbacks.onToolCall?.(toolCall)
-              appendToolResult(toolUse.id, toolName, args, invalidQuotedWrite)
-
-              if (invalidQuotedWriteRepairCount >= MAX_INVALID_QUOTED_WRITE_REPAIRS) {
-                const reason = '模型连续返回了超出选区范围的替换内容，已停止工具执行，未应用该项修改。'
-                agentDebugLog('invalid_tool_args_final', {
-                  runId,
-                  toolName,
-                  retryCount: invalidQuotedWriteRepairCount,
-                  content: reason,
-                })
-                cancelRemainingToolCalls(toolIndex, reason)
-                prepareFinalResponse(reason)
-                continue agentLoop
-              }
-
-              continue
-            }
+            agentDebugLog('tool_args_rejected', {
+              runId,
+              toolName,
+              args,
+              reason: invalidQuotedWrite.message,
+              error: invalidQuotedWrite.error,
+            })
+            toolCall.status = 'error'
+            toolCall.result = toolResultToLegacy(invalidQuotedWrite)
+            callbacks.onToolCall?.(toolCall)
+            appendToolResult(toolUse.id, toolName, args, invalidQuotedWrite)
+            continue
           }
 
           const blockedByHook = await agentEventBus.emit('pre-tool-use', {
@@ -1900,13 +1730,7 @@ export class AgentRuntime {
                   '本轮已经读取过相同的编辑器状态，请直接使用此前返回的内容，不要再次读取。',
                 ].join('\n\n'),
               }
-            : await executeAgentTool(
-                tool,
-                args,
-                runId,
-                this.abortController?.signal,
-                context
-              )
+            : await executeToolWithBudget(tool, args)
           const folderAttachmentProgress = getFolderAttachmentProgress(tool.name, args, result)
           const duration = Date.now() - startedAt
           agentDebugLog('tool_execute_end', {

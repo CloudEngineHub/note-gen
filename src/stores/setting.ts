@@ -14,7 +14,10 @@ import type { SpeechMode } from '@/lib/speech/types'
 import { applyNoteGenDefaultConfig, loadNoteGenDefaultConfig } from '@/lib/ai/notegen-default-models-runtime'
 import { enqueueAutoDataSync, isAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
 import { shouldExcludeFromSync } from '@/config/sync-exclusions'
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
+import {
+  AGENT_CORE_PROMPT_VERSION,
+  isManagedAgentSystemPrompt,
+} from '@/lib/ai/system-prompt'
 import { APP_FONT_SYSTEM_VALUE, applyAppFontFamily } from '@/lib/font-settings'
 import type { AgentPermissionMode } from '@/lib/agent/types'
 
@@ -536,8 +539,19 @@ const useSettingStore = create<SettingState>((set, get) => ({
     }
 
     const hydratedSettings: Record<string, unknown> = {}
+    const storedPromptExtension = await store.get<string>('agentSystemPromptExtension')
+    const legacySystemPrompt = await store.get<string>('systemPrompt')
+    const promptExtension = typeof storedPromptExtension === 'string'
+      ? storedPromptExtension
+      : typeof legacySystemPrompt === 'string' && !isManagedAgentSystemPrompt(legacySystemPrompt)
+        ? legacySystemPrompt
+        : ''
+    await store.set('agentSystemPromptExtension', promptExtension)
+    await store.set('agentCorePromptVersion', AGENT_CORE_PROMPT_VERSION)
+    hydratedSettings.systemPrompt = promptExtension
 
     await Promise.all(Object.entries(get()).map(async ([key, value]) => {
+      if (key === 'systemPrompt') return
       const res = await store.get(key)
 
       if (typeof value === 'function') return
@@ -711,11 +725,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ inspirationModel })
   },
 
-  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  systemPrompt: '',
   setSystemPrompt: async (systemPrompt) => {
     set({ systemPrompt })
     const store = await Store.load('store.json')
-    await store.set('systemPrompt', systemPrompt)
+    await store.set('agentSystemPromptExtension', systemPrompt)
+    await store.set('agentCorePromptVersion', AGENT_CORE_PROMPT_VERSION)
     await store.save()
   },
 

@@ -17,9 +17,8 @@ import { ClipboardMonitor } from "./clipboard-monitor"
 import { McpServerList } from "./mcp-button"
 import { ModelSelect } from "./model-select"
 import { PromptSelect } from "./prompt-select"
-import { RagSwitch } from "./rag-switch"
 
-const TOOL_IDS = ['modelSelect', 'promptSelect', 'mcpButton', 'ragSwitch', 'clipboardMonitor'] as const
+const TOOL_IDS = ['modelSelect', 'promptSelect', 'mcpButton', 'clipboardMonitor'] as const
 
 export function ChatToolsPopover() {
   const t = useTranslations()
@@ -73,7 +72,6 @@ export function ChatToolsPopover() {
                   </PopoverContent>
                 </Popover>
               )}
-              {toolId === 'ragSwitch' && <RagSwitch display="panel" />}
               {toolId === 'clipboardMonitor' && <ClipboardMonitor display="panel" />}
             </div>
           ))}

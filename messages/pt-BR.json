@@ -230,7 +230,15 @@
       "rebuildingIndex": "Reconstruindo",
       "lexicalIndexRebuilt": "Índice BM25 local reconstruído",
       "basicSettingsTitle": "Configurações básicas",
-      "basicSettingsDesc": "Escolha uma predefinição e controle quantos chunks de contexto são enviados à IA.",
+      "basicSettingsDesc": "A IA decide quando outras notas são úteis; você pode ajustar a profundidade e o alcance da busca.",
+      "automaticSearchTitle": "Permitir que a IA consulte outras notas",
+      "automaticSearchDesc": "Quando uma pergunta depender dos seus registros, a IA encontra notas relevantes automaticamente. A busca é ignorada em perguntas gerais ou quando a nota atual for suficiente.",
+      "agentStrategyTitle": "Estratégia de busca automática",
+      "agentStrategies": {
+        "fast": { "title": "Rápida", "desc": "Faz no máximo uma busca para reduzir o tempo de resposta." },
+        "balanced": { "title": "Padrão", "desc": "Faz até duas buscas, equilibrando velocidade e descoberta entre notas." },
+        "deep": { "title": "Profunda", "desc": "Faz até três buscas para comparações, histórico e síntese entre notas." }
+      },
       "presetDesc": "As predefinições alteram apenas a quantidade e os limites.",
       "presets": {
         "precision": { "title": "Precisão" },
@@ -765,14 +773,14 @@
       "optimizeFailed": "Falha ao otimizar o prompt, por favor, tente novamente mais tarde",
       "noContentToOptimize": "Por favor, insira o conteúdo do prompt primeiro",
       "systemPrompt": {
-        "title": "Prompt do sistema",
-        "desc": "Opção avançada: edite a seção de regras estáticas do prompt de sistema do Agent. Mudanças frequentes não são recomendadas.",
-        "label": "Conteúdo do prompt do sistema",
-        "placeholder": "Insira a identidade do Agent, restrições de chamada de ferramentas e Core Rules.",
-        "help": "Esta configuração avançada afeta os limites de comportamento do Agent. Listas de ferramentas, arquivo atual, seleção, Skills e contexto MCP continuam sendo anexados dinamicamente pelo sistema.",
-        "reset": "Restaurar padrão",
-        "saveSuccess": "Prompt do sistema salvo",
-        "resetSuccess": "Prompt do sistema restaurado para o padrão"
+        "title": "Orientação personalizada do Agent",
+        "desc": "Adicione preferências sem substituir as regras centrais, a segurança ou as restrições de ferramentas.",
+        "label": "Orientação personalizada",
+        "placeholder": "Exemplo: responda de forma concisa em português. Deixe em branco para usar apenas as regras centrais.",
+        "help": "O prompt central versionado permanece sempre ativo. Esta orientação não pode substituir esquemas de ferramentas, permissões, limites de segurança ou regras centrais.",
+        "reset": "Limpar orientação personalizada",
+        "saveSuccess": "Orientação personalizada do Agent salva",
+        "resetSuccess": "Orientação personalizada do Agent removida"
       }
     },
     "sync": {
@@ -2446,7 +2454,7 @@
         "copied": "Copiado"
       },
       "ragSources": {
-        "label": "Encontrado {count} notas na base de conhecimento",
+        "label": "{count} notas referenciadas",
         "openFile": "Abrir arquivo"
       },
       "preview": {

@@ -14,7 +14,6 @@ import {
 import useRagSettingsStore from '@/stores/ragSettings';
 
 interface VectorState {
-  isRagEnabled: boolean;           // 是否启用RAG检索功能
   isAutoVectorEnabled: boolean;    // 是否在文件保存后自动更新向量
   isProcessing: boolean;           // 是否正在处理向量
   lastProcessTime: number | null;  // 最后一次处理向量的时间
@@ -28,8 +27,6 @@ interface VectorState {
   // 初始化函数
   initVectorDb: () => Promise<void>;
 
-  // RAG启用/禁用
-  setRagEnabled: (enabled: boolean) => Promise<void>;
   setAutoVectorEnabled: (enabled: boolean) => Promise<void>;
 
   // 处理向量
@@ -41,7 +38,6 @@ interface VectorState {
 }
 
 const useVectorStore = create<VectorState>((set, get) => ({
-  isRagEnabled: false,
   isAutoVectorEnabled: true,
   isProcessing: false,
   lastProcessTime: null,
@@ -59,6 +55,7 @@ const useVectorStore = create<VectorState>((set, get) => ({
   // 初始化向量数据库
   initVectorDb: async () => {
     try {
+      await useRagSettingsStore.getState().initSettings();
       await initVectorDb();
 
       // 初始化 BM25 索引
@@ -66,18 +63,16 @@ const useVectorStore = create<VectorState>((set, get) => ({
 
       // 读取用户设置
       const store = await Store.load('store.json');
-      const isRagEnabled = await store.get<boolean>('isRagEnabled') || false;
       const isAutoVectorEnabled = await store.get<boolean>('autoVectorEnabled') ?? true;
       const lastProcessTime = await store.get<number>('lastVectorProcessTime') || null;
 
       set({
-        isRagEnabled,
         isAutoVectorEnabled,
         lastProcessTime
       });
 
       // 检查嵌入模型可用性
-      if (isAutoVectorEnabled || isRagEnabled) {
+      if (isAutoVectorEnabled) {
         const modelAvailable = await get().checkEmbeddingModel();
         if (!modelAvailable) {
           toast({
@@ -94,18 +89,6 @@ const useVectorStore = create<VectorState>((set, get) => ({
       await get().refreshIndexStats();
     } catch (error) {
       console.error('初始化向量数据库失败:', error);
-    }
-  },
-
-  // 设置RAG启用状态
-  setRagEnabled: async (enabled: boolean) => {
-    try {
-      const store = await Store.load('store.json');
-      await store.set('isRagEnabled', enabled);
-
-      set({ isRagEnabled: enabled });
-    } catch (error) {
-      console.error('设置RAG状态失败:', error);
     }
   },
 

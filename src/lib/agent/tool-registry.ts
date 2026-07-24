@@ -56,6 +56,11 @@ import type {
 } from './types'
 import type { EditorTransactionInput } from './editor-adapter'
 import { buildEditorChange, prepareEditorLineTransaction } from './editor-adapter'
+import { getRagAgentPolicy } from '@/lib/rag-agent-policy'
+import {
+  ensureSafeWorkspaceRelativePath,
+  toWorkspaceRelativePath,
+} from '@/lib/workspace'
 
 const EMPTY_SCHEMA: JsonSchema = {
   type: 'object',
@@ -77,6 +82,92 @@ function resultFromLegacy(result: ToolResult): AgentToolResult {
     data: result.data,
     error: result.error,
   }
+}
+
+async function executeAgentNoteSearch(
+  input: Record<string, unknown>,
+  context: AgentToolExecutionContext
+): Promise<AgentToolResult> {
+  const policy = await getRagAgentPolicy()
+  if (!policy.automaticSearchEnabled) {
+    return {
+      ok: false,
+      message: '用户已在知识库设置中关闭 AI 自动参考笔记。本次无法搜索其他笔记。',
+      error: 'AUTOMATIC_NOTE_SEARCH_DISABLED',
+    }
+  }
+
+  const requestedQuery = asString(input.query)
+  const userInput = context.context.userInput.trim()
+  const explicitlyRequestsLiteralMatches = /(?:所有|全部|逐处|逐个).{0,8}(?:包含|出现|匹配)|exact matches?|literal occurrences?/i.test(userInput)
+  const mode = input.mode === 'keyword' && explicitlyRequestsLiteralMatches
+    ? 'keyword'
+    : 'rag'
+  const query = (
+    mode === 'rag'
+    && userInput.length > requestedQuery.length
+    && (!requestedQuery || userInput.toLocaleLowerCase().includes(requestedQuery.toLocaleLowerCase()))
+  )
+    ? userInput
+    : requestedQuery
+  const result = await searchMarkdownFilesTool.execute({
+    ...input,
+    mode,
+    query,
+  })
+
+  const normalized = resultFromLegacy(result)
+  if (!normalized.ok || !Array.isArray(normalized.data)) {
+    return normalized
+  }
+
+  const candidates = normalized.data.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const candidate = item as {
+      filePath?: unknown
+      fileName?: unknown
+      matchedContent?: unknown
+      relevanceScore?: unknown
+    }
+    if (
+      typeof candidate.filePath !== 'string'
+      || typeof candidate.fileName !== 'string'
+      || typeof candidate.matchedContent !== 'string'
+    ) {
+      return []
+    }
+    return [{
+      filePath: candidate.filePath,
+      fileName: candidate.fileName,
+      matchedContent: candidate.matchedContent.slice(0, 1200),
+      relevanceScore: typeof candidate.relevanceScore === 'number'
+        ? candidate.relevanceScore
+        : 0,
+    }]
+  }).sort((a, b) => b.relevanceScore - a.relevanceScore)
+
+  if (mode !== 'rag' || candidates.length <= 1) {
+    return {
+      ...normalized,
+      data: candidates,
+    }
+  }
+
+  // 检索层只提供少量通用候选，不解释业务语义。
+  // 相关性、冲突、时效性与最终证据选择由 Agent 模型判断。
+  const selected = candidates.slice(0, 3)
+
+  return {
+    ...normalized,
+    message: `已筛选出 ${selected.length} 个最相关的笔记来源`,
+    data: selected,
+  }
+}
+
+async function normalizeAgentWorkspacePath(filePath: string): Promise<string> {
+  return await ensureSafeWorkspaceRelativePath(
+    await toWorkspaceRelativePath(filePath)
+  )
 }
 
 function createChangeId() {
@@ -473,9 +564,28 @@ async function readNoteContentForChange(filePath: string) {
 }
 
 async function executeReadFileFromEditor(input: Record<string, unknown>): Promise<AgentToolResult> {
-  const filePath = asString(input.filePath)
+  const requestedFilePath = asString(input.filePath)
+  if (!requestedFilePath) {
+    return {
+      ok: false,
+      message: 'filePath 必须是检索结果返回的非空工作区相对路径。',
+      error: 'INVALID_NOTE_FILE_PATH',
+    }
+  }
+
+  let filePath: string
+  try {
+    filePath = await normalizeAgentWorkspacePath(requestedFilePath)
+  } catch (error) {
+    return {
+      ok: false,
+      message: `无法读取该路径：${String(error)}`,
+      error: 'INVALID_NOTE_FILE_PATH',
+    }
+  }
+  const normalizedInput = { ...input, filePath }
   if (!targetsActiveEditor(filePath)) {
-    return resultFromLegacy(await readMarkdownFileTool.execute(input as Record<string, any>))
+    return resultFromLegacy(await readMarkdownFileTool.execute(normalizedInput as Record<string, any>))
   }
 
   const editorResult = await getEditorContentTool.execute({})
@@ -510,6 +620,153 @@ async function executeReadFileFromEditor(input: Record<string, unknown>): Promis
       charCount: editorState.charCount,
     },
   }
+}
+
+async function executeReadFilesBatch(input: Record<string, unknown>): Promise<AgentToolResult> {
+  if (!Array.isArray(input.filePaths) || input.filePaths.length === 0) {
+    return {
+      ok: false,
+      message: 'filePaths 必须包含至少一个由笔记检索返回的工作区相对路径。',
+      error: 'EMPTY_NOTE_FILE_PATHS',
+    }
+  }
+
+  const requestedPaths = input.filePaths.filter(
+    (filePath): filePath is string => typeof filePath === 'string' && filePath.trim().length > 0
+  )
+  if (requestedPaths.length === 0) {
+    return {
+      ok: false,
+      message: 'filePaths 中没有可读取的路径。不要调用空批量读取。',
+      error: 'EMPTY_NOTE_FILE_PATHS',
+    }
+  }
+
+  try {
+    const normalizedPaths = Array.from(new Set(
+      await Promise.all(requestedPaths.map(normalizeAgentWorkspacePath))
+    ))
+    return resultFromLegacy(await readMarkdownFilesBatchTool.execute({
+      filePaths: normalizedPaths,
+    }))
+  } catch (error) {
+    return {
+      ok: false,
+      message: `批量读取路径无效：${String(error)}`,
+      error: 'INVALID_NOTE_FILE_PATHS',
+    }
+  }
+}
+
+function parseIsoCalendarDate(value: string): number | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (!match) return undefined
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const timestamp = Date.UTC(year, month - 1, day)
+  const date = new Date(timestamp)
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) {
+    return undefined
+  }
+  return timestamp
+}
+
+const dateDifferenceTool: AgentTool = {
+  name: 'calculate_date_difference',
+  title: '计算日期间隔',
+  description: 'Calculate the exact calendar-day difference between two ISO dates. Always use this tool after retrieving dates when the answer asks how many days apart they are; do not estimate or count mentally.',
+  category: 'system',
+  risk: 'read',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      startDate: { type: 'string', description: 'Earlier or starting date in YYYY-MM-DD format.' },
+      endDate: { type: 'string', description: 'Later or ending date in YYYY-MM-DD format.' },
+    },
+    required: ['startDate', 'endDate'],
+    additionalProperties: false,
+  },
+  execute: async (input) => {
+    const startDate = asString(input.startDate)
+    const endDate = asString(input.endDate)
+    const start = parseIsoCalendarDate(startDate)
+    const end = parseIsoCalendarDate(endDate)
+    if (start === undefined || end === undefined) {
+      return {
+        ok: false,
+        message: '日期必须是真实有效的 YYYY-MM-DD 格式。',
+        error: 'INVALID_ISO_DATE',
+      }
+    }
+    const signedDays = Math.round((end - start) / 86_400_000)
+    return {
+      ok: true,
+      message: `${startDate} 到 ${endDate} 相隔 ${Math.abs(signedDays)} 个自然日。`,
+      data: {
+        startDate,
+        endDate,
+        signedDays,
+        absoluteDays: Math.abs(signedDays),
+      },
+    }
+  },
+}
+
+const noteCiteSourcesTool: AgentTool = {
+  name: 'note_cite_sources',
+  title: '确认回答来源',
+  description: 'Mark the retrieved note candidates actually used as evidence in the final answer. Call this after evaluating candidates and before the final answer. Do not include merely retrieved, conflicting, irrelevant, or unused notes.',
+  category: 'note',
+  risk: 'read',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      filePaths: {
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        description: 'Canonical workspace-relative paths from note_search_files that directly support the answer.',
+      },
+    },
+    required: ['filePaths'],
+    additionalProperties: false,
+  },
+  execute: async (input) => {
+    const requestedPaths = Array.isArray(input.filePaths)
+      ? input.filePaths.filter(
+          (filePath): filePath is string => typeof filePath === 'string' && filePath.trim().length > 0
+        )
+      : []
+    if (requestedPaths.length === 0) {
+      return {
+        ok: false,
+        message: 'filePaths 必须包含至少一个实际采用的检索候选路径。',
+        error: 'EMPTY_CITED_NOTE_PATHS',
+      }
+    }
+
+    try {
+      const filePaths = Array.from(new Set(
+        await Promise.all(requestedPaths.map(normalizeAgentWorkspacePath))
+      ))
+      return {
+        ok: true,
+        message: `已确认 ${filePaths.length} 个回答来源。`,
+        data: { filePaths },
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        message: `回答来源路径无效：${String(error)}`,
+        error: 'INVALID_CITED_NOTE_PATHS',
+      }
+    }
+  },
 }
 
 function filePathFromCreateResult(input: Record<string, unknown>, result: AgentToolResult) {
@@ -1530,7 +1787,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'note_read_file',
       title: '读取笔记文件',
-      description: 'Read a text-based NoteGen workspace file by relative path. This includes Markdown notes and generated text artifacts such as JSON, CSV, TXT, and Jupyter .ipynb files. Never use this tool for a user-selected attachment; use attachment_read with its attachment ID.',
+      description: 'Read a text-based NoteGen workspace file by canonical workspace-relative path. Pass a path returned by note_search_files unchanged. Search snippets often already contain enough evidence, so read only when more context is necessary. Never use this tool for a user-selected attachment; use attachment_read with its attachment ID.',
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFileTool,
@@ -1547,17 +1804,42 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'note_read_files_batch',
       title: '批量读取笔记文件',
+      description: 'Read one or more notes using canonical workspace-relative paths returned by note_search_files. Never call this tool with an empty array, and do not reread files when search snippets already contain enough evidence.',
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFilesBatchTool,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePaths: {
+            type: 'array',
+            items: { type: 'string' },
+            minItems: 1,
+            description: 'One or more canonical workspace-relative paths returned by note_search_files.',
+          },
+        },
+        required: ['filePaths'],
+        additionalProperties: false,
+      },
+      execute: executeReadFilesBatch,
     }),
     adaptLegacyTool({
       name: 'note_search_files',
-      title: '搜索笔记文件',
+      title: '查找相关笔记',
+      description: [
+        'Search the user’s NoteGen notes when the answer depends on their personal records, prior decisions, past writing, or information spread across notes.',
+        'Decide automatically: search when the user asks about their notes, history, plans, opinions, or explicitly asks to find/compare/summarize recorded material. Do not search for general-knowledge questions or when the current open note already contains enough evidence. Respect explicit requests not to search other notes.',
+        'Use mode=rag for answering natural-language questions, including questions containing exact names, project IDs, dates, or code symbols. Use mode=keyword only when the user explicitly asks for every literal occurrence or exact-match location; rag is the default when mode is omitted.',
+        'Results are retrieval candidates, not automatically trusted evidence. Judge each candidate against the user’s original question, including whether it actually supports the answer, conflicts with another source, or appears outdated. Use snippets directly when sufficient. For comparisons or multi-part questions, you may search with distinct queries and then read only candidates that need more context. Pass returned paths unchanged and never call batch reading with an empty array. The configured search-round budget is enforced automatically. Before the final answer, call note_cite_sources with only the paths actually used.',
+        'Use folderPath when the user linked, named, or restricted the request to a folder.',
+      ].join(' '),
       category: 'note',
       risk: 'read',
       legacy: searchMarkdownFilesTool,
+      execute: executeAgentNoteSearch,
     }),
+    noteCiteSourcesTool,
+    dateDifferenceTool,
     adaptLegacyTool({
       name: 'note_create_file',
       title: '创建文件',

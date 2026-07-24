@@ -1,8 +1,13 @@
 import { Tool, ToolResult } from '../types'
 import { BaseDirectory, readTextFile, writeTextFile, remove, rename, copyFile, stat, exists } from '@tauri-apps/plugin-fs'
 import { appDataDir } from '@tauri-apps/api/path'
+import { invoke } from '@tauri-apps/api/core'
 import { getAllMarkdownFiles, MarkdownFile } from '@/lib/files'
-import { ensureSafeWorkspaceRelativePath, getFilePathOptions } from '@/lib/workspace'
+import {
+  ensureSafeWorkspaceRelativePath,
+  getFilePathOptions,
+  toWorkspaceRelativePath,
+} from '@/lib/workspace'
 import useArticleStore from '@/stores/article'
 import useChatStore from '@/stores/chat'
 import { isLinkedFolder } from '@/lib/files'
@@ -659,13 +664,11 @@ export const searchMarkdownFilesTool: Tool = {
   name: 'search_markdown_files',
   description: `Search content within Markdown files in the file system.
 
-**IMPORTANT - Only use when user EXPLICITLY requests search**:
-- ✅ CORRECT: User says "搜索关于React的笔记" / "查找包含xxx的内容" / "帮我找找"
-- ❌ WRONG: User asks a question without explicitly asking to search (e.g., "What is React?" without asking to search)
+Use this automatically when the answer depends on the user's notes, personal history, prior decisions, plans, opinions, or recorded material. Do not use it for general knowledge or when the current open note already provides enough context. Respect explicit requests not to search other notes.
 
 Two modes:
-- keyword (default): Fast exact matching for specific terms like "useState", "React", "API"
-- rag: Semantic search - ONLY use when user explicitly asks for semantic/AI search (e.g., "语义搜索" / "AI搜索" / "相关笔记")
+- keyword: Fast exact matching for specific terms like "useState", "React", "API"
+- rag: Hybrid semantic search for natural-language questions and related notes
 
 Use folderPath to limit scope to a specific folder.`,
   category: 'search',
@@ -680,7 +683,7 @@ Use folderPath to limit scope to a specific folder.`,
     {
       name: 'mode',
       type: 'string',
-      description: 'Search mode: keyword (default, keyword matching) or rag (semantic search)',
+      description: 'Search mode: keyword for exact matching or rag for hybrid semantic search. Agent calls default to rag.',
       required: false,
     },
     {
@@ -703,8 +706,19 @@ Use folderPath to limit scope to a specific folder.`,
       if (params.mode === 'rag') {
         const { getContextForQuery, getContextForQueryInFolder } = await import('@/lib/rag')
 
-        // 将查询转换为关键词格式
-        const keywords = [{ text: params.query, weight: 1 }]
+        // 完整问题用于向量检索，关键词用于 BM25、模糊检索和查询扩展。
+        let keywords = [{ text: params.query, weight: 1 }]
+        try {
+          const rankedKeywords = await invoke<Array<{ text: string; weight: number }>>('rank_keywords', {
+            text: params.query,
+            topK: 15,
+          })
+          if (rankedKeywords.length > 0) {
+            keywords = rankedKeywords
+          }
+        } catch (error) {
+          console.warn('Failed to rank note search keywords, using the full query:', error)
+        }
 
         // 根据是否指定文件夹选择不同的 RAG 方法
         const ragResult = normalizedFolderPath
@@ -715,32 +729,56 @@ Use folderPath to limit scope to a specific folder.`,
         const allFiles = (await getAllMarkdownFiles()).filter(file => isSearchablePath(file.relativePath))
         // 创建文件名到相对路径的映射（处理同名文件）
         const fileNameToPath = new Map<string, string[]>()
+        const relativePathSet = new Set<string>()
         for (const file of allFiles) {
+          const relativePath = file.relativePath.replace(/\\/g, '/').replace(/^\.\//, '')
+          relativePathSet.add(relativePath)
           const name = file.name
           if (!fileNameToPath.has(name)) {
             fileNameToPath.set(name, [])
           }
-          fileNameToPath.get(name)!.push(file.relativePath)
+          fileNameToPath.get(name)!.push(relativePath)
         }
 
-        // 格式化返回结果，补全路径
-        const formattedResults = ragResult.sourceDetails.map(source => {
-          // 向量搜索返回的 filepath 可能只是文件名，需要补全路径
-          let filePath = source.filepath
-          if (!filePath.includes('/')) {
-            // filepath 只是文件名，从映射中获取完整路径
+        const scoreByPath = new Map(
+          ragResult.diagnostics.map(diagnostic => [diagnostic.filepath, diagnostic.finalScore])
+        )
+
+        // 格式化返回结果，并保证路径可以原样交给读取工具。
+        const resolvedResults = await Promise.all(ragResult.sourceDetails.map(async source => {
+          const workspaceRelativePath = (await toWorkspaceRelativePath(source.filepath))
+            .replace(/\\/g, '/')
+            .replace(/^\.\//, '')
+          let filePath = relativePathSet.has(workspaceRelativePath)
+            ? workspaceRelativePath
+            : undefined
+
+          if (!filePath) {
+            const suffixMatches = allFiles
+              .map(file => file.relativePath.replace(/\\/g, '/').replace(/^\.\//, ''))
+              .filter(relativePath => workspaceRelativePath.endsWith(`/${relativePath}`))
+            if (suffixMatches.length === 1) {
+              filePath = suffixMatches[0]
+            }
+          }
+
+          if (!filePath) {
             const paths = fileNameToPath.get(source.filename)
-            if (paths && paths.length > 0) {
-              // 如果有多个同名文件，使用第一个
+            if (paths?.length === 1) {
               filePath = paths[0]
             }
           }
+
+          if (!filePath) return undefined
+
           return {
-            filePath,
+            filePath: await ensureSafeWorkspaceRelativePath(filePath),
             fileName: source.filename,
             matchedContent: source.content,
+            relevanceScore: scoreByPath.get(source.filepath) ?? 0,
           }
-        })
+        }))
+        const formattedResults = resolvedResults.filter(result => result !== undefined)
 
         return {
           success: true,

@@ -51,6 +51,11 @@ export class AgentHandler {
   private readonly config: AgentHandlerConfig
   private steeringPending = false
   private pendingSteering: AgentSteeringPayload[] = []
+  private retrievedNoteSources = new Map<string, {
+    filepath: string
+    filename: string
+    content: string
+  }>()
 
   constructor(config: AgentHandlerConfig) {
     this.config = config
@@ -62,6 +67,7 @@ export class AgentHandler {
     imageUrls?: string[]
   ): Promise<string> {
     const store = useChatStore.getState()
+    this.retrievedNoteSources.clear()
 
     store.resetAgentState()
     store.setAgentState({
@@ -335,6 +341,61 @@ export class AgentHandler {
     if (toolCall.toolName === 'skill_load' && toolCall.status === 'success') {
       this.appendLoadedSkill(toolCall.params.skill_id)
     }
+
+    if (toolCall.toolName === 'note_search_files' && toolCall.status === 'success') {
+      this.captureNoteSearchCandidates(toolCall)
+    }
+
+    if (toolCall.toolName === 'note_cite_sources' && toolCall.status === 'success') {
+      this.captureCitedNoteSources(toolCall)
+    }
+  }
+
+  private captureNoteSearchCandidates(toolCall: ToolCall) {
+    const data = toolCall.result?.data
+    if (!Array.isArray(data)) return
+
+    for (const value of data) {
+      if (!value || typeof value !== 'object') continue
+      const result = value as {
+        filePath?: unknown
+        fileName?: unknown
+        matchedContent?: unknown
+      }
+      if (typeof result.filePath !== 'string' || !result.filePath.trim()) continue
+
+      const filepath = result.filePath.trim()
+      const filename = typeof result.fileName === 'string' && result.fileName.trim()
+        ? result.fileName.trim()
+        : filepath.split('/').pop() || filepath
+      const content = typeof result.matchedContent === 'string'
+        ? result.matchedContent
+        : ''
+
+      this.retrievedNoteSources.set(filepath, {
+        filepath,
+        filename,
+        content,
+      })
+    }
+  }
+
+  private captureCitedNoteSources(toolCall: ToolCall) {
+    const data = toolCall.result?.data
+    if (!data || typeof data !== 'object') return
+    const filePaths = (data as { filePaths?: unknown }).filePaths
+    if (!Array.isArray(filePaths)) return
+
+    const ragSourceDetails = filePaths.flatMap((filePath) => {
+      if (typeof filePath !== 'string') return []
+      const source = this.retrievedNoteSources.get(filePath)
+      return source ? [source] : []
+    })
+    const currentState = useChatStore.getState()
+    currentState.setAgentState({
+      ragSources: Array.from(new Set(ragSourceDetails.map(detail => detail.filename))),
+      ragSourceDetails,
+    })
   }
 
   private appendLoadedSkill(skillId: unknown) {

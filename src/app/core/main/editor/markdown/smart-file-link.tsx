@@ -25,7 +25,7 @@ import {
 import { getContextForQuery } from '@/lib/rag'
 import { toWorkspaceRelativePath } from '@/lib/workspace'
 import useArticleStore from '@/stores/article'
-import useVectorStore from '@/stores/vector'
+import useRagSettingsStore from '@/stores/ragSettings'
 
 interface SmartFileLinkProps {
   editor: Editor
@@ -80,7 +80,7 @@ function findFileForRagPath(files: MarkdownFile[], ragPath: string): MarkdownFil
 
 export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
   const t = useTranslations('editor.smartFileLink')
-  const isRagEnabled = useVectorStore(state => state.isRagEnabled)
+  const automaticSearchEnabled = useRagSettingsStore(state => state.automaticSearchEnabled)
   const [context, setContext] = useState<MarkdownLinkInputContext | null>(null)
   const [files, setFiles] = useState<MarkdownFile[]>([])
   const [currentRelativePath, setCurrentRelativePath] = useState('')
@@ -162,7 +162,7 @@ export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
     })
   }, [context, currentRelativePath, files, pathMode])
 
-  const canEnhance = !!context && !pathMode && isRagEnabled && !isEnhancing
+  const canEnhance = !!context && !pathMode && automaticSearchEnabled && !isEnhancing
   const secondaryQuickSuggestions = useMemo(() => {
     const enhancedPaths = new Set(enhancedSuggestions.map(suggestion => suggestion.relativePath))
     return quickSuggestions.filter(suggestion => !enhancedPaths.has(suggestion.relativePath))
@@ -355,7 +355,7 @@ export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
             </>
           )}
 
-          {!pathMode && isRagEnabled && (
+          {!pathMode && automaticSearchEnabled && (
             <>
               {(secondaryQuickSuggestions.length > 0 || enhancedSuggestions.length > 0) && <CommandSeparator />}
               <CommandGroup heading={t('actions')}>

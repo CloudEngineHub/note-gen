@@ -41,7 +41,6 @@ import { toast } from '@/hooks/use-toast'
 import { useI18n } from '@/hooks/useI18n'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { isMobileDevice as checkIsMobileDevice } from '@/lib/check'
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
 
 export function SettingPrompt({id, icon}: {id: string, icon?: React.ReactNode}) {
   const t = useTranslations('settings')
@@ -81,7 +80,7 @@ export function SettingPrompt({id, icon}: {id: string, icon?: React.ReactNode}) 
   }
 
   const handleResetSystemPrompt = async () => {
-    setSystemPromptDraft(DEFAULT_SYSTEM_PROMPT)
+    setSystemPromptDraft('')
   }
 
   // 添加新prompt
@@ -218,7 +217,7 @@ ${newContent}`
                     type="button"
                     variant="outline"
                     onClick={handleResetSystemPrompt}
-                    disabled={systemPromptDraft === DEFAULT_SYSTEM_PROMPT}
+                    disabled={!systemPromptDraft}
                   >
                     {t('prompt.systemPrompt.reset')}
                   </Button>
