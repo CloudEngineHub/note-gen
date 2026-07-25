@@ -713,8 +713,8 @@
           "desc": "用于搜索结果的重新排序和优化。"
         },
         "condense": {
-          "title": "摘要模型",
-          "desc": "用于压缩历史对话内容，节省 token 使用量"
+          "title": "压缩模型",
+          "desc": "用于压缩对话历史并保留关键上下文"
         }
       }
     },
@@ -1305,40 +1305,14 @@
         }
       },
       "condense": {
-        "title": "对话摘要",
         "enable": {
-          "title": "启用摘要",
-          "desc": "自动压缩长对话以节省 token 使用量"
+          "title": "自动压缩上下文",
+          "desc": "接近模型上限时提前压缩；关闭后仅在真正超限时紧急压缩并重试"
         },
         "model": {
-          "title": "摘要模型",
-          "desc": "选择用于生成摘要的 AI 模型",
+          "title": "压缩模型",
+          "desc": "用于生成会话压缩摘要；未指定时使用主模型",
           "placeholder": "使用主模型"
-        },
-        "threshold": {
-          "title": "触发阈值",
-          "desc": "AI 消息超过此数量时检查压缩"
-        },
-        "minToken": {
-          "title": "最小 Token 数",
-          "desc": "单条消息超过此 token 数才进行压缩"
-        },
-        "keepLatest": {
-          "title": "保留最新条数",
-          "desc": "保留最新的 N 条 AI 消息不进行压缩"
-        },
-        "maxLength": {
-          "title": "摘要长度限制",
-          "desc": "控制生成摘要的最大字数"
-        },
-        "prompt": {
-          "title": "自定义摘要提示词",
-          "desc": "自定义生成摘要时使用的提示词模板",
-          "label": "提示词模板",
-          "placeholder": "输入自定义提示词...",
-          "help": "使用 {content} 作为原始内容的占位符",
-          "save": "保存",
-          "reset": "重置为默认"
         }
       },
       "conversationTitle": {
@@ -1346,13 +1320,6 @@
         "model": {
           "title": "标题生成模型",
           "desc": "选择用于生成会话标题的 AI 模型"
-        }
-      },
-      "inspiration": {
-        "title": "灵感模型",
-        "model": {
-          "title": "灵感生成模型",
-          "desc": "用于生成快速提示词建议，帮助用户快速开始对话"
         }
       }
     },
@@ -1466,6 +1433,9 @@
       "maxTokens": "最大输出 Token",
       "maxTokensDesc": "限制单次生成的最大 Token 数；留空时使用模型或平台的默认限制。",
       "maxTokensPlaceholder": "由模型决定",
+      "contextWindow": "上下文窗口",
+      "contextWindowDesc": "模型可接受的输入与输出 Token 总量；留空时自动推测，并在上下文溢出后学习。",
+      "contextWindowPlaceholder": "自动检测（默认 16K）",
       "tokenLimitParam": "Token 限制参数",
       "tokenLimitParamDesc": "默认使用 max_completion_tokens；旧版兼容接口可切换为 max_tokens。",
       "advancedParameters": "高级参数",
@@ -2368,6 +2338,11 @@
           "noRecords": "没有可用的图片记录",
           "cancel": "取消",
           "confirm": "确认"
+        },
+        "contextUsage": {
+          "label": "上下文使用率：{percent}%",
+          "usageDetail": "预计上下文使用率：{percent}%",
+          "tokenDetail": "{usedTokens} / {contextWindow} Token"
         },
         "agent": {
           "running": "Agent 运行中",

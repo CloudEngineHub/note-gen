@@ -172,6 +172,34 @@ function summarizeMessage(message: OpenAI.Chat.ChatCompletionMessageParam, index
   }
 }
 
+function estimateMessageTextTokens(message: OpenAI.Chat.ChatCompletionMessageParam) {
+  if (!('content' in message)) {
+    return 0
+  }
+
+  if (typeof message.content === 'string') {
+    return estimateTokens(message.content)
+  }
+
+  if (!Array.isArray(message.content)) {
+    return 0
+  }
+
+  return message.content.reduce((sum, item) => {
+    if (
+      typeof item === 'object'
+      && item !== null
+      && 'type' in item
+      && item.type === 'text'
+      && 'text' in item
+      && typeof item.text === 'string'
+    ) {
+      return sum + estimateTokens(item.text)
+    }
+    return sum
+  }, 0)
+}
+
 function normalizeFilePathForCompare(filePath: string) {
   return filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/').trim()
 }
@@ -717,9 +745,15 @@ export class AgentRuntime {
     agentDebugLog('context_prepared', {
       runId,
       systemPromptLength: systemPrompt.length,
+      systemPromptTokens: estimateTokens(systemPrompt),
       toolCount: tools.length,
       rawMessageCount: input.messages?.length || 0,
       preparedMessageCount: messages.length,
+      preparedMessageTextTokens: messages.reduce(
+        (sum, message) => sum + estimateMessageTextTokens(message),
+        0
+      ),
+      currentImageCount: input.imageUrls?.length || 0,
       appContextMessageCount: baseMessages.filter((message) =>
         message.role === 'user' &&
         typeof message.content === 'string' &&
@@ -1033,6 +1067,21 @@ export class AgentRuntime {
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
         const openAITools = agentToolRegistry.toOpenAITools(offeredTools, loadedSkillIds)
+        const messageTextTokens = messages.reduce(
+          (sum, message) => sum + estimateMessageTextTokens(message),
+          0
+        )
+        const toolSchemaTokens = estimateTokens(JSON.stringify(openAITools))
+        agentDebugLog('model_request_budget', {
+          runId,
+          iteration,
+          messageCount: messages.length,
+          messageTextTokens,
+          offeredToolCount: offeredTools.length,
+          toolSchemaTokens,
+          estimatedTextAndToolTokens: messageTextTokens + toolSchemaTokens,
+          imageCount: input.imageUrls?.length || 0,
+        })
         const toolParams = openAITools.length > 0
           ? {
               tools: openAITools,

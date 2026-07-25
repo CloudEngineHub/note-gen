@@ -65,6 +65,13 @@ function normalizeModelItem(item: Record<string, unknown>): ModelConfig | null {
     topP: typeof item.topP === 'number' ? item.topP : undefined,
     voice: isNonEmptyString(item.voice) ? item.voice.trim() : undefined,
     enableStream: typeof item.enableStream === 'boolean' ? item.enableStream : undefined,
+    maxTokens: typeof item.maxTokens === 'number' ? item.maxTokens : undefined,
+    contextWindow: typeof item.contextWindow === 'number' ? item.contextWindow : undefined,
+    tokenLimitParam: item.tokenLimitParam === 'max_tokens'
+      ? 'max_tokens'
+      : item.tokenLimitParam === 'max_completion_tokens'
+        ? 'max_completion_tokens'
+        : undefined,
   }
 }
 

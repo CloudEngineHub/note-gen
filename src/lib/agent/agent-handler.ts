@@ -208,7 +208,7 @@ export class AgentHandler {
         status: 'failed',
       })
       const errorMessage = error instanceof Error ? error.message : String(error)
-      this.config.onError?.(errorMessage)
+      await this.config.onError?.(errorMessage)
       throw error
     }
   }

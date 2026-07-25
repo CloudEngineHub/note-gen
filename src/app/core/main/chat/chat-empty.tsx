@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import useChatStore from '@/stores/chat'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { Trash2, FileEdit, FileText, Lightbulb, ArrowRight, MessageCircle, MessageSquareDashed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,7 +18,6 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import 'dayjs/locale/en'
 import useSettingStore from '@/stores/setting'
-import { QuickPrompt } from '@/lib/ai/placeholder'
 
 // 初始化 dayjs 插件
 dayjs.extend(relativeTime)
@@ -41,42 +40,12 @@ export default function ChatEmpty() {
     isTemporaryConversation,
   } = useChatStore()
 
-  const [aiPrompts, setAiPrompts] = useState<QuickPrompt[]>([])
-
   // 快速 prompt 模板 - 默认模板
-  const defaultQuickPrompts = useMemo(() => [
+  const quickPrompts = useMemo(() => [
     { id: 1, icon: <FileEdit className="w-4 h-4" />, text: t('quickPrompts.writeNote') || '帮我写一篇笔记' },
     { id: 2, icon: <FileText className="w-4 h-4" />, text: t('quickPrompts.summarize') || '帮我总结这段内容' },
     { id: 3, icon: <Lightbulb className="w-4 h-4" />, text: t('quickPrompts.brainstorm') || '帮我头脑风暴一些想法' },
   ], [t])
-
-  // 监听来自 chat-input 的 AI 提示词生成事件
-  useEffect(() => {
-    const handleAiPromptsGenerated = (prompts: QuickPrompt[]) => {
-      if (prompts.length >= 3) {
-        setAiPrompts(prompts)
-      }
-    }
-
-    emitter.on('ai-prompts-generated', handleAiPromptsGenerated)
-    return () => {
-      emitter.off('ai-prompts-generated', handleAiPromptsGenerated)
-    }
-  }, [])
-
-  // 使用 AI 生成的提示词或默认提示词
-  const quickPrompts = useMemo(() => {
-    // 如果 AI 成功生成了至少3条提示词，使用 AI 生成的
-    if (aiPrompts.length >= 3) {
-      return aiPrompts.slice(0, 3).map((prompt, index) => ({
-        id: `ai-${index}`,
-        icon: <Lightbulb className="w-4 h-4" />,
-        text: prompt.text
-      }))
-    }
-    // 否则使用默认提示词
-    return defaultQuickPrompts
-  }, [aiPrompts, defaultQuickPrompts])
 
   const handleQuickPrompt = (prompt: string) => {
     // 将文本插入到输入框

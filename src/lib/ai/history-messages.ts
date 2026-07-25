@@ -1,4 +1,5 @@
 type ChatLike = {
+  id?: number
   role: string
   type: string
   content?: string | null
@@ -38,9 +39,7 @@ export function buildChatHistoryForAI(chats: ChatLike[], systemPrompt?: string):
     }
 
     const role: 'user' | 'assistant' = chat.role === 'user' ? 'user' : 'assistant'
-    const content = chat.role === 'user'
-      ? chat.content || ''
-      : chat.condensedContent || chat.content || ''
+    const content = chat.content || ''
 
     if (content) {
       messages.push({ role, content })
@@ -62,6 +61,8 @@ export function buildMessagesWithHistory(
     includeAssistantMessages?: boolean
     includeLatestUserMessage?: boolean
     maxUserMessages?: number
+    conversationSummary?: string
+    coveredThroughChatId?: number
   }
 ): MessageLike[] {
   const messages: MessageLike[] = []
@@ -77,6 +78,23 @@ export function buildMessagesWithHistory(
   }
 
   let chatsAfterClear = getChatsAfterLastClear(chats)
+
+  if (options?.conversationSummary) {
+    messages.push({
+      role: 'system',
+      content: `以下是较早对话的锚定摘要，仅用于恢复上下文。摘要可能省略细节；如果它与最近原始消息冲突，以最近原始消息为准。
+
+<conversation-summary>
+${options.conversationSummary}
+</conversation-summary>`
+    })
+  }
+
+  if (typeof options?.coveredThroughChatId === 'number') {
+    chatsAfterClear = chatsAfterClear.filter(chat =>
+      typeof chat.id !== 'number' || chat.id > options.coveredThroughChatId!
+    )
+  }
 
   if (!includeLatestUserMessage) {
     const lastUserIndex = [...chatsAfterClear].map(chat => chat.role).lastIndexOf('user')
@@ -114,9 +132,7 @@ export function buildMessagesWithHistory(
     }
 
     const role: 'user' | 'assistant' = chat.role === 'user' ? 'user' : 'assistant'
-    const content = chat.role === 'user'
-      ? chat.content || ''
-      : chat.condensedContent || chat.content || ''
+    const content = chat.content || ''
 
     if (content) {
       messages.push({ role, content })

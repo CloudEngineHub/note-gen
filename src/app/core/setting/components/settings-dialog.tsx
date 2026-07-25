@@ -18,7 +18,6 @@ import {
 import AboutPage from '../about/page'
 import AiPage from '../ai/page'
 import AudioPage from '../audio/page'
-import ChatSettingsPage from '../chat/page'
 import EditorSettingPage from '../editor/page'
 import SettingFilePage from '../file/page'
 import GeneralSettingsPage from '../general/page'
@@ -39,7 +38,6 @@ import { SettingTab } from './setting-tab'
 const settingPages: Record<SettingSection, ComponentType> = {
   about: AboutPage,
   general: GeneralSettingsPage,
-  chat: ChatSettingsPage,
   editor: EditorSettingPage,
   record: RecordSettingPage,
   sync: SyncPage,
@@ -76,11 +74,16 @@ export function SettingsDialog() {
   useEffect(() => {
     if (open) return
 
-    const storedSection = lastSettingPage === 'dev' ? 'general' : lastSettingPage
+    const storedSection =
+      lastSettingPage === 'dev' || lastSettingPage === 'chat'
+        ? 'general'
+        : lastSettingPage
     if (settingSections.includes(storedSection as SettingSection)) {
       setActiveSection(storedSection as SettingSection)
     }
-    if (lastSettingPage === 'dev') setLastSettingPage('general')
+    if (lastSettingPage === 'dev' || lastSettingPage === 'chat') {
+      setLastSettingPage('general')
+    }
   }, [lastSettingPage, open, setActiveSection, setLastSettingPage])
 
   useLayoutEffect(() => {

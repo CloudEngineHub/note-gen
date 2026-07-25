@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Chat, clearChatsByTagId, deleteChat, initChatsDb, insertChat, updateChat, updateChatsInsertedById, getAllChats, deleteAllChats, insertChats, updateChatCondensedContent, getChatsByConversation } from '@/db/chats'
+import { Chat, clearChatsByTagId, deleteChat, initChatsDb, insertChat, updateChat, updateChatsInsertedById, getAllChats, deleteAllChats, insertChats, getChatsByConversation } from '@/db/chats'
 import { uploadFile as uploadGithubFile, getFiles as githubGetFiles, decodeBase64ToString } from '@/lib/sync/github';
 import { uploadFile as uploadGiteeFile, getFiles as giteeGetFiles } from '@/lib/sync/gitee';
 import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileContent as gitlabGetFileContent } from '@/lib/sync/gitlab';
@@ -57,10 +57,6 @@ export interface McpToolCall {
 interface ChatState {
   loading: boolean
   setLoading: (loading: boolean) => void
-
-  isCondensing: boolean // 压缩状态
-  _condenseLock: boolean // 内部锁，防止并发压缩
-  maybeCondense: () => void // 触发压缩检查（异步，不阻塞）
 
   // 兼容旧代码：按标签加载（内部映射到默认会话）
   chats: Chat[]
@@ -150,87 +146,6 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   setLoading: (loading: boolean) => {
     set({ loading })
-  },
-
-  isCondensing: false,
-  _condenseLock: false,
-
-  maybeCondense: () => {
-    const state = get()
-
-    // 临时会话不生成或保存压缩摘要
-    if (state.isTemporaryConversation) {
-      return
-    }
-
-    // 防并发：已有压缩任务在执行，直接返回
-    if (state._condenseLock) {
-      return
-    }
-
-    // 添加版本号引用，防止竞态条件
-    const versionRef = { current: 0 }
-    const currentVersion = ++versionRef.current
-
-    const { chats } = state
-
-    // 获取最后一次清除后的消息
-    const lastClearIndex = chats.findLastIndex(c => c.type === 'clear')
-    const chatsAfterClear = lastClearIndex === -1 ? chats : chats.slice(lastClearIndex + 1)
-
-    // 使用 IIFE 立即执行异步函数，不等待结果
-    ;(async () => {
-      // 动态导入 condense 模块（避免循环依赖）
-      const { shouldCondense, condenseChats } = await import('@/lib/ai/condense')
-
-      // 版本号检查：防止被新版本覆盖
-      if (currentVersion !== versionRef.current) {
-        return
-      }
-
-      if (!(await shouldCondense(chatsAfterClear))) {
-        return
-      }
-
-      // 再次检查版本号
-      if (currentVersion !== versionRef.current) {
-        return
-      }
-
-      // 设置锁和压缩状态
-      set({ _condenseLock: true, isCondensing: true })
-
-      try {
-        // 为每条消息生成摘要并存储
-        const condensedResults = await condenseChats(chatsAfterClear)
-
-        // 版本号检查：防止在压缩过程中被新版本覆盖
-        if (currentVersion !== versionRef.current) {
-          return
-        }
-
-        for (const result of condensedResults) {
-          if (result.summary) {
-            // 更新数据库中的摘要内容
-            await updateChatCondensedContent(result.chatId, result.summary)
-
-            // 更新 state 中的消息
-            set({
-              chats: get().chats.map(c =>
-                c.id === result.chatId
-                  ? { ...c, condensedContent: result.summary || undefined, condensedAt: Date.now() }
-                  : c
-              )
-            })
-          }
-        }
-      } catch (error) {
-        // 静默失败，不影响用户体验
-        console.error('[ChatStore] 压缩失败:', error)
-      } finally {
-        set({ _condenseLock: false, isCondensing: false })
-      }
-    })()
   },
 
   agentState: {
@@ -496,6 +411,8 @@ const useChatStore = create<ChatState>((set, get) => ({
     // 更新会话的消息数量
     const { currentConversationId } = get()
     if (currentConversationId) {
+      const { deleteConversationCompactions } = await import('@/db/conversation-compactions')
+      await deleteConversationCompactions(currentConversationId)
       const { updateConversationMessageCount } = await import('@/db/conversations')
       await updateConversationMessageCount(currentConversationId, -1)
       await get().initConversations()
@@ -539,6 +456,8 @@ const useChatStore = create<ChatState>((set, get) => ({
       // 删除数据库中的记录
       const db = await import('@/db').then(m => m.getDb())
       await db.execute("delete from chats where conversationId = $1", [currentConversationId])
+      const { deleteConversationCompactions } = await import('@/db/conversation-compactions')
+      await deleteConversationCompactions(currentConversationId)
 
       const { updateConversationMessageCount } = await import('@/db/conversations')
       await updateConversationMessageCount(currentConversationId, -count)
@@ -743,6 +662,8 @@ const useChatStore = create<ChatState>((set, get) => ({
       result = JSON.parse(configJson)
     }
     if (result.length > 0) {
+      const { deleteAllConversationCompactions } = await import('@/db/conversation-compactions')
+      await deleteAllConversationCompactions()
       await deleteAllChats()
       await insertChats(result)
     }

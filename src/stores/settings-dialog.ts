@@ -3,7 +3,6 @@ import { create } from 'zustand'
 export type SettingSection =
   | 'about'
   | 'general'
-  | 'chat'
   | 'editor'
   | 'record'
   | 'sync'
@@ -24,7 +23,6 @@ export type SettingSection =
 export const settingSections: SettingSection[] = [
   'about',
   'general',
-  'chat',
   'editor',
   'record',
   'sync',

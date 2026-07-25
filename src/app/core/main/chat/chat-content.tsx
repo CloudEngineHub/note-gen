@@ -23,6 +23,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { parsePersistedChatAttachments } from '@/lib/chat-attachments'
 import { ChatAttachmentSummary } from './chat-file-attachments'
+import emitter from '@/lib/emitter'
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -32,17 +33,117 @@ import {
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller'
 
+interface DisplayedConversationCompaction {
+  revision: number
+  coveredThroughChatId: number
+  sourceTokenCount: number
+  summaryTokenCount: number
+}
+
 const ChatContent = React.memo(function ChatContent() {
-  const { chats, init, agentState, loading } = useChatStore()
+  const { chats, init, agentState, loading, currentConversationId } = useChatStore()
   const { currentTagId } = useTagStore()
+  const t = useTranslations()
+  const [compactionRunning, setCompactionRunning] = useState(false)
+  const [latestCompaction, setLatestCompaction] = useState<DisplayedConversationCompaction | null>(null)
 
   useEffect(() => {
     init(currentTagId)
   }, [currentTagId, init])
 
+  useEffect(() => {
+    let cancelled = false
+    setCompactionRunning(false)
+    setLatestCompaction(null)
+
+    if (!currentConversationId) {
+      return
+    }
+
+    void import('@/db/conversation-compactions')
+      .then(({ getLatestConversationCompaction }) =>
+        getLatestConversationCompaction(currentConversationId)
+      )
+      .then(compaction => {
+        if (!cancelled) {
+          setLatestCompaction(compaction)
+        }
+      })
+      .catch(error => {
+        console.error('[ConversationCompaction] Failed to load display state:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentConversationId])
+
+  useEffect(() => {
+    const handleStatus = (event: {
+      conversationId: number
+      status: 'running' | 'completed' | 'failed'
+      revision?: number
+      coveredThroughChatId?: number
+      sourceTokenCount?: number
+      summaryTokenCount?: number
+    }) => {
+      if (event.conversationId !== currentConversationId) {
+        return
+      }
+
+      setCompactionRunning(event.status === 'running')
+      if (
+        event.status === 'completed'
+        && typeof event.revision === 'number'
+        && typeof event.coveredThroughChatId === 'number'
+        && typeof event.sourceTokenCount === 'number'
+        && typeof event.summaryTokenCount === 'number'
+      ) {
+        setLatestCompaction({
+          revision: event.revision,
+          coveredThroughChatId: event.coveredThroughChatId,
+          sourceTokenCount: event.sourceTokenCount,
+          summaryTokenCount: event.summaryTokenCount,
+        })
+      }
+    }
+
+    emitter.on('conversation-compaction-status', handleStatus)
+    return () => {
+      emitter.off('conversation-compaction-status', handleStatus)
+    }
+  }, [currentConversationId])
+
+  const activeCompaction = useMemo(() => {
+    if (!latestCompaction) {
+      return null
+    }
+
+    const lastClear = chats.findLast(chat => chat.type === 'clear')
+    return lastClear && latestCompaction.coveredThroughChatId <= lastClear.id
+      ? null
+      : latestCompaction
+  }, [chats, latestCompaction])
+
+  const compactedMessageCount = useMemo(() => {
+    if (!activeCompaction) {
+      return 0
+    }
+
+    const lastClearIndex = chats.findLastIndex(chat => chat.type === 'clear')
+    return chats
+      .slice(lastClearIndex + 1)
+      .filter(chat =>
+        (chat.type === 'chat' || chat.type === 'note')
+        && chat.id <= activeCompaction.coveredThroughChatId
+      )
+      .length
+  }, [activeCompaction, chats])
+
   // 判断是否应该显示 loading：loading=true 且最后一个 AI 消息还没有内容
   const shouldShowLoading = useMemo(() => {
     if (!loading) return false
+    if (compactionRunning) return false
     if (agentState.isRunning) return false
 
     const lastChat = chats[chats.length - 1]
@@ -52,7 +153,7 @@ const ChatContent = React.memo(function ChatContent() {
     }
 
     return true
-  }, [loading, agentState.isRunning, chats])
+  }, [loading, compactionRunning, agentState.isRunning, chats])
 
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor" scrollPreviousItemPeek={8}>
@@ -62,17 +163,43 @@ const ChatContent = React.memo(function ChatContent() {
             className={cn("items-end", chats.length === 0 && "h-full")}
           >
             {chats.length ? chats.map((chat) => (
-              <MessageScrollerItem
-                key={chat.id}
-                messageId={String(chat.id)}
-                scrollAnchor={chat.role === 'user'}
-                className="w-full"
-              >
-                <Message chat={chat} />
-              </MessageScrollerItem>
+              <React.Fragment key={chat.id}>
+                <MessageScrollerItem
+                  messageId={String(chat.id)}
+                  scrollAnchor={chat.role === 'user'}
+                  className="w-full"
+                >
+                  <Message chat={chat} />
+                </MessageScrollerItem>
+                {activeCompaction?.coveredThroughChatId === chat.id && (
+                  <MessageScrollerItem className="w-full">
+                    <div
+                      className="flex w-full items-center gap-3 py-1 text-xs text-muted-foreground"
+                      title={`${activeCompaction.sourceTokenCount} → ${activeCompaction.summaryTokenCount} tokens`}
+                    >
+                      <Separator className="flex-1" />
+                      <span>{t('record.chat.condensed.message', { count: compactedMessageCount })}</span>
+                      <Separator className="flex-1" />
+                    </div>
+                  </MessageScrollerItem>
+                )}
+              </React.Fragment>
             )) : (
               <MessageScrollerItem className="flex w-full flex-1">
                 <ChatEmpty />
+              </MessageScrollerItem>
+            )}
+
+            {compactionRunning && (
+              <MessageScrollerItem className="w-full">
+                <div className="flex w-full items-center gap-3 py-1 text-xs text-muted-foreground">
+                  <Separator className="flex-1" />
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="size-3.5 animate-spin" />
+                    {t('record.chat.condensing')}
+                  </span>
+                  <Separator className="flex-1" />
+                </div>
               </MessageScrollerItem>
             )}
 

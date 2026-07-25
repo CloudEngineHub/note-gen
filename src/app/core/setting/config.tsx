@@ -14,7 +14,6 @@ import {
   Settings,
   Puzzle,
   Sparkles,
-  MessageSquare,
   PenTool,
   Brain,
   Globe2,
@@ -28,10 +27,6 @@ const baseConfig = [
   {
     icon: <Settings className="size-4" />,
     anchor: 'general',
-  },
-  {
-    icon: <MessageSquare className="size-4" />,
-    anchor: 'chat',
   },
   {
     icon: <FileCog className="size-4" />,
@@ -119,6 +114,7 @@ export interface ModelConfig {
   voice?: string
   enableStream?: boolean
   maxTokens?: number
+  contextWindow?: number
   tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
   enableWebSearch?: boolean
   enableNativeWebSearch?: boolean
@@ -152,6 +148,7 @@ export interface AiConfig {
   speed?: number
   enableStream?: boolean
   maxTokens?: number
+  contextWindow?: number
   tokenLimitParam?: 'max_completion_tokens' | 'max_tokens'
   enableWebSearch?: boolean
   enableNativeWebSearch?: boolean

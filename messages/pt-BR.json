@@ -728,8 +728,8 @@
           "desc": "Usado para reordenar e otimizar resultados de busca."
         },
         "condense": {
-          "title": "摘要模型",
-          "desc": "用于压缩历史对话内容，节省 token 使用量"
+          "title": "Modelo de Compactação",
+          "desc": "Usado para compactar o histórico da conversa preservando o contexto importante"
         }
       },
       "mainModel": "Modelo principal"
@@ -1236,47 +1236,14 @@
         }
       },
       "condense": {
-        "title": "Resumo da Conversa",
         "enable": {
-          "title": "Ativar Resumo",
-          "desc": "Comprimir automaticamente conversas longas para economizar uso de tokens"
+          "title": "Compactar Contexto Automaticamente",
+          "desc": "Compacta antes de atingir o limite do modelo. Quando desativado, a compactação emergencial e a nova tentativa ainda ocorrem após um estouro real"
         },
         "model": {
-          "title": "Modelo de Resumo",
-          "desc": "Selecione o modelo de IA para gerar resumos",
+          "title": "Modelo de Compactação",
+          "desc": "Gera resumos compactados da conversa; usa o modelo principal quando não selecionado",
           "placeholder": "Usar modelo principal"
-        },
-        "threshold": {
-          "title": "Limiar de Gatilho",
-          "desc": "Verificar compressão quando mensagens da IA excederem esta contagem"
-        },
-        "minToken": {
-          "title": "Contagem Mínima de Tokens",
-          "desc": "Comprimir apenas mensagens que excedam esta contagem de tokens"
-        },
-        "keepLatest": {
-          "title": "Manter Mais Recentes",
-          "desc": "Manter as últimas N mensagens da IA não compactadas"
-        },
-        "maxLength": {
-          "title": "Comprimento Máximo do Resumo",
-          "desc": "Controlar a contagem máxima de palavras dos resumos gerados"
-        },
-        "prompt": {
-          "title": "Prompt de Resumo Personalizado",
-          "desc": "Personalize o modelo de prompt para gerar resumos",
-          "label": "Modelo de Prompt",
-          "placeholder": "Digite o prompt personalizado...",
-          "help": "Use {content} como um espaço reservado para o conteúdo original",
-          "save": "Salvar",
-          "reset": "Redefinir para o Padrão"
-        }
-      },
-      "inspiration": {
-        "title": "Modelo de Inspiração",
-        "model": {
-          "title": "Gerador de Sugestões Rápidas",
-          "desc": "Gere sugestões de prompt rápidas para ajudar os usuários a iniciar conversas"
         }
       },
       "conversationTitle": {
@@ -1444,6 +1411,9 @@
       "maxTokens": "Máximo de tokens de saída",
       "maxTokensDesc": "Limita os tokens gerados por solicitação. Deixe vazio para usar o padrão do modelo ou provedor.",
       "maxTokensPlaceholder": "Usar padrão do modelo",
+      "contextWindow": "Janela de contexto",
+      "contextWindowDesc": "Total de tokens de entrada e saída aceitos pelo modelo. Deixe vazio para inferir e aprender com erros de limite de contexto.",
+      "contextWindowPlaceholder": "Detectar automaticamente (16K)",
       "tokenLimitParam": "Parâmetro de limite de tokens",
       "tokenLimitParamDesc": "Usa max_completion_tokens por padrão. Selecione max_tokens para APIs compatíveis legadas.",
       "advancedParameters": "Parâmetros avançados",
@@ -2393,6 +2363,11 @@
           "saveFailedMultiple": "Falha ao salvar {count} imagens. Tente novamente",
           "selectFailed": "Falha ao selecionar imagens. Tente novamente",
           "dropHint": "Solte as imagens para anexar"
+        },
+        "contextUsage": {
+          "label": "Uso do contexto: {percent}%",
+          "usageDetail": "Uso estimado do contexto: {percent}%",
+          "tokenDetail": "{usedTokens} / {contextWindow} tokens"
         },
         "agent": {
           "running": "Agente em Execução",

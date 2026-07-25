@@ -96,12 +96,6 @@ interface SettingState {
   speechToTextMode: SpeechMode
   setSpeechToTextMode: (mode: SpeechMode) => Promise<void>
 
-  condenseModel: string
-  setCondenseModel: (condenseModel: string) => Promise<void>
-
-  inspirationModel: string
-  setInspirationModel: (inspirationModel: string) => Promise<void>
-
   systemPrompt: string
   setSystemPrompt: (systemPrompt: string) => Promise<void>
 
@@ -257,13 +251,6 @@ interface SettingState {
   showEditorUndoRedo: boolean
   setShowEditorUndoRedo: (show: boolean) => Promise<void>
 
-  // 摘要设置
-  enableCondense: boolean
-  setEnableCondense: (enabled: boolean) => Promise<void>
-  keepLatestCount: number
-  setKeepLatestCount: (count: number) => Promise<void>
-  condenseMaxLength: number
-  setCondenseMaxLength: (length: number) => Promise<void>
 }
 
 export interface RecordToolbarItem {
@@ -445,9 +432,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const modelTypes = [
       { storeKey: 'completionModel', modelType: 'chat' },
       { storeKey: 'markDescModel', modelType: 'chat' },
-      { storeKey: 'commitModel', modelType: 'chat' },
-      { storeKey: 'condenseModel', modelType: 'chat' },
-      { storeKey: 'inspirationModel', modelType: 'chat' }
+      { storeKey: 'commitModel', modelType: 'chat' }
     ]
 
     for (const { storeKey, modelType } of modelTypes) {
@@ -709,20 +694,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const store = await Store.load('store.json')
     await store.set('speechToTextMode', normalizedMode)
     set({ speechToTextMode: normalizedMode })
-  },
-
-  condenseModel: '',
-  setCondenseModel: async (condenseModel) => {
-    const store = await Store.load('store.json');
-    await store.set('condenseModel', condenseModel)
-    set({ condenseModel })
-  },
-
-  inspirationModel: '',
-  setInspirationModel: async (inspirationModel) => {
-    const store = await Store.load('store.json');
-    await store.set('inspirationModel', inspirationModel)
-    set({ inspirationModel })
   },
 
   systemPrompt: '',
@@ -1217,31 +1188,6 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ recordToolbarConfig: config })
     const store = await Store.load('store.json');
     await store.set('recordToolbarConfig', config)
-    await store.save()
-  },
-
-  // 摘要设置
-  enableCondense: true,
-  setEnableCondense: async (enabled: boolean) => {
-    set({ enableCondense: enabled })
-    const store = await Store.load('store.json');
-    await store.set('enableCondense', enabled)
-    await store.save()
-  },
-
-  keepLatestCount: 4,
-  setKeepLatestCount: async (count: number) => {
-    set({ keepLatestCount: count })
-    const store = await Store.load('store.json');
-    await store.set('keepLatestCount', count)
-    await store.save()
-  },
-
-  condenseMaxLength: 100,
-  setCondenseMaxLength: async (length: number) => {
-    set({ condenseMaxLength: length })
-    const store = await Store.load('store.json');
-    await store.set('condenseMaxLength', length)
     await store.save()
   },
 

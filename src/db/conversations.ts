@@ -164,6 +164,10 @@ export async function updateConversationTime(id: number): Promise<void> {
 // 删除会话及其相关聊天记录
 export async function deleteConversation(id: number): Promise<void> {
   const db = await getDb()
+  await db.execute(
+    "delete from conversation_compactions where conversationId = $1",
+    [id]
+  )
   // 先删除会话的所有聊天记录
   await db.execute(
     "delete from chats where conversationId = $1",

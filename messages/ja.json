@@ -649,8 +649,8 @@
           "desc": "検索結果の並べ替えと最適化に使用されます。"
         },
         "condense": {
-          "title": "摘要模型",
-          "desc": "用于压缩历史对话内容，节省 token 使用量"
+          "title": "圧縮モデル",
+          "desc": "会話履歴を圧縮し、重要なコンテキストを保持するために使用します"
         }
       },
       "mainModel": "メインモデル"
@@ -1211,47 +1211,14 @@
         }
       },
       "condense": {
-        "title": "会話の要約",
         "enable": {
-          "title": "要約を有効にする",
-          "desc": "長い会話を自動的に圧縮してトークン使用量を節約"
+          "title": "コンテキストを自動圧縮",
+          "desc": "モデル上限に近づくと事前に圧縮します。無効時も実際の上限超過後には緊急圧縮と再試行を行います"
         },
         "model": {
-          "title": "要約モデル",
-          "desc": "要約生成に使用する AI モデルを選択",
+          "title": "圧縮モデル",
+          "desc": "会話の圧縮要約を生成します。未指定の場合はメインモデルを使用します",
           "placeholder": "メインモデルを使用"
-        },
-        "threshold": {
-          "title": "トリガーしきい値",
-          "desc": "AI メッセージがこの数を超えたときに圧縮をチェック"
-        },
-        "minToken": {
-          "title": "最小トークン数",
-          "desc": "このトークン数を超えるメッセージのみを圧縮"
-        },
-        "keepLatest": {
-          "title": "最新を保持",
-          "desc": "最新の N 件の AI メッセージを圧縮しない"
-        },
-        "maxLength": {
-          "title": "要約の最大長",
-          "desc": "生成される要約の最大文字数を制御"
-        },
-        "prompt": {
-          "title": "カスタム要約プロンプト",
-          "desc": "要約生成に使用するプロンプトテンプレートをカスタマイズ",
-          "label": "プロンプトテンプレート",
-          "placeholder": "カスタムプロンプトを入力...",
-          "help": "元のコンテンツのプレースホルダーとして {content} を使用",
-          "save": "保存",
-          "reset": "デフォルトにリセット"
-        }
-      },
-      "inspiration": {
-        "title": "インスピレーションモデル",
-        "model": {
-          "title": "クイックプロンプト生成",
-          "desc": "会話を開始するためのクイックプロンプト候補を生成します"
         }
       },
       "conversationTitle": {
@@ -1419,6 +1386,9 @@
       "maxTokens": "最大出力トークン",
       "maxTokensDesc": "1回の生成で出力するトークン数を制限します。空欄の場合はモデルまたはプロバイダーの既定値を使用します。",
       "maxTokensPlaceholder": "モデルの既定値を使用",
+      "contextWindow": "コンテキストウィンドウ",
+      "contextWindowDesc": "モデルが受け入れる入力と出力の合計トークン数です。空欄の場合は自動推定し、コンテキスト超過エラーから学習します。",
+      "contextWindowPlaceholder": "自動検出（既定16K）",
       "tokenLimitParam": "トークン制限パラメーター",
       "tokenLimitParamDesc": "既定では max_completion_tokens を使用します。旧式の互換APIでは max_tokens を選択してください。",
       "advancedParameters": "詳細パラメーター",
@@ -2319,6 +2289,11 @@
           "saveFailedMultiple": "{count} 枚の画像の保存に失敗しました。もう一度お試しください",
           "selectFailed": "画像の選択に失敗しました。もう一度お試しください",
           "dropHint": "離すと画像を添付します"
+        },
+        "contextUsage": {
+          "label": "コンテキスト使用率：{percent}%",
+          "usageDetail": "推定コンテキスト使用率：{percent}%",
+          "tokenDetail": "{usedTokens} / {contextWindow} トークン"
         },
         "agent": {
           "running": "エージェント実行中",

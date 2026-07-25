@@ -10,12 +10,12 @@ import {
   ItemActions,
   ItemGroup,
 } from '@/components/ui/item'
-import { BotMessageSquare, PenTool, Zap, GitCommit, FileText, Lightbulb } from 'lucide-react'
+import { PenTool, Zap, GitCommit } from 'lucide-react'
 import { ModelSelect } from './model-select'
 import { SettingSection } from './setting-base'
 
 interface DefaultModelsSettingsProps {
-  type: 'chat' | 'editor' | 'record'
+  type: 'editor' | 'record'
 }
 
 export function DefaultModelsSettings({ type }: DefaultModelsSettingsProps) {
@@ -24,50 +24,6 @@ export function DefaultModelsSettings({ type }: DefaultModelsSettingsProps) {
   return (
     <SettingSection title={t('defaultModels.title')}>
       <ItemGroup>
-      {/* Chat - Primary Model */}
-      {type === 'chat' && (
-        <>
-          <Item variant="outline">
-            <ItemMedia variant="icon">
-              <BotMessageSquare className="size-4" />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('chat.primaryModel.model.title')}</ItemTitle>
-              <ItemDescription>{t('chat.primaryModel.model.desc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ModelSelect modelKey="primaryModel" />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline">
-            <ItemMedia variant="icon">
-              <FileText className="size-4" />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('chat.condense.model.title')}</ItemTitle>
-              <ItemDescription>{t('chat.condense.model.desc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ModelSelect modelKey="condense" />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline">
-            <ItemMedia variant="icon">
-              <Lightbulb className="size-4" />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('chat.inspiration.model.title')}</ItemTitle>
-              <ItemDescription>{t('chat.inspiration.model.desc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ModelSelect modelKey="inspiration" />
-            </ItemActions>
-          </Item>
-        </>
-      )}
-
       {/* Record - MarkDesc */}
       {type === 'record' && (
         <Item variant="outline">

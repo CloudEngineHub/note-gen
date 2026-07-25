@@ -409,6 +409,22 @@ export default function ModelCard({
                           </Field>
 
                           <Field>
+                            <FieldLabel>{t('contextWindow')}</FieldLabel>
+                            <Input
+                              type="number"
+                              min={1024}
+                              step={1024}
+                              value={modelConfig.contextWindow ?? ''}
+                              placeholder={t('contextWindowPlaceholder')}
+                              onChange={(event) => {
+                                const value = event.target.value
+                                onUpdate(modelConfig.id, 'contextWindow', value === '' ? undefined : Number(value))
+                              }}
+                            />
+                            <FieldDescription>{t('contextWindowDesc')}</FieldDescription>
+                          </Field>
+
+                          <Field>
                             <FieldLabel>{t('tokenLimitParam')}</FieldLabel>
                             <RadioGroup
                               value={modelConfig.tokenLimitParam || 'max_completion_tokens'}

@@ -93,6 +93,7 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
           voice: targetModel.voice,
           enableStream: targetModel.enableStream,
           maxTokens: targetModel.maxTokens,
+          contextWindow: targetModel.contextWindow,
           tokenLimitParam: targetModel.tokenLimitParam,
           enableWebSearch: webSearchSettings.nativeEnabled
             || webSearchSettings.thirdPartyEnabled

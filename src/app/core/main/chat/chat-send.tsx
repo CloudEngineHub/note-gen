@@ -4,7 +4,7 @@ import useSettingStore from "@/stores/setting"
 import useChatStore from "@/stores/chat"
 import useTagStore from "@/stores/tag"
 import { TooltipButton } from "@/components/tooltip-button"
-import { useImperativeHandle, forwardRef, useRef, useEffect } from "react"
+import { useImperativeHandle, forwardRef, useRef } from "react"
 import { useTranslations } from "next-intl"
 import { LinkedResource, isLinkedFolder } from "@/lib/files"
 import { readTextFile } from "@tauri-apps/plugin-fs"
@@ -20,6 +20,13 @@ import type { AgentTraceEvent } from "@/lib/agent/types"
 import type { AgentApprovalDecision, AgentSteeringPayload } from "@/lib/agent/types"
 import { serializeChatAttachments, type RuntimeChatAttachment } from '@/lib/chat-attachments'
 import { retainCompletedAgentTraceEvents } from '@/lib/agent/trace-retention'
+import { getAISettings } from '@/lib/ai/utils'
+import {
+  confirmEstimatedContextWindow,
+  learnContextWindow,
+  parseContextOverflowError,
+  reduceLearnedContextWindow,
+} from '@/lib/ai/model-capacity'
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -46,6 +53,13 @@ function getLastDisplayableAgentContent(
   }
 
   return ''
+}
+
+function isUnknownProviderError(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error)
+  return /500 Internal Server Error/i.test(text)
+    && /"code"\s*:\s*60000/.test(text)
+    && /Unknown error/i.test(text)
 }
 
 interface QuoteData {
@@ -78,7 +92,6 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     setLoading,
     saveChat,
     setAgentState,
-    maybeCondense,
     linkedResourcePreview,
   } = useChatStore()
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -89,21 +102,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
   const pendingSteeringRef = useRef<AgentSteeringPayload[]>([])
   const activeRunRef = useRef(false)
   const repeatedScriptApprovalRef = useRef<{ signature: string; count: number }>({ signature: '', count: 0 })
+  const contextOverflowRetryRef = useRef(0)
   const t = useTranslations()
   const requestText = inputValue.trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt')
-
-  // 跟踪上一次的 loading 状态
-  const wasLoadingRef = useRef(false)
-
-  // 在 AI 响应完成后，触发压缩检查
-  useEffect(() => {
-    if (wasLoadingRef.current && !loading) {
-      // loading 从 true 变为 false，AI 响应完成
-      // 异步触发，不等待完成
-      maybeCondense()
-    }
-    wasLoadingRef.current = loading
-  }, [loading, maybeCondense])
 
   const buildPartialSuccessContent = (result: string, toolCalls: { result?: { success?: boolean; data?: any; error?: string } }[]) => {
     const generatedOutputFiles = toolCalls.flatMap((toolCall) => {
@@ -187,6 +188,45 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     }
 
     return context
+  }
+
+  const startProactiveCompaction = () => {
+    const chatState = useChatStore.getState()
+    if (
+      chatState.isTemporaryConversation
+      || !chatState.currentConversationId
+    ) {
+      return
+    }
+
+    const conversationId = chatState.currentConversationId
+    void Promise.all([
+      import('@/lib/ai/condense'),
+      import('@/stores/article'),
+    ])
+      .then(([{ prepareConversationHistory }, { default: useArticleStore }]) => {
+        const latestChatState = useChatStore.getState()
+        if (latestChatState.currentConversationId !== conversationId) {
+          return
+        }
+
+        const articleState = useArticleStore.getState()
+        const additionalContext = articleState.activeFilePath
+          ? articleState.currentArticle || ''
+          : ''
+
+        return prepareConversationHistory({
+          conversationId,
+          chats: latestChatState.chats,
+          currentUserInput: '',
+          additionalContext,
+          imageCount: 0,
+          proactive: true,
+        })
+      })
+      .catch(error => {
+        console.error('[ConversationCompaction] Background compaction failed:', error)
+      })
   }
 
   useImperativeHandle(ref, () => ({
@@ -316,6 +356,75 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     const articleStore = useArticleStore.getState()
     const useCanvasStore = (await import('@/stores/canvas')).default
     const canvasStore = useCanvasStore.getState()
+    let pendingCapacityProbe: { contextWindow: number } | undefined
+    let deferredOverflowError: string | undefined
+    let contextCapacityProbeActive = false
+
+    const persistAgentError = async (error: string) => {
+      const currentState = useChatStore.getState()
+      const currentMessage = currentState.chats.find(c => c.id === placeholderMessage.id)
+      const resolvedRagSources = currentState.agentState.ragSources?.length
+        ? JSON.stringify(currentState.agentState.ragSources)
+        : currentMessage?.ragSources
+      const resolvedRagSourceDetails = currentState.agentState.ragSourceDetails?.length
+        ? JSON.stringify(currentState.agentState.ragSourceDetails)
+        : currentMessage?.ragSourceDetails
+      const aborted = manualStopRequestedRef.current || isRequestAbortError(error)
+      const preservedContent = getLastDisplayableAgentContent(
+        currentState.agentState.finalAnswerContent,
+        currentState.agentState.traceEvents || []
+      )
+      const stoppedAt = Date.now()
+      const completedTraceEvents = (currentState.agentState.traceEvents || []).map(event => {
+        if (event.status !== 'running') {
+          return event
+        }
+
+        return {
+          ...event,
+          status: aborted ? 'success' as const : 'error' as const,
+          duration: event.duration ?? Math.max(0, stoppedAt - event.timestamp),
+        }
+      })
+      const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
+      const agentHistory = {
+        steps: currentState.agentState.completedSteps || [],
+        toolCalls: currentState.agentState.toolCalls,
+        traceEvents,
+        changes: currentState.agentState.changes || [],
+        runId: currentState.agentState.runId,
+        status: aborted ? 'stopped' : 'failed',
+        loadedSkills: currentState.agentState.loadedSkills || [],
+        iterations: currentState.agentState.currentIteration,
+      }
+
+      await saveChat({
+        id: placeholderMessage.id,
+        tagId: placeholderMessage.tagId,
+        conversationId: placeholderMessage.conversationId,
+        role: placeholderMessage.role,
+        type: placeholderMessage.type,
+        inserted: placeholderMessage.inserted,
+        createdAt: placeholderMessage.createdAt,
+        ragSources: resolvedRagSources,
+        ragSourceDetails: resolvedRagSourceDetails,
+        content: aborted
+          ? preservedContent || t('record.chat.input.stopped')
+          : `Error: ${error}`,
+        agentHistory: JSON.stringify(agentHistory),
+      }, true)
+
+      setAgentState({
+        activeChatId: undefined,
+        isFinalAnswerMode: false,
+        finalAnswerContent: undefined,
+        status: aborted ? 'stopped' : 'failed',
+        isRunning: false,
+        isThinking: false,
+        traceEvents,
+      })
+      agentHandlerRef.current = null
+    }
 
     // 每次都创建新的 AgentHandler，使用当前的 placeholderMessage
     const agentHandler = new AgentHandler({
@@ -345,11 +454,22 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
       },
       formatAutoFinalAnswer: (key, values) => t(key as any, values),
       onComplete: async (result, steps, stopped) => {
+        deferredOverflowError = undefined
         // 获取 Agent 执行历史，保存结构化运行轨迹
         const { agentState } = useChatStore.getState()
         const effectivelyStopped = Boolean(stopped)
           || manualStopRequestedRef.current
           || isRequestAbortError(result)
+        if (!effectivelyStopped && pendingCapacityProbe) {
+          const aiConfig = await getAISettings('primaryModel')
+          if (aiConfig) {
+            await confirmEstimatedContextWindow(
+              aiConfig,
+              pendingCapacityProbe.contextWindow
+            )
+          }
+          pendingCapacityProbe = undefined
+        }
         const completedAt = Date.now()
         const completedTraceEvents = (agentState.traceEvents || []).map(event => {
           if (event.status !== 'running') {
@@ -434,79 +554,57 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
           traceEvents,
         })
 
+        if (!effectivelyStopped) {
+          startProactiveCompaction()
+        }
+
         // 清空 ref
         agentHandlerRef.current = null
       },
       onError: async (error) => {
-        // 获取当前消息状态，保留 ragSources 和 ragSourceDetails
-        const currentState = useChatStore.getState()
-        const currentMessage = currentState.chats.find(c => c.id === placeholderMessage.id)
-        const resolvedRagSources = currentState.agentState.ragSources?.length
-          ? JSON.stringify(currentState.agentState.ragSources)
-          : currentMessage?.ragSources
-        const resolvedRagSourceDetails = currentState.agentState.ragSourceDetails?.length
-          ? JSON.stringify(currentState.agentState.ragSourceDetails)
-          : currentMessage?.ragSourceDetails
-        const aborted = manualStopRequestedRef.current || isRequestAbortError(error)
-        const preservedContent = getLastDisplayableAgentContent(
-          currentState.agentState.finalAnswerContent,
-          currentState.agentState.traceEvents || []
-        )
-        const stoppedAt = Date.now()
-        const completedTraceEvents = (currentState.agentState.traceEvents || []).map(event => {
-          if (event.status !== 'running') {
-            return event
+        const parsedOverflow = parseContextOverflowError(error)
+        const inferredOverflow =
+          !parsedOverflow.detected
+          && contextCapacityProbeActive
+          && isUnknownProviderError(error)
+        const overflow = inferredOverflow
+          ? { detected: true }
+          : parsedOverflow
+        if (inferredOverflow) {
+          agentDebugLog('context_overflow_inferred_from_provider_error', {
+            error,
+            reason: 'unknown_provider_error_during_capacity_probe',
+          })
+        }
+        if (overflow.detected) {
+          const aiConfig = await getAISettings('primaryModel')
+          if (aiConfig) {
+            if (overflow.contextWindow) {
+              await learnContextWindow(aiConfig, overflow.contextWindow)
+            } else {
+              await reduceLearnedContextWindow(aiConfig)
+            }
           }
-
-          return {
-            ...event,
-            status: aborted ? 'success' as const : 'error' as const,
-            duration: event.duration ?? Math.max(0, stoppedAt - event.timestamp),
-          }
-        })
-        const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
-        const agentHistory = {
-          steps: currentState.agentState.completedSteps || [],
-          toolCalls: currentState.agentState.toolCalls,
-          traceEvents,
-          changes: currentState.agentState.changes || [],
-          runId: currentState.agentState.runId,
-          status: aborted ? 'stopped' : 'failed',
-          loadedSkills: currentState.agentState.loadedSkills || [],
-          iterations: currentState.agentState.currentIteration,
         }
 
-        // SDK 可能把手动终止作为普通错误抛出。此时保留已流式输出的正文，
-        // 只有真正的执行错误才写入 Error 信息。
-        await saveChat({
-          id: placeholderMessage.id,
-          tagId: placeholderMessage.tagId,
-          conversationId: placeholderMessage.conversationId,
-          role: placeholderMessage.role,
-          type: placeholderMessage.type,
-          inserted: placeholderMessage.inserted,
-          createdAt: placeholderMessage.createdAt,
-          ragSources: resolvedRagSources,
-          ragSourceDetails: resolvedRagSourceDetails,
-          content: aborted
-            ? preservedContent || t('record.chat.input.stopped')
-            : `Error: ${error}`,
-          agentHistory: JSON.stringify(agentHistory),
-        }, true)
+        const currentState = useChatStore.getState()
+        const canRecoverFromOverflow =
+          overflow.detected
+          && contextOverflowRetryRef.current === 0
+          && currentState.agentState.toolCalls.length === 0
+          && !currentState.isTemporaryConversation
+          && Boolean(currentState.currentConversationId)
+        if (canRecoverFromOverflow) {
+          deferredOverflowError = error
+          agentDebugLog('context_overflow_error_deferred', {
+            conversationId: currentState.currentConversationId,
+            contextWindow: overflow.contextWindow || null,
+          })
+          return
+        }
 
-        // 清空 Final Answer 模式状态
-        setAgentState({
-          activeChatId: undefined,
-          isFinalAnswerMode: false,
-          finalAnswerContent: undefined,
-          status: aborted ? 'stopped' : 'failed',
-          isRunning: false,
-          isThinking: false,
-          traceEvents,
-        })
-
-        // 清空 ref
-        agentHandlerRef.current = null
+        deferredOverflowError = undefined
+        await persistAgentError(error)
       },
     })
 
@@ -530,7 +628,6 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
         injectedByRuntimeSnapshot: Boolean(articleStore.activeFilePath),
         preview: previewText(articleStore.currentArticle || ''),
       })
-
       // 2. 关联文件夹作为 Agent 自动检索时的优先范围，不在发送前预先检索。
       if (linkedResource && isLinkedFolder(linkedResource)) {
         context += [
@@ -674,32 +771,61 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         })
       }
 
-      // 5. 构建消息数组，包含对话历史（使用压缩摘要替代已压缩的消息）
-      const { chats } = useChatStore.getState()
-      const { buildMessagesWithHistory } = await import('@/lib/ai/condense')
+      // 5. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
+      const compactionContext = [
+        context,
+        articleStore.activeFilePath ? articleStore.currentArticle || '' : '',
+      ].filter(Boolean).join('\n\n')
+      const chatState = useChatStore.getState()
+      const { chats } = chatState
+      const {
+        buildMessagesWithHistory,
+        prepareConversationHistory,
+      } = await import('@/lib/ai/condense')
+      let preparedHistory: Awaited<ReturnType<typeof prepareConversationHistory>> | null = null
+      if (!chatState.isTemporaryConversation && chatState.currentConversationId) {
+        try {
+          preparedHistory = await prepareConversationHistory({
+            conversationId: chatState.currentConversationId,
+            chats,
+            currentUserInput: requestText,
+            additionalContext: compactionContext,
+            imageCount: imageUrls.length,
+          })
+          pendingCapacityProbe = preparedHistory.capacityProbe
+          contextCapacityProbeActive = Boolean(
+            preparedHistory.capacityProbe
+            || preparedHistory.capacityLimitProbe
+          )
+        } catch (error) {
+          console.error('[ConversationCompaction] Failed to prepare history:', error)
+        }
+      }
 
       // 使用 buildMessagesWithHistory 构建完整的消息数组
       // 注意：Agent 模式下，不传入 systemPrompt（Agent 会自己构建）
       // 将所有上下文（文章、RAG、关联文件、引用）作为 additionalContext
-      const messages = buildMessagesWithHistory(
+      let messages = buildMessagesWithHistory(
         chats,
         undefined, // systemPrompt - Agent 会自己构建
         context,   // additionalContext - 包含文章、RAG、关联文件、引用等
         undefined, // currentUserInput - AgentRuntime 负责且只注入一次
         {
           // Agent 自己会在 think() 里重新注入当前请求，避免重复。
-          // 保留 assistant 历史，优先使用 condensedContent，避免丢失多轮上下文。
+          // 保留 assistant 历史；已由会话级摘要覆盖的旧回合会在构建阶段排除。
           includeAssistantMessages: true,
           includeLatestUserMessage: false,
-          // Always preserve a bounded amount of user history. The model, rather
-          // than a keyword matcher, decides whether the current request refers to it.
-          maxUserMessages: 3,
+          conversationSummary: preparedHistory?.compaction?.summary,
+          coveredThroughChatId: preparedHistory?.compaction?.coveredThroughChatId,
         }
       )
 
       agentDebugLog('chat_messages_built', {
         userInput: requestText,
         contextLength: context.length,
+        compactionRevision: preparedHistory?.compaction?.revision || null,
+        compactionSource: preparedHistory?.capacity.source || null,
+        compactionWindow: preparedHistory?.capacity.contextWindow || null,
         messageCount: messages.length,
         messages: messages.map((message, index) => ({
           index,
@@ -709,8 +835,64 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         })),
       })
 
-      await agentHandler.execute(requestText, messages, imageUrls)
+      try {
+        await agentHandler.execute(requestText, messages, imageUrls)
+      } catch (error) {
+        const parsedOverflow = parseContextOverflowError(error)
+        const overflow =
+          !parsedOverflow.detected
+          && contextCapacityProbeActive
+          && isUnknownProviderError(error)
+            ? { detected: true }
+            : parsedOverflow
+        const canRetry =
+          overflow.detected
+          && contextOverflowRetryRef.current === 0
+          && useChatStore.getState().agentState.toolCalls.length === 0
+          && !chatState.isTemporaryConversation
+          && Boolean(chatState.currentConversationId)
+
+        if (!canRetry || !chatState.currentConversationId) {
+          throw error
+        }
+
+        contextOverflowRetryRef.current = 1
+        const previousCompactionRevision = preparedHistory?.compaction?.revision
+        preparedHistory = await prepareConversationHistory({
+          conversationId: chatState.currentConversationId,
+          chats: useChatStore.getState().chats,
+          currentUserInput: requestText,
+          additionalContext: compactionContext,
+          imageCount: imageUrls.length,
+          force: true,
+        })
+        pendingCapacityProbe = preparedHistory.capacityProbe
+        contextCapacityProbeActive = false
+        if (
+          !preparedHistory.compacted
+          && preparedHistory.compaction?.revision === previousCompactionRevision
+        ) {
+          throw error
+        }
+        messages = buildMessagesWithHistory(
+          useChatStore.getState().chats,
+          undefined,
+          context,
+          undefined,
+          {
+            includeAssistantMessages: true,
+            includeLatestUserMessage: false,
+            conversationSummary: preparedHistory.compaction?.summary,
+            coveredThroughChatId: preparedHistory.compaction?.coveredThroughChatId,
+          }
+        )
+        await agentHandler.execute(requestText, messages, imageUrls)
+      }
     } catch (error) {
+      if (deferredOverflowError) {
+        await persistAgentError(deferredOverflowError)
+        deferredOverflowError = undefined
+      }
       console.error('Agent execution error:', error)
     } finally {
       // 清空 ref
@@ -764,6 +946,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     }
 
     manualStopRequestedRef.current = false
+    contextOverflowRetryRef.current = 0
     activeRunRef.current = true
     repeatedScriptApprovalRef.current = { signature: '', count: 0 }
     onSent?.()

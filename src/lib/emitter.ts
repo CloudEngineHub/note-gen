@@ -1,5 +1,4 @@
 import mitt from 'mitt'
-import type { QuickPrompt } from '@/lib/ai/placeholder'
 import type { OnboardingStepId } from '@/app/core/main/editor/onboarding-state'
 import type { CanvasDocument } from '@/types/canvas'
 
@@ -80,8 +79,15 @@ interface Events {
   'record-assets-downloaded': { paths: string[] };
   'quick-prompt-insert': string;
   'quick-prompt-send': string;
-  'ai-placeholder-generated': string;
-  'ai-prompts-generated': QuickPrompt[];
+  'conversation-compaction-status': {
+    conversationId: number;
+    status: 'running' | 'completed' | 'failed';
+    messageCount: number;
+    revision?: number;
+    coveredThroughChatId?: number;
+    sourceTokenCount?: number;
+    summaryTokenCount?: number;
+  };
   'start-ai-streaming': {
     originalText: string;
     type: string;

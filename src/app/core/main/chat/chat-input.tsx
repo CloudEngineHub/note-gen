@@ -4,15 +4,13 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import useSettingStore from "@/stores/setting"
 import { Textarea } from "@/components/ui/textarea"
 import useChatStore from "@/stores/chat"
-import useMarkStore from "@/stores/mark"
 import useArticleStore from "@/stores/article"
-import { fetchAiQuickPrompts } from "@/lib/ai/placeholder"
 import { useTranslations } from 'next-intl'
 import { useLocalStorage } from 'react-use';
-import { getWorkspacePath } from "@/lib/workspace"
+import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { ChatSend } from "./chat-send"
 import { LinkedFileDisplay } from "./file-link"
-import { LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
+import { isLinkedFolder, LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
 import emitter from "@/lib/emitter"
 import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -24,6 +22,7 @@ import type { PendingQuote } from "@/stores/chat"
 import { AgentApprovalPanel } from "./agent-approval-panel"
 import { cancelPendingAgentAction, confirmPendingAgentAction } from "./agent-approval-actions"
 import { AgentPermissionModeSelect } from "./agent-permission-mode"
+import { ContextUsageIndicator } from "./context-usage-indicator"
 import { convertFileSrc } from "@tauri-apps/api/core"
 import { readTextFile, writeFile, BaseDirectory, exists, mkdir, stat } from "@tauri-apps/plugin-fs"
 import { ShineBorder } from "@/components/ui/shine-border"
@@ -97,6 +96,7 @@ export const ChatInput = React.memo(function ChatInput() {
     loading,
     setLinkedResource: setChatLinkedResource,
     setLinkedResourcePreview,
+    linkedResourcePreview,
     onboardingPromptDraft,
     setOnboardingPromptDraft,
     pendingQuote,
@@ -107,10 +107,8 @@ export const ChatInput = React.memo(function ChatInput() {
     agentState,
     isTemporaryConversation,
   } = useChatStore()
-  const { marks, trashState } = useMarkStore()
-  const { activeFilePath } = useArticleStore()
+  const { activeFilePath, currentArticle } = useArticleStore()
   const [isComposing, setIsComposing] = useState(false)
-  const [placeholder, setPlaceholder] = useState('')
   const t = useTranslations()
   const defaultPlaceholder = t('record.chat.input.placeholder.default')
   const steeringPlaceholder = t('record.chat.input.placeholder.steering')
@@ -120,12 +118,11 @@ export const ChatInput = React.memo(function ChatInput() {
   const [linkedResource, setLinkedResource] = useState<LinkedResource | null>(null)
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([])
   const [fileAttachments, setFileAttachments] = useState<RuntimeChatAttachment[]>([])
+  const [contextUsageLinkedContent, setContextUsageLinkedContent] = useState('')
   const [isImageDragOver, setIsImageDragOver] = useState(false)
   const chatSendRef = useRef<{ sendChat: () => void } | null>(null)
   const isMobile = useIsMobile()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const placeholderTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const placeholderRequestIdRef = useRef(0)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const isMobileDevice_ = isMobileDevice()
   const imageDragDepthRef = useRef(0)
@@ -133,6 +130,94 @@ export const ChatInput = React.memo(function ChatInput() {
   const onboardingTypingTimerRefs = useRef<number[]>([])
   const maxImageSizeLabel = formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE_BYTES)
   const activeQuote = pendingQuote || editorSelectionQuote
+  const contextUsageLinkedResourceIsActiveFile = Boolean(
+    linkedResource
+    && !isLinkedFolder(linkedResource)
+    && activeFilePath
+    && (
+      linkedResource.relativePath === activeFilePath
+      || linkedResource.path === activeFilePath
+      || linkedResource.name === activeFilePath.split('/').pop()
+    )
+  )
+  const contextUsageAgentRuntime = React.useMemo(() => {
+    if (!agentState.isRunning) {
+      return ''
+    }
+
+    try {
+      return JSON.stringify({
+        currentThought: agentState.currentThought,
+        completedSteps: agentState.completedSteps,
+        toolCalls: agentState.toolCalls,
+      })
+    } catch {
+      return ''
+    }
+  }, [
+    agentState.completedSteps,
+    agentState.currentThought,
+    agentState.isRunning,
+    agentState.toolCalls,
+  ])
+  const contextUsageAdditionalContext = React.useMemo(() => [
+    activeFilePath ? currentArticle : '',
+    contextUsageLinkedResourceIsActiveFile ? '' : linkedResourcePreview,
+    contextUsageLinkedContent,
+    linkedResource && !contextUsageLinkedResourceIsActiveFile
+      ? `${linkedResource.name}\n${linkedResource.relativePath}`
+      : '',
+    activeQuote?.fullContent,
+    contextUsageAgentRuntime,
+    ...fileAttachments.map(attachment => attachment.preview || ''),
+  ].filter(Boolean).join('\n\n'), [
+    activeQuote?.fullContent,
+    activeFilePath,
+    currentArticle,
+    contextUsageAgentRuntime,
+    fileAttachments,
+    contextUsageLinkedContent,
+    linkedResource,
+    contextUsageLinkedResourceIsActiveFile,
+    linkedResourcePreview,
+  ])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadLinkedContent = async () => {
+      if (!linkedResource || isLinkedFolder(linkedResource)) {
+        setContextUsageLinkedContent('')
+        return
+      }
+
+      if (contextUsageLinkedResourceIsActiveFile) {
+        setContextUsageLinkedContent('')
+        return
+      }
+
+      try {
+        const workspace = await getWorkspacePath()
+        const content = workspace.isCustom
+          ? await readTextFile(linkedResource.path)
+          : await getFilePathOptions(linkedResource.path).then(({ path, baseDir }) =>
+              readTextFile(path, { baseDir })
+            )
+        if (!cancelled) {
+          setContextUsageLinkedContent(content)
+        }
+      } catch {
+        if (!cancelled) {
+          setContextUsageLinkedContent('')
+        }
+      }
+    }
+
+    void loadLinkedContent()
+    return () => {
+      cancelled = true
+    }
+  }, [contextUsageLinkedResourceIsActiveFile, linkedResource])
 
   const applyTypedText = useCallback((value: string) => {
     setText(value)
@@ -652,87 +737,6 @@ export const ChatInput = React.memo(function ChatInput() {
     }
   }
 
-  const normalizePlaceholderText = useCallback((value: unknown) => {
-    return typeof value === 'string' ? value.trim() : ''
-  }, [])
-
-  // 获取输入框占位符
-  const genInputPlaceholder = useCallback(async () => {
-    const requestId = placeholderRequestIdRef.current + 1
-    placeholderRequestIdRef.current = requestId
-    setPlaceholder(defaultPlaceholder)
-
-    if (!primaryModel) return
-    if (trashState) return
-    const lastClearIndex = chats.findLastIndex(item => item.type === 'clear')
-    const chatsAfterClear = chats.slice(lastClearIndex + 1)
-    const request_content = `
-      ${chatsAfterClear.slice(0, 5).map(item => item.content?.slice(0, 60)).join(';\n\n')}
-    `.trim()
-
-    try {
-      // 使用 fetchAiQuickPrompts 获取4条提示词
-      const prompts = await fetchAiQuickPrompts(request_content)
-      if (requestId !== placeholderRequestIdRef.current) {
-        return
-      }
-
-      const validPrompts = prompts
-        .map(prompt => ({
-          ...prompt,
-          text: normalizePlaceholderText(prompt.text),
-        }))
-        .filter(prompt => prompt.text.length > 0)
-
-      // 发送事件给 chat-empty 组件，显示前3条
-      if (validPrompts.length >= 3) {
-        emitter.emit('ai-prompts-generated', validPrompts)
-      }
-
-      // 取第4条作为 placeholder
-      const placeholderText = validPrompts[3]?.text
-      setPlaceholder(placeholderText ? `${placeholderText} [Tab]` : defaultPlaceholder)
-    } catch {
-      if (requestId === placeholderRequestIdRef.current) {
-        setPlaceholder(defaultPlaceholder)
-      }
-    }
-  }, [chats, defaultPlaceholder, normalizePlaceholderText, primaryModel, trashState])
-
-  // 防抖的 placeholder 生成函数，延迟 1.5 秒执行，只执行最后一次
-  const debouncedGenPlaceholder = useCallback(() => {
-    // 清除之前的定时器
-    if (placeholderTimerRef.current) {
-      clearTimeout(placeholderTimerRef.current)
-    }
-    placeholderRequestIdRef.current += 1
-    setPlaceholder(defaultPlaceholder)
-    
-    // 设置新的定时器
-    placeholderTimerRef.current = setTimeout(() => {
-      genInputPlaceholder()
-    }, 1500) // 1.5秒延迟
-  }, [defaultPlaceholder, genInputPlaceholder])
-
-
-  // 插入占位符
-  function insertPlaceholder() {
-    if (placeholder.includes('[Tab]')) {
-      setText(placeholder.replace('[Tab]', ''))
-      placeholderRequestIdRef.current += 1
-      setPlaceholder(defaultPlaceholder)
-    }
-  }
-
-  useEffect(() => {
-    // 如果有 marks，生成 AI 提示词作为 placeholder
-    if (marks.length > 0) {
-      genInputPlaceholder()
-    } else {
-      setPlaceholder(defaultPlaceholder)
-    }
-  }, [defaultPlaceholder, genInputPlaceholder, marks, primaryModel])
-
   useEffect(() => {
     emitter.on('revertChat', (event: unknown) => {
       setText(event as string)
@@ -752,21 +756,12 @@ export const ChatInput = React.memo(function ChatInput() {
       setTimeout(() => {
         textareaRef.current?.focus()
       }, 50)
-      // 触发防抖的 placeholder 重新生成
-      debouncedGenPlaceholder()
     })
     emitter.on('quick-prompt-insert', (prompt: string) => {
       setText(prompt)
       textareaRef.current?.focus()
     })
-    emitter.on('ai-placeholder-generated', (event: unknown) => {
-      const promptText = normalizePlaceholderText(event)
-      setPlaceholder(promptText || defaultPlaceholder)
-    })
     return () => {
-      if (placeholderTimerRef.current) {
-        clearTimeout(placeholderTimerRef.current)
-      }
       onboardingTypingTimerRefs.current.forEach((timerId) => window.clearTimeout(timerId))
       onboardingTypingTimerRefs.current = []
       emitter.off('revertChat')
@@ -774,9 +769,8 @@ export const ChatInput = React.memo(function ChatInput() {
       emitter.off('folderSelected')
       emitter.off('insert-quote')
       emitter.off('quick-prompt-insert')
-      emitter.off('ai-placeholder-generated')
     }
-  }, [debouncedGenPlaceholder, defaultPlaceholder, normalizePlaceholderText, setPendingQuote])
+  }, [setPendingQuote])
 
   useEffect(() => {
     if (!onboardingPromptDraft) {
@@ -977,13 +971,6 @@ ${previewLines.join('\n')}
     linkCurrentResource()
   }, [activeFilePath])
 
-  // 当关联文件变化时，触发防抖的 placeholder 重新生成
-  useEffect(() => {
-    if (linkedResource) {
-      debouncedGenPlaceholder()
-    }
-  }, [linkedResource, debouncedGenPlaceholder])
-
   return (
     <footer
       id="onboarding-target-chat-input"
@@ -1079,7 +1066,7 @@ ${previewLines.join('\n')}
               const newHeight = Math.min(textarea.scrollHeight, 240)
               textarea.style.height = `${newHeight}px`
             }}
-            placeholder={loading ? steeringPlaceholder : placeholder || defaultPlaceholder}
+            placeholder={loading ? steeringPlaceholder : defaultPlaceholder}
             onKeyDown={(e) => {
               const textarea = e.target as HTMLTextAreaElement
               const cursorPosition = textarea.selectionStart
@@ -1089,10 +1076,6 @@ ${previewLines.join('\n')}
               if (e.key === "Enter" && !isComposing && !e.shiftKey && e.keyCode === 13) {
                 e.preventDefault()
                 chatSendRef.current?.sendChat()
-              }
-              if (e.key === "Tab") {
-                e.preventDefault()
-                insertPlaceholder()
               }
               if (e.key === "ArrowUp" && !isComposing) {
                 if (isAtStart) {
@@ -1112,11 +1095,6 @@ ${previewLines.join('\n')}
                   e.preventDefault()
                   // 移动光标到开头
                   textarea.setSelectionRange(0, 0)
-                }
-              }
-              if (e.key === "Backspace") {
-                if (text === '') {
-                  setPlaceholder(defaultPlaceholder)
                 }
               }
             }}
@@ -1146,6 +1124,11 @@ ${previewLines.join('\n')}
             )}
           </div>
           <div className="flex items-center justify-end gap-2 pr-1">
+            <ContextUsageIndicator
+              currentUserInput={text}
+              additionalContext={contextUsageAdditionalContext}
+              imageCount={attachedImages.length}
+            />
             <AgentPermissionModeSelect />
             <ChatSend inputValue={text} onSent={handleSent} linkedResource={linkedResource} attachedImages={attachedImages} fileAttachments={fileAttachments} quoteData={activeQuote} dockStyle={isMobile} ref={chatSendRef} />
           </div>
