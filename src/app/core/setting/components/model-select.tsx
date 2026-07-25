@@ -39,7 +39,7 @@ export function ModelSelect({
   onValueChange?: (model: string) => void | Promise<void>
 }) {
   const [groupedModels, setGroupedModels] = useState<GroupedModel[]>([])
-  const { setCompletionModel, setMarkDescModel, setPrimaryModel, setImageMethodModel, setAudioModel, setSttModel, setEmbeddingModel, setRerankingModel } = useSettingStore()
+  const { setCompletionModel, setEditorModel, setMarkDescModel, setPrimaryModel, setImageMethodModel, setAudioModel, setSttModel, setEmbeddingModel, setRerankingModel } = useSettingStore()
   const [model, setModel] = useState<string>('')
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('settings.defaultModel')
@@ -74,6 +74,9 @@ export function ModelSelect({
     switch (modelKey) {
       case 'primaryModel':
         setPrimaryModel(primaryModel)
+        break;
+      case 'editor':
+        setEditorModel(primaryModel)
         break;
       case 'imageMethod':
         setImageMethodModel(primaryModel)

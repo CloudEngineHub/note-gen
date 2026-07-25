@@ -18,7 +18,12 @@
   },
   "settings": {
     "defaultModels": {
-      "title": "預設模型"
+      "title": "預設模型",
+      "followPrimary": {
+        "title": "編輯器模型",
+        "desc": "用於續寫、內容生成和自動提交訊息；未選擇時跟隨目前的主要模型",
+        "value": "跟隨主要模型"
+      }
     },
     "others": "高級",
     "general": {
@@ -461,10 +466,56 @@
     },
     "editor": {
       "title": "編輯器設置",
-      "interfaceSettings": "界面設置",
       "desc": "在這裡，你可以對編輯器進行自定義配置，打造更適合你的寫作方式。",
-      "centeredContent": "置中內容",
-      "centeredContentDesc": "啟用後，編輯器內容將在中間顯示，兩側留白。",
+      "layout": {
+        "title": "寫作版面",
+        "desc": "調整桌面編輯器的內容寬度和閱讀密度",
+        "contentWidth": {
+          "title": "內容寬度",
+          "desc": "設定正文在編輯器中的最大顯示寬度",
+          "options": {
+            "narrow": "窄",
+            "standard": "標準",
+            "wide": "寬",
+            "full": "鋪滿"
+          }
+        },
+        "lineHeight": {
+          "title": "行高",
+          "desc": "調整正文行與行之間的距離",
+          "options": {
+            "compact": "緊湊",
+            "comfortable": "舒適",
+            "relaxed": "寬鬆"
+          }
+        }
+      },
+      "display": {
+        "title": "編輯器顯示",
+        "desc": "設定大綱和編輯器工具的預設顯示方式"
+      },
+      "mode": {
+        "title": "預設編輯模式",
+        "desc": "設定桌面編輯器預設使用的編輯方式，也可在編輯器底部隨時切換",
+        "options": {
+          "visual": "所見即所得",
+          "source": "Markdown 原始碼"
+        }
+      },
+      "stats": {
+        "title": "寫作統計",
+        "desc": "在狀態列顯示字元數和預計閱讀時間",
+        "characters": "{count} 字元",
+        "readingTime": "約 {count} 分鐘"
+      },
+      "sourceMode": {
+        "visual": "所見即所得模式",
+        "source": "Markdown 原始碼模式"
+      },
+      "sourceLineNumbers": {
+        "title": "原始碼行號",
+        "desc": "在 Markdown 原始碼模式左側顯示行號"
+      },
       "outlineEnable": "預設啟用大綱",
       "outlineEnableDesc": "啟用後，編輯器將默認顯示大綱。",
       "outlinePosition": "大綱位置",
@@ -692,7 +743,7 @@
       "options": {
         "primaryModel": {
           "title": "主要模型",
-          "desc": "作為所有場景的主要模型，如果其他對話模型未選擇默認模型，則使用此模型。"
+          "desc": "用於對話、編輯器 AI 和自動生成文字等通用場景。"
         },
         "markDesc": {
           "title": "記錄描述",

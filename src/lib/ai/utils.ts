@@ -135,6 +135,10 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
   return undefined
 }
 
+export async function getEditorAISettings(): Promise<AiConfig | undefined> {
+  return await getAISettings('editorModel') || await getAISettings('primaryModel')
+}
+
 export function getChatTokenLimitParams(
   config?: Pick<AiConfig, 'maxTokens' | 'tokenLimitParam'>
 ): { max_completion_tokens?: number; max_tokens?: number } {

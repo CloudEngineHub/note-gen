@@ -20,6 +20,22 @@ import {
 } from '@/lib/ai/system-prompt'
 import { APP_FONT_SYSTEM_VALUE, applyAppFontFamily } from '@/lib/font-settings'
 import type { AgentPermissionMode } from '@/lib/agent/types'
+import {
+  DEFAULT_EDITOR_CONTENT_WIDTH,
+  DEFAULT_EDITOR_LINE_HEIGHT,
+  DEFAULT_EDITOR_VIEW_MODE,
+  normalizeEditorContentWidth,
+  normalizeEditorLineHeight,
+  normalizeEditorViewMode,
+  type EditorContentWidth,
+  type EditorLineHeight,
+  type EditorViewMode,
+} from '@/lib/editor-layout-styles'
+import {
+  DEFAULT_OUTLINE_POSITION,
+  normalizeOutlinePosition,
+  type OutlinePosition,
+} from '@/lib/outline-preferences'
 
 export enum GenTemplateRange {
   All = 'all',
@@ -67,6 +83,9 @@ interface SettingState {
 
   primaryModel: string
   setPrimaryModel: (primaryModel: string) => void
+
+  editorModel: string
+  setEditorModel: (editorModel: string) => Promise<void>
 
   placeholderModel: string
   setPlaceholderModel: (placeholderModel: string) => Promise<void>
@@ -256,6 +275,27 @@ interface SettingState {
   showEditorUndoRedo: boolean
   setShowEditorUndoRedo: (show: boolean) => Promise<void>
 
+  showEditorStats: boolean
+  setShowEditorStats: (show: boolean) => Promise<void>
+
+  showSourceLineNumbers: boolean
+  setShowSourceLineNumbers: (show: boolean) => Promise<void>
+
+  editorContentWidth: EditorContentWidth
+  setEditorContentWidth: (width: EditorContentWidth) => Promise<void>
+
+  editorLineHeight: EditorLineHeight
+  setEditorLineHeight: (lineHeight: EditorLineHeight) => Promise<void>
+
+  editorViewMode: EditorViewMode
+  setEditorViewMode: (viewMode: EditorViewMode) => Promise<void>
+
+  enableOutline: boolean
+  setEnableOutline: (enable: boolean) => Promise<void>
+
+  outlinePosition: OutlinePosition
+  setOutlinePosition: (position: OutlinePosition) => Promise<void>
+
 }
 
 export interface RecordToolbarItem {
@@ -323,6 +363,48 @@ const useSettingStore = create<SettingState>((set, get) => ({
   initSettingData: async () => {
     const store = await Store.load('store.json');
     await get().setVersion()
+
+    let editorPreferencesChanged = false
+    const storedEditorContentWidth = await store.get('editorContentWidth')
+    if (storedEditorContentWidth === undefined) {
+      const legacyCenteredContent = await store.get<boolean>('centeredContent')
+      await store.set(
+        'editorContentWidth',
+        legacyCenteredContent === true ? 'standard' : DEFAULT_EDITOR_CONTENT_WIDTH
+      )
+      editorPreferencesChanged = true
+    } else {
+      const normalizedContentWidth = normalizeEditorContentWidth(storedEditorContentWidth)
+      if (normalizedContentWidth !== storedEditorContentWidth) {
+        await store.set('editorContentWidth', normalizedContentWidth)
+        editorPreferencesChanged = true
+      }
+    }
+
+    const storedEditorLineHeight = await store.get('editorLineHeight')
+    const normalizedLineHeight = normalizeEditorLineHeight(storedEditorLineHeight)
+    if (normalizedLineHeight !== storedEditorLineHeight) {
+      await store.set('editorLineHeight', normalizedLineHeight)
+      editorPreferencesChanged = true
+    }
+
+    const storedEditorViewMode = await store.get('editorViewMode')
+    const normalizedViewMode = normalizeEditorViewMode(storedEditorViewMode)
+    if (normalizedViewMode !== storedEditorViewMode) {
+      await store.set('editorViewMode', normalizedViewMode)
+      editorPreferencesChanged = true
+    }
+
+    const storedOutlinePosition = await store.get('outlinePosition')
+    const normalizedOutlinePosition = normalizeOutlinePosition(storedOutlinePosition)
+    if (normalizedOutlinePosition !== storedOutlinePosition) {
+      await store.set('outlinePosition', normalizedOutlinePosition)
+      editorPreferencesChanged = true
+    }
+
+    if (editorPreferencesChanged) {
+      await store.save()
+    }
 
     // 初始化图床配置
     const savedUseImageRepo = await store.get<boolean>('useImageRepo')
@@ -629,6 +711,14 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
   primaryModel: '',
   setPrimaryModel: (primaryModel) => set({ primaryModel }),
+
+  editorModel: '',
+  setEditorModel: async (editorModel) => {
+    set({ editorModel })
+    const store = await Store.load('store.json')
+    await store.set('editorModel', editorModel)
+    await store.save()
+  },
 
   placeholderModel: '',
   setPlaceholderModel: async (placeholderModel) => {
@@ -1218,6 +1308,62 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ showEditorUndoRedo: show })
     const store = await Store.load('store.json');
     await store.set('showEditorUndoRedo', show)
+    await store.save()
+  },
+
+  showEditorStats: true,
+  setShowEditorStats: async (showEditorStats) => {
+    set({ showEditorStats })
+    const store = await Store.load('store.json')
+    await store.set('showEditorStats', showEditorStats)
+    await store.save()
+  },
+
+  showSourceLineNumbers: true,
+  setShowSourceLineNumbers: async (showSourceLineNumbers) => {
+    set({ showSourceLineNumbers })
+    const store = await Store.load('store.json')
+    await store.set('showSourceLineNumbers', showSourceLineNumbers)
+    await store.save()
+  },
+
+  editorContentWidth: DEFAULT_EDITOR_CONTENT_WIDTH,
+  setEditorContentWidth: async (editorContentWidth) => {
+    set({ editorContentWidth })
+    const store = await Store.load('store.json')
+    await store.set('editorContentWidth', editorContentWidth)
+    await store.save()
+  },
+
+  editorLineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
+  setEditorLineHeight: async (editorLineHeight) => {
+    set({ editorLineHeight })
+    const store = await Store.load('store.json')
+    await store.set('editorLineHeight', editorLineHeight)
+    await store.save()
+  },
+
+  editorViewMode: DEFAULT_EDITOR_VIEW_MODE,
+  setEditorViewMode: async (editorViewMode) => {
+    set({ editorViewMode })
+    const store = await Store.load('store.json')
+    await store.set('editorViewMode', editorViewMode)
+    await store.save()
+  },
+
+  enableOutline: false,
+  setEnableOutline: async (enableOutline) => {
+    set({ enableOutline })
+    const store = await Store.load('store.json')
+    await store.set('enableOutline', enableOutline)
+    await store.save()
+  },
+
+  outlinePosition: DEFAULT_OUTLINE_POSITION,
+  setOutlinePosition: async (outlinePosition) => {
+    set({ outlinePosition })
+    const store = await Store.load('store.json')
+    await store.set('outlinePosition', outlinePosition)
     await store.save()
   },
 }))

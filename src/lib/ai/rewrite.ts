@@ -1,5 +1,5 @@
 import {
-  getAISettings,
+  getEditorAISettings,
   prepareMessages,
   createOpenAIClient,
   handleAIError,
@@ -17,7 +17,7 @@ const REWRITE_OUTPUT_RULE = 'Never output any thinking, reasoning, analysis, or 
  */
 export async function fetchAiPolish(text: string): Promise<string> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')
@@ -54,7 +54,7 @@ Output:`
  */
 export async function fetchAiConcise(text: string): Promise<string> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')
@@ -91,7 +91,7 @@ Output:`
  */
 export async function fetchAiExpand(text: string): Promise<string> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')
@@ -134,7 +134,7 @@ export async function fetchAiPolishStream(
   onThinkingUpdate?: (thinking: string) => void,
 ): Promise<void> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')
@@ -216,7 +216,7 @@ export async function fetchAiConciseStream(
   onThinkingUpdate?: (thinking: string) => void,
 ): Promise<void> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')
@@ -298,7 +298,7 @@ export async function fetchAiExpandStream(
   onThinkingUpdate?: (thinking: string) => void,
 ): Promise<void> {
   try {
-    const aiConfig = await getAISettings('primaryModel')
+    const aiConfig = await getEditorAISettings()
 
     if (!aiConfig || await validateAIService(aiConfig.baseURL) === null) {
       throw new Error('AI service not configured')

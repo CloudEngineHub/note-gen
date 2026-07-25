@@ -10,7 +10,7 @@ import {
   ItemActions,
   ItemGroup,
 } from '@/components/ui/item'
-import { PenTool, Zap, GitCommit } from 'lucide-react'
+import { Bot, PenTool } from 'lucide-react'
 import { ModelSelect } from './model-select'
 import { SettingSection } from './setting-base'
 
@@ -24,51 +24,41 @@ export function DefaultModelsSettings({ type }: DefaultModelsSettingsProps) {
   return (
     <SettingSection title={t('defaultModels.title')}>
       <ItemGroup>
-      {/* Record - MarkDesc */}
-      {type === 'record' && (
-        <Item variant="outline">
-          <ItemMedia variant="icon">
-            <PenTool className="size-4" />
-          </ItemMedia>
-          <ItemContent>
-            <ItemTitle>{t('record.model.markDesc.title')}</ItemTitle>
-            <ItemDescription>{t('record.model.markDesc.desc')}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <ModelSelect modelKey="markDesc" />
-          </ItemActions>
-        </Item>
-      )}
+        {/* Record - MarkDesc */}
+        {type === 'record' && (
+          <Item variant="outline">
+            <ItemMedia variant="icon">
+              <PenTool />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('record.model.markDesc.title')}</ItemTitle>
+              <ItemDescription>{t('record.model.markDesc.desc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ModelSelect modelKey="markDesc" />
+            </ItemActions>
+          </Item>
+        )}
 
-      {/* Editor - Completion & Commit */}
-      {type === 'editor' && (
-        <>
+        {/* Editor - use the app-wide primary model */}
+        {type === 'editor' && (
           <Item variant="outline">
             <ItemMedia variant="icon">
-              <GitCommit className="size-4" />
+              <Bot />
             </ItemMedia>
             <ItemContent>
-              <ItemTitle>{t('editor.commit.model.title')}</ItemTitle>
-              <ItemDescription>{t('editor.commit.model.desc')}</ItemDescription>
+              <ItemTitle>{t('defaultModels.followPrimary.title')}</ItemTitle>
+              <ItemDescription>{t('defaultModels.followPrimary.desc')}</ItemDescription>
             </ItemContent>
             <ItemActions>
-              <ModelSelect modelKey="commit" />
+              <ModelSelect
+                modelKey="editor"
+                emptyLabel={t('defaultModels.followPrimary.value')}
+                clearTooltip={t('defaultModels.followPrimary.value')}
+              />
             </ItemActions>
           </Item>
-          <Item variant="outline">
-            <ItemMedia variant="icon">
-              <Zap className="size-4" />
-            </ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('editor.completion.model.title')}</ItemTitle>
-              <ItemDescription>{t('editor.completion.model.desc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <ModelSelect modelKey="completion" />
-            </ItemActions>
-          </Item>
-        </>
-      )}
+        )}
       </ItemGroup>
     </SettingSection>
   )

@@ -32,8 +32,7 @@ import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useRef, useCallback, useMemo, useState, type MouseEvent as ReactMouseEvent, type UIEvent as ReactUIEvent } from 'react'
-import { Store } from '@tauri-apps/plugin-store'
+import { useEffect, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type UIEvent as ReactUIEvent } from 'react'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
 import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
@@ -80,7 +79,12 @@ import { MobileEditorContextBar } from './mobile-editor-context-bar'
 import { MobileEditorMoreSheet } from './mobile-editor-more-sheet'
 import { MobileWritingToolbar } from './mobile-writing-toolbar'
 import { shouldRestorePendingQuote } from './quote-session'
-import { getEditorContentContainerClass } from '@/lib/editor-layout-styles'
+import {
+  DEFAULT_EDITOR_CONTENT_WIDTH,
+  EDITOR_LINE_HEIGHT_VALUES,
+  getEditorContentContainerClass,
+  type EditorViewMode,
+} from '@/lib/editor-layout-styles'
 import { getCanvasDragId, hasCanvasDragData } from '@/lib/canvas/canvas-dnd'
 import { canvasDocumentToPngFile } from '@/lib/canvas/static-export'
 import { getCanvasProject } from '@/db/canvases'
@@ -1012,6 +1016,7 @@ interface TipTapEditorProps {
   contentInset?: boolean
   scrollable?: boolean
   mobileMode?: boolean
+  applyLayoutPreferences?: boolean
   onTerminate?: () => void
 }
 
@@ -1116,11 +1121,13 @@ export function TipTapEditor({
   contentInset = true,
   scrollable = true,
   mobileMode,
+  applyLayoutPreferences = false,
   onTerminate,
 }: TipTapEditorProps) {
   const t = useTranslations('editor')
   const tMermaid = useTranslations('editor.mermaid.templates')
   const tImage = useTranslations('editor.image')
+  const tSourceMode = useTranslations('settings.editor.sourceMode')
   const pendingQuote = useChatStore((state) => state.pendingQuote)
   const pendingSearchKeyword = useArticleStore((state) => state.pendingSearchKeyword)
   const setPendingSearchKeyword = useArticleStore((state) => state.setPendingSearchKeyword)
@@ -1130,20 +1137,75 @@ export function TipTapEditor({
   const placeholderText = placeholder || t('placeholder')
   const isMobile = mobileMode ?? isMobileDevice()
   const [isRestoringMobileView, setIsRestoringMobileView] = useState(isMobile)
+  const [sourceMarkdown, setSourceMarkdown] = useState(initialContent)
 
   // Use ref for autoScroll to avoid infinite re-render loop
   const autoScrollRef = useRef(autoScroll)
   autoScrollRef.current = autoScroll
 
-  // 获取正文缩放设置
-  const { contentTextScale } = useSettingStore()
-
-  // 居中内容设置
-  const [centeredContent, setCenteredContent] = useState(false)
+  const {
+    contentTextScale,
+    editorContentWidth,
+    editorLineHeight,
+    editorViewMode,
+    showSourceLineNumbers,
+    setEditorViewMode,
+  } = useSettingStore()
+  const viewMode: EditorViewMode = applyLayoutPreferences && !isMobile
+    ? editorViewMode
+    : 'visual'
+  const previousViewModeRef = useRef<EditorViewMode>(viewMode)
 
   // 编辑器容器 ref，用于应用字体缩放
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const sourceMirrorRef = useRef<HTMLDivElement>(null)
+  const sourceLines = useMemo(() => sourceMarkdown.split('\n'), [sourceMarkdown])
+  const [sourceLineHeights, setSourceLineHeights] = useState<number[]>([])
+  const measuredSourceHeight = sourceLineHeights.length === sourceLines.length
+    ? sourceLineHeights.reduce((total, height) => total + height, 48)
+    : undefined
+
+  useLayoutEffect(() => {
+    if (viewMode !== 'source') return
+
+    const textarea = sourceTextareaRef.current
+    const mirror = sourceMirrorRef.current
+    if (!textarea || !mirror) return
+
+    let frameId: number | null = null
+    const measureLines = () => {
+      mirror.style.width = `${Math.max(0, textarea.clientWidth - 32)}px`
+      const nextHeights = Array.from(
+        mirror.children,
+        (line) => line.getBoundingClientRect().height
+      )
+
+      setSourceLineHeights((currentHeights) => (
+        currentHeights.length === nextHeights.length
+        && currentHeights.every((height, index) => height === nextHeights[index])
+          ? currentHeights
+          : nextHeights
+      ))
+    }
+    const scheduleMeasure = () => {
+      if (frameId !== null) cancelAnimationFrame(frameId)
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        measureLines()
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleMeasure)
+    resizeObserver.observe(textarea)
+    scheduleMeasure()
+
+    return () => {
+      resizeObserver.disconnect()
+      if (frameId !== null) cancelAnimationFrame(frameId)
+    }
+  }, [editorLineHeight, sourceLines, viewMode])
 
   // Math dialog state
   const [mathDialogOpen, setMathDialogOpen] = useState(false)
@@ -1176,20 +1238,6 @@ export function TipTapEditor({
   const restoredViewPathRef = useRef<string | null>(null)
   const lastViewStateRef = useRef<{ path: string; selectionFrom: number; selectionTo: number; scrollTop: number } | null>(null)
 
-  // 读取居中内容设置（移动端强制关闭）
-  useEffect(() => {
-    async function loadCenteredContent() {
-      // 移动端强制关闭居中内容
-      if (isMobile) {
-        setCenteredContent(false)
-        return
-      }
-      const store = await Store.load('store.json');
-      const centered = await store.get<boolean>('centeredContent') || false
-      setCenteredContent(centered)
-    }
-    loadCenteredContent()
-  }, [isMobile])
   // Bug fix: Track when editor is ready (has caught up with content)
   const isReadyRef = useRef(false)
   // Bug fix: Track if this is the first onUpdate after initialization
@@ -1258,9 +1306,10 @@ export function TipTapEditor({
       initializedForPathRef.current = activeFilePath
       pendingSyncUpdateRef.current = null
       restoredViewPathRef.current = null
+      setSourceMarkdown(initialContent)
       setIsRestoringMobileView(isMobile)
     }
-  }, [activeFilePath, isMobile])
+  }, [activeFilePath, initialContent, isMobile])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -1606,6 +1655,47 @@ export function TipTapEditor({
       }
     },
   })
+
+  const handleSourceMarkdownChange = useCallback((value: string) => {
+    setSourceMarkdown(value)
+    editor?.commands.setContent(value, {
+      contentType: 'markdown',
+      emitUpdate: false,
+    })
+    onChangeRef.current?.(value)
+  }, [editor])
+
+  useEffect(() => {
+    if (!editor || previousViewModeRef.current === viewMode) return
+
+    if (viewMode === 'visual') {
+      setEditorContentWithoutUndo(editor, sourceMarkdown)
+    } else {
+      flushMarkdownChange(editor)
+      setSourceMarkdown(normalizeMarkdownPlaceholders(editor.getMarkdown()))
+    }
+
+    previousViewModeRef.current = viewMode
+  }, [editor, flushMarkdownChange, sourceMarkdown, viewMode])
+
+  const handleToggleViewMode = useCallback(() => {
+    void setEditorViewMode(viewMode === 'source' ? 'visual' : 'source')
+  }, [setEditorViewMode, viewMode])
+
+  const handleSourceKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Tab') return
+
+    event.preventDefault()
+    const textarea = event.currentTarget
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const nextMarkdown = `${sourceMarkdown.slice(0, start)}  ${sourceMarkdown.slice(end)}`
+
+    handleSourceMarkdownChange(nextMarkdown)
+    requestAnimationFrame(() => {
+      textarea.setSelectionRange(start + 2, start + 2)
+    })
+  }, [handleSourceMarkdownChange, sourceMarkdown])
 
   useEffect(() => {
     if (!editor) return
@@ -3751,6 +3841,7 @@ export function TipTapEditor({
         if (activeFilePath !== currentPath) return
 
         setEditorContentWithoutUndo(editor, initialContent || '')
+        setSourceMarkdown(initialContent || '')
         // Mark as initialized to allow subsequent content updates
         isInitializedRef.current = true
         // Bug fix: Mark editor as ready AFTER content is set
@@ -3967,10 +4058,11 @@ export function TipTapEditor({
   // This fixes cursor jump issue caused by unnecessary setContent during local saves
   useEffect(() => {
     const handleRemoteContentUpdate = (event: { content: string }) => {
-      if (!editor || !event?.content) return
+      if (!editor || typeof event?.content !== 'string') return
 
       const currentContent = editor.getMarkdown()
       const newContent = event.content
+      setSourceMarkdown(newContent)
 
       // Only update if content actually changed
       if (newContent !== currentContent) {
@@ -4004,6 +4096,7 @@ export function TipTapEditor({
 
       // Bug fix: Skip if content hasn't actually changed
       const currentContent = editor.getMarkdown()
+      setSourceMarkdown(event.content)
       if (currentContent === event.content) return
 
       // Bug fix: Set pending update and verify path when processing
@@ -4040,6 +4133,7 @@ export function TipTapEditor({
       if (editor && externalUpdateCounterRef.current === 0) {
         // Bug fix: Skip if content hasn't actually changed
         const currentContent = editor.getMarkdown()
+        setSourceMarkdown(newContent)
         if (currentContent === newContent) return
 
         // Bug fix: Mark editor as not ready during update
@@ -5066,6 +5160,14 @@ export function TipTapEditor({
         scrollable ? "h-full" : "h-auto min-h-full",
         !contentInset && "tiptap-editor-no-inset"
       )}
+      data-editor-line-height={applyLayoutPreferences && !isMobile ? editorLineHeight : undefined}
+      style={
+        applyLayoutPreferences && !isMobile
+          ? {
+              '--editor-line-height': EDITOR_LINE_HEIGHT_VALUES[editorLineHeight],
+            } as CSSProperties
+          : undefined
+      }
     >
       {isMobile && mobileContext && (
         <MobileEditorContextBar
@@ -5087,10 +5189,10 @@ export function TipTapEditor({
         )}
         onMouseDownCapture={handleEditorMouseDownCapture}
         onScroll={handleEditorScroll}
-        onDragEnter={handleEditorDragOver}
-        onDragOver={handleEditorDragOver}
-        onDragLeave={handleEditorDragLeave}
-        onDropCapture={handleEditorDrop}
+        onDragEnter={viewMode === 'visual' ? handleEditorDragOver : undefined}
+        onDragOver={viewMode === 'visual' ? handleEditorDragOver : undefined}
+        onDragLeave={viewMode === 'visual' ? handleEditorDragLeave : undefined}
+        onDropCapture={viewMode === 'visual' ? handleEditorDrop : undefined}
       >
         {(isCanvasDragOver || isCanvasDropPending) && (
           <div className={cn(
@@ -5104,13 +5206,19 @@ export function TipTapEditor({
           </div>
         )}
         <div
-          className={getEditorContentContainerClass({
-            centeredContent,
-            isMobile,
-            outlineOpen: !!outlineOpen,
-            outlinePosition,
-            contentInset,
-          })}
+          className={cn(
+            getEditorContentContainerClass({
+              contentWidth: applyLayoutPreferences
+                ? editorContentWidth
+                : DEFAULT_EDITOR_CONTENT_WIDTH,
+              isMobile,
+              outlineOpen: !!outlineOpen,
+              outlinePosition,
+              contentInset,
+            }),
+            scrollable && viewMode !== 'source' && 'h-full',
+            viewMode === 'source' && 'min-h-full'
+          )}
           style={
             !isMobile && outlineOpen
               ? {
@@ -5119,35 +5227,94 @@ export function TipTapEditor({
               : undefined
           }
         >
-        <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
-          <SmartFileLink editor={editor} activeFilePath={activeFilePath} />
-
-          {!isMobile && <ImageBubbleMenu editor={editor} />}
-
-          <AISuggestionFloating editor={editor} />
-
-          {!isMobile && <FloatingTableMenu editor={editor} />}
-
-          {!isMobile && (
-            <BubbleMenuComponent
-              editor={editor}
-              onAIPolish={handleAIPolish}
-              onAIConcise={handleAIConcise}
-              onAIExpand={handleAIExpand}
-              onAITranslate={handleAITranslate}
-              onCreateCanvas={type => void handleCreateCanvasFromSelection(type)}
-              openAiMenuSignal={openAiMenuSignal}
-              openTranslateMenuSignal={openTranslateMenuSignal}
-              openLinkInputSignal={openLinkInputSignal}
+        {viewMode === 'source' && applyLayoutPreferences && !isMobile ? (
+          <div className="relative flex min-h-full w-full">
+            {showSourceLineNumbers ? (
+              <div
+                aria-hidden="true"
+                className="relative min-h-full min-w-12 shrink-0 select-none border-r bg-muted/20 py-6 pl-2 pr-3 text-right font-mono text-sm text-muted-foreground before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-screen before:bg-muted/20 before:content-['']"
+              >
+                {sourceLines.map((_, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      height: sourceLineHeights[index],
+                      lineHeight: 'var(--editor-line-height)',
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div
+              ref={sourceMirrorRef}
+              aria-hidden="true"
+              className="pointer-events-none invisible absolute left-0 top-0 whitespace-pre-wrap break-words font-mono text-sm"
+              style={{
+                lineHeight: 'var(--editor-line-height)',
+                overflowWrap: 'anywhere',
+                tabSize: 2,
+              }}
+            >
+              {sourceLines.map((line, index) => (
+                <div key={index}>
+                  {line || '\u200b'}
+                </div>
+              ))}
+            </div>
+            <textarea
+              ref={sourceTextareaRef}
+              value={sourceMarkdown}
+              disabled={!editable}
+              spellCheck={false}
+              wrap="soft"
+              rows={sourceLines.length}
+              aria-label={tSourceMode('source')}
+              className="block min-h-full min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent px-4 py-6 font-mono text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              style={{
+                height: measuredSourceHeight,
+                lineHeight: 'var(--editor-line-height)',
+                overflowWrap: 'anywhere',
+                tabSize: 2,
+              }}
+              onChange={(event) => handleSourceMarkdownChange(event.target.value)}
+              onKeyDown={handleSourceKeyDown}
             />
-          )}
-        </EditorContent>
+          </div>
+        ) : (
+          <>
+            <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
+              <SmartFileLink editor={editor} activeFilePath={activeFilePath} />
 
-        <SearchReplacePanel
-          editor={editor}
-          open={searchReplaceOpen}
-          onOpenChange={setSearchReplaceOpen}
-        />
+              {!isMobile && <ImageBubbleMenu editor={editor} />}
+
+              <AISuggestionFloating editor={editor} />
+
+              {!isMobile && <FloatingTableMenu editor={editor} />}
+
+              {!isMobile && (
+                <BubbleMenuComponent
+                  editor={editor}
+                  onAIPolish={handleAIPolish}
+                  onAIConcise={handleAIConcise}
+                  onAIExpand={handleAIExpand}
+                  onAITranslate={handleAITranslate}
+                  onCreateCanvas={type => void handleCreateCanvasFromSelection(type)}
+                  openAiMenuSignal={openAiMenuSignal}
+                  openTranslateMenuSignal={openTranslateMenuSignal}
+                  openLinkInputSignal={openLinkInputSignal}
+                />
+              )}
+            </EditorContent>
+
+            <SearchReplacePanel
+              editor={editor}
+              open={searchReplaceOpen}
+              onOpenChange={setSearchReplaceOpen}
+            />
+          </>
+        )}
         </div>
       </div>
 
@@ -5228,6 +5395,9 @@ export function TipTapEditor({
           editor={editor}
           outlineOpen={effectiveOutlineOpen}
           onToggleOutline={handleOutlineToggle}
+          viewMode={viewMode}
+          onToggleViewMode={applyLayoutPreferences && !isMobile ? handleToggleViewMode : undefined}
+          sourceMarkdown={viewMode === 'source' ? sourceMarkdown : undefined}
         />
       ) : null}
 

@@ -8,15 +8,13 @@ import { Loader2, Download } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import emitter from '@/lib/emitter'
 import {
-  DEFAULT_OUTLINE_POSITION,
   DEFAULT_OUTLINE_WIDTH,
-  normalizeOutlinePosition,
   normalizeOutlineWidth,
   OUTLINE_WIDTH_STORE_KEY,
-  type OutlinePosition,
 } from '@/lib/outline-preferences'
 import { Store } from '@tauri-apps/plugin-store'
 import { useShallow } from 'zustand/react/shallow'
+import useSettingStore from '@/stores/setting'
 
 interface MdEditorProps {
   tabContentsRef: RefObject<Record<string, string>>
@@ -40,6 +38,15 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     currentArticle: state.currentArticle,
     justPulledFile: state.justPulledFile,
   })))
+  const {
+    enableOutline,
+    outlinePosition,
+    setEnableOutline,
+  } = useSettingStore(useShallow((state) => ({
+    enableOutline: state.enableOutline,
+    outlinePosition: state.outlinePosition,
+    setEnableOutline: state.setEnableOutline,
+  })))
 
   const t = useTranslations('article.file.sync')
   const tEditor = useTranslations('editor')
@@ -57,8 +64,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   // Bug fix: Track expected content to detect if editor is behind
   const expectedContentRef = useRef<string | null>(null)
   // Outline panel state
-  const [outlineOpen, setOutlineOpen] = useState(false)
-  const [outlinePosition, setOutlinePosition] = useState<OutlinePosition>(DEFAULT_OUTLINE_POSITION)
   const [outlineWidth, setOutlineWidth] = useState(DEFAULT_OUTLINE_WIDTH)
   // State for editor instance (to trigger re-render when ready)
   const [editorInstance, setEditorInstance] = useState<any>(null)
@@ -130,35 +135,24 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     }
   }, [filePath])
 
-  const loadOutlinePreferences = useCallback(async () => {
+  const loadOutlineWidth = useCallback(async () => {
     const store = await Store.load('store.json')
-    setOutlineOpen(await store.get<boolean>('enableOutline') || false)
-    setOutlinePosition(normalizeOutlinePosition(await store.get('outlinePosition')))
     setOutlineWidth(normalizeOutlineWidth(await store.get(OUTLINE_WIDTH_STORE_KEY)))
   }, [])
 
   useEffect(() => {
-    loadOutlinePreferences()
-  }, [loadOutlinePreferences])
+    loadOutlineWidth()
+  }, [loadOutlineWidth])
 
   useEffect(() => {
     if (!isActive) return
 
-    loadOutlinePreferences()
-  }, [isActive, loadOutlinePreferences])
+    loadOutlineWidth()
+  }, [isActive, loadOutlineWidth])
 
   const handleToggleOutline = useCallback(() => {
-    setOutlineOpen((previous) => {
-      const next = !previous
-
-      void (async () => {
-        const store = await Store.load('store.json')
-        await store.set('enableOutline', next)
-      })()
-
-      return next
-    })
-  }, [])
+    void setEnableOutline(!enableOutline)
+  }, [enableOutline, setEnableOutline])
 
   const handleOutlineWidthChange = useCallback((width: number) => {
     setOutlineWidth(normalizeOutlineWidth(width))
@@ -284,8 +278,8 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
 
   // Handle content changes - only save if this is the active file
   const handleContentChange = useCallback((content: string) => {
-    // Bug fix: Don't save if content is empty
-    if (content.length === 0) {
+    // Ignore only the initial empty update; clearing an initialized document must still save.
+    if (content.length === 0 && !contentInitializedRef.current) {
       return
     }
     // Bug fix: If expected content is set and incoming content doesn't match, skip save
@@ -426,10 +420,11 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         placeholder={tEditor('placeholder')}
         activeFilePath={filePath}
         onEditorReady={handleEditorReady}
-        outlineOpen={outlineOpen}
+        outlineOpen={enableOutline}
         outlinePosition={outlinePosition}
         outlineWidth={outlineWidth}
         onToggleOutline={handleToggleOutline}
+        applyLayoutPreferences
         editable={!isPulling && !aiStreaming}
         autoScroll={aiStreaming}
         showOverlay={aiStreaming}
@@ -443,10 +438,10 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         }
       />
 
-      {outlineOpen && !isPulling && editorReady && editorInstance && (
+      {enableOutline && !isPulling && editorReady && editorInstance && (
         <Outline
           editor={editorInstance}
-          isOpen={outlineOpen}
+          isOpen={enableOutline}
           position={outlinePosition}
           documentKey={filePath}
           width={outlineWidth}

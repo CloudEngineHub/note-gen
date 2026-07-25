@@ -18,7 +18,12 @@
   },
   "settings": {
     "defaultModels": {
-      "title": "Default Models"
+      "title": "Default Models",
+      "followPrimary": {
+        "title": "Editor model",
+        "desc": "Used for continuations, content generation, and automatic commit messages; follows the primary model when not selected",
+        "value": "Follow primary model"
+      }
     },
     "others": "Advanced",
     "general": {
@@ -524,10 +529,56 @@
     },
     "editor": {
       "title": "Editor Settings",
-      "interfaceSettings": "Interface Settings",
       "desc": "Here, you can customize the editor, creating a writing experience tailored to your needs.",
-      "centeredContent": "Centered Content",
-      "centeredContentDesc": "When enabled, editor content will be centered with margins on both sides.",
+      "layout": {
+        "title": "Writing Layout",
+        "desc": "Adjust the content width and reading density of the desktop editor",
+        "contentWidth": {
+          "title": "Content width",
+          "desc": "Set the maximum width of the document in the editor",
+          "options": {
+            "narrow": "Narrow",
+            "standard": "Standard",
+            "wide": "Wide",
+            "full": "Full"
+          }
+        },
+        "lineHeight": {
+          "title": "Line height",
+          "desc": "Adjust the spacing between lines of text",
+          "options": {
+            "compact": "Compact",
+            "comfortable": "Comfortable",
+            "relaxed": "Relaxed"
+          }
+        }
+      },
+      "display": {
+        "title": "Editor Display",
+        "desc": "Choose how the outline and editor controls appear by default"
+      },
+      "mode": {
+        "title": "Default editing mode",
+        "desc": "Choose the default desktop editing mode; you can also switch it from the editor footer",
+        "options": {
+          "visual": "Visual",
+          "source": "Markdown source"
+        }
+      },
+      "stats": {
+        "title": "Writing statistics",
+        "desc": "Show character count and estimated reading time in the status bar",
+        "characters": "{count} characters",
+        "readingTime": "about {count} min"
+      },
+      "sourceMode": {
+        "visual": "Visual editor",
+        "source": "Markdown source"
+      },
+      "sourceLineNumbers": {
+        "title": "Source line numbers",
+        "desc": "Show line numbers beside the Markdown source editor"
+      },
       "outlineEnable": "Default outline enabled",
       "outlineEnableDesc": "Enabling it will make the outline visible by default.",
       "outlinePosition": "Outline position",
@@ -853,7 +904,7 @@
       "options": {
         "primaryModel": {
           "title": "Main model",
-          "desc": "As the main model for all scenarios, this model is used if other dialogue models do not select the default model."
+          "desc": "Used for chat, editor AI, and other general text generation."
         },
         "markDesc": {
           "title": "Record Description",

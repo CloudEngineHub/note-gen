@@ -1,5 +1,5 @@
 import {
-  getAISettings,
+  getEditorAISettings,
   validateAIService,
   createOpenAIClient,
   handleAIError,
@@ -120,8 +120,7 @@ ${context}`
  */
 export async function fetchCompletion(context: string, abortSignal?: AbortSignal): Promise<string> {
   try {
-    // 获取AI设置（使用快速补全模型）
-    const aiConfig = await getAISettings('completionModel')
+    const aiConfig = await getEditorAISettings()
 
     // 验证AI服务
     if (await validateAIService(aiConfig?.baseURL) === null) return ''
@@ -172,8 +171,7 @@ export async function fetchCompletionStream(
   abortSignal?: AbortSignal
 ): Promise<void> {
   try {
-    // 获取AI设置（使用快速补全模型）
-    const aiConfig = await getAISettings('completionModel')
+    const aiConfig = await getEditorAISettings()
 
     // 验证AI服务
     if (await validateAIService(aiConfig?.baseURL) === null) return
@@ -238,7 +236,7 @@ export async function fetchEditorAiGenerationStream(
   abortSignal?: AbortSignal
 ): Promise<void> {
   try {
-    const aiConfig = await getAISettings('completionModel')
+    const aiConfig = await getEditorAISettings()
 
     if (await validateAIService(aiConfig?.baseURL) === null) return
 

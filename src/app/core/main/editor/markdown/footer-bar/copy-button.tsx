@@ -13,11 +13,12 @@ import {
 
 interface CopyButtonProps {
   editor: Editor
+  markdown?: string
 }
 
 type CopyFormat = 'markdown' | 'html' | 'json' | 'text'
 
-export function CopyButton({ editor }: CopyButtonProps) {
+export function CopyButton({ editor, markdown }: CopyButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [copying, setCopying] = useState<CopyFormat | null>(null)
 
@@ -42,8 +43,8 @@ export function CopyButton({ editor }: CopyButtonProps) {
   }, [])
 
   const handleCopyMarkdown = useCallback(() => {
-    copyToClipboard(editor.getMarkdown(), 'markdown')
-  }, [editor, copyToClipboard])
+    copyToClipboard(markdown ?? editor.getMarkdown(), 'markdown')
+  }, [editor, markdown, copyToClipboard])
 
   const handleCopyHtml = useCallback(() => {
     copyToClipboard(editor.getHTML(), 'html')

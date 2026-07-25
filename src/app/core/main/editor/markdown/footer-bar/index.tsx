@@ -1,7 +1,7 @@
 'use client'
 
 import { Editor } from '@tiptap/react'
-import { FileText } from 'lucide-react'
+import { Code2, Eye, FileText } from 'lucide-react'
 import { WordCount } from './word-count'
 import { CopyButton } from './copy-button'
 import { ExportButton } from './export-button'
@@ -12,20 +12,31 @@ import { PullButton } from '../sync/pull-button'
 import { HistorySheet } from '../sync/history-sheet'
 import useArticleStore from '@/stores/article'
 import { isMobileDevice } from '@/lib/check'
+import { Button } from '@/components/ui/button'
+import useSettingStore from '@/stores/setting'
+import { useTranslations } from 'next-intl'
 
 interface FooterBarProps {
   editor: Editor
   outlineOpen?: boolean
   onToggleOutline?: () => void
+  viewMode?: 'visual' | 'source'
+  onToggleViewMode?: () => void
+  sourceMarkdown?: string
 }
 
 export function FooterBar({
   editor,
   outlineOpen,
   onToggleOutline,
+  viewMode = 'visual',
+  onToggleViewMode,
+  sourceMarkdown,
 }: FooterBarProps) {
   const activeFilePath = useArticleStore((state) => state.activeFilePath)
   const isMobile = isMobileDevice()
+  const showEditorStats = useSettingStore((state) => state.showEditorStats)
+  const tSourceMode = useTranslations('settings.editor.sourceMode')
   const fileName = activeFilePath
     ? activeFilePath.split('/').pop() || activeFilePath
     : '未命名'
@@ -38,7 +49,7 @@ export function FooterBar({
           <div className="min-w-0 flex items-center gap-1.5 overflow-hidden">
             <span className="block min-w-0 truncate font-medium text-foreground/90">{fileName}</span>
             <div className="shrink-0">
-              <WordCount editor={editor} />
+              <WordCount editor={editor} compact />
             </div>
           </div>
         </div>
@@ -55,9 +66,21 @@ export function FooterBar({
     <div className="h-6 flex items-center justify-between px-3 border-t border-border bg-background text-xs text-muted-foreground">
       {/* Left side: Word count, Copy, Export, Outline */}
       <div className="flex items-center gap-1">
-        <WordCount editor={editor} />
-        <CopyButton editor={editor} />
-        <ExportButton editor={editor} />
+        {showEditorStats ? <WordCount editor={editor} sourceMarkdown={sourceMarkdown} /> : null}
+        {onToggleViewMode ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            title={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+            aria-label={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+            onClick={onToggleViewMode}
+          >
+            {viewMode === 'source' ? <Eye /> : <Code2 />}
+          </Button>
+        ) : null}
+        <CopyButton editor={editor} markdown={sourceMarkdown} />
+        <ExportButton editor={editor} markdown={sourceMarkdown} />
         <OutlineToggle
           editor={editor}
           outlineOpen={outlineOpen}

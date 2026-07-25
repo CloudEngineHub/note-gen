@@ -18,7 +18,12 @@
   },
   "settings": {
     "defaultModels": {
-      "title": "默认模型"
+      "title": "默认模型",
+      "followPrimary": {
+        "title": "编辑器模型",
+        "desc": "用于续写、内容生成和自动提交信息；不选择时跟随当前主要模型",
+        "value": "跟随主要模型"
+      }
     },
     "others": "高级",
     "general": {
@@ -525,9 +530,55 @@
     "editor": {
       "title": "编辑器设置",
       "desc": "在这里，你可以对编辑器进行自定义配置，打造更适合你的写作方式。",
-      "interfaceSettings": "界面设置",
-      "centeredContent": "居中内容",
-      "centeredContentDesc": "启用后，编辑器内容将在中间显示，两侧留白。",
+      "layout": {
+        "title": "写作布局",
+        "desc": "调整桌面编辑器的内容宽度和阅读密度",
+        "contentWidth": {
+          "title": "内容宽度",
+          "desc": "设置正文在编辑器中的最大显示宽度",
+          "options": {
+            "narrow": "窄",
+            "standard": "标准",
+            "wide": "宽",
+            "full": "铺满"
+          }
+        },
+        "lineHeight": {
+          "title": "行高",
+          "desc": "调整正文行与行之间的距离",
+          "options": {
+            "compact": "紧凑",
+            "comfortable": "舒适",
+            "relaxed": "宽松"
+          }
+        }
+      },
+      "display": {
+        "title": "编辑器显示",
+        "desc": "设置大纲和编辑器工具的默认显示方式"
+      },
+      "mode": {
+        "title": "默认编辑模式",
+        "desc": "设置桌面编辑器默认使用的编辑方式，也可在编辑器底部随时切换",
+        "options": {
+          "visual": "所见即所得",
+          "source": "Markdown 源码"
+        }
+      },
+      "stats": {
+        "title": "写作统计",
+        "desc": "在状态栏显示字符数和预计阅读时间",
+        "characters": "{count} 字符",
+        "readingTime": "约 {count} 分钟"
+      },
+      "sourceMode": {
+        "visual": "所见即所得模式",
+        "source": "Markdown 源码模式"
+      },
+      "sourceLineNumbers": {
+        "title": "源码行号",
+        "desc": "在 Markdown 源码模式左侧显示行号"
+      },
       "outlineEnable": "默认启用大纲",
       "outlineEnableDesc": "启用后，编辑器将默认显示大纲。",
       "outlinePosition": "大纲位置",
@@ -795,7 +846,7 @@
       "options": {
         "primaryModel": {
           "title": "主要模型",
-          "desc": "作为所有场景的主要模型，如果其他对话模型未选择默认模型，则使用此模型。"
+          "desc": "用于对话、编辑器 AI 和自动生成文本等通用场景。"
         },
         "markDesc": {
           "title": "记录描述",

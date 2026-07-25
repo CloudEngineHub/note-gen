@@ -18,7 +18,12 @@
   },
   "settings": {
     "defaultModels": {
-      "title": "デフォルトモデル"
+      "title": "デフォルトモデル",
+      "followPrimary": {
+        "title": "エディターモデル",
+        "desc": "文章の続き、コンテンツ生成、自動コミットメッセージに使用します。未選択の場合はメインモデルに従います",
+        "value": "メインモデルに従う"
+      }
     },
     "others": "その他",
     "general": {
@@ -461,10 +466,56 @@
     },
     "editor": {
       "title": "エディター設定",
-      "interfaceSettings": "インターフェース設定",
       "desc": "ここでは、エディターをカスタマイズして、より適した書き込み体験を提供できます。",
-      "centeredContent": "コンテンツを中央に表示",
-      "centeredContentDesc": "有効にすると、コンテンツを中央に表示し、両側に余白を設けます。",
+      "layout": {
+        "title": "執筆レイアウト",
+        "desc": "デスクトップエディターのコンテンツ幅と読みやすさを調整します",
+        "contentWidth": {
+          "title": "コンテンツ幅",
+          "desc": "エディター内の本文の最大表示幅を設定します",
+          "options": {
+            "narrow": "狭い",
+            "standard": "標準",
+            "wide": "広い",
+            "full": "全幅"
+          }
+        },
+        "lineHeight": {
+          "title": "行間",
+          "desc": "本文の行間を調整します",
+          "options": {
+            "compact": "コンパクト",
+            "comfortable": "快適",
+            "relaxed": "ゆったり"
+          }
+        }
+      },
+      "display": {
+        "title": "エディター表示",
+        "desc": "アウトラインとエディターツールの既定の表示方法を設定します"
+      },
+      "mode": {
+        "title": "デフォルト編集モード",
+        "desc": "デスクトップエディターのデフォルト編集方法を設定します。エディター下部からいつでも切り替えられます",
+        "options": {
+          "visual": "WYSIWYG",
+          "source": "Markdown ソース"
+        }
+      },
+      "stats": {
+        "title": "執筆統計",
+        "desc": "ステータスバーに文字数と推定読書時間を表示します",
+        "characters": "{count} 文字",
+        "readingTime": "約 {count} 分"
+      },
+      "sourceMode": {
+        "visual": "ビジュアルエディター",
+        "source": "Markdown ソース"
+      },
+      "sourceLineNumbers": {
+        "title": "ソースの行番号",
+        "desc": "Markdown ソースモードの左側に行番号を表示します"
+      },
       "outlineEnable": "アウトラインを有効にする",
       "outlineEnableDesc": "アウトラインを有効にすると、アウトラインが表示されます。",
       "outlinePosition": "アウトライン位置",
@@ -691,7 +742,7 @@
       "options": {
         "primaryModel": {
           "title": "メインモデル",
-          "desc": "すべてのシーンのメインモデルとして、他の会話モデルがデフォルトモデルを選択していない場合、このモデルを使用します。"
+          "desc": "チャット、エディター AI、その他の一般的なテキスト生成に使用します。"
         },
         "markDesc": {
           "title": "記録の説明",

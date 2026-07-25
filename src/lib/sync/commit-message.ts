@@ -1,6 +1,6 @@
 import {
   createOpenAIClient,
-  getAISettings,
+  getEditorAISettings,
   withEditorFastAiRequestOptions,
 } from '@/lib/ai/utils'
 
@@ -17,7 +17,7 @@ export async function generateGitSyncCommitMessage(path: string, content: string
     : null
 
   try {
-    const aiConfig = await getAISettings('commitModel')
+    const aiConfig = await getEditorAISettings()
     if (!aiConfig?.baseURL || !aiConfig?.model) {
       return fallback
     }

@@ -1,5 +1,6 @@
 import {
   getAISettings,
+  getEditorAISettings,
   prepareMessages,
   createOpenAIClient,
   handleAIError,
@@ -17,8 +18,8 @@ import { createAiStreamContentProcessor } from './sanitize';
 export async function fetchAiTranslate(text: string, targetLanguage: string): Promise<string> {
   try {
     // 项目当前没有 translateModel 设置项，优先兼容未来扩展，
-    // 若不存在则回退到主对话模型。
-    const aiConfig = await getAISettings('translateModel') || await getAISettings('primaryModel')
+    // 若不存在则使用编辑器模型，并在未选择时回退到主要模型。
+    const aiConfig = await getAISettings('translateModel') || await getEditorAISettings()
 
     if (await validateAIService(aiConfig?.baseURL) === null) {
       return ''
@@ -52,7 +53,7 @@ export async function fetchAiTranslateStream(
   onThinkingUpdate?: (thinking: string) => void,
 ): Promise<void> {
   try {
-    const aiConfig = await getAISettings('translateModel') || await getAISettings('primaryModel')
+    const aiConfig = await getAISettings('translateModel') || await getEditorAISettings()
 
     if (await validateAIService(aiConfig?.baseURL) === null) {
       return

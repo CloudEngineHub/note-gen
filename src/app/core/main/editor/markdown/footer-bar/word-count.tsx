@@ -2,17 +2,32 @@
 
 import { Editor } from '@tiptap/react'
 import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+
+import {
+  getEditorStatistics,
+  markdownToPlainText,
+  type EditorStatistics,
+} from '@/lib/editor-statistics'
 
 interface WordCountProps {
   editor: Editor
+  sourceMarkdown?: string
+  compact?: boolean
 }
 
-export function WordCount({ editor }: WordCountProps) {
-  const [characters, setCharacters] = useState(() => editor.state.doc.textContent.length)
+export function WordCount({ editor, sourceMarkdown, compact = false }: WordCountProps) {
+  const t = useTranslations('settings.editor.stats')
+  const getCurrentStatistics = () => getEditorStatistics(
+    sourceMarkdown === undefined
+      ? editor.state.doc.textContent
+      : markdownToPlainText(sourceMarkdown)
+  )
+  const [statistics, setStatistics] = useState<EditorStatistics>(getCurrentStatistics)
 
   useEffect(() => {
-    if (!editor) {
-      setCharacters(0)
+    if (sourceMarkdown !== undefined) {
+      setStatistics(getEditorStatistics(markdownToPlainText(sourceMarkdown)))
       return
     }
 
@@ -25,11 +40,11 @@ export function WordCount({ editor }: WordCountProps) {
 
       updateTimer = setTimeout(() => {
         updateTimer = null
-        setCharacters(editor.state.doc.textContent.length)
+        setStatistics(getEditorStatistics(editor.state.doc.textContent))
       }, 400)
     }
 
-    setCharacters(editor.state.doc.textContent.length)
+    setStatistics(getEditorStatistics(editor.state.doc.textContent))
     editor.on('create', updateCharacters)
     editor.on('update', updateCharacters)
 
@@ -40,9 +55,17 @@ export function WordCount({ editor }: WordCountProps) {
       editor.off('create', updateCharacters)
       editor.off('update', updateCharacters)
     }
-  }, [editor])
+  }, [editor, sourceMarkdown])
+
+  if (compact) {
+    return <span className="text-xs">{t('characters', { count: statistics.characters })}</span>
+  }
 
   return (
-    <span className="text-xs">{characters} 字符</span>
+    <span className="flex items-center gap-1.5 text-xs">
+      <span>{t('characters', { count: statistics.characters })}</span>
+      <span aria-hidden="true">·</span>
+      <span>{t('readingTime', { count: statistics.readingMinutes })}</span>
+    </span>
   )
 }

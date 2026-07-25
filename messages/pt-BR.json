@@ -18,7 +18,12 @@
   },
   "settings": {
     "defaultModels": {
-      "title": "Modelos Padrão"
+      "title": "Modelos Padrão",
+      "followPrimary": {
+        "title": "Modelo do editor",
+        "desc": "Usado para continuações, geração de conteúdo e mensagens automáticas de commit; segue o modelo principal quando não selecionado",
+        "value": "Seguir modelo principal"
+      }
     },
     "others": "Avançado",
     "general": {
@@ -461,10 +466,56 @@
     },
     "editor": {
       "title": "Configurações do Editor",
-      "interfaceSettings": "Configurações de Interface",
       "desc": "Aqui, você pode personalizar o editor, criando uma experiência de escrita adaptada às suas necessidades.",
-      "centeredContent": "Conteúdo Centralizado",
-      "centeredContentDesc": "Quando ativado, o conteúdo do editor será centralizado com margens em ambos os lados.",
+      "layout": {
+        "title": "Layout de escrita",
+        "desc": "Ajuste a largura do conteúdo e a densidade de leitura no editor para desktop",
+        "contentWidth": {
+          "title": "Largura do conteúdo",
+          "desc": "Defina a largura máxima do texto no editor",
+          "options": {
+            "narrow": "Estreita",
+            "standard": "Padrão",
+            "wide": "Ampla",
+            "full": "Total"
+          }
+        },
+        "lineHeight": {
+          "title": "Altura da linha",
+          "desc": "Ajuste o espaço entre as linhas do texto",
+          "options": {
+            "compact": "Compacta",
+            "comfortable": "Confortável",
+            "relaxed": "Espaçosa"
+          }
+        }
+      },
+      "display": {
+        "title": "Exibição do editor",
+        "desc": "Escolha como o sumário e os controles do editor são exibidos por padrão"
+      },
+      "mode": {
+        "title": "Modo de edição padrão",
+        "desc": "Escolha o modo padrão do editor para desktop; você também pode alterná-lo no rodapé do editor",
+        "options": {
+          "visual": "Visual",
+          "source": "Código Markdown"
+        }
+      },
+      "stats": {
+        "title": "Estatísticas de escrita",
+        "desc": "Mostre caracteres e o tempo estimado de leitura na barra de status",
+        "characters": "{count} caracteres",
+        "readingTime": "cerca de {count} min"
+      },
+      "sourceMode": {
+        "visual": "Editor visual",
+        "source": "Código-fonte Markdown"
+      },
+      "sourceLineNumbers": {
+        "title": "Números de linha",
+        "desc": "Mostra números de linha ao lado do editor de código Markdown"
+      },
       "outlineEnable": "Sumário habilitado por padrão",
       "outlineEnableDesc": "Habilitar esta opção tornará o sumário visível por padrão.",
       "outlinePosition": "Posição do Sumário",
@@ -770,7 +821,7 @@
       "options": {
         "primaryModel": {
           "title": "Modelo principal",
-          "desc": "Como o modelo principal para todos os cenários, este modelo é usado se outros modelos de diálogo não selecionarem o modelo padrão."
+          "desc": "Usado para chat, IA do editor e outras tarefas gerais de geração de texto."
         },
         "markDesc": {
           "title": "Descrição do Registro",
