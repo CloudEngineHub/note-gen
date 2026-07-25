@@ -24,6 +24,31 @@
     "general": {
       "title": "Configurações Gerais",
       "desc": "Aqui, você pode configurar as definições básicas do aplicativo, incluindo tema da interface, idioma e outras opções.",
+      "behavior": {
+        "title": "Comportamento do Aplicativo",
+        "desc": "Escolha como o NoteGen inicia e o que acontece ao fechar a janela",
+        "close": {
+          "title": "Ao fechar a janela",
+          "desc": "Escolha o que o botão de fechar deve fazer",
+          "options": {
+            "minimize": "Minimizar para a bandeja",
+            "quit": "Sair imediatamente",
+            "ask": "Perguntar sempre"
+          }
+        },
+        "autostart": {
+          "title": "Iniciar com o sistema",
+          "desc": "Inicie o NoteGen automaticamente após entrar no sistema",
+          "error": "Não foi possível atualizar a inicialização automática"
+        },
+        "closePrompt": {
+          "title": "Fechar o NoteGen?",
+          "desc": "Você pode manter o NoteGen disponível na bandeja do sistema ou sair completamente do aplicativo.",
+          "cancel": "Cancelar",
+          "minimize": "Minimizar para a bandeja",
+          "quit": "Sair do aplicativo"
+        }
+      },
       "interface": {
         "title": "Configurações da Interface",
         "theme": {

@@ -38,6 +38,8 @@ export interface GenTemplate {
   range: GenTemplateRange
 }
 
+export type CloseBehavior = 'minimize' | 'quit' | 'ask'
+
 interface SettingState {
   initSettingData: () => Promise<void>
 
@@ -52,6 +54,9 @@ interface SettingState {
 
   appFontFamily: string
   setAppFontFamily: (fontFamily: string) => Promise<void>
+
+  closeBehavior: CloseBehavior
+  setCloseBehavior: (behavior: CloseBehavior) => Promise<void>
 
   // setting - ai - 当前选择的模型 key
   currentAi: string
@@ -605,6 +610,14 @@ const useSettingStore = create<SettingState>((set, get) => ({
     applyAppFontFamily(fontFamily)
     const store = await Store.load('store.json')
     await store.set('appFontFamily', fontFamily)
+    await store.save()
+  },
+
+  closeBehavior: 'minimize',
+  setCloseBehavior: async (closeBehavior) => {
+    set({ closeBehavior })
+    const store = await Store.load('store.json')
+    await store.set('closeBehavior', closeBehavior)
     await store.save()
   },
 

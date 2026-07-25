@@ -1,6 +1,7 @@
 'use client'
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { CloseBehaviorGuard } from "@/components/close-behavior-guard"
 import useSettingStore from "@/stores/setting"
 import { useEffect, useRef, useState } from "react";
 import { initAllDatabases } from "@/db"
@@ -455,6 +456,7 @@ export default function RootLayout({
         <SyncConfirmDialog />
         <AutoDataSyncConflictDialog />
         <MemoryAutoNotifications />
+        <CloseBehaviorGuard />
       </TextSizeProvider>
     </ThemeProvider>
   );

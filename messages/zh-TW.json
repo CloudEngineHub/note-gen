@@ -24,6 +24,31 @@
     "general": {
       "title": "常規設置",
       "desc": "在這裡，你可以配置應用的基本設置，包括界面主題、語言等選項。",
+      "behavior": {
+        "title": "應用行為",
+        "desc": "設定 NoteGen 的啟動方式和關閉視窗時的行為",
+        "close": {
+          "title": "關閉視窗時",
+          "desc": "選擇點擊視窗關閉按鈕後執行的操作",
+          "options": {
+            "minimize": "最小化到系統匣",
+            "quit": "直接退出",
+            "ask": "每次詢問"
+          }
+        },
+        "autostart": {
+          "title": "開機啟動",
+          "desc": "登入系統後自動啟動 NoteGen",
+          "error": "無法更新開機啟動設定"
+        },
+        "closePrompt": {
+          "title": "關閉 NoteGen？",
+          "desc": "你可以將 NoteGen 保留在系統匣，或完全退出應用。",
+          "cancel": "取消",
+          "minimize": "最小化到系統匣",
+          "quit": "退出應用"
+        }
+      },
       "interface": {
         "title": "界面設置",
         "theme": {

@@ -60,6 +60,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(
             window::handle_single_instance,
         ))
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         // 核心插件
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())

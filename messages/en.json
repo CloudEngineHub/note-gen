@@ -24,6 +24,31 @@
     "general": {
       "title": "General Settings",
       "desc": "Here, you can configure basic application settings, including interface theme, language and other options.",
+      "behavior": {
+        "title": "App Behavior",
+        "desc": "Choose how NoteGen starts and what happens when you close its window",
+        "close": {
+          "title": "When closing the window",
+          "desc": "Choose what the window close button should do",
+          "options": {
+            "minimize": "Minimize to tray",
+            "quit": "Quit immediately",
+            "ask": "Ask every time"
+          }
+        },
+        "autostart": {
+          "title": "Launch at startup",
+          "desc": "Start NoteGen automatically after you sign in",
+          "error": "Could not update the startup setting"
+        },
+        "closePrompt": {
+          "title": "Close NoteGen?",
+          "desc": "You can keep NoteGen available in the system tray or quit the app completely.",
+          "cancel": "Cancel",
+          "minimize": "Minimize to tray",
+          "quit": "Quit app"
+        }
+      },
       "interface": {
         "title": "Interface Settings",
         "theme": {

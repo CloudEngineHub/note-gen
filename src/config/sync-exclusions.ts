@@ -63,6 +63,7 @@ export interface SyncExclusionOptions {
 export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   'autoDataSyncEnabled',
   'autoVectorEnabled',
+  'closeBehavior',
   'excludeSensitiveConfig',
   'syncedFileShas',
   'syncQueue',

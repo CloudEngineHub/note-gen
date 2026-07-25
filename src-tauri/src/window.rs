@@ -1,4 +1,5 @@
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri_plugin_store::StoreExt;
 
 pub fn setup_window_events(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
@@ -11,36 +12,38 @@ pub fn setup_window_events(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
 fn handle_window_event(
     event: &WindowEvent,
     window: &tauri::WebviewWindow,
-    _app_handle: &AppHandle,
+    app_handle: &AppHandle,
 ) {
-    match event {
-        WindowEvent::CloseRequested { api, .. } => {
-            // 有托盘：隐藏到托盘
+    let WindowEvent::CloseRequested { api, .. } = event else {
+        return;
+    };
+
+    match get_close_behavior(app_handle).as_str() {
+        "quit" => {
+            api.prevent_close();
+            app_handle.exit(0);
+        }
+        "ask" => {
+            api.prevent_close();
+            let _ = window.emit("close-behavior-requested", ());
+        }
+        _ => {
             api.prevent_close();
             let _ = window.hide();
         }
-        _ => {}
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-fn handle_window_event(
-    event: &WindowEvent,
-    window: &tauri::WebviewWindow,
-    _app_handle: &AppHandle,
-) {
-    match event {
-        WindowEvent::CloseRequested { api, .. } => {
-            // 有托盘：隐藏到托盘
-            api.prevent_close();
-            let _ = window.hide();
-        }
-        _ => {}
-    }
+fn get_close_behavior(app_handle: &AppHandle) -> String {
+    app_handle
+        .store("store.json")
+        .ok()
+        .and_then(|store| store.get("closeBehavior"))
+        .and_then(|value| value.as_str().map(ToOwned::to_owned))
+        .unwrap_or_else(|| "minimize".to_string())
 }
 
 pub fn handle_single_instance(app: &AppHandle, _argv: Vec<String>, _cwd: String) {

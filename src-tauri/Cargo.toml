@@ -61,6 +61,7 @@ jieba-rs = { version = "0.7", features = ["textrank"] }
 machine-uid = "0.5"
 regex = "1"
 font-kit = "0.14"
+tauri-plugin-autostart = "=2.4.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = [
