@@ -99,7 +99,7 @@ export function FontFamilySettings() {
         <ItemTitle>{t('fontFamily.title')}</ItemTitle>
         <ItemDescription>{t('fontFamily.desc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="basis-full sm:ml-auto sm:basis-auto">
         <Select value={appFontFamily} onValueChange={handleFontChange}>
           <SelectTrigger className="w-full sm:w-[220px]">
             <SelectValue placeholder={t('fontFamily.placeholder')} />

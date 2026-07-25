@@ -14,17 +14,23 @@ export function InterfaceSettings({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.general.interface')
 
   return (
-    <SettingSection title={t('title')}>
-      <div className="flex flex-col gap-4">
-        <ThemeSettings />
-        <LanguageSettings />
-        <FontFamilySettings />
-        {!mobile && <ScaleSettings />}
-        <ContentTextScaleSettings />
-        {!mobile && <FileManagerTextSizeSettings />}
-        {!mobile && <RecordTextSizeSettings />}
-        <CustomThemeSettings />
-      </div>
-    </SettingSection>
+    <>
+      <SettingSection title={t('appearance.title')} desc={t('appearance.desc')}>
+        <div className="flex flex-col gap-3">
+          <ThemeSettings />
+          <LanguageSettings />
+          <FontFamilySettings />
+          <CustomThemeSettings />
+        </div>
+      </SettingSection>
+      <SettingSection title={t('reading.title')} desc={t('reading.desc')}>
+        <div className="flex flex-col gap-3">
+          {!mobile && <ScaleSettings />}
+          <ContentTextScaleSettings />
+          {!mobile && <FileManagerTextSizeSettings />}
+          {!mobile && <RecordTextSizeSettings />}
+        </div>
+      </SettingSection>
+    </>
   )
 }

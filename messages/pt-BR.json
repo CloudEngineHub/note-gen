@@ -51,6 +51,14 @@
       },
       "interface": {
         "title": "Configurações da Interface",
+        "appearance": {
+          "title": "Aparência e Idioma",
+          "desc": "Ajuste o tema, o idioma de exibição e a fonte global do aplicativo"
+        },
+        "reading": {
+          "title": "Leitura e Escala",
+          "desc": "Ajuste separadamente o tamanho da interface, do conteúdo e das listas"
+        },
         "theme": {
           "title": "Tema",
           "desc": "Escolha o tema de aparência do aplicativo",
@@ -1319,7 +1327,7 @@
       "title": "Avançado",
       "desc": "Configure opções avançadas, como proxy de rede, gerenciamento de dados e arquivos de configuração. Algumas ações podem afetar dados existentes, portanto faça alterações com cuidado.",
       "clearData": "Limpar Dados",
-      "clearDataConfirm": "Tem certeza de que deseja limpar os dados?",
+      "clearDataConfirm": "Isso excluirá permanentemente as configurações do sistema, o banco de dados e todos os registros. Esta ação não pode ser desfeita. Continuar?",
       "proxy": "Proxy, usado para resolver problemas de rede, após a configuração, é recomendado reiniciar o aplicativo.",
       "proxyPlaceholder": "Insira o endereço do proxy",
       "proxyTitle": "Proxy de Rede",
@@ -1327,6 +1335,14 @@
       "clearDataDesc": "Limpar informações de dados, incluindo configuração do sistema e banco de dados (incluindo registros).",
       "clearFileTitle": "Limpar Arquivos",
       "clearFileDesc": "Limpar arquivos, incluindo imagens e artigos.",
+      "dangerZoneTitle": "Zona de Perigo",
+      "dangerZoneDesc": "As ações abaixo excluem permanentemente o conteúdo local. Confirme se há um backup antes de continuar.",
+      "clearFilesConfirm": "Isso excluirá permanentemente imagens, artigos e arquivos temporários locais. Esta ação não pode ser desfeita. Continuar?",
+      "filesCleared": "Arquivos limpos",
+      "dataClearedRestartTitle": "Reinicialização necessária",
+      "dataClearedRestartDesc": "Os dados foram limpos e o aplicativo será fechado. Inicie-o novamente.",
+      "cancelButton": "Cancelar",
+      "confirmClearButton": "Limpar permanentemente",
       "clearButton": "Limpar",
       "configFileTitle": "Gerenciamento de Arquivo de Configuração",
       "configFileDesc": "Importar e exportar arquivos de configuração. A importação sobrescreverá a configuração atual e terá efeito após a reinicialização.",

@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/item'
 import { useToast } from '@/hooks/use-toast'
 import { isMobileDevice } from '@/lib/check'
-import { FileJson } from 'lucide-react'
+import { Download, FileJson, Upload } from 'lucide-react'
 
 export function ConfigFileActions() {
   const t = useTranslations('settings.dev')
@@ -68,10 +68,16 @@ export function ConfigFileActions() {
         <ItemTitle>{t('configFileTitle')}</ItemTitle>
         <ItemDescription>{t('configFileDesc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
-        <ButtonGroup>
-          <Button variant="outline" onClick={handleImport}>{t('importButton')}</Button>
-          <Button variant="outline" onClick={handleExport}>{t('exportButton')}</Button>
+      <ItemActions className="basis-full sm:ml-auto sm:basis-auto">
+        <ButtonGroup className="w-full sm:w-auto">
+          <Button className="flex-1 sm:flex-none" variant="outline" onClick={handleImport}>
+            <Upload data-icon="inline-start" />
+            {t('importButton')}
+          </Button>
+          <Button className="flex-1 sm:flex-none" variant="outline" onClick={handleExport}>
+            <Download data-icon="inline-start" />
+            {t('exportButton')}
+          </Button>
         </ButtonGroup>
       </ItemActions>
     </Item>

@@ -51,6 +51,14 @@
       },
       "interface": {
         "title": "界面設置",
+        "appearance": {
+          "title": "外觀與語言",
+          "desc": "調整應用主題、顯示語言和全域字體"
+        },
+        "reading": {
+          "title": "閱讀與縮放",
+          "desc": "分別調整界面、正文和列表的顯示尺寸"
+        },
         "theme": {
           "title": "主題",
           "desc": "選擇應用的外觀主題",
@@ -1271,7 +1279,7 @@
       "title": "進階設定",
       "desc": "設定網路代理、資料管理和設定檔等進階選項。部分操作可能影響現有資料，請謹慎修改。",
       "clearData": "清理數據",
-      "clearDataConfirm": "確定清理數據嗎？",
+      "clearDataConfirm": "這會永久刪除系統設定、資料庫和全部記錄，且無法復原。確定繼續嗎？",
       "proxy": "代理，用於解決網路問題，配置後建議重啟應用。",
       "proxyPlaceholder": "請輸入代理地址",
       "proxyTitle": "網路代理",
@@ -1279,6 +1287,14 @@
       "clearDataDesc": "清理數據資訊，包括系統配置資訊、資料庫（包含記錄）。",
       "clearFileTitle": "清理文件",
       "clearFileDesc": "清理文件，包括圖片、文章。",
+      "dangerZoneTitle": "危險操作",
+      "dangerZoneDesc": "以下操作會永久刪除本機內容，執行前請確認已完成備份。",
+      "clearFilesConfirm": "這會永久刪除本機圖片、文章和暫存檔案，且無法復原。確定繼續嗎？",
+      "filesCleared": "檔案已清理",
+      "dataClearedRestartTitle": "需要重新啟動應用",
+      "dataClearedRestartDesc": "資料已清理，應用即將關閉。請重新啟動應用。",
+      "cancelButton": "取消",
+      "confirmClearButton": "確認清理",
       "clearButton": "清理",
       "configFileTitle": "設定檔管理",
       "configFileDesc": "設定檔匯入與匯出，匯入設定檔將覆蓋當前配置，並且重啟後生效。",

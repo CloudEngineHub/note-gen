@@ -51,6 +51,14 @@
       },
       "interface": {
         "title": "Interface Settings",
+        "appearance": {
+          "title": "Appearance & Language",
+          "desc": "Adjust the app theme, display language, and global font"
+        },
+        "reading": {
+          "title": "Reading & Scale",
+          "desc": "Fine-tune the size of the interface, content, and lists"
+        },
         "theme": {
           "title": "Theme",
           "desc": "Choose the application's appearance theme",
@@ -1336,7 +1344,7 @@
       "title": "Advanced",
       "desc": "Configure advanced options such as network proxy, data management, and configuration files. Some actions may affect existing data, so make changes carefully.",
       "clearData": "Clear Data",
-      "clearDataConfirm": "Are you sure to clear data?",
+      "clearDataConfirm": "This permanently deletes system settings, the database, and all records. This action cannot be undone. Continue?",
       "proxy": "Proxy, used to solve network problems, after configuration, it is recommended to restart the application.",
       "proxyPlaceholder": "Enter proxy address",
       "proxyTitle": "Network Proxy",
@@ -1344,6 +1352,14 @@
       "clearDataDesc": "Clear data information, including system configuration and database (including records).",
       "clearFileTitle": "Clear Files",
       "clearFileDesc": "Clear files, including images and articles.",
+      "dangerZoneTitle": "Danger Zone",
+      "dangerZoneDesc": "The actions below permanently delete local content. Make sure you have a backup before continuing.",
+      "clearFilesConfirm": "This permanently deletes local images, articles, and temporary files. This action cannot be undone. Continue?",
+      "filesCleared": "Files cleared",
+      "dataClearedRestartTitle": "Restart required",
+      "dataClearedRestartDesc": "Data has been cleared and the app will now close. Please start it again.",
+      "cancelButton": "Cancel",
+      "confirmClearButton": "Clear permanently",
       "clearButton": "Clear",
       "configFileTitle": "Config File Management",
       "configFileDesc": "Import and export configuration files. Importing will overwrite current configuration and take effect after restart.",

@@ -51,6 +51,14 @@
       },
       "interface": {
         "title": "界面设置",
+        "appearance": {
+          "title": "外观与语言",
+          "desc": "调整应用主题、显示语言和全局字体"
+        },
+        "reading": {
+          "title": "阅读与缩放",
+          "desc": "分别调整界面、正文和列表的显示尺寸"
+        },
         "theme": {
           "title": "主题",
           "desc": "选择应用的外观主题",
@@ -1333,7 +1341,7 @@
       "title": "高级设置",
       "desc": "配置网络代理、数据管理和配置文件等高级选项。部分操作可能影响现有数据，请谨慎修改。",
       "clearData": "清理数据",
-      "clearDataConfirm": "确定清理数据吗？",
+      "clearDataConfirm": "这会永久删除系统配置、数据库和全部记录，且无法撤销。确定继续吗？",
       "proxy": "代理，用于解决网络问题，配置后建议重启应用。",
       "proxyPlaceholder": "请输入代理地址",
       "proxyTitle": "网络代理",
@@ -1341,6 +1349,14 @@
       "clearDataDesc": "清理数据信息，包括系统配置信息、数据库（包含记录）。",
       "clearFileTitle": "清理文件",
       "clearFileDesc": "清理文件，包括图片、文章。",
+      "dangerZoneTitle": "危险操作",
+      "dangerZoneDesc": "以下操作会永久删除本地内容，执行前请确认已完成备份。",
+      "clearFilesConfirm": "这会永久删除本地图片、文章和临时文件，且无法撤销。确定继续吗？",
+      "filesCleared": "文件已清理",
+      "dataClearedRestartTitle": "需要重启应用",
+      "dataClearedRestartDesc": "数据已清理，应用即将关闭。请重新启动应用。",
+      "cancelButton": "取消",
+      "confirmClearButton": "确认清理",
       "clearButton": "清理",
       "configFileTitle": "配置文件管理",
       "configFileDesc": "配置文件导入与导出，导入配置文件将覆盖当前配置，并且重启后生效。",

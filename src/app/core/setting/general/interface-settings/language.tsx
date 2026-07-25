@@ -7,6 +7,7 @@ import { useI18n } from "@/hooks/useI18n"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -35,12 +36,12 @@ export function LanguageSettings() {
 
   return (
     <Item variant="outline">
-      <ItemMedia variant="icon"><Languages className="h-4 w-4" /></ItemMedia>
+      <ItemMedia variant="icon"><Languages /></ItemMedia>
       <ItemContent>
         <ItemTitle>{t('language.title')}</ItemTitle>
         <ItemDescription>{t('language.desc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="basis-full sm:ml-auto sm:basis-auto">
         <Select value={currentLocale} onValueChange={changeLanguage}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue>
@@ -50,31 +51,13 @@ export function LanguageSettings() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="zh">
-              <div className="flex items-center gap-2">
-                <span>中文</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="zh-TW">
-              <div className="flex items-center gap-2">
-                <span>繁體中文</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="en">
-              <div className="flex items-center gap-2">
-                <span>English</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="ja">
-              <div className="flex items-center gap-2">
-                <span>日本語</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="pt-BR">
-              <div className="flex items-center gap-2">
-                <span>Português</span>
-              </div>
-            </SelectItem>
+            <SelectGroup>
+              <SelectItem value="zh">中文</SelectItem>
+              <SelectItem value="zh-TW">繁體中文</SelectItem>
+              <SelectItem value="en">English</SelectItem>
+              <SelectItem value="ja">日本語</SelectItem>
+              <SelectItem value="pt-BR">Português</SelectItem>
+            </SelectGroup>
           </SelectContent>
         </Select>
       </ItemActions>

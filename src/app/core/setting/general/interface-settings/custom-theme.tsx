@@ -200,12 +200,12 @@ export function CustomThemeSettings() {
   return (
     <>
       <Item variant="outline">
-        <ItemMedia variant="icon"><Palette className="size-4" /></ItemMedia>
+        <ItemMedia variant="icon"><Palette /></ItemMedia>
         <ItemContent>
           <ItemTitle>{t('title')}</ItemTitle>
           <ItemDescription>{t('desc')}</ItemDescription>
         </ItemContent>
-        <ItemActions>
+        <ItemActions className="basis-full sm:ml-auto sm:basis-auto">
           <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
             {t('button')}
           </Button>
