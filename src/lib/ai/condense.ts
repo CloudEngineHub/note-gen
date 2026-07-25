@@ -35,7 +35,7 @@ import {
 
 export { getChatsAfterLastClear, buildChatHistoryForAI, buildMessagesWithHistory } from './history-messages'
 
-const COMPACTION_PROMPT_VERSION = 1
+const COMPACTION_PROMPT_VERSION = 2
 const DEFAULT_SUMMARY_MAX_CHARS = 1_200
 const PROACTIVE_COMPACTION_THRESHOLD = 80
 const MAX_COMPACTION_OVERFLOW_RETRIES = 3
@@ -78,6 +78,7 @@ function buildCompactionPrompt(previousSummary: string | undefined, chats: Chat[
 - 仅记录后续对话仍可能需要的信息。
 - 保留用户目标、明确事实、偏好、约束、决定及原因、TODO、重要数字、日期、笔记名和文件路径。
 - 区分用户明确说明、助手建议和尚未确认的推测，不得把推测写成用户事实。
+- “本轮记忆变更”只记录用户明确确认的保存、更新、归档或删除；不得把自动提取候选写成已生效记忆。
 - 新内容否定或修改旧信息时，更新旧信息，不要同时保留互相冲突的版本。
 - 删除寒暄、重复表达、中间推理、无效尝试、冗长日志和可重新检索的大段原文。
 - 只保留 RAG、附件和工具调用的来源、关键结论、修改结果或错误，不保留大段返回值。
@@ -89,8 +90,10 @@ function buildCompactionPrompt(previousSummary: string | undefined, chats: Chat[
 
 可用章节：
 ## 当前目标
+## 当前约束
 ## 已确认信息
 ## 关键决定
+## 本轮记忆变更
 ## 笔记与资料
 ## 已完成事项
 ## 待处理事项
@@ -545,14 +548,11 @@ async function prepareConversationHistoryInternal(
     MIN_RECENT_HISTORY_BUDGET,
     Math.floor(budget.historyBudget * (input.force ? 0.15 : 0.25))
   )
-  let recentTurns = selectRecentConversationTurns(
+  const recentTurns = selectRecentConversationTurns(
     turns,
-    1,
+    2,
     recentBudget
   )
-  if (recentTurns.length === 1 && recentTurns[0].tokenCount > recentBudget) {
-    recentTurns = []
-  }
   const summarizeCount = turns.length - recentTurns.length
   agentDebugLog('conversation_compaction_turns_selected', {
     conversationId: input.conversationId,
@@ -740,6 +740,9 @@ async function prepareConversationHistoryInternal(
     summaryTokenCount,
     model: condenseConfig?.model || '',
     promptVersion: COMPACTION_PROMPT_VERSION,
+    retainedTurnCount: recentTurns.length,
+    prunedToolResultCount: 0,
+    prunedToolTokenCount: 0,
   })
 
   agentDebugLog('conversation_compaction_saved', {
@@ -749,6 +752,9 @@ async function prepareConversationHistoryInternal(
     tailStartChatId: saved.tailStartChatId || null,
     sourceTokenCount: saved.sourceTokenCount,
     summaryTokenCount: saved.summaryTokenCount,
+    retainedTurnCount: saved.retainedTurnCount,
+    prunedToolResultCount: saved.prunedToolResultCount,
+    prunedToolTokenCount: saved.prunedToolTokenCount,
     model: saved.model,
   })
   emitter.emit('conversation-compaction-status', {

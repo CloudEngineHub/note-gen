@@ -88,6 +88,14 @@ interface Events {
     sourceTokenCount?: number;
     summaryTokenCount?: number;
   };
+  'memory-auto-created': {
+    conversationId: number;
+    created: Array<{
+      id: string;
+      content: string;
+      status: 'active' | 'pending';
+    }>;
+  };
   'start-ai-streaming': {
     originalText: string;
     type: string;

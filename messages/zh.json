@@ -629,10 +629,13 @@
     "memories": {
       "title": "记忆管理",
       "desc": "AI 长期记忆功能，让 AI 记住你的写作偏好、经验知识和笔记习惯。",
-      "stats": {
-        "total": "总记忆数",
-        "preferences": "偏好",
-        "memories": "记忆"
+    "stats": {
+      "total": "总记忆数",
+      "preferences": "偏好",
+      "memories": "记忆",
+      "active": "活跃",
+      "pending": "待确认",
+      "archived": "已删除"
       },
       "form": {
         "title": "添加新记忆",
@@ -647,12 +650,20 @@
         "preferenceDesc": "语言、格式、风格等",
         "memoryDesc": "事实、经验、专长等",
         "save": "保存记忆",
-        "saving": "保存中..."
+      "saving": "保存中...",
+      "description": "保存可在未来对话中复用的稳定用户信息。",
+      "kindLabel": "记忆类型",
+      "scopeLabel": "作用范围",
+      "alwaysApply": "始终应用",
+      "alwaysApplyDescription": "固定注入上下文，不依赖相关性召回。",
+      "update": "更新记忆"
       },
       "listTitle": "我的记忆",
       "addMemory": "添加记忆",
       "empty": "暂无记忆，添加第一条记忆吧！",
-      "emptyHint": "你可以手动添加记忆，或在对话中使用「请记住」「记住这个」等话术让 AI 自动记忆。",
+      "emptyHint": "你可以手动添加记忆，也可以说「请记住……」「以后都……」「默认……」让 AI 立即记住。",
+      "noMatches": "没有找到匹配的记忆",
+      "noMatchesHint": "试试更换关键词或清除筛选条件。",
       "preference": "偏好",
       "memory": "记忆",
       "replaced": "已替换",
@@ -664,7 +675,7 @@
       },
       "success": "成功",
       "saved": "记忆已保存",
-      "updated": "记忆已更新（已替换相似记忆）",
+      "updated": "记忆已更新",
       "deleted": "记忆已删除",
       "cleared": "所有记忆已清空",
       "found": "找到 {count} 条记忆",
@@ -674,7 +685,72 @@
       "errorDelete": "删除记忆失败",
       "errorList": "获取记忆列表失败",
       "errorEmbedding": "无法生成向量嵌入，请检查嵌入模型配置",
-      "errorClear": "清空记忆失败"
+    "errorClear": "清空记忆失败",
+    "policy": {
+      "generate": "自动记住聊天中的重要信息",
+      "generateDescription": "AI 会自动记住重要信息。你也可以说「请记住……」或「以后都……」。"
+    },
+    "actions": {
+      "undo": "撤销",
+      "more": "更多操作",
+      "approve": "确认",
+      "approveAll": "全部确认",
+      "review": "去确认",
+      "edit": "编辑",
+      "promote": "提升为稳定指引",
+      "demote": "取消稳定指引",
+      "restore": "恢复",
+      "archive": "删除",
+      "deletePermanently": "永久删除"
+    },
+    "kinds": {
+      "preference": "偏好",
+      "fact": "事实",
+      "experience": "经历",
+      "decision": "决定"
+    },
+    "scopes": {
+      "global": "全局",
+      "workspace": "当前工作区"
+    },
+    "statuses": {
+      "active": "活跃",
+      "pending": "待确认",
+      "archived": "已删除"
+    },
+    "filters": {
+      "search": "搜索记忆",
+      "allKinds": "全部类型",
+      "allScopes": "全部范围"
+    },
+    "sensitive": {
+      "title": "可能包含敏感信息",
+      "description": "密码、令牌、密钥等内容不会自动进入活跃记忆。请确认内容安全后再保存。",
+      "badge": "疑似敏感"
+    },
+    "indexing": {
+      "ready": "索引就绪",
+      "pending": "等待索引",
+      "failed": "索引失败"
+    },
+    "deleteConfirm": {
+      "title": "永久删除这条记忆？",
+      "description": "永久删除后无法恢复。",
+      "cancel": "取消"
+    },
+    "autoCreated": "后台生成了 {count} 条记忆",
+    "pendingConfirmation": "这条记忆需要确认",
+    "approvedAll": "已确认全部候选",
+    "savedPendingIndex": "记忆已保存，将在后台生成索引",
+    "savedPendingReview": "记忆已进入待确认队列",
+    "archived": "记忆已删除",
+    "promoted": "已加入 Agent 自定义指引",
+    "demoted": "已取消稳定指引",
+    "always": "始终应用",
+    "lastRecallReason": "上次召回：{reason}",
+    "neverRecalled": "尚未召回",
+    "editTitle": "编辑记忆",
+    "editDescription": "修改内容、类型、作用范围和应用方式。"
     },
     "defaultModel": {
       "title": "默认模型",
@@ -2398,6 +2474,11 @@
               "replaceExisting": "替换已有 Skill"
             },
             "tools": {
+              "create_memory": {
+                "title": "记住这条信息？",
+                "description": "确认后，AI 会在之后的对话中使用这条信息。",
+                "content": "记忆内容"
+              },
               "create_file": {
                 "title": "创建文件",
                 "description": "将在工作区中新建一个文件。"

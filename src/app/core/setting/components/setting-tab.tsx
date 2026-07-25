@@ -23,7 +23,7 @@ export function SettingTab() {
   return (
     <TabsList
       variant="line"
-      className="min-h-0 w-56 shrink-0 items-stretch justify-start overflow-y-scroll rounded-none border-r bg-sidebar p-3 group-data-vertical/tabs:h-full [scrollbar-gutter:stable]"
+      className="!h-full min-h-0 w-56 shrink-0 self-stretch items-stretch justify-start overflow-y-scroll rounded-none border-r bg-sidebar p-3 [scrollbar-gutter:stable]"
       aria-label={t('title')}
     >
       {config.map((item, index) => {

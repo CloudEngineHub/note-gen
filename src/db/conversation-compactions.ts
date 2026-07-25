@@ -10,6 +10,9 @@ export interface ConversationCompaction {
   summaryTokenCount: number
   model: string
   promptVersion: number
+  retainedTurnCount: number
+  prunedToolResultCount: number
+  prunedToolTokenCount: number
   revision: number
   createdAt: number
 }
@@ -33,6 +36,17 @@ export async function initConversationCompactionsDb() {
       createdAt integer not null
     )
   `)
+  for (const column of [
+    'retainedTurnCount integer not null default 0',
+    'prunedToolResultCount integer not null default 0',
+    'prunedToolTokenCount integer not null default 0',
+  ]) {
+    try {
+      await db.execute(`alter table conversation_compactions add column ${column}`)
+    } catch {
+      // Idempotent migration.
+    }
+  }
   await db.execute(`
     create index if not exists idx_conversation_compactions_latest
     on conversation_compactions(conversationId, revision desc)
@@ -44,7 +58,22 @@ export async function getLatestConversationCompaction(
 ): Promise<ConversationCompaction | null> {
   const db = await getDb()
   const result = await db.select<ConversationCompaction[]>(
-    `select * from conversation_compactions
+    `select
+       id,
+       conversationId,
+       summary,
+       coveredThroughChatId,
+       tailStartChatId,
+       sourceTokenCount,
+       summaryTokenCount,
+       model,
+       promptVersion,
+       coalesce(retainedTurnCount, 0) as retainedTurnCount,
+       coalesce(prunedToolResultCount, 0) as prunedToolResultCount,
+       coalesce(prunedToolTokenCount, 0) as prunedToolTokenCount,
+       revision,
+       createdAt
+     from conversation_compactions
      where conversationId = $1
      order by revision desc
      limit 1`,
@@ -68,9 +97,12 @@ export async function insertConversationCompaction(compaction: NewConversationCo
       summaryTokenCount,
       model,
       promptVersion,
+      retainedTurnCount,
+      prunedToolResultCount,
+      prunedToolTokenCount,
       revision,
       createdAt
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       compaction.conversationId,
       compaction.summary,
@@ -80,6 +112,9 @@ export async function insertConversationCompaction(compaction: NewConversationCo
       compaction.summaryTokenCount,
       compaction.model,
       compaction.promptVersion,
+      compaction.retainedTurnCount,
+      compaction.prunedToolResultCount,
+      compaction.prunedToolTokenCount,
       revision,
       createdAt,
     ]

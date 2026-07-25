@@ -39,6 +39,7 @@ import { useSidebarStore } from "@/stores/sidebar"
 import { useTranslations } from "next-intl"
 import { SettingsDialog } from "./setting/components/settings-dialog"
 import { settingSections, type SettingSection, useSettingsDialogStore } from "@/stores/settings-dialog"
+import { MemoryAutoNotifications } from "@/components/memories/memory-auto-notifications"
 
 export default function RootLayout({
   children,
@@ -322,6 +323,14 @@ export default function RootLayout({
         // 先完成数据库和默认工作区初始化，避免首次启动时其他逻辑抢先读取空目录或未建表数据库。
         await initAllDatabases()
         if (cancelled) return
+        const { runMemoryMaintenance } = await import('@/lib/memory/auto-memory')
+        void runMemoryMaintenance()
+        const {
+          reconcileMemoryEmbeddingModel,
+          reindexPendingMemories,
+        } = await import('@/db/memories')
+        await reconcileMemoryEmbeddingModel()
+        void reindexPendingMemories()
         await initAutoDataSyncRuntime()
         if (cancelled) return
 
@@ -445,6 +454,7 @@ export default function RootLayout({
         <SettingsDialog />
         <SyncConfirmDialog />
         <AutoDataSyncConflictDialog />
+        <MemoryAutoNotifications />
       </TextSizeProvider>
     </ThemeProvider>
   );

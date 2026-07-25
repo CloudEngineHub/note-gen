@@ -5,6 +5,7 @@ import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
 import { AgentPermissionEngine } from './permission-engine'
 import { AgentPromptAssembler, hasInlineCurrentEditorSelection, hasInlineCurrentEditorState } from './prompt-assembler'
+import { memoryContextService } from '@/lib/context/loader'
 import { AgentRecoveryManager } from './recovery-manager'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
 import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
@@ -723,10 +724,23 @@ export class AgentRuntime {
     const toolMap = new Map(allTools.map((tool) => [tool.name, tool]))
     let tools = selectToolsForContext(context, allTools, input.permissionMode)
     const customSystemPrompt = await getSystemPromptContent()
+    let memoryContext = input.useMemories === false
+      ? {
+          memories: [],
+          usedTokens: 0,
+          policyEnabled: false,
+          workspaceId: input.workspaceId || 'default',
+        }
+      : await memoryContextService.getMemoryContext({
+          query: input.userInput,
+          conversationId: input.conversationId,
+          workspaceId: input.workspaceId,
+        })
     let systemPrompt = this.promptAssembler.assemble(
       context,
       tools,
-      customSystemPrompt
+      customSystemPrompt,
+      memoryContextService.formatMemoryContext(memoryContext)
     )
     const baseMessages = this.contextManager.prepareMessages(input.messages || [])
       .map(normalizeBaseMessage)
@@ -967,7 +981,24 @@ export class AgentRuntime {
       forceFinalResponseReason = undefined
       successfulMutationCalls.clear()
       directAnswerEvidenceChecked = false
-      systemPrompt = this.promptAssembler.assemble(context, tools, customSystemPrompt)
+      memoryContext = input.useMemories === false
+        ? {
+            memories: [],
+            usedTokens: 0,
+            policyEnabled: false,
+            workspaceId: input.workspaceId || 'default',
+          }
+        : await memoryContextService.getMemoryContext({
+            query: latest.text,
+            conversationId: input.conversationId,
+            workspaceId: input.workspaceId,
+          })
+      systemPrompt = this.promptAssembler.assemble(
+        context,
+        tools,
+        customSystemPrompt,
+        memoryContextService.formatMemoryContext(memoryContext)
+      )
       messages[0] = { role: 'system', content: systemPrompt }
 
       const steeringTrace = recorder.add({
@@ -1067,7 +1098,8 @@ export class AgentRuntime {
         })
         const offeredToolNames = new Set(offeredTools.map((tool) => tool.name))
         const openAITools = agentToolRegistry.toOpenAITools(offeredTools, loadedSkillIds)
-        const messageTextTokens = messages.reduce(
+        const requestMessages = this.contextManager.prepareMessages(messages)
+        const messageTextTokens = requestMessages.reduce(
           (sum, message) => sum + estimateMessageTextTokens(message),
           0
         )
@@ -1075,7 +1107,7 @@ export class AgentRuntime {
         agentDebugLog('model_request_budget', {
           runId,
           iteration,
-          messageCount: messages.length,
+          messageCount: requestMessages.length,
           messageTextTokens,
           offeredToolCount: offeredTools.length,
           toolSchemaTokens,
@@ -1091,7 +1123,7 @@ export class AgentRuntime {
         const stream = await this.recoveryManager.withRetry(() =>
           createChatCompletionStreamWithToolChoiceFallback(client, withFastAiRequestOptions({
             model: aiConfig?.model || '',
-            messages,
+            messages: requestMessages,
             temperature: aiConfig?.temperature,
             top_p: aiConfig?.topP,
             stream: true,

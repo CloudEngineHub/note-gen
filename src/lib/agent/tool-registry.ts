@@ -2252,7 +2252,7 @@ function buildTools(): AgentTool[] {
       name: 'memory_create',
       title: '创建记忆',
       category: 'memory',
-      risk: 'medium',
+      risk: 'memory-write',
       legacy: saveMemoryTool,
       execute: (input) => executeStructuralToolWithChange(
         input,

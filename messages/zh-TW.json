@@ -566,10 +566,13 @@
     "memories": {
       "title": "記憶管理",
       "desc": "AI 長期記憶功能，讓 AI 記住你的寫作偏好、知識體系和筆記習慣。",
-      "stats": {
-        "total": "總記憶數",
-        "preferences": "偏好",
-        "memories": "记忆"
+    "stats": {
+      "total": "總記憶數",
+      "preferences": "偏好",
+      "memories": "記憶",
+      "active": "使用中",
+      "pending": "待確認",
+      "archived": "已刪除"
       },
       "form": {
         "title": "新增記憶",
@@ -584,23 +587,56 @@
         "memoryDescription": "记忆：事实、经验、专长等信息，根据对话内容智能匹配",
         "preferenceLabel": "偏好",
         "memoryLabel": "记忆",
-        "memoryDesc": "事实、经验、专长等"
+      "memoryDesc": "事实、经验、专长等",
+      "description": "儲存可在未來對話中使用的穩定使用者資訊。",
+      "kindLabel": "記憶類型",
+      "scopeLabel": "作用範圍",
+      "alwaysApply": "一律套用",
+      "alwaysApplyDescription": "固定注入上下文，不依賴相關性召回。",
+      "update": "更新記憶"
       },
       "listTitle": "我的記憶",
       "addMemory": "新增記憶",
       "empty": "暫無記憶，新增第一條記憶吧！",
-      "emptyHint": "你可以手動新增記憶，或在對話中使用「請記住」「記住這個」等話術讓 AI 自動記憶。",
+      "emptyHint": "你可以手動新增記憶，也可以說「請記住……」「以後都……」「預設……」讓 AI 立即記住。",
+      "noMatches": "找不到符合條件的記憶",
+      "noMatchesHint": "請嘗試更換關鍵詞或清除篩選條件。",
       "preference": "偏好",
       "replaced": "已替換",
       "accessCount": "存取 {count} 次",
       "tabs": {
         "all": "全部",
         "preference": "偏好",
-        "memory": "记忆"
+    "memory": "记忆",
+    "policy": {
+      "generate": "自動記住聊天中的重要資訊",
+      "generateDescription": "AI 會自動記住重要資訊。你也可以說「請記住……」或「以後都……」。"
+    },
+    "actions": {"undo": "復原", "more": "更多操作", "approve": "確認", "approveAll": "全部確認", "review": "去確認", "edit": "編輯", "promote": "提升為穩定指引", "demote": "取消穩定指引", "restore": "恢復", "archive": "刪除", "deletePermanently": "永久刪除"},
+    "kinds": {"preference": "偏好", "fact": "事實", "experience": "經歷", "decision": "決定"},
+    "scopes": {"global": "全域", "workspace": "目前工作區"},
+    "statuses": {"active": "使用中", "pending": "待確認", "archived": "已刪除"},
+    "filters": {"search": "搜尋記憶", "allKinds": "全部類型", "allScopes": "全部範圍"},
+    "sensitive": {"title": "可能包含敏感資訊", "description": "密碼、權杖、私鑰不會自動成為使用中記憶，請先確認內容安全。", "badge": "疑似敏感"},
+    "indexing": {"ready": "索引就緒", "pending": "等待索引", "failed": "索引失敗"},
+    "deleteConfirm": {"title": "永久刪除這條記憶？", "description": "永久刪除後無法復原。", "cancel": "取消"},
+    "autoCreated": "背景產生了 {count} 條記憶",
+    "pendingConfirmation": "這條記憶需要確認",
+    "approvedAll": "已確認全部候選",
+    "savedPendingIndex": "記憶已儲存並等待索引",
+    "savedPendingReview": "記憶已進入待確認佇列",
+    "archived": "記憶已刪除",
+    "promoted": "已加入 Agent 自訂指引",
+    "demoted": "已取消穩定指引",
+    "always": "一律套用",
+    "lastRecallReason": "上次召回：{reason}",
+    "neverRecalled": "尚未召回",
+    "editTitle": "編輯記憶",
+    "editDescription": "修改內容、類型、範圍和套用方式。"
       },
       "success": "成功",
       "saved": "記憶已儲存",
-      "updated": "記憶已更新（已替換相似記憶）",
+      "updated": "記憶已更新",
       "deleted": "記憶已刪除",
       "cleared": "所有記憶已清空",
       "found": "找到 {count} 條記憶",
@@ -2343,6 +2379,11 @@
               "replaceExisting": "取代現有 Skill"
             },
             "tools": {
+              "create_memory": {
+                "title": "記住這條資訊？",
+                "description": "確認後，AI 會在之後的對話中使用這條資訊。",
+                "content": "記憶內容"
+              },
               "uninstall_skill": {
                 "title": "確認移除 Skill",
                 "description": "將永久刪除此 Skill、第三方安裝記錄和隔離執行環境。"

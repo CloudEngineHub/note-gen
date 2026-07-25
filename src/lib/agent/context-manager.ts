@@ -1,7 +1,8 @@
 import type OpenAI from 'openai'
 import { convertImageToBase64 } from '@/lib/ai/utils'
 
-const MAX_TOOL_RESULT_CHARS = 12000
+const MAX_RECENT_TOOL_RESULT_CHARS = 12000
+const MAX_OLD_TOOL_RESULT_CHARS = 2000
 const MAX_HISTORY_MESSAGES = 60
 
 function isToolMessage(message: OpenAI.Chat.ChatCompletionMessageParam) {
@@ -9,23 +10,26 @@ function isToolMessage(message: OpenAI.Chat.ChatCompletionMessageParam) {
 }
 
 function compactToolMessage(
-  message: OpenAI.Chat.ChatCompletionMessageParam
+  message: OpenAI.Chat.ChatCompletionMessageParam,
+  maxChars: number
 ): OpenAI.Chat.ChatCompletionMessageParam {
   if (!isToolMessage(message)) {
     return message
   }
 
   const content = typeof message.content === 'string' ? message.content : ''
-  if (content.length <= MAX_TOOL_RESULT_CHARS) {
+  if (content.length <= maxChars) {
     return message
   }
 
   return {
     ...message,
     content: [
-      content.slice(0, MAX_TOOL_RESULT_CHARS),
+      content.slice(0, Math.floor(maxChars * 0.7)),
       '',
-      `[tool result truncated: ${content.length - MAX_TOOL_RESULT_CHARS} characters omitted]`,
+      `[tool result pruned: source=${message.tool_call_id}; ${content.length - maxChars} characters omitted]`,
+      '',
+      content.slice(-Math.ceil(maxChars * 0.3)),
     ].join('\n'),
   }
 }
@@ -34,7 +38,18 @@ export class AgentContextManager {
   prepareMessages(
     messages: OpenAI.Chat.ChatCompletionMessageParam[] = []
   ): OpenAI.Chat.ChatCompletionMessageParam[] {
-    const compacted = messages.map(compactToolMessage)
+    const userIndexes = messages
+      .map((message, index) => message.role === 'user' ? index : -1)
+      .filter(index => index >= 0)
+    const recentTurnStart = userIndexes.at(-2) ?? 0
+    const compacted = messages.map((message, index) =>
+      compactToolMessage(
+        message,
+        index >= recentTurnStart
+          ? MAX_RECENT_TOOL_RESULT_CHARS
+          : MAX_OLD_TOOL_RESULT_CHARS
+      )
+    )
 
     if (compacted.length <= MAX_HISTORY_MESSAGES) {
       return compacted

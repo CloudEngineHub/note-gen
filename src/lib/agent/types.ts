@@ -61,6 +61,7 @@ export type AgentToolRisk =
   | 'editor-write'
   | 'file-create'
   | 'file-update'
+  | 'memory-write'
   | 'delete'
   | 'script'
   | 'skill-install'
@@ -225,6 +226,9 @@ export interface AgentRuntimeInput {
   selectedMcpServerIds?: string[]
   attachments?: RuntimeChatAttachment[]
   permissionMode?: AgentPermissionMode
+  conversationId?: number
+  workspaceId?: string
+  useMemories?: boolean
 }
 
 export interface AgentSteeringPayload {

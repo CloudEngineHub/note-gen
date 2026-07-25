@@ -566,10 +566,13 @@
     "memories": {
       "title": "記憶管理",
       "desc": "AI長期記憶機能で、AIがあなたの執筆設定、知識ベース、メモ習慣を記憶します。",
-      "stats": {
-        "total": "総記憶数",
-        "preferences": "設定",
-        "memories": "记忆"
+    "stats": {
+      "total": "総記憶数",
+      "preferences": "設定",
+      "memories": "記憶",
+      "active": "有効",
+      "pending": "確認待ち",
+      "archived": "削除済み"
       },
       "form": {
         "title": "新しい記憶を追加",
@@ -584,23 +587,56 @@
         "memoryDescription": "记忆：事实、经验、专长等信息，根据对话内容智能匹配",
         "preferenceLabel": "偏好",
         "memoryLabel": "记忆",
-        "memoryDesc": "事实、经验、专长等"
+      "memoryDesc": "事实、经验、专长等",
+      "description": "今後の会話で利用できる安定したユーザー情報を保存します。",
+      "kindLabel": "記憶タイプ",
+      "scopeLabel": "範囲",
+      "alwaysApply": "常に適用",
+      "alwaysApplyDescription": "関連性検索に依存せずコンテキストへ追加します。",
+      "update": "記憶を更新"
       },
       "listTitle": "マイ記憶",
       "addMemory": "記憶を追加",
       "empty": "まだ記憶がありません。最初の記憶を追加しましょう！",
-      "emptyHint": "手動で記憶を追加するか、会話で「覚えて」「これを覚えて」などのフレーズを使うとAIが自動的に記憶を作成します。",
+      "emptyHint": "手動で追加するか、「覚えて……」「今後は……」「常に……」と伝えると、AIがすぐに記憶します。",
+      "noMatches": "一致する記憶が見つかりません",
+      "noMatchesHint": "別のキーワードを試すか、フィルターを解除してください。",
       "preference": "設定",
       "replaced": "置換済み",
       "accessCount": "{count} 回アクセス",
       "tabs": {
         "all": "すべて",
         "preference": "設定",
-        "memory": "记忆"
+    "memory": "记忆",
+    "policy": {
+      "generate": "チャットの重要な情報を自動的に記憶する",
+      "generateDescription": "AIが重要な情報を自動的に記憶します。「覚えて……」や「今後は……」と伝えることもできます。"
+    },
+    "actions": {"undo": "元に戻す", "more": "その他", "approve": "承認", "approveAll": "すべて承認", "review": "確認する", "edit": "編集", "promote": "安定した指示へ昇格", "demote": "安定した指示から解除", "restore": "復元", "archive": "削除", "deletePermanently": "完全に削除"},
+    "kinds": {"preference": "設定", "fact": "事実", "experience": "経験", "decision": "決定"},
+    "scopes": {"global": "グローバル", "workspace": "現在のワークスペース"},
+    "statuses": {"active": "有効", "pending": "確認待ち", "archived": "削除済み"},
+    "filters": {"search": "記憶を検索", "allKinds": "すべてのタイプ", "allScopes": "すべての範囲"},
+    "sensitive": {"title": "機密情報の可能性", "description": "パスワード、トークン、秘密鍵は自動的に有効化されません。安全性を確認してください。", "badge": "機密"},
+    "indexing": {"ready": "インデックス済み", "pending": "待機中", "failed": "失敗"},
+    "deleteConfirm": {"title": "この記憶を完全に削除しますか？", "description": "完全に削除すると元に戻せません。", "cancel": "キャンセル"},
+    "autoCreated": "バックグラウンドで {count} 件の記憶を生成しました",
+    "pendingConfirmation": "この記憶は確認が必要です",
+    "approvedAll": "すべての候補を承認しました",
+    "savedPendingIndex": "記憶を保存し、インデックス待ちに追加しました",
+    "savedPendingReview": "確認待ちに追加しました",
+    "archived": "記憶を削除しました",
+    "promoted": "Agent のカスタム指示へ追加しました",
+    "demoted": "Agent のカスタム指示から解除しました",
+    "always": "常に適用",
+    "lastRecallReason": "前回の呼び出し：{reason}",
+    "neverRecalled": "未使用",
+    "editTitle": "記憶を編集",
+    "editDescription": "内容、タイプ、範囲、適用方法を変更します。"
       },
       "success": "成功",
       "saved": "記憶を保存しました",
-      "updated": "記憶を更新しました（類似の記憶を置換）",
+      "updated": "記憶を更新しました",
       "deleted": "記憶を削除しました",
       "cleared": "すべての記憶をクリアしました",
       "found": "{count} 件の記憶が見つかりました",
@@ -2337,6 +2373,11 @@
               "replaceExisting": "既存の Skill を置換"
             },
             "tools": {
+              "create_memory": {
+                "title": "この情報を記憶しますか？",
+                "description": "確認すると、AI が今後の会話でこの情報を使用します。",
+                "content": "記憶する内容"
+              },
               "uninstall_skill": {
                 "title": "Skill の削除を確認",
                 "description": "この Skill、サードパーティーのインストール記録、隔離された実行環境を完全に削除します。"

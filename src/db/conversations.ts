@@ -165,6 +165,14 @@ export async function updateConversationTime(id: number): Promise<void> {
 export async function deleteConversation(id: number): Promise<void> {
   const db = await getDb()
   await db.execute(
+    "delete from memory_conversation_policy where conversation_id = $1",
+    [id]
+  )
+  await db.execute(
+    "delete from memory_jobs where conversation_id = $1",
+    [id]
+  )
+  await db.execute(
     "delete from conversation_compactions where conversationId = $1",
     [id]
   )

@@ -92,7 +92,6 @@ export const ChatInput = React.memo(function ChatInput() {
   const [text, setText] = useState("")
   const { primaryModel } = useSettingStore()
   const {
-    chats,
     loading,
     setLinkedResource: setChatLinkedResource,
     setLinkedResourcePreview,

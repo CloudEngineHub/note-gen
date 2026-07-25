@@ -30,7 +30,7 @@ interface RerankResponse {
 /**
  * 获取嵌入模型信息
  */
-async function getEmbeddingModelInfo() {
+export async function getEmbeddingModelInfo() {
   const store = await Store.load('store.json');
   const embeddingModel = await store.get<string>('embeddingModel');
   if (!embeddingModel) return null;
@@ -66,6 +66,18 @@ async function getEmbeddingModelInfo() {
   }
   
   return null;
+}
+
+export async function getEmbeddingModelDescriptor(): Promise<{
+  id: string
+  model: string
+} | null> {
+  const modelInfo = await getEmbeddingModelInfo()
+  if (!modelInfo?.model) return null
+  return {
+    id: modelInfo.key,
+    model: `${modelInfo.key}:${modelInfo.model}`,
+  }
 }
 
 /**
@@ -151,7 +163,10 @@ export async function checkRerankModelAvailable(): Promise<boolean> {
  * @param text 需要嵌入的文本
  * @returns 嵌入向量结果，如果失败则返回null
  */
-export async function fetchEmbedding(text: string): Promise<number[] | null> {
+export async function fetchEmbedding(
+  text: string,
+  options?: { silent?: boolean }
+): Promise<number[] | null> {
   try {
     if (text.length) {
       // 获取嵌入模型信息
@@ -186,7 +201,7 @@ export async function fetchEmbedding(text: string): Promise<number[] | null> {
     
     return null;
   } catch (error) {
-    handleAIError(error);
+    handleAIError(error, !options?.silent);
     return null;
   }
 }

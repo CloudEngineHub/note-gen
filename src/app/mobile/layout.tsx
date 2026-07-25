@@ -20,6 +20,7 @@ import { initMcp } from "@/lib/mcp/init"
 import { reportAppStart } from "@/lib/event-report"
 import { MobileStatusBar } from "@/components/mobile-statusbar"
 import { TextSizeProvider } from "@/contexts/text-size-context"
+import { MemoryAutoNotifications } from "@/components/memories/memory-auto-notifications"
 import { SyncConfirmDialog } from "@/components/sync-confirm-dialog"
 import { AutoDataSyncConflictDialog } from "@/components/auto-data-sync-conflict-dialog"
 import { MobileViewport } from "@/components/mobile-viewport"
@@ -76,6 +77,14 @@ export default function RootLayout({
         initMainHosting()
         await initAllDatabases()
         if (cancelled) return
+        const { runMemoryMaintenance } = await import('@/lib/memory/auto-memory')
+        void runMemoryMaintenance()
+        const {
+          reconcileMemoryEmbeddingModel,
+          reindexPendingMemories,
+        } = await import('@/db/memories')
+        await reconcileMemoryEmbeddingModel()
+        void reindexPendingMemories()
         await initCollapsibleList()
         if (cancelled) return
         await initAutoDataSyncRuntime()
@@ -164,6 +173,7 @@ export default function RootLayout({
         <SyncConfirmDialog />
         <AutoDataSyncConflictDialog />
         <MobileUpdateChecker />
+        <MemoryAutoNotifications />
       </TextSizeProvider>
     </ThemeProvider>
   );

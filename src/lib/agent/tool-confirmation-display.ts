@@ -4,6 +4,7 @@ export interface ToolConfirmationDisplayConfig {
   summaryFields?: string[]
   contentFields?: string[]
   parameterLabels?: Record<string, string>
+  hiddenFields?: string[]
 }
 
 export interface ConfirmationPreviewField {
@@ -20,6 +21,16 @@ export interface ConfirmationPreview {
 }
 
 const TOOL_CONFIRMATION_DISPLAY: Record<string, ToolConfirmationDisplayConfig> = {
+  memory_create: {
+    titleKey: 'record.chat.input.agent.confirmation.tools.create_memory.title',
+    descriptionKey: 'record.chat.input.agent.confirmation.tools.create_memory.description',
+    summaryFields: ['content'],
+    contentFields: ['content'],
+    parameterLabels: {
+      content: 'record.chat.input.agent.confirmation.tools.create_memory.content',
+    },
+    hiddenFields: ['category', 'scope', 'conflict_key'],
+  },
   note_create_file: {
     titleKey: 'record.chat.input.agent.confirmation.tools.create_file.title',
     descriptionKey: 'record.chat.input.agent.confirmation.tools.create_file.description',
@@ -182,8 +193,13 @@ export function formatConfirmationPreview(
   params: Record<string, unknown>
 ): ConfirmationPreview {
   const config = getToolConfirmationDisplay(toolName)
-  const orderedNames = config?.summaryFields?.filter((field) => field in params) ?? []
-  const remainingNames = Object.keys(params).filter((name) => !orderedNames.includes(name))
+  const hiddenFields = new Set(config?.hiddenFields ?? [])
+  const orderedNames = config?.summaryFields?.filter(
+    (field) => field in params && !hiddenFields.has(field)
+  ) ?? []
+  const remainingNames = Object.keys(params).filter(
+    (name) => !orderedNames.includes(name) && !hiddenFields.has(name)
+  )
   const fieldNames = [...orderedNames, ...remainingNames]
   const contentFields = new Set(config?.contentFields ?? [])
 
@@ -193,7 +209,8 @@ export function formatConfirmationPreview(
       config?.descriptionKey ?? 'record.chat.input.agent.confirmation.fallback.description',
     fields: fieldNames.map((name) => ({
       name,
-      labelKey: `record.chat.input.agent.confirmation.params.${name}`,
+      labelKey: config?.parameterLabels?.[name]
+        ?? `record.chat.input.agent.confirmation.params.${name}`,
       value: params[name],
       displayType: contentFields.has(name)
         ? 'content'

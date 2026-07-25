@@ -204,7 +204,12 @@ function formatAttachments(context: AgentContextSnapshot) {
 }
 
 export class AgentPromptAssembler {
-  assemble(context: AgentContextSnapshot, tools: AgentTool[], userPromptExtension = '') {
+  assemble(
+    context: AgentContextSnapshot,
+    tools: AgentTool[],
+    userPromptExtension = '',
+    memoryContext = ''
+  ) {
     const sections = [
       DEFAULT_SYSTEM_PROMPT,
       userPromptExtension.trim()
@@ -226,6 +231,7 @@ export class AgentPromptAssembler {
       formatAttachments(context),
       formatSkills(context),
       formatMcpCatalog(context),
+      memoryContext,
     ].filter((section) => section.trim().length > 0)
 
     return sections.join('\n\n')

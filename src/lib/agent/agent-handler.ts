@@ -15,6 +15,9 @@ export interface AgentHandlerConfig {
   activeFilePath?: string
   activeCanvasId?: string
   permissionMode?: AgentPermissionMode
+  conversationId?: number
+  workspaceId?: string
+  useMemories?: boolean
   onThought?: (thought: string) => void
   onAction?: (action: string, params: Record<string, any>) => void
   onObservation?: (observation: string) => void
@@ -124,6 +127,9 @@ export class AgentHandler {
         selectedMcpServerIds,
         attachments: this.config.attachments,
         permissionMode: this.config.permissionMode,
+        conversationId: this.config.conversationId,
+        workspaceId: this.config.workspaceId,
+        useMemories: this.config.useMemories,
       }, {
         onStatus: (status) => {
           store.setAgentState({

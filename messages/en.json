@@ -708,10 +708,13 @@
     "memories": {
       "title": "Memory Management",
       "desc": "AI long-term memory feature that lets AI remember your writing preferences, experiences, and note-taking habits.",
-      "stats": {
-        "total": "Total Memories",
-        "preferences": "Preferences",
-        "memories": "Memories"
+    "stats": {
+      "total": "Total Memories",
+      "preferences": "Preferences",
+      "memories": "Memories",
+      "active": "Active",
+      "pending": "Needs review",
+      "archived": "Deleted"
       },
       "form": {
         "title": "Add New Memory",
@@ -726,12 +729,20 @@
         "preferenceDesc": "Language, format, style, etc.",
         "memoryDesc": "Facts, experience, expertise, etc.",
         "save": "Save Memory",
-        "saving": "Saving..."
+      "saving": "Saving...",
+      "description": "Save stable user information that can help in future conversations.",
+      "kindLabel": "Memory type",
+      "scopeLabel": "Scope",
+      "alwaysApply": "Always apply",
+      "alwaysApplyDescription": "Inject this memory without relying on relevance retrieval.",
+      "update": "Update memory"
       },
       "listTitle": "My Memories",
       "addMemory": "Add Memory",
       "empty": "No memories yet, add your first memory!",
-      "emptyHint": "You can add memories manually, or use phrases like \"please remember\" or \"remember this\" in conversations to let AI automatically create memories.",
+      "emptyHint": "Add memories manually, or say “Please remember…”, “From now on…”, or “Always…” to save one immediately.",
+      "noMatches": "No matching memories",
+      "noMatchesHint": "Try another keyword or clear the filters.",
       "preference": "Preference",
       "memory": "Memory",
       "replaced": "Replaced",
@@ -743,7 +754,7 @@
       },
       "success": "Success",
       "saved": "Memory saved",
-      "updated": "Memory updated (similar memory replaced)",
+      "updated": "Memory updated",
       "deleted": "Memory deleted",
       "cleared": "All memories cleared",
       "found": "Found {count} memories",
@@ -753,7 +764,52 @@
       "errorDelete": "Failed to delete",
       "errorList": "Failed to get memory list",
       "errorEmbedding": "Failed to generate embedding, please check embedding model configuration",
-      "errorClear": "Failed to clear"
+    "errorClear": "Failed to clear",
+    "policy": {
+      "generate": "Remember important information from chats",
+      "generateDescription": "AI automatically remembers important information. You can also say “Please remember…” or “From now on…”."
+    },
+    "actions": {
+      "undo": "Undo",
+      "more": "More actions",
+      "approve": "Approve",
+      "approveAll": "Approve all",
+      "review": "Review",
+      "edit": "Edit",
+      "promote": "Promote to stable guidance",
+      "demote": "Remove from stable guidance",
+      "restore": "Restore",
+      "archive": "Delete",
+      "deletePermanently": "Delete permanently"
+    },
+    "kinds": {"preference": "Preference", "fact": "Fact", "experience": "Experience", "decision": "Decision"},
+    "scopes": {"global": "Global", "workspace": "Current workspace"},
+    "statuses": {"active": "Active", "pending": "Needs review", "archived": "Deleted"},
+    "filters": {"search": "Search memories", "allKinds": "All types", "allScopes": "All scopes"},
+    "sensitive": {
+      "title": "Potentially sensitive content",
+      "description": "Passwords, tokens, and private keys never become active memories automatically. Confirm that this content is safe before saving.",
+      "badge": "Sensitive"
+    },
+    "indexing": {"ready": "Indexed", "pending": "Awaiting index", "failed": "Index failed"},
+    "deleteConfirm": {
+      "title": "Permanently delete this memory?",
+      "description": "This cannot be undone.",
+      "cancel": "Cancel"
+    },
+    "autoCreated": "Generated {count} memories in the background",
+    "pendingConfirmation": "This memory needs confirmation",
+    "approvedAll": "All candidates approved",
+    "savedPendingIndex": "Memory saved and queued for indexing",
+    "savedPendingReview": "Memory added to the review queue",
+    "archived": "Memory deleted",
+    "promoted": "Added to Agent custom guidance",
+    "demoted": "Removed from Agent custom guidance",
+    "always": "Always apply",
+    "lastRecallReason": "Last recalled: {reason}",
+    "neverRecalled": "Never recalled",
+    "editTitle": "Edit memory",
+    "editDescription": "Change the content, type, scope, and application mode."
     },
     "defaultModel": {
       "title": "Default Model",
@@ -2484,6 +2540,11 @@
               "replaceExisting": "Replace existing Skill"
             },
             "tools": {
+              "create_memory": {
+                "title": "Remember this information?",
+                "description": "After confirmation, AI can use this information in future chats.",
+                "content": "Memory"
+              },
               "create_file": {
                 "title": "Create file",
                 "description": "A new file will be created in the workspace."

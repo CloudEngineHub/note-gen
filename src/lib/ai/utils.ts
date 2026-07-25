@@ -236,7 +236,12 @@ export function handleAIError(error: any, showToast = true): string | null {
  */
 export async function prepareMessages(
   text: string,
-  baseMessages?: OpenAI.Chat.ChatCompletionMessageParam[]
+  baseMessages?: OpenAI.Chat.ChatCompletionMessageParam[],
+  options?: {
+    conversationId?: number
+    workspaceId?: string
+    useMemory?: boolean
+  }
 ): Promise<{
   messages: OpenAI.Chat.ChatCompletionMessageParam[],
   geminiText?: string
@@ -244,29 +249,40 @@ export async function prepareMessages(
   // 获取当前 Prompt 模板
   let promptContent = await getPromptContent()
 
-  // 加载记忆上下文
-  try {
-    const { contextLoader } = await import('@/lib/context/loader')
-    // 确定用于检索记忆的查询文本
-    let queryText = text || ''
-    if (baseMessages && baseMessages.length > 0) {
-      // 如果提供了消息数组，使用最后一条用户消息作为查询
-      const lastUserMessage = [...baseMessages].reverse().find(m => m.role === 'user')
-      if (lastUserMessage) {
-        queryText = typeof lastUserMessage.content === 'string' ? lastUserMessage.content : queryText
-      }
-    }
+  const currentChatState = (await import('@/stores/chat')).default.getState()
+  const shouldUseMemory = options?.useMemory
+    ?? !currentChatState.isTemporaryConversation
 
-    if (queryText) {
-      const memoryContext = await contextLoader.getContextForQuery(queryText)
-      if (memoryContext.preferences.length > 0 || memoryContext.memory.length > 0) {
-        const memoryPrompt = contextLoader.formatMemoriesForPrompt(memoryContext)
-        promptContent += '\n\n' + memoryPrompt
+  if (shouldUseMemory) {
+    try {
+      const { memoryContextService } = await import('@/lib/context/loader')
+      // 确定用于检索记忆的查询文本
+      let queryText = text || ''
+      if (baseMessages && baseMessages.length > 0) {
+        const lastUserMessage = [...baseMessages].reverse().find(message => message.role === 'user')
+        if (lastUserMessage) {
+          queryText = typeof lastUserMessage.content === 'string'
+            ? lastUserMessage.content
+            : queryText
+        }
       }
+
+      if (queryText) {
+        const memoryContext = await memoryContextService.getMemoryContext({
+          query: queryText,
+          conversationId: options?.conversationId
+            ?? currentChatState.currentConversationId
+            ?? undefined,
+          workspaceId: options?.workspaceId,
+        })
+        const memoryPrompt = memoryContextService.formatMemoryContext(memoryContext)
+        if (memoryPrompt) {
+          promptContent += '\n\n' + memoryPrompt
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load memory context:', error)
     }
-  } catch (error) {
-    // 如果记忆加载失败，不影响正常对话
-    console.error('Failed to load memory context:', error)
   }
 
   // 如果提供了基础消息数组，直接使用它

@@ -645,10 +645,13 @@
     "memories": {
       "title": "Gerenciamento de Memória",
       "desc": "Recurso de memória de longo prazo da IA que permite que a IA lembre de suas preferências de escrita, base de conhecimento e hábitos de anotações.",
-      "stats": {
-        "total": "Total de Memórias",
-        "preferences": "Preferências",
-        "memories": "记忆"
+    "stats": {
+      "total": "Total de Memórias",
+      "preferences": "Preferências",
+      "memories": "Memórias",
+      "active": "Ativas",
+      "pending": "Para revisar",
+      "archived": "Excluídas"
       },
       "form": {
         "title": "Adicionar Nova Memória",
@@ -663,23 +666,56 @@
         "memoryDescription": "记忆：事实、经验、专长等信息，根据对话内容智能匹配",
         "preferenceLabel": "偏好",
         "memoryLabel": "记忆",
-        "memoryDesc": "事实、经验、专长等"
+      "memoryDesc": "事实、经验、专长等",
+      "description": "Salve informações estáveis do usuário para conversas futuras.",
+      "kindLabel": "Tipo de memória",
+      "scopeLabel": "Escopo",
+      "alwaysApply": "Sempre aplicar",
+      "alwaysApplyDescription": "Injeta a memória sem depender da recuperação por relevância.",
+      "update": "Atualizar memória"
       },
       "listTitle": "Minhas Memórias",
       "addMemory": "Adicionar Memória",
       "empty": "Nenhuma memória ainda, adicione sua primeira memória!",
-      "emptyHint": "Você pode adicionar memórias manualmente ou usar frases como \"por favor, lembre-se\" ou \"lembre-se disso\" nas conversas para que a IA crie memórias automaticamente.",
+      "emptyHint": "Adicione memórias manualmente ou diga “Lembre-se…”, “A partir de agora…” ou “Sempre…” para salvar imediatamente.",
+      "noMatches": "Nenhuma memória correspondente",
+      "noMatchesHint": "Tente outra palavra-chave ou limpe os filtros.",
       "preference": "Preferência",
       "replaced": "Substituído",
       "accessCount": "Acessado {count} vezes",
       "tabs": {
         "all": "Todas",
         "preference": "Preferências",
-        "memory": "记忆"
+    "memory": "记忆",
+    "policy": {
+      "generate": "Memorizar informações importantes das conversas",
+      "generateDescription": "A IA memoriza automaticamente informações importantes. Você também pode dizer “Lembre-se…” ou “A partir de agora…”."
+    },
+    "actions": {"undo": "Desfazer", "more": "Mais ações", "approve": "Aprovar", "approveAll": "Aprovar todas", "review": "Revisar", "edit": "Editar", "promote": "Promover para instrução estável", "demote": "Remover da instrução estável", "restore": "Restaurar", "archive": "Excluir", "deletePermanently": "Excluir permanentemente"},
+    "kinds": {"preference": "Preferência", "fact": "Fato", "experience": "Experiência", "decision": "Decisão"},
+    "scopes": {"global": "Global", "workspace": "Espaço de trabalho atual"},
+    "statuses": {"active": "Ativa", "pending": "Para revisar", "archived": "Excluída"},
+    "filters": {"search": "Pesquisar memórias", "allKinds": "Todos os tipos", "allScopes": "Todos os escopos"},
+    "sensitive": {"title": "Conteúdo potencialmente sensível", "description": "Senhas, tokens e chaves privadas nunca são ativados automaticamente. Confirme se o conteúdo é seguro.", "badge": "Sensível"},
+    "indexing": {"ready": "Indexada", "pending": "Aguardando índice", "failed": "Falha no índice"},
+    "deleteConfirm": {"title": "Excluir esta memória permanentemente?", "description": "Esta ação não poderá ser desfeita.", "cancel": "Cancelar"},
+    "autoCreated": "{count} memórias geradas em segundo plano",
+    "pendingConfirmation": "Esta memória precisa de confirmação",
+    "approvedAll": "Todas as candidatas foram aprovadas",
+    "savedPendingIndex": "Memória salva e aguardando indexação",
+    "savedPendingReview": "Memória adicionada à fila de revisão",
+    "archived": "Memória excluída",
+    "promoted": "Adicionada às instruções personalizadas do Agent",
+    "demoted": "Removida das instruções personalizadas do Agent",
+    "always": "Sempre aplicar",
+    "lastRecallReason": "Última recuperação: {reason}",
+    "neverRecalled": "Nunca recuperada",
+    "editTitle": "Editar memória",
+    "editDescription": "Altere conteúdo, tipo, escopo e modo de aplicação."
       },
       "success": "Sucesso",
       "saved": "Memória salva",
-      "updated": "Memória atualizada (memória similar substituída)",
+      "updated": "Memória atualizada",
       "deleted": "Memória excluída",
       "cleared": "Todas as memórias limpas",
       "found": "Encontrado {count} memórias",
@@ -2411,6 +2447,11 @@
               "replaceExisting": "Substituir Skill existente"
             },
             "tools": {
+              "create_memory": {
+                "title": "Lembrar desta informação?",
+                "description": "Após a confirmação, a IA poderá usar esta informação em conversas futuras.",
+                "content": "Memória"
+              },
               "uninstall_skill": {
                 "title": "Confirmar remoção do Skill",
                 "description": "Isso exclui permanentemente o Skill, o registro de instalação de terceiros e o ambiente isolado."

@@ -692,6 +692,11 @@ const useChatStore = create<ChatState>((set, get) => ({
   },
 
   switchConversation: async (id: number) => {
+    const previousConversationId = get().currentConversationId
+    if (previousConversationId && previousConversationId !== id) {
+      const { scheduleConversationMemoryExtraction } = await import('@/lib/memory/auto-memory')
+      scheduleConversationMemoryExtraction(previousConversationId)
+    }
     // 先同步消息数量，确保 messageCount 与实际消息数量一致
     const { syncConversationMessageCount } = await import('@/db/conversations')
     await syncConversationMessageCount(id)
@@ -757,6 +762,10 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   startNewConversation: async () => {
     const { currentConversationId } = get()
+    if (currentConversationId) {
+      const { scheduleConversationMemoryExtraction } = await import('@/lib/memory/auto-memory')
+      scheduleConversationMemoryExtraction(currentConversationId)
+    }
 
     // 如果当前会话无消息，删除它（从数据库查询最新状态）
     if (currentConversationId) {

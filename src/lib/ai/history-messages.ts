@@ -11,6 +11,14 @@ type MessageLike = {
   content: string
 }
 
+const MAX_RETAINED_MESSAGE_CHARS = 16_000
+
+function preserveContinuationTail(content: string, enabled: boolean) {
+  if (!enabled || content.length <= MAX_RETAINED_MESSAGE_CHARS) return content
+  const omitted = content.length - MAX_RETAINED_MESSAGE_CHARS
+  return `[Earlier content in this message omitted: ${omitted} characters]\n\n${content.slice(-MAX_RETAINED_MESSAGE_CHARS)}`
+}
+
 /**
  * 获取最后一次清除后的消息
  */
@@ -132,7 +140,10 @@ ${options.conversationSummary}
     }
 
     const role: 'user' | 'assistant' = chat.role === 'user' ? 'user' : 'assistant'
-    const content = chat.content || ''
+    const content = preserveContinuationTail(
+      chat.content || '',
+      Boolean(options?.conversationSummary)
+    )
 
     if (content) {
       messages.push({ role, content })

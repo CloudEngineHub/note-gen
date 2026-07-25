@@ -429,6 +429,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     // 每次都创建新的 AgentHandler，使用当前的 placeholderMessage
     const agentHandler = new AgentHandler({
       activeChatId: placeholderMessage.id,
+      conversationId: placeholderMessage.conversationId,
+      workspaceId: useSettingStore.getState().workspacePath.trim().replace(/\\/g, '/').replace(/\/+$/, '') || 'default',
+      useMemories: !useChatStore.getState().isTemporaryConversation,
       activeFilePath: articleStore.activeFilePath,
       activeCanvasId: canvasStore.activeCanvasId || undefined,
       permissionMode: agentPermissionMode,
@@ -556,6 +559,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
 
         if (!effectivelyStopped) {
           startProactiveCompaction()
+          const { scheduleConversationMemoryExtraction } = await import('@/lib/memory/auto-memory')
+          scheduleConversationMemoryExtraction(placeholderMessage.conversationId)
         }
 
         // 清空 ref

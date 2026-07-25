@@ -650,6 +650,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const store = await Store.load('store.json');
     await store.set('embeddingModel', embeddingModel)
     set({ embeddingModel })
+    const {
+      reconcileMemoryEmbeddingModel,
+      reindexPendingMemories,
+    } = await import('@/db/memories')
+    await reconcileMemoryEmbeddingModel()
+    void reindexPendingMemories()
   },
 
   rerankingModel: '',
@@ -839,6 +845,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
   workspacePath: '',
   setWorkspacePath: async (path: string) => {
     set({ workspacePath: path })
+    const { invalidateMemoryCache } = await import('@/lib/memory/cache-version')
+    invalidateMemoryCache()
     const store = await Store.load('store.json');
     await store.set('workspacePath', path)
     
