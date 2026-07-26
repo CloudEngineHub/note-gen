@@ -92,6 +92,16 @@ export const SENSITIVE_SYNC_EXCLUDED_FIELDS: string[] = [
   's3SyncConfig',
   'webdavSyncConfig',
   'imageHostingConfig',
+  's3Config',
+  'smms',
+  'picgo',
+  'lskyImageConfig',
+  'webdavImageConfig',
+  'customHttpImageConfig',
+  'cloudinaryImageConfig',
+  'imageKitImageConfig',
+  'qiniuImageConfig',
+  'upyunImageConfig',
   'mcpServers',
 ]
 

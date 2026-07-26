@@ -954,7 +954,6 @@
       "desc": "在這裡，你可以配置同步倉庫，它可以幫助你同步記錄、markdown 文件、系統配置等資訊。",
       "selectPlatform": "選擇同步平台",
       "platformSettings": "備份方案",
-      "platformListDesc": "選擇平台查看設定，連線成功後可設為使用平台。",
       "currentPlatform": "使用中",
       "setCurrentPlatform": "設為使用平台",
       "connectionTab": "連線設定",
@@ -973,6 +972,7 @@
       "imageRepoDesc": "同步你的圖片到圖床倉庫。",
       "status": {
         "connected": "已連接",
+        "configured": "已配置",
         "disconnected": "未連接",
         "failed": "連線失敗",
         "unconfigured": "未配置"
@@ -1141,8 +1141,27 @@
       }
     },
     "imageHosting": {
-      "title": "圖床設置",
-      "desc": "在這裡，你可以配置圖床服務，用於儲存和管理你的圖片。",
+      "title": "圖片儲存",
+      "desc": "選擇將圖片儲存在本機工作區，或上傳到已配置的圖床服務。",
+      "platformSettings": "圖片儲存方式",
+      "localProviderTitle": "本機儲存",
+      "localProviderDesc": "將圖片儲存在工作區內，適合離線使用及隨筆記一起遷移。",
+      "useLocalStorage": "使用本機儲存",
+      "localLocationTitle": "跟隨筆記儲存",
+      "localLocationDesc": "圖片儲存在 Markdown 文件所在目錄的資源資料夾。",
+      "relativePathTitle": "相對路徑引用",
+      "relativePathDesc": "Markdown 使用相對路徑引用圖片，移動整個工作區時圖片可隨筆記一起遷移。",
+      "currentPlatform": "使用中",
+      "setCurrentPlatform": "使用此服務",
+      "status": {
+        "connected": "已連接",
+        "checking": "檢測中",
+        "disconnected": "未連接"
+      },
+      "common": {
+        "status": "連接狀態",
+        "testConnection": "測試連接"
+      },
       "type": "選擇平台",
       "typeDesc": "選擇圖床服務提供商",
       "customRepoName": "自訂倉庫名",
@@ -1166,6 +1185,12 @@
         "error": "獲取失敗，請檢查網路或 Token 是否正確。"
       },
       "picgo": {
+        "title": "PicGo 圖床",
+        "description": "使用本機 PicGo 客戶端上傳圖片",
+        "status": "連接狀態",
+        "connected": "已連接",
+        "connecting": "檢測中",
+        "disconnected": "未連接",
         "desc": "PicGo 伺服器地址",
         "ok": "檢測到服務正在運行，請確保 PicGo 圖床已配置。",
         "error": "服務未運行，請確保 PicGo（需要 v2.2.0+） 應用正在運行，否則無法上傳圖片。"
@@ -1193,8 +1218,8 @@
         "recheckingRepo": "檢測中..."
       },
       "s3": {
-        "title": "S3 對象儲存",
-        "description": "配置 AWS S3 或相容 S3 協議的對象儲存服務作為圖床",
+        "title": "對象儲存",
+        "description": "連接 Amazon S3、Cloudflare R2、阿里雲 OSS、騰訊雲 COS、Backblaze B2、MinIO 或其他相容服務",
         "status": "連接狀態",
         "connected": "已連接",
         "connecting": "連線中",
@@ -1203,12 +1228,52 @@
         "accessKeyIdPlaceholder": "輸入 Access Key ID",
         "secretAccessKey": "Secret Access Key",
         "secretAccessKeyPlaceholder": "輸入 Secret Access Key",
+        "credentialPlaceholder": "輸入 {name}",
         "region": "區域",
+        "accountId": "帳戶 ID",
+        "accountIdPlaceholder": "輸入 Cloudflare 帳戶 ID",
+        "accountIdDesc": "可在 Cloudflare 控制台的 R2 概覽頁面找到。",
         "bucket": "儲存桶",
         "bucketPlaceholder": "輸入儲存桶名稱",
+        "provider": "服務商",
+        "providerDesc": "選擇預設可自動處理端點和尋址方式，舊 S3 設定會自動遷移。",
+        "providers": {
+          "aws": "Amazon S3",
+          "cloudflare-r2": "Cloudflare R2",
+          "aliyun-oss": "阿里雲 OSS",
+          "tencent-cos": "騰訊雲 COS",
+          "backblaze-b2": "Backblaze B2",
+          "minio": "MinIO",
+          "custom": "其他 S3 相容服務"
+        },
+        "providerDetails": {
+          "aws": "使用 AWS 官方 S3 服務，自動產生區域端點並採用虛擬主機尋址。",
+          "cloudflare-r2": "使用 R2 的 S3 相容 API，只需填寫 Cloudflare 帳戶 ID。",
+          "aliyun-oss": "使用阿里雲 OSS 的 S3 相容介面，依所選區域產生端點。",
+          "tencent-cos": "使用騰訊雲 COS 的 S3 相容介面，憑證對應 SecretId 和 SecretKey。",
+          "backblaze-b2": "使用 Backblaze B2 S3 相容 API，區域應與儲存桶所在區域一致。",
+          "minio": "連接自架 MinIO，需要填寫完整服務端點。",
+          "custom": "連接其他 S3 相容服務，可自行設定端點和尋址方式。"
+        },
         "advancedSettings": "進階設定",
         "endpoint": "自訂端點",
-        "endpointDesc": "留空使用 AWS S3，或輸入相容 S3 的服務端點",
+        "endpointDesc": "R2、MinIO 和自訂服務需要填寫；其他預設可留空自動產生。",
+        "endpointRequired": "需要填寫端點",
+        "endpointAutomaticDesc": "留空時自動使用 {endpoint}，填寫後將覆蓋自動端點。",
+        "endpointRequiredDetails": {
+          "cloudflare-r2": "必填，格式為 https://<帳戶 ID>.r2.cloudflarestorage.com。",
+          "minio": "必填，填寫 MinIO API 位址和連接埠，例如 http://127.0.0.1:9000。",
+          "custom": "必填，填寫相容 S3 API 的完整服務位址。"
+        },
+        "resolvedEndpoint": "目前端點",
+        "resolvedAddressing": "目前尋址",
+        "addressingStyle": "尋址方式",
+        "addressingStyleDesc": "自動模式會根據服務商選擇路徑尋址或虛擬主機尋址。",
+        "addressingStyles": {
+          "auto": "自動",
+          "path": "路徑模式",
+          "virtual": "虛擬主機模式"
+        },
         "customDomain": "自訂域名",
         "customDomainDesc": "可選，用於訪問圖片的自訂域名",
         "pathPrefix": "路徑前綴",
@@ -1227,7 +1292,75 @@
         "testFailedDesc": "請檢查配置資訊和網路連接",
         "testFirstDesc": "請先測試連接成功後再設為主要圖床",
         "setPrimarySuccess": "設置成功",
-        "setPrimarySuccessDesc": "S3 已設為主要圖床"
+        "setPrimarySuccessDesc": "對象儲存已設為主要圖床"
+      },
+      "lsky": {
+        "title": "Lsky Pro",
+        "description": "連接自架的蘭空圖床服務",
+        "apiUrl": "API 地址",
+        "apiUrlDesc": "填寫包含版本號的 API 根地址，例如 https://example.com/api/v1。",
+        "token": "API Token",
+        "tokenPlaceholder": "輸入 Bearer Token",
+        "strategyId": "儲存策略 ID",
+        "strategyIdPlaceholder": "可選",
+        "strategyIdDesc": "留空時使用 Lsky 帳戶的預設儲存策略。"
+      },
+      "webdav": {
+        "title": "WebDAV",
+        "description": "將圖片上傳到 NAS、網碟或自架 WebDAV 服務",
+        "baseUrl": "WebDAV 目錄地址",
+        "username": "使用者名稱",
+        "password": "密碼",
+        "publicUrl": "公開存取地址",
+        "publicUrlDesc": "Markdown 使用此地址載入圖片，必須可被閱讀筆記的裝置直接存取。",
+        "pathPrefix": "路徑前綴"
+      },
+      "customHttp": {
+        "title": "自訂 HTTP",
+        "description": "連接提供 POST 或 PUT 上傳介面的任意服務",
+        "url": "上傳地址",
+        "urlDesc": "地址可使用 '{filename}' 和 '{originalName}' 佔位符。",
+        "method": "請求方法",
+        "fileField": "檔案欄位名",
+        "headers": "請求標頭",
+        "headersDesc": "使用 JSON 物件填寫驗證資訊等請求標頭。",
+        "formFields": "附加表單欄位",
+        "formFieldsDesc": "使用 JSON 物件加入相簿、路徑等額外 multipart 欄位。",
+        "responseUrlPath": "回傳 URL 路徑",
+        "responseUrlPathDesc": "填寫 JSON 路徑（如 data.url）、header.Location，或使用 $requestUrl。"
+      },
+      "cloudinary": {
+        "title": "Cloudinary",
+        "description": "使用 Cloudinary CDN 上傳、最佳化和分發圖片",
+        "cloudName": "Cloud Name",
+        "uploadPreset": "Unsigned Upload Preset",
+        "uploadPresetDesc": "使用受限的 unsigned preset，無需在客戶端儲存 API Secret。",
+        "folder": "資源資料夾"
+      },
+      "imagekit": {
+        "title": "ImageKit",
+        "description": "使用 ImageKit 上傳、最佳化並透過 CDN 分發圖片",
+        "privateKey": "Private Key",
+        "privateKeyDesc": "密鑰僅儲存在本機設定中，用於 ImageKit 服務端上傳介面。",
+        "folder": "資源資料夾"
+      },
+      "qiniu": {
+        "title": "七牛雲 Kodo",
+        "description": "使用七牛雲對象儲存上傳並分發圖片",
+        "bucket": "儲存空間",
+        "publicUrl": "公開存取網域",
+        "uploadUrl": "上傳區域地址",
+        "uploadUrlDesc": "預設使用華東上傳地址，其他區域請填寫七牛雲提供的上傳網域。",
+        "pathPrefix": "路徑前綴"
+      },
+      "upyun": {
+        "title": "又拍雲 USS",
+        "description": "使用又拍雲雲端儲存上傳並分發圖片",
+        "bucket": "服務名稱",
+        "operator": "操作員",
+        "password": "操作員密碼",
+        "publicUrl": "公開存取網域",
+        "pathPrefix": "路徑前綴"
       }
     },
     "backupSync": {

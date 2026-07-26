@@ -10,17 +10,16 @@ import { useTranslations } from "next-intl";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
+import { SyncStateEnum } from "@/lib/sync/github.types";
 
 const CREATE_TOKEN_URL = 'https://s.ee/user/developers'
 
 export default function SMMSImageHosting() {
   const t = useTranslations('settings.imageHosting.smms')
-  useImageStore()
+  const { smmsState, setSmmsState } = useImageStore()
 
-  const [loading, setLoading] = useState(false)
   const [token, setToken] = useState('')
   const [tokenVisible, setTokenVisible] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
 
   async function init() {
     const store = await Store.load('store.json');
@@ -40,11 +39,9 @@ export default function SMMSImageHosting() {
 
   // 获取用户信息
   async function handleSetUserInfo() {
-    setLoading(true)
-    setIsConnected(false)
+    setSmmsState(SyncStateEnum.checking)
     const user = await getUserInfo()
-    setIsConnected(!!user)
-    setLoading(false)
+    setSmmsState(user ? SyncStateEnum.success : SyncStateEnum.fail)
   }
 
   useEffect(() => {
@@ -56,27 +53,21 @@ export default function SMMSImageHosting() {
   }, [token])
 
   const getStatusIcon = () => {
-    if (loading) {
-      return <LoaderCircle className="size-4 animate-spin text-blue-500" />;
+    if (smmsState === SyncStateEnum.checking) {
+      return <LoaderCircle className="size-4 animate-spin text-muted-foreground" />;
     }
-    if (token && isConnected) {
-      return <CheckCircle className="size-4 text-green-500" />;
+    if (smmsState === SyncStateEnum.success) {
+      return <CheckCircle className="size-4 text-primary" />;
     }
-    if (token && !isConnected) {
-      return <XCircle className="size-4 text-red-500" />;
-    }
-    return <XCircle className="size-4 text-gray-500" />;
+    return <XCircle className="size-4 text-muted-foreground" />;
   };
 
   const getStatusText = () => {
-    if (loading) {
+    if (smmsState === SyncStateEnum.checking) {
       return t('connecting');
     }
-    if (token && isConnected) {
+    if (smmsState === SyncStateEnum.success) {
       return t('connected');
-    }
-    if (token && !isConnected) {
-      return t('disconnected');
     }
     return t('disconnected');
   };

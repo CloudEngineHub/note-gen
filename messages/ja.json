@@ -954,7 +954,6 @@
       "desc": "ここでは、同期リポジトリを設定することができます。ログ、markdownファイル、システム設定などの情報を同期するのに役立ちます。",
       "selectPlatform": "同期プラットフォームを選択",
       "platformSettings": "バックアップ先",
-      "platformListDesc": "プラットフォームを選択して設定を確認し、接続後に使用先として設定できます。",
       "currentPlatform": "使用中",
       "setCurrentPlatform": "使用するプラットフォームに設定",
       "connectionTab": "接続設定",
@@ -973,6 +972,7 @@
       "imageRepoDesc": "あなたの画像を画像ホスティングリポジトリに同期します。",
       "status": {
         "connected": "接続済み",
+        "configured": "設定済み",
         "disconnected": "未接続",
         "failed": "接続失敗",
         "unconfigured": "未設定"
@@ -1141,8 +1141,27 @@
       }
     },
     "imageHosting": {
-      "title": "画像ホスティング",
-      "desc": "ここでは、画像の保存と管理のための画像ホスティングサービスを設定できます。",
+      "title": "画像の保存",
+      "desc": "画像をローカルワークスペースに保存するか、設定済みの画像ホスティングへアップロードします。",
+      "platformSettings": "画像の保存方法",
+      "localProviderTitle": "ローカル保存",
+      "localProviderDesc": "画像をワークスペース内に保存し、オフライン利用やノートと一緒の移行に対応します。",
+      "useLocalStorage": "ローカル保存を使用",
+      "localLocationTitle": "ノートと一緒に保存",
+      "localLocationDesc": "画像は Markdown ファイルと同じ場所のアセットフォルダーに保存されます。",
+      "relativePathTitle": "相対パスで参照",
+      "relativePathDesc": "Markdown は相対パスで画像を参照するため、ワークスペースと一緒に移動できます。",
+      "currentPlatform": "使用中",
+      "setCurrentPlatform": "このサービスを使用",
+      "status": {
+        "connected": "接続済み",
+        "checking": "確認中",
+        "disconnected": "未接続"
+      },
+      "common": {
+        "status": "接続状態",
+        "testConnection": "接続をテスト"
+      },
       "type": "プラットフォームを選択",
       "typeDesc": "画像ホスティングサービスを選択",
       "customRepoName": "カスタムリポジトリ名",
@@ -1166,6 +1185,12 @@
         "error": "取得失敗、ネットワークや Token の正しさを確認してください。"
       },
       "picgo": {
+        "title": "PicGo 画像ホスティング",
+        "description": "このデバイスで実行中の PicGo クライアントを使用して画像をアップロード",
+        "status": "接続状態",
+        "connected": "接続済み",
+        "connecting": "確認中",
+        "disconnected": "未接続",
         "desc": "PicGo サーバー URL",
         "ok": "サービスが起動しています。PicGo の設定を確認してください。",
         "error": "サービスが起動していません。PicGo（v2.2.0+）を起動してください。"
@@ -1193,8 +1218,8 @@
         "recheckingRepo": "確認中..."
       },
       "s3": {
-        "title": "S3オブジェクトストレージ",
-        "description": "AWS S3またはS3互換オブジェクトストレージサービスを画像ホスティングとして設定",
+        "title": "オブジェクトストレージ",
+        "description": "Amazon S3、Cloudflare R2、Alibaba OSS、Tencent COS、Backblaze B2、MinIO、その他の互換サービスに接続",
         "status": "接続状態",
         "connected": "接続済み",
         "connecting": "接続中",
@@ -1203,12 +1228,52 @@
         "accessKeyIdPlaceholder": "Access Key ID を入力",
         "secretAccessKey": "Secret Access Key",
         "secretAccessKeyPlaceholder": "Secret Access Key を入力",
+        "credentialPlaceholder": "{name} を入力",
         "region": "リージョン",
+        "accountId": "アカウント ID",
+        "accountIdPlaceholder": "Cloudflare アカウント ID を入力",
+        "accountIdDesc": "Cloudflare ダッシュボードの R2 概要ページで確認できます。",
         "bucket": "バケット",
         "bucketPlaceholder": "バケット名を入力",
+        "provider": "プロバイダー",
+        "providerDesc": "プリセットによりエンドポイントとアドレス方式を自動設定し、既存の S3 設定も移行します。",
+        "providers": {
+          "aws": "Amazon S3",
+          "cloudflare-r2": "Cloudflare R2",
+          "aliyun-oss": "Alibaba Cloud OSS",
+          "tencent-cos": "Tencent Cloud COS",
+          "backblaze-b2": "Backblaze B2",
+          "minio": "MinIO",
+          "custom": "その他の S3 互換サービス"
+        },
+        "providerDetails": {
+          "aws": "AWS 公式 S3 を使用し、リージョンのエンドポイントと仮想ホスト形式を自動設定します。",
+          "cloudflare-r2": "R2 の S3 互換 API を使用し、Cloudflare アカウント ID だけを入力します。",
+          "aliyun-oss": "Alibaba Cloud OSS の S3 互換 API を使用し、リージョンからエンドポイントを生成します。",
+          "tencent-cos": "Tencent Cloud COS の S3 互換 API を SecretId と SecretKey で使用します。",
+          "backblaze-b2": "Backblaze B2 S3 互換 API を使用します。リージョンはバケットに合わせてください。",
+          "minio": "セルフホストした MinIO に接続します。完全なサービスエンドポイントが必要です。",
+          "custom": "任意の S3 互換サービスにカスタムエンドポイントとアドレス形式で接続します。"
+        },
         "advancedSettings": "詳細設定",
         "endpoint": "カスタムエンドポイント",
-        "endpointDesc": "AWS S3 の場合は空白、S3 互換サービスのエンドポイントを入力",
+        "endpointDesc": "R2、MinIO、カスタムサービスでは必須です。他のプリセットでは自動生成できます。",
+        "endpointRequired": "エンドポイントが必要です",
+        "endpointAutomaticDesc": "空欄の場合は {endpoint} を使用し、入力すると自動設定を上書きします。",
+        "endpointRequiredDetails": {
+          "cloudflare-r2": "必須。https://<ACCOUNT_ID>.r2.cloudflarestorage.com の形式で入力します。",
+          "minio": "必須。http://127.0.0.1:9000 のように MinIO API のアドレスとポートを入力します。",
+          "custom": "必須。S3 互換 API の完全な URL を入力します。"
+        },
+        "resolvedEndpoint": "現在のエンドポイント",
+        "resolvedAddressing": "現在のアドレス形式",
+        "addressingStyle": "アドレス方式",
+        "addressingStyleDesc": "自動モードではプロバイダーに合わせてパス形式または仮想ホスト形式を選択します。",
+        "addressingStyles": {
+          "auto": "自動",
+          "path": "パス形式",
+          "virtual": "仮想ホスト形式"
+        },
         "customDomain": "カスタムドメイン",
         "customDomainDesc": "オプション、画像アクセス用のカスタムドメイン",
         "pathPrefix": "パスプレフィックス",
@@ -1227,7 +1292,75 @@
         "testFailedDesc": "設定情報とネットワーク接続を確認してください",
         "testFirstDesc": "メイン画像ホスティングに設定する前に接続テストを成功させてください",
         "setPrimarySuccess": "設定成功",
-        "setPrimarySuccessDesc": "S3 がメイン画像ホスティングに設定されました"
+        "setPrimarySuccessDesc": "オブジェクトストレージが使用中の画像サービスに設定されました"
+      },
+      "lsky": {
+        "title": "Lsky Pro",
+        "description": "セルフホストされた Lsky Pro 画像サービスに接続",
+        "apiUrl": "API URL",
+        "apiUrlDesc": "https://example.com/api/v1 のようにバージョンを含む API ルートを入力します。",
+        "token": "API Token",
+        "tokenPlaceholder": "Bearer Token を入力",
+        "strategyId": "ストレージ戦略 ID",
+        "strategyIdPlaceholder": "任意",
+        "strategyIdDesc": "空欄の場合はアカウントの既定ストレージ戦略を使用します。"
+      },
+      "webdav": {
+        "title": "WebDAV",
+        "description": "NAS、クラウドドライブ、セルフホスト WebDAV に画像をアップロード",
+        "baseUrl": "WebDAV フォルダー URL",
+        "username": "ユーザー名",
+        "password": "パスワード",
+        "publicUrl": "公開 URL",
+        "publicUrlDesc": "Markdown はこの URL で画像を読み込みます。ノートを読む端末からアクセス可能である必要があります。",
+        "pathPrefix": "パスプレフィックス"
+      },
+      "customHttp": {
+        "title": "カスタム HTTP",
+        "description": "POST または PUT のアップロード API を提供するサービスに接続",
+        "url": "アップロード URL",
+        "urlDesc": "URL には '{filename}' と '{originalName}' プレースホルダーを使用できます。",
+        "method": "リクエストメソッド",
+        "fileField": "ファイルフィールド",
+        "headers": "リクエストヘッダー",
+        "headersDesc": "認証情報などのヘッダーを JSON オブジェクトで入力します。",
+        "formFields": "追加フォームフィールド",
+        "formFieldsDesc": "アルバムやパスなどの multipart フィールドを JSON オブジェクトで追加します。",
+        "responseUrlPath": "レスポンス URL パス",
+        "responseUrlPathDesc": "data.url のような JSON パス、header.Location、または $requestUrl を使用します。"
+      },
+      "cloudinary": {
+        "title": "Cloudinary",
+        "description": "Cloudinary CDN で画像をアップロード、最適化、配信",
+        "cloudName": "Cloud Name",
+        "uploadPreset": "Unsigned Upload Preset",
+        "uploadPresetDesc": "制限付き unsigned preset を使用し、API Secret をクライアントに保存しません。",
+        "folder": "アセットフォルダー"
+      },
+      "imagekit": {
+        "title": "ImageKit",
+        "description": "ImageKit CDN で画像をアップロード、最適化、配信",
+        "privateKey": "Private Key",
+        "privateKeyDesc": "ローカル設定にのみ保存し、ImageKit のサーバー側アップロード API に使用します。",
+        "folder": "アセットフォルダー"
+      },
+      "qiniu": {
+        "title": "Qiniu Kodo",
+        "description": "Qiniu オブジェクトストレージで画像をアップロード、配信",
+        "bucket": "バケット",
+        "publicUrl": "公開ドメイン",
+        "uploadUrl": "リージョン別アップロード URL",
+        "uploadUrlDesc": "既定は中国華東です。他のリージョンでは提供されたアップロードホストを入力してください。",
+        "pathPrefix": "パスプレフィックス"
+      },
+      "upyun": {
+        "title": "UPYUN USS",
+        "description": "UPYUN クラウドストレージで画像をアップロード、配信",
+        "bucket": "サービス名",
+        "operator": "オペレーター",
+        "password": "オペレーターパスワード",
+        "publicUrl": "公開ドメイン",
+        "pathPrefix": "パスプレフィックス"
       }
     },
     "imageMethod": {

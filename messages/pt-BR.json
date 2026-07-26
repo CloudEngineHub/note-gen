@@ -979,7 +979,6 @@
       "desc": "Aqui, você pode configurar o repositório de sincronização, que pode ajudá-lo a sincronizar registros, arquivos markdown, configurações do sistema e outras informações.",
       "selectPlatform": "Selecionar Plataforma de Sincronização",
       "platformSettings": "Provedor de Backup",
-      "platformListDesc": "Selecione um provedor para ver as configurações e defina-o como ativo após conectar.",
       "currentPlatform": "Em uso",
       "setCurrentPlatform": "Usar este provedor",
       "connectionTab": "Conexão",
@@ -998,6 +997,7 @@
       "imageRepoDesc": "Sincronize suas imagens para o repositório, usando jsdelivr para aceleração",
       "status": {
         "connected": "Conectado",
+        "configured": "Configurado",
         "disconnected": "Desconectado",
         "failed": "Conexão Falhou",
         "unconfigured": "Não Configurado"
@@ -1166,8 +1166,27 @@
       "jsdelivrSettingDesc": "Use jsDelivr para acelerar o acesso às imagens."
     },
     "imageHosting": {
-      "title": "Hospedagem de Imagens",
-      "desc": "Aqui, você pode configurar serviços de hospedagem de imagens para armazenar e gerenciar suas imagens.",
+      "title": "Armazenamento de Imagens",
+      "desc": "Armazene imagens no espaço de trabalho local ou envie-as a um serviço configurado.",
+      "platformSettings": "Armazenamento de Imagens",
+      "localProviderTitle": "Armazenamento Local",
+      "localProviderDesc": "Mantenha as imagens no espaço de trabalho para acesso offline e migração junto com as notas.",
+      "useLocalStorage": "Usar Armazenamento Local",
+      "localLocationTitle": "Armazenadas com a nota",
+      "localLocationDesc": "As imagens são salvas na pasta de recursos ao lado do arquivo Markdown.",
+      "relativePathTitle": "Referências por caminho relativo",
+      "relativePathDesc": "O Markdown usa caminhos relativos, permitindo mover as imagens junto com o espaço de trabalho.",
+      "currentPlatform": "Em Uso",
+      "setCurrentPlatform": "Usar Este Serviço",
+      "status": {
+        "connected": "Conectado",
+        "checking": "Verificando",
+        "disconnected": "Desconectado"
+      },
+      "common": {
+        "status": "Status da Conexão",
+        "testConnection": "Testar Conexão"
+      },
       "type": "Selecionar Plataforma",
       "typeDesc": "Selecione o provedor de serviços de hospedagem de imagens",
       "customRepoName": "Nome Personalizado do Repositório",
@@ -1191,6 +1210,12 @@
         "error": "Falha ao obter, por favor, verifique a rede ou se o Token está correto."
       },
       "picgo": {
+        "title": "Hospedagem de Imagens PicGo",
+        "description": "Envie imagens pelo cliente PicGo em execução neste dispositivo",
+        "status": "Status da Conexão",
+        "connected": "Conectado",
+        "connecting": "Verificando",
+        "disconnected": "Desconectado",
         "desc": "URL do servidor PicGo",
         "ok": "O serviço está em execução, por favor, garanta que a hospedagem de imagens do PicGo esteja configurada.",
         "error": "O serviço não está em execução, por favor, garanta que o PicGo (v2.2.0+) esteja em execução, caso contrário, o upload de imagens falhará."
@@ -1218,8 +1243,8 @@
         "recheckingRepo": "Verificando..."
       },
       "s3": {
-        "title": "Armazenamento de Objetos S3",
-        "description": "Configure o AWS S3 ou serviço de armazenamento de objetos compatível com S3 como hospedagem de imagens",
+        "title": "Armazenamento de Objetos",
+        "description": "Conecte Amazon S3, Cloudflare R2, Alibaba OSS, Tencent COS, Backblaze B2, MinIO ou outro serviço compatível",
         "status": "Status da Conexão",
         "connected": "Conectado",
         "connecting": "Conectando",
@@ -1228,12 +1253,52 @@
         "accessKeyIdPlaceholder": "Insira o ID da Chave de Acesso",
         "secretAccessKey": "Chave de Acesso Secreta",
         "secretAccessKeyPlaceholder": "Insira a Chave de Acesso Secreta",
+        "credentialPlaceholder": "Insira {name}",
         "region": "Região",
+        "accountId": "ID da Conta",
+        "accountIdPlaceholder": "Insira o ID da conta Cloudflare",
+        "accountIdDesc": "Encontre-o na página de visão geral do R2 no painel da Cloudflare.",
         "bucket": "Bucket",
         "bucketPlaceholder": "Insira o nome do bucket",
+        "provider": "Provedor",
+        "providerDesc": "As predefinições configuram endpoints e endereçamento automaticamente e migram ajustes S3 existentes.",
+        "providers": {
+          "aws": "Amazon S3",
+          "cloudflare-r2": "Cloudflare R2",
+          "aliyun-oss": "Alibaba Cloud OSS",
+          "tencent-cos": "Tencent Cloud COS",
+          "backblaze-b2": "Backblaze B2",
+          "minio": "MinIO",
+          "custom": "Outro serviço compatível com S3"
+        },
+        "providerDetails": {
+          "aws": "Usa o serviço oficial AWS S3 com endpoint regional gerado e endereçamento por host virtual.",
+          "cloudflare-r2": "Usa a API compatível com S3 do R2 e requer apenas o ID da conta Cloudflare.",
+          "aliyun-oss": "Usa a API compatível com S3 do Alibaba Cloud OSS e gera o endpoint pela região.",
+          "tencent-cos": "Usa a API compatível com S3 do Tencent Cloud COS com credenciais SecretId e SecretKey.",
+          "backblaze-b2": "Usa a API compatível com S3 do Backblaze B2; a região deve corresponder ao bucket.",
+          "minio": "Conecta a uma instância MinIO auto-hospedada e requer o endpoint completo.",
+          "custom": "Conecta a outro serviço compatível com S3 com endpoint e estilo de endereçamento personalizados."
+        },
         "advancedSettings": "Configurações Avançadas",
         "endpoint": "Endpoint Personalizado",
-        "endpointDesc": "Deixe em branco para AWS S3, ou insira o endpoint do serviço compatível com S3",
+        "endpointDesc": "Obrigatório para R2, MinIO e serviços personalizados. Outros podem gerar automaticamente.",
+        "endpointRequired": "Endpoint obrigatório",
+        "endpointAutomaticDesc": "Deixe vazio para usar {endpoint}; um valor informado substitui o endpoint gerado.",
+        "endpointRequiredDetails": {
+          "cloudflare-r2": "Obrigatório. Use https://<ACCOUNT_ID>.r2.cloudflarestorage.com.",
+          "minio": "Obrigatório. Informe o endereço e a porta da API MinIO, como http://127.0.0.1:9000.",
+          "custom": "Obrigatório. Informe a URL completa da API compatível com S3."
+        },
+        "resolvedEndpoint": "Endpoint atual",
+        "resolvedAddressing": "Endereçamento atual",
+        "addressingStyle": "Estilo de Endereçamento",
+        "addressingStyleDesc": "O modo automático seleciona endereçamento por caminho ou host virtual para o provedor.",
+        "addressingStyles": {
+          "auto": "Automático",
+          "path": "Estilo de caminho",
+          "virtual": "Estilo de host virtual"
+        },
         "customDomain": "Domínio Personalizado",
         "customDomainDesc": "Opcional, domínio personalizado para acessar imagens",
         "pathPrefix": "Prefixo do Caminho",
@@ -1252,7 +1317,75 @@
         "testFailedDesc": "Por favor, verifique a configuração e a conexão de rede",
         "testFirstDesc": "Por favor, teste a conexão com sucesso antes de definir como principal",
         "setPrimarySuccess": "Definido com Sucesso",
-        "setPrimarySuccessDesc": "O S3 foi definido como a hospedagem de imagem principal"
+        "setPrimarySuccessDesc": "O armazenamento de objetos foi definido como serviço de imagem ativo"
+      },
+      "lsky": {
+        "title": "Lsky Pro",
+        "description": "Conecte um serviço de imagens Lsky Pro auto-hospedado",
+        "apiUrl": "URL da API",
+        "apiUrlDesc": "Informe a raiz versionada da API, como https://example.com/api/v1.",
+        "token": "Token da API",
+        "tokenPlaceholder": "Insira o Bearer Token",
+        "strategyId": "ID da Estratégia de Armazenamento",
+        "strategyIdPlaceholder": "Opcional",
+        "strategyIdDesc": "Deixe vazio para usar a estratégia padrão da conta."
+      },
+      "webdav": {
+        "title": "WebDAV",
+        "description": "Envie imagens para NAS, unidade na nuvem ou serviço WebDAV auto-hospedado",
+        "baseUrl": "URL da Pasta WebDAV",
+        "username": "Usuário",
+        "password": "Senha",
+        "publicUrl": "URL Pública",
+        "publicUrlDesc": "O Markdown usa esta URL para carregar imagens. Ela deve ser acessível pelos dispositivos que leem a nota.",
+        "pathPrefix": "Prefixo do Caminho"
+      },
+      "customHttp": {
+        "title": "HTTP Personalizado",
+        "description": "Conecte qualquer serviço com endpoint de upload POST ou PUT",
+        "url": "URL de Upload",
+        "urlDesc": "A URL pode conter os marcadores '{filename}' e '{originalName}'.",
+        "method": "Método da Requisição",
+        "fileField": "Campo do Arquivo",
+        "headers": "Cabeçalhos",
+        "headersDesc": "Informe autenticação e outros cabeçalhos como objeto JSON.",
+        "formFields": "Campos Adicionais",
+        "formFieldsDesc": "Adicione álbum, caminho ou outros campos multipart como objeto JSON.",
+        "responseUrlPath": "Caminho da URL na Resposta",
+        "responseUrlPathDesc": "Use um caminho JSON como data.url, header.Location ou $requestUrl."
+      },
+      "cloudinary": {
+        "title": "Cloudinary",
+        "description": "Envie, otimize e distribua imagens pela CDN da Cloudinary",
+        "cloudName": "Cloud Name",
+        "uploadPreset": "Unsigned Upload Preset",
+        "uploadPresetDesc": "Use uma predefinição unsigned restrita para não armazenar o API Secret no cliente.",
+        "folder": "Pasta de Recursos"
+      },
+      "imagekit": {
+        "title": "ImageKit",
+        "description": "Envie, otimize e distribua imagens pela CDN da ImageKit",
+        "privateKey": "Private Key",
+        "privateKeyDesc": "Armazenada apenas nas configurações locais e usada pela API de upload do servidor ImageKit.",
+        "folder": "Pasta de Recursos"
+      },
+      "qiniu": {
+        "title": "Qiniu Kodo",
+        "description": "Envie e distribua imagens com o armazenamento de objetos Qiniu",
+        "bucket": "Bucket",
+        "publicUrl": "Domínio Público",
+        "uploadUrl": "URL Regional de Upload",
+        "uploadUrlDesc": "O padrão usa a região Leste da China. Informe o host fornecido para outras regiões.",
+        "pathPrefix": "Prefixo do Caminho"
+      },
+      "upyun": {
+        "title": "UPYUN USS",
+        "description": "Envie e distribua imagens com o armazenamento em nuvem UPYUN",
+        "bucket": "Nome do Serviço",
+        "operator": "Operador",
+        "password": "Senha do Operador",
+        "publicUrl": "Domínio Público",
+        "pathPrefix": "Prefixo do Caminho"
       }
     },
     "imageMethod": {

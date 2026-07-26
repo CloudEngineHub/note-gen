@@ -1069,7 +1069,6 @@
       "desc": "Here, you can configure the synchronization repository, which can help you synchronize records, markdown files, system configurations and other information.",
       "selectPlatform": "Select Sync Platform",
       "platformSettings": "Backup Provider",
-      "platformListDesc": "Select a provider to view its settings, then set it as active after connecting.",
       "currentPlatform": "In Use",
       "setCurrentPlatform": "Use This Provider",
       "connectionTab": "Connection",
@@ -1088,6 +1087,7 @@
       "imageRepoDesc": "Sync your images to repository, using jsdelivr for acceleration",
       "status": {
         "connected": "Connected",
+        "configured": "Configured",
         "disconnected": "Disconnected",
         "failed": "Connection Failed",
         "unconfigured": "Not Configured"
@@ -1256,8 +1256,27 @@
       "jsdelivrSettingDesc": "Use jsdelivr to accelerate image access."
     },
     "imageHosting": {
-      "title": "Image Hosting",
-      "desc": "Here, you can configure image hosting services for storing and managing your images.",
+      "title": "Image Storage",
+      "desc": "Store images in the local workspace or upload them to a configured image hosting service.",
+      "platformSettings": "Image Storage",
+      "localProviderTitle": "Local Storage",
+      "localProviderDesc": "Keep images inside the workspace for offline access and easy migration with your notes.",
+      "useLocalStorage": "Use Local Storage",
+      "localLocationTitle": "Stored with the note",
+      "localLocationDesc": "Images are saved in the asset folder beside the Markdown file.",
+      "relativePathTitle": "Relative path references",
+      "relativePathDesc": "Markdown uses relative image paths, so images move together with the workspace.",
+      "currentPlatform": "In Use",
+      "setCurrentPlatform": "Use This Service",
+      "status": {
+        "connected": "Connected",
+        "checking": "Checking",
+        "disconnected": "Disconnected"
+      },
+      "common": {
+        "status": "Connection Status",
+        "testConnection": "Test Connection"
+      },
       "type": "Select Platform",
       "typeDesc": "Select image hosting service provider",
       "customRepoName": "Custom Repository Name",
@@ -1281,6 +1300,12 @@
         "error": "Failed to get, please check network or Token is correct."
       },
       "picgo": {
+        "title": "PicGo Image Hosting",
+        "description": "Upload images through the PicGo client running on this device",
+        "status": "Connection Status",
+        "connected": "Connected",
+        "connecting": "Checking",
+        "disconnected": "Disconnected",
         "desc": "PicGo server URL",
         "ok": "Service is running, please ensure PicGo image hosting is configured.",
         "error": "Service is not running, please ensure PicGo (v2.2.0+) is running, otherwise image upload will fail."
@@ -1308,8 +1333,8 @@
         "recheckingRepo": "Checking..."
       },
       "s3": {
-        "title": "S3 Object Storage",
-        "description": "Configure AWS S3 or S3-compatible object storage service as image hosting",
+        "title": "Object Storage",
+        "description": "Connect Amazon S3, Cloudflare R2, Alibaba OSS, Tencent COS, Backblaze B2, MinIO, or another compatible service",
         "status": "Connection Status",
         "connected": "Connected",
         "connecting": "Connecting",
@@ -1318,12 +1343,52 @@
         "accessKeyIdPlaceholder": "Enter Access Key ID",
         "secretAccessKey": "Secret Access Key",
         "secretAccessKeyPlaceholder": "Enter Secret Access Key",
+        "credentialPlaceholder": "Enter {name}",
         "region": "Region",
+        "accountId": "Account ID",
+        "accountIdPlaceholder": "Enter Cloudflare Account ID",
+        "accountIdDesc": "Find this on the R2 overview page in the Cloudflare dashboard.",
         "bucket": "Bucket",
         "bucketPlaceholder": "Enter bucket name",
+        "provider": "Provider",
+        "providerDesc": "Presets configure endpoints and addressing automatically. Existing S3 settings are migrated.",
+        "providers": {
+          "aws": "Amazon S3",
+          "cloudflare-r2": "Cloudflare R2",
+          "aliyun-oss": "Alibaba Cloud OSS",
+          "tencent-cos": "Tencent Cloud COS",
+          "backblaze-b2": "Backblaze B2",
+          "minio": "MinIO",
+          "custom": "Other S3-compatible service"
+        },
+        "providerDetails": {
+          "aws": "Uses the official AWS S3 service with a generated regional endpoint and virtual-hosted addressing.",
+          "cloudflare-r2": "Uses the R2 S3-compatible API and only requires your Cloudflare Account ID.",
+          "aliyun-oss": "Uses the Alibaba Cloud OSS S3-compatible API and generates an endpoint from the selected region.",
+          "tencent-cos": "Uses the Tencent Cloud COS S3-compatible API with SecretId and SecretKey credentials.",
+          "backblaze-b2": "Uses the Backblaze B2 S3-compatible API; the region must match the bucket.",
+          "minio": "Connects to a self-hosted MinIO instance and requires its full service endpoint.",
+          "custom": "Connects to another S3-compatible service with a custom endpoint and addressing style."
+        },
         "advancedSettings": "Advanced Settings",
         "endpoint": "Custom Endpoint",
-        "endpointDesc": "Leave empty for AWS S3, or enter S3-compatible service endpoint",
+        "endpointDesc": "Required for R2, MinIO, and custom services. Other presets can generate it automatically.",
+        "endpointRequired": "Endpoint required",
+        "endpointAutomaticDesc": "Leave empty to use {endpoint}; entering a value overrides the generated endpoint.",
+        "endpointRequiredDetails": {
+          "cloudflare-r2": "Required. Use https://<ACCOUNT_ID>.r2.cloudflarestorage.com.",
+          "minio": "Required. Enter the MinIO API address and port, such as http://127.0.0.1:9000.",
+          "custom": "Required. Enter the full URL of the S3-compatible API."
+        },
+        "resolvedEndpoint": "Current endpoint",
+        "resolvedAddressing": "Current addressing",
+        "addressingStyle": "Addressing Style",
+        "addressingStyleDesc": "Automatic mode selects path-style or virtual-hosted addressing for the provider.",
+        "addressingStyles": {
+          "auto": "Automatic",
+          "path": "Path style",
+          "virtual": "Virtual-hosted style"
+        },
         "customDomain": "Custom Domain",
         "customDomainDesc": "Optional, custom domain for accessing images",
         "pathPrefix": "Path Prefix",
@@ -1342,7 +1407,75 @@
         "testFailedDesc": "Please check configuration and network connection",
         "testFirstDesc": "Please test connection successfully before setting as primary",
         "setPrimarySuccess": "Set Successfully",
-        "setPrimarySuccessDesc": "S3 has been set as primary image hosting"
+        "setPrimarySuccessDesc": "Object storage has been set as the active image service"
+      },
+      "lsky": {
+        "title": "Lsky Pro",
+        "description": "Connect a self-hosted Lsky Pro image service",
+        "apiUrl": "API URL",
+        "apiUrlDesc": "Enter the versioned API root, such as https://example.com/api/v1.",
+        "token": "API Token",
+        "tokenPlaceholder": "Enter Bearer Token",
+        "strategyId": "Storage Strategy ID",
+        "strategyIdPlaceholder": "Optional",
+        "strategyIdDesc": "Leave empty to use the account's default storage strategy."
+      },
+      "webdav": {
+        "title": "WebDAV",
+        "description": "Upload images to a NAS, cloud drive, or self-hosted WebDAV service",
+        "baseUrl": "WebDAV Folder URL",
+        "username": "Username",
+        "password": "Password",
+        "publicUrl": "Public URL",
+        "publicUrlDesc": "Markdown uses this URL to load images. It must be reachable by devices reading the note.",
+        "pathPrefix": "Path Prefix"
+      },
+      "customHttp": {
+        "title": "Custom HTTP",
+        "description": "Connect any service that provides a POST or PUT upload endpoint",
+        "url": "Upload URL",
+        "urlDesc": "The URL can contain '{filename}' and '{originalName}' placeholders.",
+        "method": "Request Method",
+        "fileField": "File Field",
+        "headers": "Request Headers",
+        "headersDesc": "Enter authentication and other headers as a JSON object.",
+        "formFields": "Additional Form Fields",
+        "formFieldsDesc": "Add album, path, or other multipart fields as a JSON object.",
+        "responseUrlPath": "Response URL Path",
+        "responseUrlPathDesc": "Use a JSON path such as data.url, header.Location, or $requestUrl."
+      },
+      "cloudinary": {
+        "title": "Cloudinary",
+        "description": "Upload, optimize, and deliver images through the Cloudinary CDN",
+        "cloudName": "Cloud Name",
+        "uploadPreset": "Unsigned Upload Preset",
+        "uploadPresetDesc": "Use a restricted unsigned preset so no API secret is stored on the client.",
+        "folder": "Asset Folder"
+      },
+      "imagekit": {
+        "title": "ImageKit",
+        "description": "Upload, optimize, and deliver images through the ImageKit CDN",
+        "privateKey": "Private Key",
+        "privateKeyDesc": "Stored only in local settings and used with ImageKit's server-side upload API.",
+        "folder": "Asset Folder"
+      },
+      "qiniu": {
+        "title": "Qiniu Kodo",
+        "description": "Upload and deliver images with Qiniu object storage",
+        "bucket": "Bucket",
+        "publicUrl": "Public Domain",
+        "uploadUrl": "Regional Upload URL",
+        "uploadUrlDesc": "The default is the East China endpoint. Enter the upload host provided for other regions.",
+        "pathPrefix": "Path Prefix"
+      },
+      "upyun": {
+        "title": "UPYUN USS",
+        "description": "Upload and deliver images with UPYUN cloud storage",
+        "bucket": "Service Name",
+        "operator": "Operator",
+        "password": "Operator Password",
+        "publicUrl": "Public Domain",
+        "pathPrefix": "Path Prefix"
       }
     },
     "imageMethod": {

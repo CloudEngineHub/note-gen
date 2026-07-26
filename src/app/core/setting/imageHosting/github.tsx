@@ -134,14 +134,14 @@ export function GithubImageHosting() {
   const getStatusIcon = () => {
     switch (imageRepoState) {
       case SyncStateEnum.success:
-        return <CheckCircle className="size-4 text-green-500" />;
+        return <CheckCircle className="size-4 text-primary" />;
       case SyncStateEnum.checking:
-        return <Loader2 className="size-4 animate-spin text-blue-500" />;
+        return <Loader2 className="size-4 animate-spin text-muted-foreground" />;
       case SyncStateEnum.creating:
-        return <Loader2 className="size-4 animate-spin text-yellow-500" />;
+        return <Loader2 className="size-4 animate-spin text-muted-foreground" />;
       case SyncStateEnum.fail:
       default:
-        return <XCircle className="size-4 text-red-500" />;
+        return <XCircle className="size-4 text-muted-foreground" />;
     }
   };
 
@@ -162,8 +162,8 @@ export function GithubImageHosting() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>GitHub 图床</CardTitle>
-        <CardDescription>使用 GitHub 仓库作为图片存储服务</CardDescription>
+        <CardTitle>{t('settings.imageHosting.github.title')}</CardTitle>
+        <CardDescription>{t('settings.imageHosting.github.description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup>
@@ -183,7 +183,9 @@ export function GithubImageHosting() {
               size="sm"
               disabled={isCreating || isChecking}
             >
-              {isCreating ? '创建中...' : '创建仓库'}
+              {isCreating
+                ? t('settings.imageHosting.github.creating')
+                : t('settings.imageHosting.github.createNewRepo')}
             </Button>
             <Button 
               onClick={checkGithubRepos}
@@ -191,20 +193,22 @@ export function GithubImageHosting() {
               variant="outline"
               disabled={isChecking || isCreating}
             >
-              {isChecking ? '检测中...' : '重新检测'}
+              {isChecking
+                ? t('settings.imageHosting.github.recheckingRepo')
+                : t('settings.imageHosting.github.recheckRepo')}
             </Button>
           </div>
         )}
 
         <Field>
-          <FieldLabel htmlFor="github-image-repo">自定义图床仓库名</FieldLabel>
+          <FieldLabel htmlFor="github-image-repo">{t('settings.imageHosting.customRepoName')}</FieldLabel>
           <Input 
             id="github-image-repo"
             value={githubCustomImageRepo} 
             onChange={customRepoChangeHandler}
-            placeholder={`默认: ${RepoNames.image}`}
+            placeholder={RepoNames.image}
           />
-          <FieldDescription>留空则使用默认仓库名 &quot;{RepoNames.image}&quot;</FieldDescription>
+          <FieldDescription>{t('settings.imageHosting.customRepoNameDesc')}</FieldDescription>
         </Field>
 
         <Field>

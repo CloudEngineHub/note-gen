@@ -11,33 +11,63 @@ import { testS3Connection } from '@/lib/imageHosting/s3';
 import { Store } from '@tauri-apps/plugin-store';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { InputGroup, InputGroupButton, InputGroupInput } from '@/components/ui/input-group';
-import { Item, ItemActions, ItemContent, ItemTitle } from '@/components/ui/item';
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from '@/components/ui/item';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type {
+  ObjectStorageAddressingStyle,
+  ObjectStoragePreset,
+  S3Config,
+} from '@/lib/imageHosting/types';
+import {
+  applyObjectStoragePreset,
+  getObjectStorageEndpoint,
+  isObjectStorageConfigComplete,
+  normalizeObjectStorageConfig,
+  OBJECT_STORAGE_PRESETS,
+} from '@/lib/imageHosting/object-storage-presets';
 
-interface S3Config {
-  accessKeyId: string
-  secretAccessKey: string
-  region: string
-  bucket: string
-  endpoint?: string
-  customDomain?: string
-  pathPrefix?: string
+const DEFAULT_CONFIG: S3Config = {
+  preset: 'aws',
+  accessKeyId: '',
+  secretAccessKey: '',
+  region: 'us-east-1',
+  bucket: '',
+  endpoint: '',
+  customDomain: '',
+  pathPrefix: '',
+  addressingStyle: 'auto',
 }
 
 export function S3ImageHosting() {
   const t = useTranslations();
   const { setS3Config, s3State, setS3State } = useImageStore();
   
-  const [config, setConfig] = useState<S3Config>({
-    accessKeyId: '',
-    secretAccessKey: '',
-    region: 'us-east-1',
-    bucket: '',
-    endpoint: '',
-    customDomain: '',
-    pathPrefix: ''
-  });
-  
+  const [config, setConfig] = useState<S3Config>(DEFAULT_CONFIG);
   const [showSecretKey, setShowSecretKey] = useState(false);
+  const preset = config.preset || 'custom'
+  const endpoint = getObjectStorageEndpoint(config)
+  const credentialLabels = getCredentialLabels(preset)
+  const r2AccountId = getR2AccountId(config.endpoint)
+  const showRegion = (
+    preset === 'aws'
+    || preset === 'aliyun-oss'
+    || preset === 'tencent-cos'
+    || preset === 'backblaze-b2'
+    || preset === 'custom'
+  )
 
   // 初始化配置
   useEffect(() => {
@@ -45,12 +75,17 @@ export function S3ImageHosting() {
       const store = await Store.load('store.json');
       const savedConfig = await store.get<S3Config>('s3Config');
       if (savedConfig) {
-        setConfig(savedConfig);
+        const normalizedConfig = normalizeObjectStorageConfig({
+          ...DEFAULT_CONFIG,
+          ...savedConfig,
+        });
+        setConfig(normalizedConfig);
+        await setS3Config(normalizedConfig);
         // 如果配置完整，自动进行连接检测
-        if (savedConfig.accessKeyId && savedConfig.secretAccessKey && savedConfig.region && savedConfig.bucket) {
+        if (isObjectStorageConfigComplete(normalizedConfig)) {
           setS3State(SyncStateEnum.checking);
           try {
-            const isConnected = await testS3Connection(savedConfig);
+            const isConnected = await testS3Connection(normalizedConfig);
             if (isConnected) {
               setS3State(SyncStateEnum.success);
             } else {
@@ -78,7 +113,7 @@ export function S3ImageHosting() {
     }
     
     // 如果必填字段都已填写，自动测试连接
-    if (newConfig.accessKeyId && newConfig.secretAccessKey && newConfig.region && newConfig.bucket) {
+    if (isObjectStorageConfigComplete(newConfig)) {
       setS3State(SyncStateEnum.checking);
 
       try {
@@ -100,12 +135,12 @@ export function S3ImageHosting() {
   const getStatusIcon = () => {
     switch (s3State) {
       case SyncStateEnum.success:
-        return <CheckCircle className="size-4 text-green-500" />;
+        return <CheckCircle className="size-4 text-primary" />;
       case SyncStateEnum.checking:
-        return <Loader2 className="size-4 animate-spin text-blue-500" />;
+        return <Loader2 className="size-4 animate-spin text-muted-foreground" />;
       case SyncStateEnum.fail:
       default:
-        return <XCircle className="size-4 text-red-500" />;
+        return <XCircle className="size-4 text-muted-foreground" />;
     }
   };
 
@@ -141,24 +176,71 @@ export function S3ImageHosting() {
 
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="accessKeyId">{t('settings.imageHosting.s3.accessKeyId')}</FieldLabel>
+              <FieldLabel>{t('settings.imageHosting.s3.provider')}</FieldLabel>
+              <Select
+                value={config.preset || 'custom'}
+                onValueChange={(preset: ObjectStoragePreset) => {
+                  void handleConfigChange(applyObjectStoragePreset(preset, config))
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {OBJECT_STORAGE_PRESETS.map((preset) => (
+                      <SelectItem key={preset} value={preset}>
+                        {t(`settings.imageHosting.s3.providers.${preset}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t('settings.imageHosting.s3.providerDesc')}</FieldDescription>
+            </Field>
+            <Item variant="muted">
+              <ItemContent>
+                <ItemTitle>
+                  {t(`settings.imageHosting.s3.providers.${preset}`)}
+                </ItemTitle>
+                <ItemDescription>
+                  {t(`settings.imageHosting.s3.providerDetails.${preset}`)}
+                </ItemDescription>
+                <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0">
+                      {t('settings.imageHosting.s3.resolvedEndpoint')}
+                    </span>
+                    <code className="truncate text-foreground">
+                      {endpoint || t('settings.imageHosting.s3.endpointRequired')}
+                    </code>
+                  </div>
+                </div>
+              </ItemContent>
+            </Item>
+            <Field>
+              <FieldLabel htmlFor="accessKeyId">{credentialLabels.accessKey}</FieldLabel>
               <Input
                 id="accessKeyId"
                 type="text"
                 value={config.accessKeyId}
                 onChange={(e) => handleConfigChange({ ...config, accessKeyId: e.target.value })}
-                placeholder={t('settings.imageHosting.s3.accessKeyIdPlaceholder')}
+                placeholder={t('settings.imageHosting.s3.credentialPlaceholder', {
+                  name: credentialLabels.accessKey,
+                })}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="secretAccessKey">{t('settings.imageHosting.s3.secretAccessKey')}</FieldLabel>
+              <FieldLabel htmlFor="secretAccessKey">{credentialLabels.secretKey}</FieldLabel>
               <InputGroup>
                 <InputGroupInput
                   id="secretAccessKey"
                   type={showSecretKey ? "text" : "password"}
                   value={config.secretAccessKey}
                   onChange={(e) => handleConfigChange({ ...config, secretAccessKey: e.target.value })}
-                  placeholder={t('settings.imageHosting.s3.secretAccessKeyPlaceholder')}
+                  placeholder={t('settings.imageHosting.s3.credentialPlaceholder', {
+                    name: credentialLabels.secretKey,
+                  })}
                 />
                 <InputGroupButton
                   size="icon-xs"
@@ -169,21 +251,86 @@ export function S3ImageHosting() {
                 </InputGroupButton>
               </InputGroup>
             </Field>
-            <Field>
-              <FieldLabel htmlFor="region">{t('settings.imageHosting.s3.region')}</FieldLabel>
-              <Input id="region" value={config.region} onChange={(e) => handleConfigChange({ ...config, region: e.target.value })} placeholder="us-east-1" />
-            </Field>
+            {preset === 'cloudflare-r2' ? (
+              <Field>
+                <FieldLabel htmlFor="r2-account-id">
+                  {t('settings.imageHosting.s3.accountId')}
+                </FieldLabel>
+                <Input
+                  id="r2-account-id"
+                  value={r2AccountId}
+                  placeholder={t('settings.imageHosting.s3.accountIdPlaceholder')}
+                  onChange={(event) => {
+                    const accountId = event.target.value.trim()
+                    void handleConfigChange({
+                      ...config,
+                      endpoint: accountId
+                        ? `https://${accountId}.r2.cloudflarestorage.com`
+                        : '',
+                    })
+                  }}
+                />
+                <FieldDescription>
+                  {t('settings.imageHosting.s3.accountIdDesc')}
+                </FieldDescription>
+              </Field>
+            ) : null}
+            {showRegion ? (
+              <Field>
+                <FieldLabel htmlFor="region">{t('settings.imageHosting.s3.region')}</FieldLabel>
+                <Input
+                  id="region"
+                  value={config.region}
+                  onChange={(e) => handleConfigChange({ ...config, region: e.target.value })}
+                  placeholder={getRegionPlaceholder(preset)}
+                />
+              </Field>
+            ) : null}
             <Field>
               <FieldLabel htmlFor="bucket">{t('settings.imageHosting.s3.bucket')}</FieldLabel>
               <Input id="bucket" value={config.bucket} onChange={(e) => handleConfigChange({ ...config, bucket: e.target.value })} placeholder={t('settings.imageHosting.s3.bucketPlaceholder')} />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="endpoint">{t('settings.imageHosting.s3.endpoint')}</FieldLabel>
-              <Input id="endpoint" value={config.endpoint || ''} onChange={(e) => handleConfigChange({ ...config, endpoint: e.target.value })} placeholder="https://s3.amazonaws.com" />
-            </Field>
+            {preset === 'minio' || preset === 'custom' ? (
+              <Field>
+                <FieldLabel htmlFor="endpoint">{t('settings.imageHosting.s3.endpoint')}</FieldLabel>
+                <Input
+                  id="endpoint"
+                  value={config.endpoint || ''}
+                  onChange={(e) => handleConfigChange({ ...config, endpoint: e.target.value })}
+                  placeholder={getEndpointPlaceholder(preset)}
+                />
+                <FieldDescription>
+                  {t(`settings.imageHosting.s3.endpointRequiredDetails.${preset}`)}
+                </FieldDescription>
+              </Field>
+            ) : null}
+            {preset === 'custom' ? (
+              <Field>
+                <FieldLabel>{t('settings.imageHosting.s3.addressingStyle')}</FieldLabel>
+                <Select
+                  value={config.addressingStyle || 'auto'}
+                  onValueChange={(addressingStyle: ObjectStorageAddressingStyle) => {
+                    void handleConfigChange({ ...config, addressingStyle })
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="auto">{t('settings.imageHosting.s3.addressingStyles.auto')}</SelectItem>
+                      <SelectItem value="path">{t('settings.imageHosting.s3.addressingStyles.path')}</SelectItem>
+                      <SelectItem value="virtual">{t('settings.imageHosting.s3.addressingStyles.virtual')}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{t('settings.imageHosting.s3.addressingStyleDesc')}</FieldDescription>
+              </Field>
+            ) : null}
             <Field>
               <FieldLabel htmlFor="customDomain">{t('settings.imageHosting.s3.customDomain')}</FieldLabel>
               <Input id="customDomain" value={config.customDomain || ''} onChange={(e) => handleConfigChange({ ...config, customDomain: e.target.value })} placeholder="https://cdn.example.com" />
+              <FieldDescription>{t('settings.imageHosting.s3.customDomainDesc')}</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="pathPrefix">{t('settings.imageHosting.s3.pathPrefix')}</FieldLabel>
@@ -195,4 +342,61 @@ export function S3ImageHosting() {
       </CardContent>
     </Card>
   );
+}
+
+function getCredentialLabels(preset: ObjectStoragePreset) {
+  switch (preset) {
+    case 'aliyun-oss':
+      return { accessKey: 'AccessKey ID', secretKey: 'AccessKey Secret' }
+    case 'tencent-cos':
+      return { accessKey: 'SecretId', secretKey: 'SecretKey' }
+    case 'backblaze-b2':
+      return { accessKey: 'Key ID', secretKey: 'Application Key' }
+    case 'minio':
+    case 'custom':
+      return { accessKey: 'Access Key', secretKey: 'Secret Key' }
+    case 'aws':
+    case 'cloudflare-r2':
+      return { accessKey: 'Access Key ID', secretKey: 'Secret Access Key' }
+  }
+}
+
+function getRegionPlaceholder(preset: ObjectStoragePreset) {
+  switch (preset) {
+    case 'cloudflare-r2':
+      return 'auto'
+    case 'aliyun-oss':
+      return 'cn-hangzhou'
+    case 'tencent-cos':
+      return 'ap-guangzhou'
+    case 'backblaze-b2':
+      return 'us-west-004'
+    case 'aws':
+    case 'minio':
+    case 'custom':
+      return 'us-east-1'
+  }
+}
+
+function getEndpointPlaceholder(
+  preset: ObjectStoragePreset,
+) {
+  switch (preset) {
+    case 'minio':
+      return 'http://127.0.0.1:9000'
+    default:
+      return 'https://s3.example.com'
+  }
+}
+
+function getR2AccountId(endpoint?: string) {
+  if (!endpoint) return ''
+  try {
+    const hostname = new URL(endpoint).hostname
+    return hostname.endsWith('.r2.cloudflarestorage.com')
+      ? hostname.slice(0, -'.r2.cloudflarestorage.com'.length)
+      : ''
+  } catch {
+    return ''
+  }
 }

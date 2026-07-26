@@ -331,7 +331,6 @@ export default function SyncPage() {
         <Card size="sm" className="lg:sticky lg:top-2">
           <CardHeader>
             <CardTitle>{t('settings.sync.platformSettings')}</CardTitle>
-            <CardDescription>{t('settings.sync.platformListDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <ItemGroup className="gap-1">
