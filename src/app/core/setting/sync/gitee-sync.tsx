@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useTranslations } from 'next-intl';
 import useSettingStore from "@/stores/setting";
 import useSyncStore from "@/stores/sync";
@@ -43,6 +43,14 @@ export function GiteeSync() {
   const getRepoName = () => {
     return giteeCustomSyncRepo.trim() || RepoNames.sync
   }
+
+  const handleAccessTokenChange = useCallback((token: string) => {
+    void setGiteeAccessToken(token)
+    if (!token) {
+      setGiteeSyncRepoState(SyncStateEnum.fail)
+      setGiteeSyncRepoInfo(undefined)
+    }
+  }, [setGiteeAccessToken, setGiteeSyncRepoInfo, setGiteeSyncRepoState])
 
 
   // 检查 Gitee 仓库状态（仅检查，不创建）
@@ -156,13 +164,7 @@ export function GiteeSync() {
     <SyncPlatformCard
       config={GITEE_CONFIG}
       accessToken={giteeAccessToken}
-      setAccessToken={(token) => {
-        setGiteeAccessToken(token)
-        if (!token) {
-          setGiteeSyncRepoState(SyncStateEnum.fail)
-          setGiteeSyncRepoInfo(undefined)
-        }
-      }}
+      setAccessToken={handleAccessTokenChange}
       syncRepoState={giteeSyncRepoState}
       syncRepoInfo={giteeSyncRepoInfo}
       customRepo={giteeCustomSyncRepo}
