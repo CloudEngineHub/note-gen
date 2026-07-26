@@ -2973,7 +2973,15 @@
     "aiPreview": "AI 修改預覽",
     "tools": { "label": "畫布工具", "select": "選取", "hand": "抓手", "pen": "畫筆", "highlighter": "螢光筆", "eraser": "橡皮擦" },
     "brush": { "penTitle": "畫筆", "highlighterTitle": "螢光筆", "strokeTitle": "筆刷樣式", "color": "顏色", "size": "筆刷寬度" },
-    "nodes": { "process": "處理步驟", "decision": "判斷條件", "terminator": "開始 / 結束", "text": "文字", "note": "筆記引用", "image": "圖片", "link": "網頁連結", "todo": "待辦事項", "group": "群組" },
+    "nodes": { "process": "處理步驟", "decision": "判斷條件", "terminator": "開始 / 結束", "text": "文字", "note": "筆記引用", "image": "圖片", "link": "網頁連結", "todo": "待辦事項", "group": "群組", "chart": "資料圖表" },
+    "chart": {
+      "createTitle": "建立資料圖表", "editTitle": "編輯資料圖表", "description": "輸入資料後直接插入畫布，節點會在背景完成解析。", "titleLabel": "圖表標題", "titlePlaceholder": "留空則自動產生", "titleDescription": "自動標題會在每次產生圖表資料時重新產生。", "typeLabel": "圖表類型", "dataLabel": "資料", "dataPlaceholder": "月份,桌面端,行動端\n一月,186,80\n二月,305,200", "dataDescription": "支援自然語言描述，以及 CSV、TSV、Markdown 表格和 JSON 格式。", "generate": "產生預覽", "generating": "正在解析", "preview": "預覽", "primarySeries": "數值欄位", "summary": "{rows} 列資料 · {series} 個系列", "emptyPreviewTitle": "等待產生預覽", "emptyPreviewDescription": "輸入資料並產生預覽，確認圖表類型和內容。", "cancel": "取消", "insert": "插入畫布", "update": "重新產生", "nodeLoading": "正在產生圖表…", "nodeErrorTitle": "圖表產生失敗", "nodeErrorHint": "雙擊節點修改資料並重試。",
+      "types": { "auto": "自動識別", "area": "面積圖", "bar": "長條圖", "line": "折線圖", "pie": "圓餅圖", "radar": "雷達圖", "radial": "徑向圖" },
+      "notes": { "label": "引用筆記", "placeholder": "選擇筆記", "selected": "已選擇 {count} 篇筆記", "title": "圖表資料來源", "description": "選擇一篇或多篇筆記作為圖表資料來源。", "search": "搜尋筆記", "empty": "找不到筆記", "manualInput": "手動輸入" },
+      "recommendations": { "time-series": "偵測到時間序列，推薦折線圖", "continuous": "偵測到連續累計資料，推薦面積圖", "proportion": "偵測到占比資料，推薦圓餅圖", "progress": "偵測到進度資料，推薦徑向圖", "multidimensional": "偵測到多維比較，推薦雷達圖", "categorical": "偵測到分類資料，推薦長條圖", "ai": "由 AI 根據資料語意推薦" },
+      "appearance": { "title": "圖表外觀", "variant": "容器樣式", "palette": "配色方案", "showTitle": "顯示標題", "showLegend": "顯示圖例", "showGrid": "顯示網格", "showXAxis": "顯示分類軸", "showYAxis": "顯示數值軸", "variants": { "card": "卡片", "minimal": "簡潔", "transparent": "透明" }, "palettes": { "system": "系統", "cool": "冷色", "warm": "暖色", "monochrome": "單色" } },
+      "errors": { "CHART_NEEDS_HEADER_AND_ROW": "至少需要表頭和一列資料。", "CHART_NEEDS_TWO_COLUMNS": "至少需要兩欄資料。", "CHART_INVALID_MARKDOWN_TABLE": "Markdown 表格格式無效。", "CHART_JSON_ARRAY_REQUIRED": "JSON 必須是物件陣列，或包含 data 陣列。", "CHART_EMPTY_DATA": "資料不能為空。", "CHART_NUMERIC_SERIES_REQUIRED": "找不到可繪製的數值欄。", "CHART_MISSING_NUMERIC_VALUE": "數值系列中有空值或非數值內容。", "CHART_EMPTY_INPUT": "請輸入資料。", "CHART_AI_REQUIRED": "此內容需要 AI 才能解析。", "CHART_AI_ADDED_VALUE": "AI 傳回了輸入中不存在的數值，已阻止產生。", "CHART_AI_SERIES_MISMATCH": "AI 傳回的資料系列長度不一致。", "CHART_AI_INVALID_JSON": "AI 沒有傳回有效的圖表資料。", "CHART_AI_NOT_CONFIGURED": "請先在設定中配置編輯器或主要 AI 模型。", "CHART_GENERATION_INTERRUPTED": "上次產生程序已中斷。", "CHART_UNKNOWN_ERROR": "圖表產生失敗，請檢查資料後重試。" }
+    },
     "linkNode": { "urlPrompt": "輸入網頁位址", "labelPrompt": "輸入連結標題" },
     "utilityNodes": { "title": "實用節點", "description": "新增圖片、網頁連結或待辦事項。" },
     "arrange": { "title": "對齊與群組", "description": "整理目前選取的節點。", "alignHorizontal": "水平置中對齊", "alignVertical": "垂直置中對齊", "distributeHorizontal": "水平平均分布", "distributeVertical": "垂直平均分布", "group": "建立群組" },

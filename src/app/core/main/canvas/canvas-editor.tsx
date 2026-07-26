@@ -29,12 +29,12 @@ import {
   AlignCenterVertical,
   AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter,
+  ChartNoAxesCombined,
   ClipboardPaste,
   CircleSlash2,
   Copy,
   CopyPlus,
   Eraser,
-  FileText,
   FolderKanban,
   Hand,
   Highlighter,
@@ -70,14 +70,6 @@ import {
 } from '@/components/ui/context-menu'
 import { Input } from '@/components/ui/input'
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -92,16 +84,32 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field'
 import useCanvasStore from '@/stores/canvas'
 import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
 import type {
   CanvasDocument,
   CanvasHistorySnapshot,
+  CanvasChartAppearance,
+  CanvasChartRequest,
   CanvasNode,
   CanvasPoint,
   CanvasTool,
@@ -117,6 +125,7 @@ import {
   PEN_STYLE,
 } from '@/lib/canvas/freehand'
 import {
+  ChartCanvasNode,
   DecisionNode,
   FreehandNode,
   GroupCanvasNode,
@@ -129,10 +138,21 @@ import {
   TodoCanvasNode,
   type FlowCanvasNode,
 } from './nodes/canvas-nodes'
+import { ChartEditorDialog } from './chart-editor-dialog'
 import { CanvasFooter } from './canvas-footer'
 import { canvasDocumentToMermaid, mermaidToCanvasDocument } from '@/lib/canvas/mermaid'
 import { parseCanvasProjectFile, serializeCanvasProject } from '@/lib/canvas/file-format'
 import { cn } from '@/lib/utils'
+import {
+  generateCanvasCharts,
+  getChartErrorCode,
+  type CanvasChartSource,
+} from '@/lib/ai/chart'
+import {
+  DEFAULT_CANVAS_CHART_APPEARANCE,
+  resolveCanvasChartAppearance,
+} from '@/lib/canvas/chart-appearance'
+import { serializeCanvasChartData } from '@/lib/canvas/chart-data'
 
 const elk = new ELK()
 const DRAWING_CURSORS = {
@@ -152,6 +172,7 @@ const nodeTypes: NodeTypes = {
   todo: TodoCanvasNode,
   group: GroupCanvasNode,
   freehand: FreehandNode,
+  chart: ChartCanvasNode,
 }
 
 interface CanvasEditorProps {
@@ -296,7 +317,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const [canUndo, setCanUndo] = useState(Boolean(initialHistory?.undo.length))
   const [canRedo, setCanRedo] = useState(Boolean(initialHistory?.redo.length))
   const [hasClipboard, setHasClipboard] = useState(false)
-  const [notePickerOpen, setNotePickerOpen] = useState(false)
+  const [chartEditorOpen, setChartEditorOpen] = useState(false)
+  const [editingChartNodeId, setEditingChartNodeId] = useState<string | null>(null)
   const [agentPreviewOperations, setAgentPreviewOperations] = useState<unknown[] | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [edgeEditorOpen, setEdgeEditorOpen] = useState(false)
@@ -322,6 +344,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const persistedEdgesRef = useRef(edges)
   const pendingDocumentRef = useRef<CanvasDocument | null>(null)
   const pendingDocumentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chartGenerationRef = useRef(new Map<string, AbortController>())
   const lastStoreDocumentRef = useRef(document)
   const appliedDefaultZoomRef = useRef('')
   const { screenToFlowPosition, getViewport, getNodesBounds, fitView, setViewport } = useReactFlow()
@@ -338,7 +361,12 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const selectedFreehandNodes = nodes.filter(node => node.selected && node.type === 'freehand')
   const selectedFreehandIds = selectedFreehandNodes.map(node => node.id).join(':')
   const selectedOnlyFreehand = selectedNodeCount > 0 && selectedFreehandNodes.length === selectedNodeCount
-  const selectedBoxNode = nodes.find(node => node.selected && node.type !== 'freehand' && node.type !== 'text')
+  const selectedChartNodes = nodes.filter(node => node.selected && node.type === 'chart')
+  const selectedChartNode = selectedNodeCount === 1 ? selectedChartNodes[0] : undefined
+  const selectedChartAppearance = resolveCanvasChartAppearance(selectedChartNode?.data.chartAppearance)
+  const selectedBoxNode = nodes.find(node => (
+    node.selected && node.type !== 'freehand' && node.type !== 'text' && node.type !== 'chart'
+  ))
   const selectedBorderStyle = selectedBoxNode?.data.borderStyle || (selectedBoxNode?.type === 'group' ? 'dashed' : 'solid')
   const selectedFillColor = selectedBoxNode?.data.fillColor
   const isDrawingTool = tool === 'pen' || tool === 'highlighter'
@@ -356,6 +384,32 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const availableNotes = useMemo(() => flattenFileTree(fileTree).filter(entry => (
     entry.isFile && /\.(md|markdown|txt)$/i.test(entry.name)
   )), [fileTree])
+  const editingChartRequest = useMemo(() => {
+    if (!editingChartNodeId) return null
+    const data = nodes.find(node => node.id === editingChartNodeId)?.data
+    if (data?.chart) {
+      return {
+        title: data.chart.title,
+        titleMode: data.chartRequest?.titleMode,
+        source: serializeCanvasChartData(data.chart),
+        notePaths: [],
+        requestedType: data.chart.requestedType,
+      }
+    }
+    return data?.chartRequest || null
+  }, [editingChartNodeId, nodes])
+  const restoreCanvasNodes = useCallback((nextNodes: FlowCanvasNode[]) => nextNodes.map(node => (
+    node.data.chartStatus === 'loading' && !chartGenerationRef.current.has(node.id)
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            chartStatus: 'error' as const,
+            chartError: 'CHART_GENERATION_INTERRUPTED',
+          },
+        }
+      : node
+  )), [])
   const previewSnapshot = useMemo(() => {
     if (!document || !agentPreviewOperations) return null
     const currentDocument: CanvasDocument = {
@@ -384,8 +438,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         ...currentFlowNode,
         ...node,
         ...(!currentFlowNode ? {
-          width: node.width || (node.type === 'decision' ? 144 : node.type === 'text' ? 120 : 180),
-          height: node.height || (node.type === 'decision' ? 144 : node.type === 'text' ? 40 : 56),
+          width: node.width || (node.type === 'chart' ? 520 : node.type === 'decision' ? 144 : node.type === 'text' ? 120 : 180),
+          height: node.height || (node.type === 'chart' ? 340 : node.type === 'decision' ? 144 : node.type === 'text' ? 40 : 56),
         } : {}),
         data: {
           ...node.data,
@@ -474,9 +528,13 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     redoRef.current = (savedHistory?.redo || []).map(restoreHistorySnapshot)
     setCanUndo(historyRef.current.length > 0)
     setCanRedo(redoRef.current.length > 0)
-    setNodes(nextNodes)
+    setNodes(restoreCanvasNodes(nextNodes))
     setEdges(nextEdges)
-  }, [document, setEdges, setNodes])
+  }, [document, restoreCanvasNodes, setEdges, setNodes])
+
+  useEffect(() => {
+    setNodes(current => restoreCanvasNodes(current))
+  }, [canvasId, restoreCanvasNodes, setNodes])
 
   useEffect(() => {
     const showPreview = ({ operations }: { operations: unknown[] }) => setAgentPreviewOperations(operations)
@@ -498,10 +556,10 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   }, [agentPreviewOperations, fitView])
 
   useEffect(() => {
-    if (notePickerOpen && fileTree.length === 0) {
+    if (chartEditorOpen && fileTree.length === 0) {
       void loadFileTree({ skipRemoteSync: true })
     }
-  }, [fileTree.length, loadFileTree, notePickerOpen])
+  }, [chartEditorOpen, fileTree.length, loadFileTree])
 
   useEffect(() => {
     if (!document) return
@@ -574,23 +632,23 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     const snapshot = historyRef.current.pop()
     if (!snapshot) return
     redoRef.current.push(cloneSnapshot(nodes, edges))
-    setNodes(snapshot.nodes)
+    setNodes(restoreCanvasNodes(snapshot.nodes))
     setEdges(snapshot.edges)
     persistHistory()
     setCanUndo(historyRef.current.length > 0)
     setCanRedo(true)
-  }, [edges, nodes, persistHistory, setEdges, setNodes])
+  }, [edges, nodes, persistHistory, restoreCanvasNodes, setEdges, setNodes])
 
   const redo = useCallback(() => {
     const snapshot = redoRef.current.pop()
     if (!snapshot) return
     historyRef.current.push(cloneSnapshot(nodes, edges))
-    setNodes(snapshot.nodes)
+    setNodes(restoreCanvasNodes(snapshot.nodes))
     setEdges(snapshot.edges)
     persistHistory()
     setCanUndo(true)
     setCanRedo(redoRef.current.length > 0)
-  }, [edges, nodes, persistHistory, setEdges, setNodes])
+  }, [edges, nodes, persistHistory, restoreCanvasNodes, setEdges, setNodes])
 
   useEffect(() => {
     const handleUndo = ({ canvasId: targetCanvasId }: { canvasId: string }) => {
@@ -819,23 +877,6 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     completeNodeInsertion()
   }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setNodes, t])
 
-  const addNoteNode = useCallback((filePath: string, name: string) => {
-    pushHistory()
-    const position = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    })
-    setNodes(current => [...current, {
-      id: crypto.randomUUID(),
-      type: 'note',
-      position,
-      data: { label: name, filePath },
-    }])
-    setNotePickerOpen(false)
-    completeNodeInsertion()
-    toast.success(t('noteNode.added', { name }))
-  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setNodes, t])
-
   const addImageNode = useCallback(async () => {
     const sourcePath = await open({
       multiple: false,
@@ -866,6 +907,169 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     }])
     completeNodeInsertion()
   }, [completeNodeInsertion, loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
+
+  const openChartCreator = useCallback(() => {
+    setEditingChartNodeId(null)
+    setChartEditorOpen(true)
+  }, [])
+
+  const saveChartNode = useCallback((request: CanvasChartRequest) => {
+    pushHistory()
+    const nodeId = editingChartNodeId || crypto.randomUUID()
+    const batchId = editingChartNodeId ? crypto.randomUUID() : nodeId
+    const requestId = crypto.randomUUID()
+    nodes
+      .filter(node => node.id === nodeId || node.data.chartBatchId === batchId)
+      .forEach(node => chartGenerationRef.current.get(node.id)?.abort())
+    const controller = new AbortController()
+    chartGenerationRef.current.set(nodeId, controller)
+    if (editingChartNodeId) {
+      setNodes(current => current.map(node => (
+        node.id === nodeId || node.data.chartBatchId === batchId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                label: request.title || node.data.label || t('nodes.chart'),
+                chartRequest: request,
+                chartRequestId: requestId,
+                chartBatchId: batchId,
+                chartStatus: 'loading',
+                chartError: undefined,
+              },
+            }
+          : node
+      )))
+    } else {
+      const position = screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      })
+      setNodes(current => [
+        ...current.map(node => ({ ...node, selected: false })),
+        {
+          id: nodeId,
+          type: 'chart',
+          position,
+          width: 520,
+          height: 340,
+          selected: true,
+          data: {
+            label: request.title || t('nodes.chart'),
+            chartRequest: request,
+            chartRequestId: requestId,
+            chartBatchId: batchId,
+            chartBatchIndex: 0,
+            chartStatus: 'loading',
+            chartAppearance: DEFAULT_CANVAS_CHART_APPEARANCE,
+          },
+        },
+      ])
+      completeNodeInsertion()
+    }
+    const loadSources = async () => {
+      const sources: CanvasChartSource[] = []
+      if (request.source.trim()) {
+        sources.push({ name: t('chart.notes.manualInput'), content: request.source })
+      }
+      const noteSources = await Promise.all((request.notePaths || []).map(async filePath => {
+        try {
+          const options = await getFilePathOptions(filePath)
+          const content = options.baseDir
+            ? await readTextFile(options.path, { baseDir: options.baseDir })
+            : await readTextFile(options.path)
+          return {
+            name: filePath.split('/').pop() || filePath,
+            content,
+          } satisfies CanvasChartSource
+        } catch (error) {
+          console.warn(`Failed to read chart source note: ${filePath}`, error)
+          return null
+        }
+      }))
+      sources.push(...noteSources.filter((source): source is CanvasChartSource => source !== null))
+      return sources
+    }
+    void loadSources().then(sources => generateCanvasCharts(request, sources, controller.signal)).then(charts => {
+      const removedNodeIds = new Set(nodes
+        .filter(node => (
+          (node.id === nodeId || node.data.chartBatchId === batchId)
+          && (node.data.chartBatchIndex || 0) >= charts.length
+        ))
+        .map(node => node.id))
+      if (removedNodeIds.size > 0) {
+        setEdges(current => current.filter(edge => (
+          !removedNodeIds.has(edge.source) && !removedNodeIds.has(edge.target)
+        )))
+      }
+      setNodes(current => {
+        const belongsToBatch = (node: FlowCanvasNode) => (
+          node.id === nodeId || node.data.chartBatchId === batchId
+        )
+        const batchNodes = current
+          .filter(belongsToBatch)
+          .sort((a, b) => (a.data.chartBatchIndex || 0) - (b.data.chartBatchIndex || 0))
+        if (!batchNodes.some(node => node.data.chartRequestId === requestId)) return current
+        const anchor = batchNodes[0]
+        if (!anchor) return current
+        const nodesByIndex = new Map(batchNodes.map(node => [node.data.chartBatchIndex || 0, node]))
+        const nextBatch = charts.map((chart, index) => {
+          const existing = nodesByIndex.get(index)
+          return {
+            ...existing,
+            id: existing?.id || crypto.randomUUID(),
+            type: 'chart' as const,
+            position: existing?.position || {
+              x: anchor.position.x + (index % 2) * 560,
+              y: anchor.position.y + Math.floor(index / 2) * 380,
+            },
+            width: existing?.width || 520,
+            height: existing?.height || 340,
+            selected: existing?.selected ?? index === 0,
+            data: {
+              ...existing?.data,
+              label: chart.title || t('nodes.chart'),
+              chart,
+              chartRequest: request,
+              chartRequestId: requestId,
+              chartBatchId: batchId,
+              chartBatchIndex: index,
+              chartStatus: 'ready' as const,
+              chartError: undefined,
+              chartAppearance: existing?.data.chartAppearance
+                || anchor.data.chartAppearance
+                || DEFAULT_CANVAS_CHART_APPEARANCE,
+            },
+          } satisfies FlowCanvasNode
+        })
+        return [...current.filter(node => !belongsToBatch(node)), ...nextBatch]
+      })
+    }).catch(error => {
+      if (error instanceof Error && error.name === 'AbortError') return
+      setNodes(current => current.map(node => (
+        (node.id === nodeId || node.data.chartBatchId === batchId)
+          && node.data.chartRequestId === requestId
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                chartStatus: 'error',
+                chartError: getChartErrorCode(error),
+              },
+            }
+          : node
+      )))
+    }).finally(() => {
+      if (chartGenerationRef.current.get(nodeId) === controller) {
+        chartGenerationRef.current.delete(nodeId)
+      }
+    })
+  }, [completeNodeInsertion, editingChartNodeId, nodes, pushHistory, screenToFlowPosition, setEdges, setNodes, t])
+
+  useEffect(() => () => {
+    chartGenerationRef.current.forEach(controller => controller.abort())
+    chartGenerationRef.current.clear()
+  }, [])
 
   useEffect(() => {
     const handlePaste = async (event: ClipboardEvent) => {
@@ -998,6 +1202,25 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     updateSelectedNodeStyle({ color })
   }, [updateSelectedNodeStyle])
 
+  const updateSelectedChartAppearance = useCallback((appearance: Partial<CanvasChartAppearance>) => {
+    if (!selectedChartNode) return
+    pushHistory()
+    setNodes(current => current.map(node => (
+      node.id === selectedChartNode.id
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              chartAppearance: {
+                ...resolveCanvasChartAppearance(node.data.chartAppearance),
+                ...appearance,
+              },
+            },
+          }
+        : node
+    )))
+  }, [pushHistory, selectedChartNode, setNodes])
+
   const updateSelectedFreehandColor = useCallback((color: string) => {
     if (selectedFreehandNodes.length === 0) return
     pushHistory()
@@ -1111,10 +1334,10 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     const getLayoutSize = (node: FlowCanvasNode) => ({
       width: node.type === 'group'
         ? node.width || node.measured?.width || 360
-        : node.measured?.width || node.width || 180,
+        : node.measured?.width || node.width || (node.type === 'chart' ? 520 : 180),
       height: node.type === 'group'
         ? node.height || node.measured?.height || 240
-        : node.measured?.height || node.height || 72,
+        : node.measured?.height || node.height || (node.type === 'chart' ? 340 : 72),
     })
     const arrangedById = new Map(nodes.map(node => [node.id, structuredClone(node)]))
     const groupByChildId = new Map<string, string>()
@@ -1555,6 +1778,11 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           setEdgeLabelDraft(typeof targetEdge.label === 'string' ? targetEdge.label : '')
           setEdgeEditorOpen(true)
         }}
+        onNodeDoubleClick={(_event, targetNode) => {
+          if (targetNode.type !== 'chart' || targetNode.data.chartStatus === 'loading') return
+          setEditingChartNodeId(targetNode.id)
+          setChartEditorOpen(true)
+        }}
         onMoveEnd={(_event, viewport) => persistViewport(viewport)}
         onNodeDragStart={(_event, node) => {
           pushHistory()
@@ -1701,14 +1929,14 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
               <Type />
             </Button>
           </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.note')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.note')} onClick={() => setNotePickerOpen(true)}>
-              <FileText />
-            </Button>
-          </CanvasToolbarTooltip>
           <CanvasToolbarTooltip label={t('nodes.image')}>
             <Button variant="ghost" size="icon-sm" aria-label={t('nodes.image')} onClick={() => void addImageNode()}>
               <ImagePlus />
+            </Button>
+          </CanvasToolbarTooltip>
+          <CanvasToolbarTooltip label={t('nodes.chart')}>
+            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.chart')} onClick={openChartCreator}>
+              <ChartNoAxesCombined />
             </Button>
           </CanvasToolbarTooltip>
           <Popover>
@@ -1824,7 +2052,77 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           </Card>
         )}
 
-        {!isDrawingTool && selectedNodeCount > 0 && !selectedOnlyFreehand && (
+        {!isDrawingTool && selectedChartNode && (
+          <Card className="absolute bottom-3 left-3 z-10 w-72 gap-3 py-3 shadow-sm">
+            <CardHeader className="px-3">
+              <CardTitle className="text-sm">{t('chart.appearance.title')}</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3">
+              <FieldGroup className="gap-3">
+                <Field orientation="horizontal">
+                  <FieldLabel htmlFor="canvas-chart-variant">{t('chart.appearance.variant')}</FieldLabel>
+                  <Select
+                    value={selectedChartAppearance.variant}
+                    onValueChange={value => updateSelectedChartAppearance({
+                      variant: value as CanvasChartAppearance['variant'],
+                    })}
+                  >
+                    <SelectTrigger id="canvas-chart-variant" className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="card">{t('chart.appearance.variants.card')}</SelectItem>
+                        <SelectItem value="minimal">{t('chart.appearance.variants.minimal')}</SelectItem>
+                        <SelectItem value="transparent">{t('chart.appearance.variants.transparent')}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field orientation="horizontal">
+                  <FieldLabel htmlFor="canvas-chart-palette">{t('chart.appearance.palette')}</FieldLabel>
+                  <Select
+                    value={selectedChartAppearance.palette}
+                    onValueChange={value => updateSelectedChartAppearance({
+                      palette: value as CanvasChartAppearance['palette'],
+                    })}
+                  >
+                    <SelectTrigger id="canvas-chart-palette" className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="system">{t('chart.appearance.palettes.system')}</SelectItem>
+                        <SelectItem value="cool">{t('chart.appearance.palettes.cool')}</SelectItem>
+                        <SelectItem value="warm">{t('chart.appearance.palettes.warm')}</SelectItem>
+                        <SelectItem value="monochrome">{t('chart.appearance.palettes.monochrome')}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {([
+                  ['showTitle', 'showTitle'],
+                  ['showLegend', 'showLegend'],
+                  ['showGrid', 'showGrid'],
+                  ['showXAxis', 'showXAxis'],
+                  ['showYAxis', 'showYAxis'],
+                ] as const).map(([key, label]) => (
+                  <Field key={key} orientation="horizontal">
+                    <FieldLabel htmlFor={`canvas-chart-${key}`}>{t(`chart.appearance.${label}`)}</FieldLabel>
+                    <Switch
+                      id={`canvas-chart-${key}`}
+                      size="sm"
+                      checked={selectedChartAppearance[key]}
+                      onCheckedChange={checked => updateSelectedChartAppearance({ [key]: checked })}
+                    />
+                  </Field>
+                ))}
+              </FieldGroup>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isDrawingTool && selectedNodeCount > 0 && !selectedOnlyFreehand && selectedChartNodes.length === 0 && (
           <Card className="absolute bottom-3 left-3 z-10 w-64 gap-3 py-3 shadow-sm">
             <CardHeader className="px-3">
               <CardTitle className="text-sm">{t('selection.style')}</CardTitle>
@@ -1973,33 +2271,13 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         onImportContent={() => setImportContentOpen(true)}
       />
 
-      <Dialog open={notePickerOpen} onOpenChange={setNotePickerOpen}>
-        <DialogContent className="p-0 sm:max-w-lg">
-          <DialogHeader className="px-4 pt-4">
-            <DialogTitle>{t('noteNode.title')}</DialogTitle>
-            <DialogDescription>{t('noteNode.description')}</DialogDescription>
-          </DialogHeader>
-          <Command className="border-t">
-            <CommandInput placeholder={t('noteNode.search')} />
-            <CommandList>
-              <CommandEmpty>{t('noteNode.empty')}</CommandEmpty>
-              <CommandGroup heading={t('noteNode.group')}>
-                {availableNotes.map(note => (
-                  <CommandItem
-                    key={note.path}
-                    value={`${note.name} ${note.path}`}
-                    onSelect={() => addNoteNode(note.path, note.name)}
-                  >
-                    <FileText />
-                    <span className="min-w-0 flex-1 truncate">{note.name}</span>
-                    <span className="max-w-48 truncate text-xs text-muted-foreground">{note.path}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </DialogContent>
-      </Dialog>
+      <ChartEditorDialog
+        open={chartEditorOpen}
+        initialRequest={editingChartRequest}
+        availableNotes={availableNotes}
+        onOpenChange={setChartEditorOpen}
+        onSubmit={saveChartNode}
+      />
 
       <Dialog open={edgeEditorOpen} onOpenChange={setEdgeEditorOpen}>
         <DialogContent className="sm:max-w-sm">

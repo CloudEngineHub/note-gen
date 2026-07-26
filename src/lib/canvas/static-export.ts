@@ -1,4 +1,13 @@
-import type { CanvasDocument, CanvasNode } from '@/types/canvas'
+import {
+  getCanvasChartColors,
+  resolveCanvasChartAppearance,
+} from '@/lib/canvas/chart-appearance'
+import type {
+  CanvasChartAppearance,
+  CanvasChartSpec,
+  CanvasDocument,
+  CanvasNode,
+} from '@/types/canvas'
 
 const PADDING = 64
 
@@ -16,10 +25,209 @@ function getNodeSize(node: CanvasNode) {
   if (node.type === 'text') return { width: node.width || 120, height: node.height || 40 }
   if (node.type === 'freehand') return { width: node.width || node.data.width || 4, height: node.height || node.data.height || 4 }
   if (node.type === 'group') return { width: node.width || 360, height: node.height || 240 }
+  if (node.type === 'chart') return { width: node.width || 520, height: node.height || 340 }
   if (node.type === 'note' || node.type === 'image' || node.type === 'link' || node.type === 'todo') {
     return { width: node.width || 220, height: node.height || 76 }
   }
   return { width: node.width || 180, height: node.height || 56 }
+}
+
+function chartValueRange(spec: CanvasChartSpec) {
+  const values = spec.data.flatMap(item => spec.series.map(series => item.values[series.id]))
+  const minimum = Math.min(0, ...values)
+  const maximum = Math.max(0, ...values)
+  return { minimum, maximum: maximum === minimum ? minimum + 1 : maximum }
+}
+
+function renderChartLegend(labels: string[], colors: string[], width: number, height: number) {
+  if (labels.length === 0) return ''
+  const entries = labels.slice(0, 5)
+  const itemWidth = width / entries.length
+  return entries.map((label, index) => {
+    const x = itemWidth * index + itemWidth / 2
+    return `<g transform="translate(${x - 32} ${height - 13})"><rect width="8" height="8" rx="2" fill="${colors[index % colors.length]}"/><text x="12" y="8" font-family="sans-serif" font-size="10" fill="#52525b">${escapeXml(label.slice(0, 10))}</text></g>`
+  }).join('')
+}
+
+function renderCartesianChart(
+  spec: CanvasChartSpec,
+  appearance: CanvasChartAppearance,
+  width: number,
+  height: number
+) {
+  const colors = getCanvasChartColors(appearance.palette, true)
+  const left = appearance.showYAxis ? 48 : 18
+  const right = 18
+  const top = appearance.showTitle && spec.title ? 42 : 22
+  const legendHeight = appearance.showLegend ? 24 : 0
+  const bottom = (appearance.showXAxis ? 34 : 16) + legendHeight
+  const plotWidth = Math.max(1, width - left - right)
+  const plotHeight = Math.max(1, height - top - bottom)
+  const { minimum, maximum } = chartValueRange(spec)
+  const scaleY = (value: number) => top + plotHeight - ((value - minimum) / (maximum - minimum)) * plotHeight
+  const baseline = scaleY(0)
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
+    const y = top + plotHeight * ratio
+    const value = maximum - (maximum - minimum) * ratio
+    const line = appearance.showGrid
+      ? `<line x1="${left}" y1="${y}" x2="${left + plotWidth}" y2="${y}" stroke="#d4d4d8" stroke-opacity=".55"/>`
+      : ''
+    const label = appearance.showYAxis
+      ? `<text x="${left - 6}" y="${y + 4}" text-anchor="end" font-family="sans-serif" font-size="10" fill="#71717a">${Number(value.toFixed(2))}</text>`
+      : ''
+    return `${line}${label}`
+  }).join('')
+  const labels = appearance.showXAxis ? spec.data.map((item, index) => {
+    const x = left + plotWidth * ((index + 0.5) / spec.data.length)
+    return `<text x="${x}" y="${height - legendHeight - 12}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#71717a">${escapeXml(item.label.slice(0, 12))}</text>`
+  }).join('') : ''
+  let marks = ''
+  if (spec.type === 'bar') {
+    const groupWidth = plotWidth / spec.data.length
+    const barWidth = Math.max(2, Math.min(28, groupWidth * 0.72 / spec.series.length))
+    marks = spec.data.flatMap((item, dataIndex) => spec.series.map((series, seriesIndex) => {
+      const value = item.values[series.id]
+      const y = scaleY(value)
+      const x = left + dataIndex * groupWidth + (groupWidth - barWidth * spec.series.length) / 2 + seriesIndex * barWidth
+      return `<rect x="${x}" y="${Math.min(y, baseline)}" width="${Math.max(1, barWidth - 2)}" height="${Math.max(1, Math.abs(baseline - y))}" rx="3" fill="${colors[series.colorIndex % colors.length]}"/>`
+    })).join('')
+  } else {
+    marks = spec.series.map(series => {
+      const points = spec.data.map((item, index) => {
+        const x = left + plotWidth * ((index + 0.5) / spec.data.length)
+        return `${x},${scaleY(item.values[series.id])}`
+      })
+      const color = colors[series.colorIndex % colors.length]
+      const fill = spec.type === 'area'
+        ? `<polygon points="${left + plotWidth * (0.5 / spec.data.length)},${baseline} ${points.join(' ')} ${left + plotWidth * ((spec.data.length - 0.5) / spec.data.length)},${baseline}" fill="${color}" fill-opacity=".18"/>`
+        : ''
+      return `${fill}<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    }).join('')
+  }
+  const baselineLine = appearance.showXAxis
+    ? `<line x1="${left}" y1="${baseline}" x2="${left + plotWidth}" y2="${baseline}" stroke="#a1a1aa"/>`
+    : ''
+  const legend = appearance.showLegend
+    ? renderChartLegend(spec.series.map(series => series.name), colors, width, height)
+    : ''
+  return `${grid}${baselineLine}${marks}${labels}${legend}`
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  return {
+    x: cx + Math.cos(angle - Math.PI / 2) * radius,
+    y: cy + Math.sin(angle - Math.PI / 2) * radius,
+  }
+}
+
+function arcPath(cx: number, cy: number, innerRadius: number, outerRadius: number, start: number, end: number) {
+  const outerStart = polarPoint(cx, cy, outerRadius, start)
+  const outerEnd = polarPoint(cx, cy, outerRadius, end)
+  const innerEnd = polarPoint(cx, cy, innerRadius, end)
+  const innerStart = polarPoint(cx, cy, innerRadius, start)
+  const largeArc = end - start > Math.PI ? 1 : 0
+  return `M ${outerStart.x} ${outerStart.y} A ${outerRadius} ${outerRadius} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y} L ${innerEnd.x} ${innerEnd.y} A ${innerRadius} ${innerRadius} 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y} Z`
+}
+
+function renderPolarChart(
+  spec: CanvasChartSpec,
+  appearance: CanvasChartAppearance,
+  width: number,
+  height: number
+) {
+  const colors = getCanvasChartColors(appearance.palette, true)
+  const top = appearance.showTitle && spec.title ? 38 : 16
+  const legendHeight = appearance.showLegend ? 24 : 0
+  const availableHeight = height - top - 20 - legendHeight
+  const cx = width / 2
+  const cy = top + availableHeight / 2
+  const radius = Math.max(20, Math.min(width * 0.32, availableHeight * 0.4))
+  if (spec.type === 'radar') {
+    const maximum = Math.max(1, ...spec.data.flatMap(item => spec.series.map(series => Math.abs(item.values[series.id]))))
+    const grid = appearance.showGrid ? [0.25, 0.5, 0.75, 1].map(scale => {
+      const points = spec.data.map((_item, index) => {
+        const point = polarPoint(cx, cy, radius * scale, index / spec.data.length * Math.PI * 2)
+        return `${point.x},${point.y}`
+      }).join(' ')
+      return `<polygon points="${points}" fill="none" stroke="#d4d4d8"/>`
+    }).join('') : ''
+    const axes = spec.data.map((item, index) => {
+      const point = polarPoint(cx, cy, radius, index / spec.data.length * Math.PI * 2)
+      const label = polarPoint(cx, cy, radius + 16, index / spec.data.length * Math.PI * 2)
+      const line = appearance.showGrid
+        ? `<line x1="${cx}" y1="${cy}" x2="${point.x}" y2="${point.y}" stroke="#d4d4d8"/>`
+        : ''
+      const text = appearance.showXAxis
+        ? `<text x="${label.x}" y="${label.y + 3}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#71717a">${escapeXml(item.label.slice(0, 10))}</text>`
+        : ''
+      return `${line}${text}`
+    }).join('')
+    const series = spec.series.map(item => {
+      const points = spec.data.map((datum, index) => {
+        const valueRadius = radius * Math.abs(datum.values[item.id]) / maximum
+        const point = polarPoint(cx, cy, valueRadius, index / spec.data.length * Math.PI * 2)
+        return `${point.x},${point.y}`
+      }).join(' ')
+      const color = colors[item.colorIndex % colors.length]
+      return `<polygon points="${points}" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="2"/>`
+    }).join('')
+    const legend = appearance.showLegend
+      ? renderChartLegend(spec.series.map(series => series.name), colors, width, height)
+      : ''
+    return `${grid}${axes}${series}${legend}`
+  }
+  const primary = spec.series.find(series => series.id === spec.primarySeriesId) || spec.series[0]
+  const values = spec.data.map(item => Math.max(0, item.values[primary.id]))
+  if (spec.type === 'pie') {
+    const total = values.reduce((sum, value) => sum + value, 0) || 1
+    let angle = 0
+    const marks = values.map((value, index) => {
+      const nextAngle = angle + value / total * Math.PI * 2
+      const path = arcPath(cx, cy, radius * 0.42, radius, angle, Math.max(angle + 0.001, nextAngle - 0.02))
+      angle = nextAngle
+      return `<path d="${path}" fill="${colors[index % colors.length]}"/>`
+    }).join('')
+    const legend = appearance.showLegend
+      ? renderChartLegend(spec.data.map(item => item.label), colors, width, height)
+      : ''
+    return `${marks}${legend}`
+  }
+  const maximum = Math.max(100, ...values)
+  const ringWidth = Math.max(6, radius / Math.max(5, values.length + 1))
+  const marks = values.map((value, index) => {
+    const ringRadius = radius - index * ringWidth
+    const end = Math.max(0.001, value / maximum * Math.PI * 2)
+    const background = arcPath(cx, cy, ringRadius - ringWidth * 0.7, ringRadius, 0, Math.PI * 2 - 0.001)
+    const foreground = arcPath(cx, cy, ringRadius - ringWidth * 0.7, ringRadius, 0, end)
+    return `<path d="${background}" fill="#e4e4e7"/><path d="${foreground}" fill="${colors[index % colors.length]}"/>`
+  }).join('')
+  const legend = appearance.showLegend
+    ? renderChartLegend(spec.data.map(item => item.label), colors, width, height)
+    : ''
+  return `${marks}${legend}`
+}
+
+function renderChartNode(
+  spec: CanvasChartSpec,
+  appearanceValue: CanvasNode['data']['chartAppearance'],
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const appearance = resolveCanvasChartAppearance(appearanceValue)
+  const title = appearance.showTitle && spec.title
+    ? `<text x="${width / 2}" y="24" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="600" fill="#18181b">${escapeXml(spec.title)}</text>`
+    : ''
+  const chart = ['bar', 'line', 'area'].includes(spec.type)
+    ? renderCartesianChart(spec, appearance, width, height)
+    : renderPolarChart(spec, appearance, width, height)
+  const shell = appearance.variant === 'card'
+    ? `<rect width="${width}" height="${height}" rx="12" fill="#ffffff" stroke="#d4d4d8"/>`
+    : appearance.variant === 'minimal'
+      ? `<rect width="${width}" height="${height}" rx="8" fill="#ffffff" fill-opacity=".92"/>`
+      : ''
+  return `<g transform="translate(${x} ${y})">${shell}${title}${chart}</g>`
 }
 
 function renderNode(node: CanvasNode, offsetX: number, offsetY: number) {
@@ -68,6 +276,9 @@ function renderNode(node: CanvasNode, offsetX: number, offsetY: number) {
       ? explicitFillColor === 'transparent' ? 0 : 1
       : 0.1
     return `<g><rect x="${x}" y="${y}" width="${width}" height="${height}" rx="16" fill="${groupFill}" fill-opacity="${groupFillOpacity}" stroke="${accentColor}" stroke-width="${borderWidth}"${groupDashArray}/><text x="${x + 16}" y="${y + 26}" font-family="sans-serif" font-size="14" font-weight="600" fill="#52525b">${label}</text></g>`
+  }
+  if (node.type === 'chart' && node.data.chart) {
+    return renderChartNode(node.data.chart, node.data.chartAppearance, x, y, width, height)
   }
   if (node.type === 'decision') {
     const cx = x + width / 2

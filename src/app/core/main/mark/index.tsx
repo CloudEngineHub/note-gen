@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl'
 import React from "react"
-import { useEffect } from "react"
 import { TagManage } from './tag-manage'
 import { MarkList } from './mark-list'
 import { MarkToolbar } from './mark-toolbar'

@@ -3106,7 +3106,15 @@
     "aiPreview": "AI 修改预览",
     "tools": { "label": "画布工具", "select": "选择", "hand": "抓手", "pen": "画笔", "highlighter": "荧光笔", "eraser": "橡皮擦" },
     "brush": { "penTitle": "画笔", "highlighterTitle": "荧光笔", "strokeTitle": "笔刷样式", "color": "颜色", "size": "笔刷宽度" },
-    "nodes": { "process": "处理步骤", "decision": "判断条件", "terminator": "开始 / 结束", "text": "文本", "note": "笔记引用", "image": "图片", "link": "网页链接", "todo": "待办事项", "group": "分组" },
+    "nodes": { "process": "处理步骤", "decision": "判断条件", "terminator": "开始 / 结束", "text": "文本", "note": "笔记引用", "image": "图片", "link": "网页链接", "todo": "待办事项", "group": "分组", "chart": "数据图表" },
+    "chart": {
+      "createTitle": "创建数据图表", "editTitle": "编辑数据图表", "description": "输入数据后直接插入画布，节点会在后台完成解析。", "titleLabel": "图表标题", "titlePlaceholder": "留空则自动生成", "titleDescription": "自动标题会在每次生成图表数据时重新生成。", "typeLabel": "图表类型", "dataLabel": "数据", "dataPlaceholder": "月份,桌面端,移动端\n一月,186,80\n二月,305,200", "dataDescription": "支持自然语言描述，以及 CSV、TSV、Markdown 表格和 JSON 格式。", "generate": "生成预览", "generating": "正在解析", "preview": "预览", "primarySeries": "数值字段", "summary": "{rows} 行数据 · {series} 个系列", "emptyPreviewTitle": "等待生成预览", "emptyPreviewDescription": "输入数据并生成预览，确认图表类型和内容。", "cancel": "取消", "insert": "插入画布", "update": "重新生成", "nodeLoading": "正在生成图表…", "nodeErrorTitle": "图表生成失败", "nodeErrorHint": "双击节点修改数据并重试。",
+      "types": { "auto": "自动识别", "area": "面积图", "bar": "柱状图", "line": "折线图", "pie": "饼图", "radar": "雷达图", "radial": "径向图" },
+      "notes": { "label": "引用笔记", "placeholder": "选择笔记", "selected": "已选择 {count} 篇笔记", "title": "图表数据来源", "description": "选择一篇或多篇笔记作为图表数据来源。", "search": "搜索笔记", "empty": "没有找到笔记", "manualInput": "手动输入" },
+      "recommendations": { "time-series": "检测到时间序列，推荐折线图", "continuous": "检测到连续累计数据，推荐面积图", "proportion": "检测到占比数据，推荐饼图", "progress": "检测到进度数据，推荐径向图", "multidimensional": "检测到多维比较，推荐雷达图", "categorical": "检测到分类数据，推荐柱状图", "ai": "由 AI 根据数据语义推荐" },
+      "appearance": { "title": "图表外观", "variant": "容器样式", "palette": "配色方案", "showTitle": "显示标题", "showLegend": "显示图例", "showGrid": "显示网格", "showXAxis": "显示分类轴", "showYAxis": "显示数值轴", "variants": { "card": "卡片", "minimal": "简洁", "transparent": "透明" }, "palettes": { "system": "系统", "cool": "冷色", "warm": "暖色", "monochrome": "单色" } },
+      "errors": { "CHART_NEEDS_HEADER_AND_ROW": "至少需要表头和一行数据。", "CHART_NEEDS_TWO_COLUMNS": "至少需要两列数据。", "CHART_INVALID_MARKDOWN_TABLE": "Markdown 表格格式无效。", "CHART_JSON_ARRAY_REQUIRED": "JSON 必须是对象数组，或包含 data 数组。", "CHART_EMPTY_DATA": "数据不能为空。", "CHART_NUMERIC_SERIES_REQUIRED": "没有找到可绘制的数值列。", "CHART_MISSING_NUMERIC_VALUE": "数值系列中存在空值或非数值内容。", "CHART_EMPTY_INPUT": "请输入数据。", "CHART_AI_REQUIRED": "该内容需要 AI 才能解析。", "CHART_AI_ADDED_VALUE": "AI 返回了输入中不存在的数值，已阻止生成。", "CHART_AI_SERIES_MISMATCH": "AI 返回的数据系列长度不一致。", "CHART_AI_INVALID_JSON": "AI 没有返回有效的图表数据。", "CHART_AI_NOT_CONFIGURED": "请先在设置中配置编辑器或主 AI 模型。", "CHART_GENERATION_INTERRUPTED": "上次生成过程已中断。", "CHART_UNKNOWN_ERROR": "图表生成失败，请检查数据后重试。" }
+    },
     "linkNode": { "urlPrompt": "输入网页地址", "labelPrompt": "输入链接标题" },
     "utilityNodes": { "title": "实用节点", "description": "添加图片、网页链接或待办事项。" },
     "arrange": { "title": "对齐与分组", "description": "整理当前选择的多个节点。", "alignHorizontal": "水平居中对齐", "alignVertical": "垂直居中对齐", "distributeHorizontal": "水平均匀分布", "distributeVertical": "垂直均匀分布", "group": "创建分组" },

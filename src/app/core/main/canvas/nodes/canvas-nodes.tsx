@@ -3,14 +3,18 @@
 import { memo, useEffect, useState, type CSSProperties } from 'react'
 import Image from 'next/image'
 import { Handle, NodeResizer, Position, useReactFlow, type Node, type NodeProps } from '@xyflow/react'
-import { CheckSquare2, ExternalLink, FileText, ImageIcon, Square } from 'lucide-react'
+import { AlertCircle, CheckSquare2, ExternalLink, FileText, ImageIcon, Square } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { useTranslations } from 'next-intl'
 import { BaseNode, BaseNodeContent } from '@/components/base-node'
+import { Spinner } from '@/components/ui/spinner'
+import { resolveCanvasChartAppearance } from '@/lib/canvas/chart-appearance'
 import emitter from '@/lib/emitter'
 import type { CanvasNodeData, CanvasNodeType } from '@/types/canvas'
 import useArticleStore from '@/stores/article'
 import { useSidebarStore } from '@/stores/sidebar'
 import { cn, convertImageByWorkspace } from '@/lib/utils'
+import { CanvasChart } from './canvas-chart'
 
 export type FlowCanvasNode = Node<CanvasNodeData, CanvasNodeType>
 
@@ -219,6 +223,64 @@ export const GroupCanvasNode = memo(function GroupCanvasNode({ id, data, selecte
       />
       <div className="absolute left-3 top-2 max-w-[calc(100%-1.5rem)] text-sm font-medium text-muted-foreground">
         <EditableLabel id={id} value={data.label || '分组'} className="text-left" />
+      </div>
+    </div>
+  )
+})
+
+export const ChartCanvasNode = memo(function ChartCanvasNode({ data, selected }: NodeProps<FlowCanvasNode>) {
+  const t = useTranslations('canvas')
+  const isLoading = data.chartStatus === 'loading'
+  const hasError = data.chartStatus === 'error' || (!data.chart && !isLoading)
+  const appearance = resolveCanvasChartAppearance(data.chartAppearance)
+  return (
+    <div
+      data-chart-variant={appearance.variant}
+      className={cn(
+        'relative size-full min-h-64 min-w-80 overflow-hidden text-foreground transition-[background-color,border-color,box-shadow] in-[.selected]:ring-2 in-[.selected]:ring-ring/50',
+        appearance.variant === 'card' && 'rounded-xl border bg-card shadow-sm in-[.selected]:shadow-md',
+        appearance.variant === 'minimal' && 'rounded-lg bg-background/90',
+        appearance.variant === 'transparent' && 'rounded-lg bg-transparent',
+        previewClassName(data.previewState)
+      )}
+    >
+      <ConnectionHandles />
+      <NodeResizer
+        isVisible={selected}
+        minWidth={360}
+        minHeight={260}
+        onResizeStart={() => emitter.emit('canvas-history-checkpoint')}
+      />
+      <div className={cn(
+        'flex size-full flex-col gap-2',
+        appearance.variant === 'card' && 'p-4',
+        appearance.variant === 'minimal' && 'p-2',
+        appearance.variant === 'transparent' && 'p-1'
+      )}>
+        {appearance.showTitle && (data.chart?.title || data.chartRequest?.title) && (
+          <div className="truncate text-center text-sm font-medium">
+            {data.chart?.title || data.chartRequest?.title}
+          </div>
+        )}
+        <div className="nodrag flex min-h-0 flex-1 items-center justify-center">
+          {isLoading ? (
+            <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+              <Spinner className="size-6" />
+              <span>{t('chart.nodeLoading')}</span>
+            </div>
+          ) : hasError ? (
+            <div className="flex max-w-72 flex-col items-center gap-2 text-center">
+              <AlertCircle className="text-destructive" />
+              <span className="text-sm font-medium">{t('chart.nodeErrorTitle')}</span>
+              <span className="text-xs text-muted-foreground">
+                {t(`chart.errors.${data.chartError || 'CHART_UNKNOWN_ERROR'}`)}
+              </span>
+              <span className="text-xs text-muted-foreground">{t('chart.nodeErrorHint')}</span>
+            </div>
+          ) : data.chart ? (
+            <CanvasChart spec={data.chart} appearance={appearance} />
+          ) : null}
+        </div>
       </div>
     </div>
   )

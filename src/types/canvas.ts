@@ -28,6 +28,79 @@ export type CanvasNodeType =
   | 'todo'
   | 'group'
   | 'freehand'
+  | 'chart'
+
+export type CanvasChartType =
+  | 'area'
+  | 'bar'
+  | 'line'
+  | 'pie'
+  | 'radar'
+  | 'radial'
+
+export type CanvasChartSourceFormat =
+  | 'csv'
+  | 'tsv'
+  | 'markdown'
+  | 'json'
+  | 'natural-language'
+
+export type CanvasChartRecommendation =
+  | 'time-series'
+  | 'continuous'
+  | 'proportion'
+  | 'progress'
+  | 'multidimensional'
+  | 'categorical'
+  | 'ai'
+
+export interface CanvasChartSeries {
+  id: string
+  name: string
+  colorIndex: number
+}
+
+export interface CanvasChartDatum {
+  label: string
+  values: Record<string, number>
+}
+
+export interface CanvasChartRequest {
+  title: string
+  titleMode?: 'auto' | 'manual'
+  source: string
+  notePaths?: string[]
+  requestedType: CanvasChartType | 'auto'
+}
+
+export type CanvasChartVariant = 'card' | 'minimal' | 'transparent'
+
+export type CanvasChartPalette = 'system' | 'cool' | 'warm' | 'monochrome'
+
+export interface CanvasChartAppearance {
+  variant: CanvasChartVariant
+  palette: CanvasChartPalette
+  showTitle: boolean
+  showLegend: boolean
+  showGrid: boolean
+  showXAxis: boolean
+  showYAxis: boolean
+}
+
+export interface CanvasChartSpec {
+  version: 1
+  type: CanvasChartType
+  requestedType: CanvasChartType | 'auto'
+  recommendedType: CanvasChartType
+  title: string
+  categoryLabel: string
+  series: CanvasChartSeries[]
+  data: CanvasChartDatum[]
+  primarySeriesId: string
+  source: string
+  sourceFormat: CanvasChartSourceFormat
+  recommendation: CanvasChartRecommendation
+}
 
 export interface CanvasPoint {
   x: number
@@ -56,6 +129,14 @@ export interface CanvasNodeData extends Record<string, unknown> {
   url?: string
   checked?: boolean
   childIds?: string[]
+  chart?: CanvasChartSpec
+  chartRequest?: CanvasChartRequest
+  chartRequestId?: string
+  chartBatchId?: string
+  chartBatchIndex?: number
+  chartStatus?: 'loading' | 'ready' | 'error'
+  chartError?: string
+  chartAppearance?: CanvasChartAppearance
   previewState?: 'add' | 'update' | 'delete'
 }
 
