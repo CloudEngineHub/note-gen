@@ -8,6 +8,7 @@ import type {
   CanvasDocument,
   CanvasNode,
 } from '@/types/canvas'
+import { getCanvasNodeDefaultSize, isCanvasFlowchartNodeType } from '@/lib/canvas/shapes'
 
 const PADDING = 64
 
@@ -21,15 +22,54 @@ function escapeXml(value: string) {
 }
 
 function getNodeSize(node: CanvasNode) {
-  if (node.type === 'decision') return { width: node.width || 144, height: node.height || 144 }
-  if (node.type === 'text') return { width: node.width || 120, height: node.height || 40 }
   if (node.type === 'freehand') return { width: node.width || node.data.width || 4, height: node.height || node.data.height || 4 }
-  if (node.type === 'group') return { width: node.width || 360, height: node.height || 240 }
-  if (node.type === 'chart') return { width: node.width || 520, height: node.height || 340 }
-  if (node.type === 'note' || node.type === 'image' || node.type === 'link' || node.type === 'todo') {
+  if (node.type === 'note' || node.type === 'record' || node.type === 'image' || node.type === 'link' || node.type === 'todo') {
     return { width: node.width || 220, height: node.height || 76 }
   }
-  return { width: node.width || 180, height: node.height || 56 }
+  const fallback = getCanvasNodeDefaultSize(node.type)
+  return { width: node.width || fallback.width, height: node.height || fallback.height }
+}
+
+function renderCenteredText(label: string, x: number, y: number, options: { size?: number; fill?: string } = {}) {
+  const lines = label.split('\n').slice(0, 5)
+  const lineHeight = (options.size || 14) + 3
+  const startY = y - ((lines.length - 1) * lineHeight) / 2
+  return `<text x="${x}" y="${startY}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="${options.size || 14}" fill="${options.fill || '#18181b'}">${lines.map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : lineHeight}">${line}</tspan>`).join('')}</text>`
+}
+
+function renderFlowchartShape(
+  type: CanvasNode['type'],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  fill: string,
+  fillOpacity: number,
+  stroke: string,
+  borderWidth: number,
+  dashArray: string,
+  label: string
+) {
+  const attributes = `fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${borderWidth}" vector-effect="non-scaling-stroke"${dashArray}`
+  const outline = (() => {
+    if (type === 'process') return `<rect x="1" y="1" width="198" height="98" rx="8" ${attributes}/>`
+    if (type === 'decision') return `<polygon points="100,1 199,50 100,99 1,50" ${attributes}/>`
+    if (type === 'terminator') return `<rect x="1" y="1" width="198" height="98" rx="49" ${attributes}/>`
+    if (type === 'input-output') return `<polygon points="24,1 199,1 176,99 1,99" ${attributes}/>`
+    if (type === 'document') return `<path d="M1 1H199V80C160 60 132 100 99 81C65 61 35 100 1 82Z" ${attributes}/>`
+    if (type === 'multi-document') return `<path d="M15 1H199V73C163 57 137 90 106 75C76 60 49 90 15 75Z" ${attributes}/><path d="M8 9H192V81C156 65 130 98 99 83C69 68 42 98 8 83Z" ${attributes}/><path d="M1 17H185V89C149 73 123 106 92 91C62 76 35 106 1 91Z" ${attributes}/>`
+    if (type === 'predefined-process') return `<rect x="1" y="1" width="198" height="98" rx="6" ${attributes}/><path d="M24 1V99M176 1V99" fill="none" stroke="${stroke}" stroke-width="${borderWidth}"${dashArray}/>`
+    if (type === 'manual-input') return `<polygon points="1,25 199,1 199,99 1,99" ${attributes}/>`
+    if (type === 'preparation') return `<polygon points="28,1 172,1 199,50 172,99 28,99 1,50" ${attributes}/>`
+    if (type === 'delay') return `<path d="M1 1H126C167 1 199 23 199 50S167 99 126 99H1Z" ${attributes}/>`
+    if (type === 'display') return `<path d="M25 1H132C174 1 199 23 199 50S174 99 132 99H25C43 75 43 25 25 1Z" ${attributes}/>`
+    if (type === 'connector') return `<ellipse cx="100" cy="50" rx="49" ry="49" ${attributes}/>`
+    if (type === 'off-page-connector') return `<polygon points="1,1 199,1 199,66 100,99 1,66" ${attributes}/>`
+    if (type === 'internal-storage') return `<rect x="1" y="1" width="198" height="98" rx="4" ${attributes}/><path d="M28 1V99M1 24H199" fill="none" stroke="${stroke}" stroke-width="${borderWidth}"${dashArray}/>`
+    if (type === 'database') return `<path d="M1 17C1 8 45 1 100 1S199 8 199 17V83C199 92 155 99 100 99S1 92 1 83Z" ${attributes}/><ellipse cx="100" cy="17" rx="99" ry="16" fill="none" stroke="${stroke}" stroke-width="${borderWidth}"${dashArray}/>`
+    return `<path d="M24 1H176C207 20 207 80 176 99H24C-7 80-7 20 24 1Z" ${attributes}/>`
+  })()
+  return `<g><svg x="${x}" y="${y}" width="${width}" height="${height}" viewBox="0 0 200 100" preserveAspectRatio="none" overflow="visible">${outline}</svg>${renderCenteredText(label, x + width / 2, y + height / 2)}</g>`
 }
 
 function chartValueRange(spec: CanvasChartSpec) {
@@ -280,22 +320,36 @@ function renderNode(node: CanvasNode, offsetX: number, offsetY: number) {
   if (node.type === 'chart' && node.data.chart) {
     return renderChartNode(node.data.chart, node.data.chartAppearance, x, y, width, height)
   }
-  if (node.type === 'decision') {
-    const cx = x + width / 2
-    const cy = y + height / 2
-    return `<g><polygon points="${cx},${y} ${x + width},${cy} ${cx},${y + height} ${x},${cy}" fill="${nodeFill}" fill-opacity="${nodeFillOpacity}" stroke="${accentColor}" stroke-width="${borderWidth}"${dashArray}/><text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#18181b">${label}</text></g>`
+  if (isCanvasFlowchartNodeType(node.type)) {
+    return renderFlowchartShape(
+      node.type,
+      x,
+      y,
+      width,
+      height,
+      nodeFill,
+      nodeFillOpacity,
+      accentColor,
+      borderWidth,
+      dashArray,
+      label
+    )
   }
   if (node.type === 'text') {
-    return `<text x="${x + width / 2}" y="${y + height / 2 + 5}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="${escapeXml(node.data.color || '#52525b')}">${label}</text>`
+    return renderCenteredText(label, x + width / 2, y + height / 2, {
+      fill: escapeXml(node.data.color || '#52525b'),
+    })
   }
-  const radius = node.type === 'terminator' ? height / 2 : 10
+  const radius = 10
   const subtitle = node.type === 'note'
     ? node.data.filePath
-    : node.type === 'link'
-      ? node.data.url
-      : node.type === 'todo'
-        ? (node.data.checked ? '✓' : '○')
-        : ''
+    : node.type === 'record'
+      ? node.data.recordType
+      : node.type === 'link'
+        ? node.data.url
+        : node.type === 'todo'
+          ? (node.data.checked ? '✓' : '○')
+          : ''
   return `<g><rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" fill="${nodeFill}" fill-opacity="${nodeFillOpacity}" stroke="${accentColor}" stroke-width="${borderWidth}"${dashArray}/><text x="${x + width / 2}" y="${y + height / 2 - (subtitle ? 5 : -5)}" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#18181b">${label}</text>${subtitle ? `<text x="${x + width / 2}" y="${y + height / 2 + 15}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#71717a">${escapeXml(String(subtitle))}</text>` : ''}</g>`
 }
 

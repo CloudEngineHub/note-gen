@@ -2971,9 +2971,10 @@
     "exportSuccess": "畫布已匯出",
     "exportError": "匯出畫布失敗",
     "aiPreview": "AI 修改預覽",
-    "tools": { "label": "畫布工具", "select": "選取", "hand": "抓手", "pen": "畫筆", "highlighter": "螢光筆", "eraser": "橡皮擦" },
+    "tools": { "label": "畫布工具", "select": "選取", "hand": "抓手", "connector": "連線", "pen": "畫筆", "highlighter": "螢光筆", "eraser": "橡皮擦" },
+    "toolbox": { "ai": "AI 產生圖形", "aiPrompt": "請根據我的描述，在目前畫布中產生由原生節點和連線組成、可獨立編輯的圖形：", "shapes": "圖形庫", "media": "媒體", "drawing": "繪圖", "close": "關閉面板", "commonShapes": "常用圖形", "flowchartShapes": "流程圖", "dataShapes": "資料與儲存", "favorites": "收藏", "recent": "最近使用", "searchShapes": "搜尋圖形", "noShapes": "沒有相符的圖形", "favorite": "收藏圖形", "unfavorite": "取消收藏", "customComponents": "個人元件", "deleteCustomComponent": "刪除個人元件", "saveCustomComponent": "儲存個人元件", "saveCustomComponentDescription": "將目前選取的節點與內部連線儲存為可重用元件。", "customComponentName": "元件名稱", "customComponentDefaultName": "我的元件", "customComponentSaved": "個人元件已儲存", "connectionShape": "選擇連接圖形", "connectionShapeDescription": "建立圖形並自動連接到目前節點。", "aiDescription": "描述要產生或修改的圖形", "aiGenerate": "傳送給 AI", "aiScopes": { "append": "追加", "replace": "取代", "selection": "修改選取", "appendPrompt": "保留目前內容並追加以下圖形：", "replacePrompt": "取代目前畫布內容並產生以下圖形：", "selectionPrompt": "只修改目前選取的節點與連線："}, "aiPresets": { "flowchart": "流程圖", "flowchartPrompt": "產生結構清楚的業務流程圖", "architecture": "架構圖", "architecturePrompt": "產生分層的軟體系統架構圖", "sequence": "時序流程", "sequencePrompt": "以可獨立編輯的節點與連線表達參與者之間的時序互動", "mindmap": "心智圖", "mindmapPrompt": "產生以中心主題向外展開的心智圖" } },
     "brush": { "penTitle": "畫筆", "highlighterTitle": "螢光筆", "strokeTitle": "筆刷樣式", "color": "顏色", "size": "筆刷寬度" },
-    "nodes": { "process": "處理步驟", "decision": "判斷條件", "terminator": "開始 / 結束", "text": "文字", "note": "筆記引用", "image": "圖片", "link": "網頁連結", "todo": "待辦事項", "group": "群組", "chart": "資料圖表" },
+    "nodes": { "process": "處理步驟", "decision": "判斷條件", "terminator": "開始 / 結束", "inputOutput": "輸入 / 輸出", "document": "文件", "multiDocument": "多文件", "database": "資料庫", "predefinedProcess": "子流程", "manualInput": "手動輸入", "preparation": "準備", "delay": "延遲", "display": "顯示", "connector": "頁面連接符", "offPageConnector": "跨頁連接符", "internalStorage": "內部儲存", "storedData": "儲存資料", "text": "文字", "note": "筆記引用", "record": "記錄", "image": "圖片", "link": "網頁連結", "todo": "待辦事項", "group": "群組", "chart": "資料圖表" },
     "chart": {
       "createTitle": "建立資料圖表", "editTitle": "編輯資料圖表", "description": "輸入資料後直接插入畫布，節點會在背景完成解析。", "titleLabel": "圖表標題", "titlePlaceholder": "留空則自動產生", "titleDescription": "自動標題會在每次產生圖表資料時重新產生。", "typeLabel": "圖表類型", "dataLabel": "資料", "dataPlaceholder": "月份,桌面端,行動端\n一月,186,80\n二月,305,200", "dataDescription": "支援自然語言描述，以及 CSV、TSV、Markdown 表格和 JSON 格式。", "generate": "產生預覽", "generating": "正在解析", "preview": "預覽", "primarySeries": "數值欄位", "summary": "{rows} 列資料 · {series} 個系列", "emptyPreviewTitle": "等待產生預覽", "emptyPreviewDescription": "輸入資料並產生預覽，確認圖表類型和內容。", "cancel": "取消", "insert": "插入畫布", "update": "重新產生", "nodeLoading": "正在產生圖表…", "nodeErrorTitle": "圖表產生失敗", "nodeErrorHint": "雙擊節點修改資料並重試。",
       "types": { "auto": "自動識別", "area": "面積圖", "bar": "長條圖", "line": "折線圖", "pie": "圓餅圖", "radar": "雷達圖", "radial": "徑向圖" },
@@ -2987,7 +2988,7 @@
     "arrange": { "title": "對齊與群組", "description": "整理目前選取的節點。", "alignHorizontal": "水平置中對齊", "alignVertical": "垂直置中對齊", "distributeHorizontal": "水平平均分布", "distributeVertical": "垂直平均分布", "group": "建立群組" },
     "group": { "defaultLabel": "群組" },
     "edge": { "title": "連線樣式", "description": "調整選取連線的路徑和文字。", "orthogonal": "折線", "straight": "直線", "curve": "曲線", "editLabel": "編輯連線文字", "labelPrompt": "輸入連線文字", "labelDescription": "文字會顯示在線段中間，留空即可移除。", "saveLabel": "儲存文字" },
-    "selection": { "style": "節點樣式", "color": "強調色", "customColor": "自訂顏色", "border": "邊框", "solid": "實線", "dashed": "虛線", "dotted": "點線", "borderWidth": "邊框粗細", "fill": "背景填色", "transparent": "透明", "customFill": "自訂填色", "imagePasted": "圖片已貼到畫布", "imagePasteError": "貼上圖片失敗" },
+    "selection": { "tools": "節點工具", "style": "節點樣式", "color": "強調色", "customColor": "自訂顏色", "border": "邊框", "solid": "實線", "dashed": "虛線", "dotted": "點線", "borderWidth": "邊框粗細", "fill": "背景填色", "transparent": "透明", "customFill": "自訂填色", "lock": "鎖定節點", "unlock": "解鎖節點", "copyStyle": "複製樣式", "pasteStyle": "貼上樣式", "styleCopied": "節點樣式已複製", "stylePasted": "節點樣式已套用", "imagePasted": "圖片已貼到畫布", "imagePasteError": "貼上圖片失敗", "chatContext": "已關聯畫布元素：{nodes} 個節點，{edges} 條連線", "removeChatContext": "取消關聯畫布元素" },
     "layer": { "front": "置於頂層", "forward": "上移一層", "backward": "下移一層", "back": "置於底層" },
     "noteNode": { "title": "新增筆記引用", "description": "從檔案管理器選擇一篇筆記，雙擊節點可以開啟原始檔案。", "search": "搜尋筆記...", "empty": "找不到筆記", "group": "工作區筆記", "added": "已新增筆記「{name}」" },
     "footer": {
@@ -2999,9 +3000,9 @@
       "zoomOut": "縮小",
       "fit": "符合檢視",
       "layout": "自動整理",
-      "export": "匯出 PNG",
+      "export": "匯出",
       "import": { "title": "匯入", "file": "選擇檔案", "content": "輸入內容", "contentTitle": "匯入畫布內容", "contentDescription": "支援 NoteGen Canvas JSON 或 Mermaid 流程圖內容，匯入後會取代目前畫布。", "contentPlaceholder": "貼上 Canvas JSON 或 Mermaid 內容…", "confirm": "匯入目前畫布" },
-      "exportMenu": { "computer": "儲存到電腦", "source": "可編輯檔案", "png2x": "PNG · 2× 高解析", "png4x": "PNG · 4× 超高解析", "svg": "SVG · 向量圖", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid 流程圖" }
+      "exportMenu": { "record": "匯出為插圖記錄", "recordError": "儲存插圖記錄失敗", "computer": "儲存到電腦", "source": "可編輯檔案", "png2x": "PNG · 2× 高解析", "png4x": "PNG · 4× 超高解析", "svg": "SVG · 向量圖", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid 流程圖" }
     },
     "contextMenu": { "selectAll": "全選", "copy": "複製", "paste": "貼上", "duplicate": "建立副本", "delete": "刪除所選內容" },
     "empty": {

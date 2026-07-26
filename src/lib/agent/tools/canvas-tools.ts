@@ -2,8 +2,12 @@ import emitter from '@/lib/emitter'
 import { applyCanvasOperations } from '@/lib/canvas/operations'
 import type { CanvasDocument } from '@/types/canvas'
 import type { AgentTool, AgentToolExecutionContext, AgentToolResult } from '../types'
+import { FLOWCHART_NODE_TYPES } from '@/lib/canvas/shapes'
 
-const CANVAS_NODE_TYPES = ['process', 'decision', 'terminator', 'text'] as const
+const CANVAS_NODE_TYPES = [
+  ...FLOWCHART_NODE_TYPES,
+  'text',
+] as const
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -237,7 +241,11 @@ const createCanvasDiagramTool: AgentTool = {
           type: 'object',
           properties: {
             id: { type: 'string', description: '唯一且稳定的节点 ID。' },
-            nodeType: { type: 'string', enum: [...CANVAS_NODE_TYPES] },
+            nodeType: {
+              type: 'string',
+              enum: [...CANVAS_NODE_TYPES],
+              description: '节点形状。根据语义选择标准流程图图形，例如 process 步骤、decision 判断、terminator 开始结束、input-output 输入输出、document/multi-document 文档、predefined-process 子流程、manual-input 手动输入、preparation 准备、delay 延迟、display 显示、connector/off-page-connector 连接符、internal-storage/database/stored-data 数据存储、text 纯文本。',
+            },
             label: { type: 'string', description: '显示在节点上的非空名称。' },
             description: { type: 'string' },
             x: { type: 'number' },
@@ -300,7 +308,11 @@ const applyCanvasOperationsTool: AgentTool = {
               description: '操作类型。不同类型所需字段由工具描述和运行时校验决定。',
             },
             id: { type: 'string', description: '节点或连线的稳定 ID。除 clear 外均需要。' },
-            nodeType: { type: 'string', enum: [...CANVAS_NODE_TYPES] },
+            nodeType: {
+              type: 'string',
+              enum: [...CANVAS_NODE_TYPES],
+              description: 'add_node 的节点形状。',
+            },
             label: { type: 'string' },
             description: { type: 'string' },
             x: { type: 'number' },

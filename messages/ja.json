@@ -2958,9 +2958,10 @@
     "exportSuccess": "キャンバスを書き出しました",
     "exportError": "キャンバスの書き出しに失敗しました",
     "aiPreview": "AI 変更プレビュー",
-    "tools": { "label": "キャンバスツール", "select": "選択", "hand": "手のひら", "pen": "ペン", "highlighter": "蛍光ペン", "eraser": "消しゴム" },
+    "tools": { "label": "キャンバスツール", "select": "選択", "hand": "手のひら", "connector": "コネクター", "pen": "ペン", "highlighter": "蛍光ペン", "eraser": "消しゴム" },
+    "toolbox": { "ai": "AI で図形を生成", "aiPrompt": "私の説明に基づき、現在のキャンバスに個別編集可能なネイティブノードと接続線で図を生成してください：", "shapes": "図形", "media": "メディア", "drawing": "描画", "close": "パネルを閉じる", "commonShapes": "基本図形", "flowchartShapes": "フローチャート", "dataShapes": "データとストレージ", "favorites": "お気に入り", "recent": "最近使用", "searchShapes": "図形を検索", "noShapes": "一致する図形がありません", "favorite": "お気に入りに追加", "unfavorite": "お気に入りを解除", "customComponents": "マイコンポーネント", "deleteCustomComponent": "カスタムコンポーネントを削除", "saveCustomComponent": "コンポーネントを保存", "saveCustomComponentDescription": "選択したノードと内部の接続線を再利用可能なコンポーネントとして保存します。", "customComponentName": "コンポーネント名", "customComponentDefaultName": "マイコンポーネント", "customComponentSaved": "カスタムコンポーネントを保存しました", "connectionShape": "接続する図形を選択", "connectionShapeDescription": "図形を作成し、現在のノードに自動接続します。", "aiDescription": "生成または変更する図を説明", "aiGenerate": "AI に送信", "aiScopes": { "append": "追加", "replace": "置換", "selection": "選択範囲", "appendPrompt": "現在の内容を保持し、次の図を追加してください：", "replacePrompt": "現在のキャンバスを置換し、次の図を生成してください：", "selectionPrompt": "現在選択中のノードと接続線のみ変更してください："}, "aiPresets": { "flowchart": "フローチャート", "flowchartPrompt": "明確な業務フローチャートを生成", "architecture": "アーキテクチャ", "architecturePrompt": "階層化されたソフトウェアシステム構成図を生成", "sequence": "シーケンス", "sequencePrompt": "個別編集可能なノードと接続線で参加者間の時系列のやり取りを表現", "mindmap": "マインドマップ", "mindmapPrompt": "中心テーマから外側へ展開するマインドマップを生成" } },
     "brush": { "penTitle": "ペン", "highlighterTitle": "蛍光ペン", "strokeTitle": "ブラシストローク", "color": "色", "size": "ブラシ幅" },
-    "nodes": { "process": "処理", "decision": "条件", "terminator": "開始 / 終了", "text": "テキスト", "note": "ノート参照", "image": "画像", "link": "ウェブリンク", "todo": "タスク", "group": "グループ", "chart": "データチャート" },
+    "nodes": { "process": "処理", "decision": "条件", "terminator": "開始 / 終了", "inputOutput": "入力 / 出力", "document": "ドキュメント", "multiDocument": "複数ドキュメント", "database": "データベース", "predefinedProcess": "定義済み処理", "manualInput": "手動入力", "preparation": "準備", "delay": "遅延", "display": "表示", "connector": "ページ内接続子", "offPageConnector": "ページ外接続子", "internalStorage": "内部ストレージ", "storedData": "保存データ", "text": "テキスト", "note": "ノート参照", "record": "記録", "image": "画像", "link": "ウェブリンク", "todo": "タスク", "group": "グループ", "chart": "データチャート" },
     "chart": {
       "createTitle": "データチャートを作成", "editTitle": "データチャートを編集", "description": "データを入力して直接挿入します。ノードはバックグラウンドで解析を完了します。", "titleLabel": "チャートタイトル", "titlePlaceholder": "空欄の場合は自動生成", "titleDescription": "自動タイトルはチャートデータを生成するたびに再生成されます。", "typeLabel": "チャート種類", "dataLabel": "データ", "dataPlaceholder": "月,デスクトップ,モバイル\n1月,186,80\n2月,305,200", "dataDescription": "自然言語の説明、CSV、TSV、Markdown テーブル、JSON に対応しています。", "generate": "プレビューを生成", "generating": "解析中", "preview": "プレビュー", "primarySeries": "数値フィールド", "summary": "{rows} 行 · {series} 系列", "emptyPreviewTitle": "プレビュー未生成", "emptyPreviewDescription": "データを入力してプレビューを生成し、種類と内容を確認してください。", "cancel": "キャンセル", "insert": "キャンバスに挿入", "update": "再生成", "nodeLoading": "チャートを生成中…", "nodeErrorTitle": "チャートの生成に失敗しました", "nodeErrorHint": "ノードをダブルクリックしてデータを修正し、再試行してください。",
       "types": { "auto": "自動判定", "area": "エリアチャート", "bar": "棒グラフ", "line": "折れ線グラフ", "pie": "円グラフ", "radar": "レーダーチャート", "radial": "ラジアルチャート" },
@@ -2974,7 +2975,7 @@
     "arrange": { "title": "整列とグループ", "description": "選択したノードを整理します。", "alignHorizontal": "水平中央揃え", "alignVertical": "垂直中央揃え", "distributeHorizontal": "水平方向に均等配置", "distributeVertical": "垂直方向に均等配置", "group": "グループを作成" },
     "group": { "defaultLabel": "グループ" },
     "edge": { "title": "接続スタイル", "description": "選択した接続の経路とラベルを調整します。", "orthogonal": "折れ線", "straight": "直線", "curve": "曲線", "editLabel": "ラベルを編集", "labelPrompt": "接続ラベルを入力", "labelDescription": "ラベルは接続の中央に表示されます。空欄で削除できます。", "saveLabel": "ラベルを保存" },
-    "selection": { "style": "ノードスタイル", "color": "アクセント", "customColor": "カスタムカラー", "border": "枠線", "solid": "実線", "dashed": "破線", "dotted": "点線", "borderWidth": "枠線の太さ", "fill": "背景", "transparent": "透明", "customFill": "カスタム背景色", "imagePasted": "画像をキャンバスに貼り付けました", "imagePasteError": "画像を貼り付けられませんでした" },
+    "selection": { "tools": "ノードツール", "style": "ノードスタイル", "color": "アクセント", "customColor": "カスタムカラー", "border": "枠線", "solid": "実線", "dashed": "破線", "dotted": "点線", "borderWidth": "枠線の太さ", "fill": "背景", "transparent": "透明", "customFill": "カスタム背景色", "lock": "ノードをロック", "unlock": "ノードのロックを解除", "copyStyle": "スタイルをコピー", "pasteStyle": "スタイルを貼り付け", "styleCopied": "ノードスタイルをコピーしました", "stylePasted": "ノードスタイルを適用しました", "imagePasted": "画像をキャンバスに貼り付けました", "imagePasteError": "画像を貼り付けられませんでした", "chatContext": "キャンバス選択：ノード {nodes} 件、接続線 {edges} 件", "removeChatContext": "キャンバス選択を解除" },
     "layer": { "front": "最前面へ", "forward": "前面へ移動", "backward": "背面へ移動", "back": "最背面へ" },
     "noteNode": { "title": "ノート参照を追加", "description": "ファイルマネージャーからノートを選択します。ノードをダブルクリックすると元ファイルを開けます。", "search": "ノートを検索...", "empty": "ノートが見つかりません", "group": "ワークスペースのノート", "added": "ノート「{name}」を追加しました" },
     "footer": {
@@ -2986,9 +2987,9 @@
       "zoomOut": "縮小",
       "fit": "全体を表示",
       "layout": "自動整列",
-      "export": "PNGを書き出す",
+      "export": "書き出す",
       "import": { "title": "インポート", "file": "ファイルを選択", "content": "内容を入力", "contentTitle": "キャンバス内容をインポート", "contentDescription": "NoteGen Canvas JSON または Mermaid フローチャートに対応しています。現在のキャンバスは置き換えられます。", "contentPlaceholder": "Canvas JSON または Mermaid の内容を貼り付け…", "confirm": "現在のキャンバスにインポート" },
-      "exportMenu": { "computer": "コンピューターに保存", "source": "編集可能なファイル", "png2x": "PNG · 2× 高解像度", "png4x": "PNG · 4× 超高解像度", "svg": "SVG · ベクター", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid フローチャート" }
+      "exportMenu": { "record": "画像記録として書き出す", "recordError": "画像記録の保存に失敗しました", "computer": "コンピューターに保存", "source": "編集可能なファイル", "png2x": "PNG · 2× 高解像度", "png4x": "PNG · 4× 超高解像度", "svg": "SVG · ベクター", "canvasFile": "NoteGen Canvas JSON", "mermaid": "Mermaid フローチャート" }
     },
     "contextMenu": { "selectAll": "すべて選択", "copy": "コピー", "paste": "貼り付け", "duplicate": "複製", "delete": "選択項目を削除" },
     "empty": {

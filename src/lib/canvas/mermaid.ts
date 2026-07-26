@@ -1,4 +1,5 @@
 import { DEFAULT_CANVAS_DOCUMENT, type CanvasDocument, type CanvasNode, type CanvasNodeType } from '@/types/canvas'
+import { isCanvasFlowchartNodeType } from '@/lib/canvas/shapes'
 
 const NODE_PATTERN = /^([A-Za-z_][\w-]*)\s*(?:\(\[([\s\S]*?)\]\)|\{([\s\S]*?)\}|\[([\s\S]*?)\]|\(([\s\S]*?)\))?$/
 
@@ -10,10 +11,20 @@ function parseNodeToken(token: string): { id: string; type: CanvasNodeType; labe
   const match = token.trim().match(NODE_PATTERN)
   if (!match) return null
   const [, id, terminator, decision, rectangle, rounded] = match
+  const database = rectangle?.match(/^\(([\s\S]*)\)$/)?.[1]
+  const inputOutput = rectangle?.match(/^\/([\s\S]*)\/$/)?.[1]
   return {
     id,
-    type: terminator ? 'terminator' : decision ? 'decision' : rounded ? 'terminator' : 'process',
-    label: cleanLabel(terminator || decision || rectangle || rounded, id),
+    type: terminator
+      ? 'terminator'
+      : decision
+        ? 'decision'
+        : rounded
+          ? 'terminator'
+          : database
+            ? 'database'
+            : inputOutput ? 'input-output' : 'process',
+    label: cleanLabel(terminator || decision || database || inputOutput || rectangle || rounded, id),
   }
 }
 
@@ -22,6 +33,13 @@ function stripComment(line: string) {
 }
 
 export function mermaidToCanvasDocument(source: string): CanvasDocument {
+  const typeOverrides = new Map<string, CanvasNodeType>()
+  for (const line of source.split(/\r?\n/)) {
+    const match = line.trim().match(/^%%\s*notegen-type\s+([A-Za-z_][\w-]*)\s+([\w-]+)$/)
+    if (match && isCanvasFlowchartNodeType(match[2])) {
+      typeOverrides.set(match[1], match[2])
+    }
+  }
   const lines = source.split(/\r?\n/).map(stripComment).filter(Boolean)
   const header = lines.shift()?.match(/^(?:flowchart|graph)\s+(TB|TD|BT|LR|RL)/i)
   if (!header) throw new Error('Only Mermaid flowchart/graph syntax is supported')
@@ -35,7 +53,7 @@ export function mermaidToCanvasDocument(source: string): CanvasDocument {
     const existing = nodes.get(parsed.id)
     nodes.set(parsed.id, {
       id: parsed.id,
-      type: existing?.type || parsed.type,
+      type: typeOverrides.get(parsed.id) || existing?.type || parsed.type,
       data: { label: existing?.data.label || parsed.label },
     })
     return parsed.id
@@ -108,12 +126,15 @@ export function canvasDocumentToMermaid(document: CanvasDocument): string {
   const visibleNodes = document.nodes.filter(node => node.type !== 'freehand' && node.type !== 'group')
   const aliases = new Map(visibleNodes.map((node, index) => [node.id, `node_${index + 1}`]))
   const nodeLines = visibleNodes
-    .map(node => {
+    .flatMap(node => {
       const id = aliases.get(node.id)!
       const label = escapeLabel(String(node.data.label || node.id))
-      if (node.type === 'decision') return `  ${id}{"${label}"}`
-      if (node.type === 'terminator') return `  ${id}(["${label}"])`
-      return `  ${id}["${label}"]`
+      const metadata = `  %% notegen-type ${id} ${node.type}`
+      if (node.type === 'decision') return [metadata, `  ${id}{"${label}"}`]
+      if (node.type === 'terminator') return [metadata, `  ${id}(["${label}"])`]
+      if (node.type === 'input-output') return [metadata, `  ${id}[/"${label}"/]`]
+      if (node.type === 'database' || node.type === 'stored-data') return [metadata, `  ${id}[("${label}")]`]
+      return [metadata, `  ${id}["${label}"]`]
     })
   const edgeLines = document.edges
     .filter(edge => aliases.has(edge.source) && aliases.has(edge.target))

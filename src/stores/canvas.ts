@@ -16,7 +16,13 @@ import { createCanvasDocument } from '@/lib/canvas/templates'
 import { CANVAS_THUMBNAIL_VERSION, generateCanvasThumbnail, removeCanvasThumbnail } from '@/lib/canvas/thumbnail'
 import { purgeCanvas, uploadCanvas } from '@/lib/sync/canvas-sync'
 import { enqueueAutoDataSync, isAutoDataSyncProviderConfigured } from '@/lib/sync/auto-data-sync-queue'
-import type { CanvasDocument, CanvasHistoryState, CanvasProject, CanvasProjectType } from '@/types/canvas'
+import type {
+  CanvasDocument,
+  CanvasHistoryState,
+  CanvasProject,
+  CanvasProjectType,
+  CanvasSelectionContext,
+} from '@/types/canvas'
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const thumbnailTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -46,6 +52,7 @@ interface CanvasState {
   deletedProjects: CanvasProject[]
   documents: Record<string, CanvasDocument>
   activeCanvasId: string | null
+  selectionContext: CanvasSelectionContext | null
   loading: boolean
   trashMode: boolean
   loadProjects: () => Promise<void>
@@ -54,6 +61,7 @@ interface CanvasState {
   duplicateProject: (id: string, title?: string) => Promise<CanvasProject | null>
   openProject: (id: string) => Promise<CanvasProject | null>
   setActiveCanvasId: (id: string | null) => void
+  setSelectionContext: (context: CanvasSelectionContext | null) => void
   updateDocument: (id: string, document: CanvasDocument) => void
   updateHistory: (id: string, history: CanvasHistoryState) => void
   saveProject: (id: string) => Promise<void>
@@ -72,6 +80,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
   deletedProjects: [],
   documents: {},
   activeCanvasId: null,
+  selectionContext: null,
   loading: false,
   trashMode: false,
 
@@ -105,6 +114,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       projects: [project, ...state.projects],
       documents: { ...state.documents, [project.id]: project.document },
       activeCanvasId: project.id,
+      selectionContext: null,
     }))
     void get().refreshThumbnail(project.id)
     return project
@@ -122,6 +132,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       projects: [project, ...state.projects],
       documents: { ...state.documents, [project.id]: project.document },
       activeCanvasId: project.id,
+      selectionContext: null,
     }))
     void get().refreshThumbnail(project.id)
     return project
@@ -141,6 +152,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       projects: [project, ...state.projects],
       documents: { ...state.documents, [project.id]: project.document },
       activeCanvasId: project.id,
+      selectionContext: null,
     }))
     void get().refreshThumbnail(project.id)
     return project
@@ -153,11 +165,16 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     set(state => ({
       activeCanvasId: id,
       documents: { ...state.documents, [id]: project.document },
+      selectionContext: state.selectionContext?.canvasId === id ? state.selectionContext : null,
     }))
     return project
   },
 
-  setActiveCanvasId: (id) => set({ activeCanvasId: id }),
+  setActiveCanvasId: (id) => set(state => ({
+    activeCanvasId: id,
+    selectionContext: state.selectionContext?.canvasId === id ? state.selectionContext : null,
+  })),
+  setSelectionContext: (selectionContext) => set({ selectionContext }),
 
   updateDocument: (id, document) => {
     set(state => ({ documents: { ...state.documents, [id]: document } }))
@@ -283,6 +300,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
           : state.deletedProjects,
         documents,
         activeCanvasId: state.activeCanvasId === id ? null : state.activeCanvasId,
+        selectionContext: state.selectionContext?.canvasId === id ? null : state.selectionContext,
       }
     })
     if (!syncConfigured) return 'local'

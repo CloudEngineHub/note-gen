@@ -27,6 +27,31 @@ import {
   parseContextOverflowError,
   reduceLearnedContextWindow,
 } from '@/lib/ai/model-capacity'
+import type { CanvasSelectionContext } from '@/types/canvas'
+
+function buildCanvasSelectionContext(context: CanvasSelectionContext | null) {
+  if (!context) return ''
+  const nodes = context.nodes.length > 0
+    ? context.nodes.map(node => `- id=${node.id}; type=${node.type}; label=${JSON.stringify(node.label)}`).join('\n')
+    : '- 无'
+  const edges = context.edges.length > 0
+    ? context.edges.map(edge => (
+        `- id=${edge.id}; source=${edge.source}; target=${edge.target}${edge.label ? `; label=${JSON.stringify(edge.label)}` : ''}`
+      )).join('\n')
+    : '- 无'
+  return [
+    '## 用户关联的画布元素',
+    `画布：${context.canvasTitle}（ID: ${context.canvasId}）`,
+    '以下节点和连线是用户为本次对话明确选中的操作对象。回答或调用画布工具时优先使用这些精确 ID；除非用户明确要求，不要修改未选中的元素。',
+    '',
+    '节点：',
+    nodes,
+    '',
+    '连线：',
+    edges,
+    '',
+  ].join('\n')
+}
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -80,10 +105,20 @@ interface ChatSendProps {
   attachedImages?: ImageAttachment[];
   fileAttachments?: RuntimeChatAttachment[];
   quoteData?: QuoteData | null;
+  canvasSelectionContext?: CanvasSelectionContext | null;
   dockStyle?: boolean;
 }
 
-export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ inputValue, onSent, linkedResource, attachedImages = [], fileAttachments = [], quoteData = null, dockStyle = false }, ref) => {
+export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
+  inputValue,
+  onSent,
+  linkedResource,
+  attachedImages = [],
+  fileAttachments = [],
+  quoteData = null,
+  canvasSelectionContext = null,
+  dockStyle = false,
+}, ref) => {
   const { primaryModel, agentPermissionMode } = useSettingStore()
   const { currentTagId } = useTagStore()
   const {
@@ -186,6 +221,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({ i
     if (quoteData) {
       context += `## 用户引用内容\n文件: ${quoteData.fileName}\n范围: ${quoteData.from}-${quoteData.to}\n\n${quoteData.fullContent}\n\n`
     }
+
+    context += buildCanvasSelectionContext(canvasSelectionContext)
 
     return context
   }
@@ -775,6 +812,8 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
           hasValidRange,
         })
       }
+
+      context += buildCanvasSelectionContext(canvasSelectionContext)
 
       // 5. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
       const compactionContext = [

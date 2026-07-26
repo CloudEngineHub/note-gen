@@ -7,6 +7,7 @@ import {
   FileInput,
   Grid3X3,
   ImageDown,
+  ImagePlus,
   Magnet,
   Maximize2,
   WandSparkles,
@@ -37,6 +38,7 @@ interface CanvasFooterProps {
   onFitView: () => void
   onLayout: () => void
   onExport: (format: 'png' | 'svg', pixelRatio: number) => void
+  onExportRecord: () => void
   onExportSource: (format: 'canvas' | 'mermaid') => void
   onImportFile: () => void
   onImportContent: () => void
@@ -81,6 +83,7 @@ export function CanvasFooter({
   onFitView,
   onLayout,
   onExport,
+  onExportRecord,
   onExportSource,
   onImportFile,
   onImportContent,
@@ -88,7 +91,7 @@ export function CanvasFooter({
   const t = useTranslations('canvas.footer')
 
   return (
-    <div className="flex h-6 shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-3 text-xs text-muted-foreground">
+    <div className="flex h-6 min-h-6 max-h-6 shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-3 text-xs text-muted-foreground">
       <div className="flex shrink-0 items-center gap-0.5">
         <FooterButton label={t('grid')} active={showGrid} onClick={onToggleGrid}>
           <Grid3X3 />
@@ -99,7 +102,7 @@ export function CanvasFooter({
         <FooterButton label={t('layout')} onClick={onLayout}>
           <WandSparkles />
         </FooterButton>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
@@ -121,7 +124,7 @@ export function CanvasFooter({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
@@ -133,6 +136,13 @@ export function CanvasFooter({
             <TooltipContent side="top">{t('export')}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="start" side="top" className="w-56">
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={onExportRecord}>
+                <ImagePlus />
+                {t('exportMenu.record')}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuLabel>{t('exportMenu.computer')}</DropdownMenuLabel>
             <DropdownMenuGroup>
               <DropdownMenuItem onSelect={() => onExport('png', 2)}>

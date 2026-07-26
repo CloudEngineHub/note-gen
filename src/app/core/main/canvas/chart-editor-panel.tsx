@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { ChevronRight, ChevronsUpDown, FileText, Folder } from 'lucide-react'
+import { ChevronRight, ChevronsUpDown, FileText, Folder, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -11,14 +11,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   Field,
   FieldDescription,
@@ -170,7 +162,7 @@ function NoteTreeItem({
   )
 }
 
-export function ChartEditorDialog({
+export function ChartEditorPanel({
   open,
   initialRequest,
   availableNotes,
@@ -218,20 +210,32 @@ export function ChartEditorDialog({
     })
   }
 
+  if (!open) return null
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(800px,calc(100dvh-2rem))] w-[min(1080px,calc(100vw-2rem))] max-w-none grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] gap-0 overflow-hidden p-0 sm:w-[min(1080px,calc(100vw-3rem))] sm:max-w-none">
-        <DialogHeader className="gap-1 px-6 py-5 pr-12">
-          <DialogTitle>{t(initialRequest ? 'chart.editTitle' : 'chart.createTitle')}</DialogTitle>
-          <DialogDescription>{t('chart.description')}</DialogDescription>
-        </DialogHeader>
+    <div className="absolute inset-y-3 left-[4.25rem] z-20 flex w-[min(30rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+      <div className="flex min-h-14 shrink-0 items-start justify-between gap-3 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-medium">{t(initialRequest ? 'chart.editTitle' : 'chart.createTitle')}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('chart.description')}</p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('toolbox.close')}
+          onClick={() => onOpenChange(false)}
+        >
+          <X data-icon="inline-start" />
+        </Button>
+      </div>
 
-        <Separator />
+      <Separator />
 
-        <div className="min-h-0 overflow-y-auto p-6">
-          <FieldGroup className="gap-6">
-            <FieldGroup className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_240px_320px]">
-              <Field className="md:col-span-2 lg:col-span-1">
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        <FieldGroup className="min-h-0 flex-1 gap-5">
+          <FieldGroup className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
+              <Field>
                 <FieldLabel htmlFor="canvas-chart-title">{t('chart.titleLabel')}</FieldLabel>
                 <Input
                   id="canvas-chart-title"
@@ -259,7 +263,7 @@ export function ChartEditorDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field>
+              <Field className="sm:col-span-2">
                 <FieldLabel>{t('chart.notes.label')}</FieldLabel>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -322,54 +326,49 @@ export function ChartEditorDialog({
                   </div>
                 )}
               </Field>
-            </FieldGroup>
-
-            <Field>
-              <FieldLabel htmlFor="canvas-chart-source">{t('chart.dataLabel')}</FieldLabel>
-              <Textarea
-                id="canvas-chart-source"
-                value={source}
-                rows={10}
-                maxRows={10}
-                className="field-sizing-fixed h-[calc(10lh+1rem+2px)] min-h-[calc(10lh+1rem+2px)] max-h-[calc(10lh+1rem+2px)] resize-none font-mono text-xs"
-                placeholder={t('chart.dataPlaceholder')}
-                onChange={event => setSource(event.target.value)}
-              />
-              <FieldDescription>{t('chart.dataDescription')}</FieldDescription>
-            </Field>
           </FieldGroup>
-        </div>
 
-        <Separator />
+          <Field className="min-h-0 flex-1">
+            <FieldLabel htmlFor="canvas-chart-source">{t('chart.dataLabel')}</FieldLabel>
+            <FieldDescription>{t('chart.dataDescription')}</FieldDescription>
+            <Textarea
+              id="canvas-chart-source"
+              value={source}
+              className="field-sizing-fixed min-h-0 flex-1 resize-none font-mono text-xs"
+              placeholder={t('chart.dataPlaceholder')}
+              onChange={event => setSource(event.target.value)}
+            />
+          </Field>
+        </FieldGroup>
+      </div>
 
-        <DialogFooter className="mx-0 mb-0 min-h-18 items-center rounded-none border-t-0 px-6 py-4 sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            {t('chart.cancel')}
-          </Button>
-          <Button
-            type="button"
-            disabled={!source.trim() && notePaths.length === 0}
-            onClick={() => {
-              const nextTitle = title.trim()
-              const initialTitle = initialRequest?.title.trim() || ''
-              const initialTitleMode = initialRequest?.titleMode || 'auto'
-              const titleMode = nextTitle === initialTitle
-                ? initialTitleMode
-                : nextTitle ? 'manual' : 'auto'
-              onSubmit({
-                title: nextTitle,
-                titleMode,
-                source: source.trim(),
-                notePaths,
-                requestedType,
-              })
-              onOpenChange(false)
-            }}
-          >
-            {t(initialRequest ? 'chart.update' : 'chart.insert')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="flex shrink-0 justify-end gap-2 border-t p-3">
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          {t('chart.cancel')}
+        </Button>
+        <Button
+          type="button"
+          disabled={!source.trim() && notePaths.length === 0}
+          onClick={() => {
+            const nextTitle = title.trim()
+            const initialTitle = initialRequest?.title.trim() || ''
+            const initialTitleMode = initialRequest?.titleMode || 'auto'
+            const titleMode = nextTitle === initialTitle
+              ? initialTitleMode
+              : nextTitle ? 'manual' : 'auto'
+            onSubmit({
+              title: nextTitle,
+              titleMode,
+              source: source.trim(),
+              notePaths,
+              requestedType,
+            })
+            onOpenChange(false)
+          }}
+        >
+          {t(initialRequest ? 'chart.update' : 'chart.insert')}
+        </Button>
+      </div>
+    </div>
   )
 }

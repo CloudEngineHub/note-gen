@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   addEdge,
   Background,
@@ -23,42 +23,32 @@ import {
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled.js'
 import { toPng, toSvg } from 'html-to-image'
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { mkdir, readFile, readTextFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, exists, mkdir, readFile, readTextFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignHorizontalDistributeCenter,
   AlignVerticalDistributeCenter,
-  ChartNoAxesCombined,
   ClipboardPaste,
+  Blocks,
   CircleSlash2,
   Copy,
   CopyPlus,
-  Eraser,
   FolderKanban,
-  Hand,
-  Highlighter,
-  ImagePlus,
-  MousePointer2,
+  Lock,
+  Paintbrush,
   Palette,
-  Pencil,
-  RectangleHorizontal,
   Route,
-  SquareRoundCorner,
   Trash2,
-  Type,
+  Unlock,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
+import { useTheme } from 'next-themes'
 import emitter from '@/lib/emitter'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -93,10 +83,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Field,
   FieldGroup,
@@ -105,16 +96,21 @@ import {
 import useCanvasStore from '@/stores/canvas'
 import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
+import useMarkStore from '@/stores/mark'
+import { useSidebarStore } from '@/stores/sidebar'
+import { insertMark, type Mark } from '@/db/marks'
 import type {
   CanvasDocument,
   CanvasHistorySnapshot,
   CanvasChartAppearance,
   CanvasChartRequest,
+  CanvasCustomComponent,
   CanvasNode,
   CanvasPoint,
   CanvasTool,
 } from '@/types/canvas'
 import { flattenFileTree } from '@/app/core/main/file/file-selection'
+import { getMarkListItemContent } from '@/app/core/main/mark/mark-list-item-content'
 import { applyCanvasOperations } from '@/lib/canvas/operations'
 import { getFilePathOptions } from '@/lib/workspace'
 import {
@@ -126,20 +122,39 @@ import {
 } from '@/lib/canvas/freehand'
 import {
   ChartCanvasNode,
+  ConnectorNode,
+  DatabaseNode,
+  DelayNode,
   DecisionNode,
+  DisplayNode,
+  DocumentNode,
   FreehandNode,
   GroupCanvasNode,
   ImageCanvasNode,
+  InputOutputNode,
+  InternalStorageNode,
   LinkCanvasNode,
+  ManualInputNode,
+  MultiDocumentNode,
   NoteCanvasNode,
+  OffPageConnectorNode,
+  PredefinedProcessNode,
+  PreparationNode,
   ProcessNode,
+  RecordCanvasNode,
+  StoredDataNode,
   TerminatorNode,
   TextCanvasNode,
   TodoCanvasNode,
   type FlowCanvasNode,
 } from './nodes/canvas-nodes'
-import { ChartEditorDialog } from './chart-editor-dialog'
+import { ChartEditorPanel } from './chart-editor-panel'
 import { CanvasFooter } from './canvas-footer'
+import {
+  CANVAS_SHAPE_DEFINITIONS,
+  CanvasToolsSidebar,
+  type InsertableCanvasNodeType,
+} from './canvas-tools-sidebar'
 import { canvasDocumentToMermaid, mermaidToCanvasDocument } from '@/lib/canvas/mermaid'
 import { parseCanvasProjectFile, serializeCanvasProject } from '@/lib/canvas/file-format'
 import { cn } from '@/lib/utils'
@@ -153,8 +168,12 @@ import {
   resolveCanvasChartAppearance,
 } from '@/lib/canvas/chart-appearance'
 import { serializeCanvasChartData } from '@/lib/canvas/chart-data'
+import { getCanvasNodeDefaultSize } from '@/lib/canvas/shapes'
+import { CANVAS_MARK_DRAG_TYPE } from '@/lib/canvas/drag-data'
+import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
 
 const elk = new ELK()
+const CUSTOM_COMPONENTS_KEY = 'canvas-custom-components'
 const DRAWING_CURSORS = {
   pen: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 20l3.5-1 11-11-2.5-2.5-11 11L4 20z' fill='%23fff' stroke='%2318181b' stroke-width='1.5'/><path d='M14.8 6.7l2.5 2.5' stroke='%2318181b' stroke-width='1.5'/></svg>") 4 20, crosshair`,
   highlighter: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M4 19l4 1L20 8l-4-4L4 16z' fill='%23facc15' stroke='%2318181b' stroke-width='1.5'/><path d='M4 19h7' stroke='%2318181b' stroke-width='2'/></svg>") 4 19, crosshair`,
@@ -165,8 +184,22 @@ const nodeTypes: NodeTypes = {
   process: ProcessNode,
   decision: DecisionNode,
   terminator: TerminatorNode,
+  'input-output': InputOutputNode,
+  document: DocumentNode,
+  'multi-document': MultiDocumentNode,
+  database: DatabaseNode,
+  'predefined-process': PredefinedProcessNode,
+  'manual-input': ManualInputNode,
+  preparation: PreparationNode,
+  delay: DelayNode,
+  display: DisplayNode,
+  connector: ConnectorNode,
+  'off-page-connector': OffPageConnectorNode,
+  'internal-storage': InternalStorageNode,
+  'stored-data': StoredDataNode,
   text: TextCanvasNode,
   note: NoteCanvasNode,
+  record: RecordCanvasNode,
   image: ImageCanvasNode,
   link: LinkCanvasNode,
   todo: TodoCanvasNode,
@@ -182,25 +215,6 @@ interface CanvasEditorProps {
 interface CanvasSnapshot {
   nodes: FlowCanvasNode[]
   edges: Edge[]
-}
-
-function CanvasToolbarTooltip({
-  label,
-  disabled = false,
-  children,
-}: {
-  label: string
-  disabled?: boolean
-  children: ReactElement
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        {disabled ? <span className="inline-flex">{children}</span> : children}
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
-    </Tooltip>
-  )
 }
 
 function isInteractiveCanvasTarget(target: EventTarget | null): boolean {
@@ -279,11 +293,14 @@ function havePersistentEdgesChanged(previous: Edge[], current: Edge[]) {
 
 function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const t = useTranslations('canvas')
+  const { resolvedTheme } = useTheme()
   const document = useCanvasStore(state => state.documents[canvasId])
   const updateDocument = useCanvasStore(state => state.updateDocument)
   const updateHistory = useCanvasStore(state => state.updateHistory)
   const openProject = useCanvasStore(state => state.openProject)
   const projects = useCanvasStore(state => state.projects)
+  const activeCanvasId = useCanvasStore(state => state.activeCanvasId)
+  const setCanvasSelectionContext = useCanvasStore(state => state.setSelectionContext)
   const initialHistory = projects.find(project => project.id === canvasId)?.history
   const fileTree = useArticleStore(state => state.fileTree)
   const loadFileTree = useArticleStore(state => state.loadFileTree)
@@ -299,7 +316,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const setCanvasSnapToGrid = useSettingStore(state => state.setCanvasSnapToGrid)
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<FlowCanvasNode>(
     ((document?.nodes || []) as FlowCanvasNode[]).map(node => (
-      node.draggable === false ? { ...node, draggable: true } : node
+      node.draggable === false && !node.data.locked ? { ...node, draggable: true } : node
     ))
   )
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(document?.edges || [])
@@ -317,7 +334,9 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const [canUndo, setCanUndo] = useState(Boolean(initialHistory?.undo.length))
   const [canRedo, setCanRedo] = useState(Boolean(initialHistory?.redo.length))
   const [hasClipboard, setHasClipboard] = useState(false)
+  const [hasStyleClipboard, setHasStyleClipboard] = useState(false)
   const [chartEditorOpen, setChartEditorOpen] = useState(false)
+  const [toolPanelOpen, setToolPanelOpen] = useState(false)
   const [editingChartNodeId, setEditingChartNodeId] = useState<string | null>(null)
   const [agentPreviewOperations, setAgentPreviewOperations] = useState<unknown[] | null>(null)
   const [isExporting, setIsExporting] = useState(false)
@@ -326,12 +345,22 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const [edgeLabelDraft, setEdgeLabelDraft] = useState('')
   const [importContentOpen, setImportContentOpen] = useState(false)
   const [importContentDraft, setImportContentDraft] = useState('')
+  const [customComponents, setCustomComponents] = useState<CanvasCustomComponent[]>([])
+  const [customComponentDialogOpen, setCustomComponentDialogOpen] = useState(false)
+  const [customComponentName, setCustomComponentName] = useState('')
+  const [preferredNodeType, setPreferredNodeType] = useState<InsertableCanvasNodeType>('process')
+  const [pendingConnection, setPendingConnection] = useState<{
+    sourceId: string
+    clientX: number
+    clientY: number
+  } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const historyRef = useRef<CanvasSnapshot[]>((initialHistory?.undo || []).map(restoreHistorySnapshot))
   const redoRef = useRef<CanvasSnapshot[]>((initialHistory?.redo || []).map(restoreHistorySnapshot))
   const drawingFlowPointsRef = useRef<CanvasPoint[]>([])
   const erasingIdsRef = useRef(new Set<string>())
   const clipboardRef = useRef<CanvasSnapshot | null>(null)
+  const styleClipboardRef = useRef<Partial<CanvasNode['data']> | null>(null)
   const pasteOffsetRef = useRef(0)
   const resizingRef = useRef(false)
   const freehandWidthHistoryRef = useRef(false)
@@ -347,6 +376,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const chartGenerationRef = useRef(new Map<string, AbortController>())
   const lastStoreDocumentRef = useRef(document)
   const appliedDefaultZoomRef = useRef('')
+  const suppressViewportPersistRef = useRef(true)
   const { screenToFlowPosition, getViewport, getNodesBounds, fitView, setViewport } = useReactFlow()
   const viewport = useViewport()
   const activeBrushColor = tool === 'highlighter' ? highlighterColor : penColor
@@ -358,6 +388,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const selectedNodeCount = nodes.filter(node => node.selected).length
   const selectedEdgeCount = edges.filter(edge => edge.selected).length
   const selectedCount = selectedNodeCount + selectedEdgeCount
+  const selectedNodesAreLocked = selectedNodeCount > 0
+    && nodes.filter(node => node.selected).every(node => node.data.locked)
   const selectedFreehandNodes = nodes.filter(node => node.selected && node.type === 'freehand')
   const selectedFreehandIds = selectedFreehandNodes.map(node => node.id).join(':')
   const selectedOnlyFreehand = selectedNodeCount > 0 && selectedFreehandNodes.length === selectedNodeCount
@@ -384,6 +416,48 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const availableNotes = useMemo(() => flattenFileTree(fileTree).filter(entry => (
     entry.isFile && /\.(md|markdown|txt)$/i.test(entry.name)
   )), [fileTree])
+
+  useEffect(() => {
+    if (activeCanvasId !== canvasId) return
+    const selectedNodes = nodes.filter(node => node.selected)
+    const selectedEdges = edges.filter(edge => edge.selected)
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) {
+      setCanvasSelectionContext(null)
+      return
+    }
+    setCanvasSelectionContext({
+      canvasId,
+      canvasTitle: projects.find(project => project.id === canvasId)?.title || t('untitled'),
+      nodes: selectedNodes.map(node => ({
+        id: node.id,
+        type: node.type as CanvasNode['type'],
+        label: String(node.data.label || node.type || t('untitled')),
+      })),
+      edges: selectedEdges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: typeof edge.label === 'string' ? edge.label : undefined,
+      })),
+    })
+  }, [activeCanvasId, canvasId, edges, nodes, projects, setCanvasSelectionContext, t])
+
+  useEffect(() => () => {
+    const selectionContext = useCanvasStore.getState().selectionContext
+    if (selectionContext?.canvasId === canvasId) {
+      useCanvasStore.getState().setSelectionContext(null)
+    }
+  }, [canvasId])
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CUSTOM_COMPONENTS_KEY) || '[]')
+      setCustomComponents(Array.isArray(saved) ? saved : [])
+    } catch {
+      setCustomComponents([])
+    }
+  }, [])
+
   const editingChartRequest = useMemo(() => {
     if (!editingChartNodeId) return null
     const data = nodes.find(node => node.id === editingChartNodeId)?.data
@@ -398,18 +472,25 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     }
     return data?.chartRequest || null
   }, [editingChartNodeId, nodes])
-  const restoreCanvasNodes = useCallback((nextNodes: FlowCanvasNode[]) => nextNodes.map(node => (
-    node.data.chartStatus === 'loading' && !chartGenerationRef.current.has(node.id)
+  const restoreCanvasNodes = useCallback((nextNodes: FlowCanvasNode[]) => nextNodes.map(node => {
+    const defaultSize = getCanvasNodeDefaultSize(node.type)
+    const restoredNode = {
+      ...node,
+      width: node.width || defaultSize.width,
+      height: node.height || defaultSize.height,
+      draggable: node.data.locked ? false : node.draggable,
+    }
+    return node.data.chartStatus === 'loading' && !chartGenerationRef.current.has(node.id)
       ? {
-          ...node,
+          ...restoredNode,
           data: {
             ...node.data,
             chartStatus: 'error' as const,
             chartError: 'CHART_GENERATION_INTERRUPTED',
           },
         }
-      : node
-  )), [])
+      : restoredNode
+  }), [])
   const previewSnapshot = useMemo(() => {
     if (!document || !agentPreviewOperations) return null
     const currentDocument: CanvasDocument = {
@@ -434,12 +515,13 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         JSON.stringify(current.position) !== JSON.stringify(node.position)
         || JSON.stringify(current.data) !== JSON.stringify(node.data)
       )
+      const defaultSize = getCanvasNodeDefaultSize(node.type)
       return {
         ...currentFlowNode,
         ...node,
         ...(!currentFlowNode ? {
-          width: node.width || (node.type === 'chart' ? 520 : node.type === 'decision' ? 144 : node.type === 'text' ? 120 : 180),
-          height: node.height || (node.type === 'chart' ? 340 : node.type === 'decision' ? 144 : node.type === 'text' ? 40 : 56),
+          width: node.width || defaultSize.width,
+          height: node.height || defaultSize.height,
         } : {}),
         data: {
           ...node.data,
@@ -489,10 +571,15 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     const preferenceKey = `${canvasId}:${canvasDefaultZoom}`
     if (appliedDefaultZoomRef.current === preferenceKey) return
     appliedDefaultZoomRef.current = preferenceKey
+    suppressViewportPersistRef.current = true
     void setViewport(
       { ...getViewport(), zoom: canvasDefaultZoom },
       { duration: 120 },
-    )
+    ).finally(() => {
+      requestAnimationFrame(() => {
+        suppressViewportPersistRef.current = false
+      })
+    })
   }, [canvasDefaultZoom, canvasId, document, getViewport, setViewport])
 
   useEffect(() => {
@@ -521,19 +608,24 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       node.draggable === false ? { ...node, draggable: true } : node
     ))
     const nextEdges = document.edges as Edge[]
-    persistedNodesRef.current = nextNodes
+    const restoredNodes = restoreCanvasNodes(nextNodes)
+    persistedNodesRef.current = restoredNodes
     persistedEdgesRef.current = nextEdges
     const savedHistory = useCanvasStore.getState().projects.find(project => project.id === canvasId)?.history
     historyRef.current = (savedHistory?.undo || []).map(restoreHistorySnapshot)
     redoRef.current = (savedHistory?.redo || []).map(restoreHistorySnapshot)
     setCanUndo(historyRef.current.length > 0)
     setCanRedo(redoRef.current.length > 0)
-    setNodes(restoreCanvasNodes(nextNodes))
+    setNodes(restoredNodes)
     setEdges(nextEdges)
   }, [document, restoreCanvasNodes, setEdges, setNodes])
 
   useEffect(() => {
-    setNodes(current => restoreCanvasNodes(current))
+    setNodes(current => {
+      const restoredNodes = restoreCanvasNodes(current)
+      persistedNodesRef.current = restoredNodes
+      return restoredNodes
+    })
   }, [canvasId, restoreCanvasNodes, setNodes])
 
   useEffect(() => {
@@ -760,7 +852,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   }, [getSelectedSnapshot, insertSnapshot])
 
   const deleteSelection = useCallback(() => {
-    const selectedNodeIds = new Set(nodes.filter(node => node.selected).map(node => node.id))
+    const selectedNodeIds = new Set(nodes.filter(node => node.selected && !node.data.locked).map(node => node.id))
     const selectedEdgeIds = new Set(edges.filter(edge => edge.selected).map(edge => edge.id))
     if (selectedNodeIds.size === 0 && selectedEdgeIds.size === 0) return
     pushHistory()
@@ -854,28 +946,134 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     if (canvasInsertBehavior === 'select') setTool('select')
   }, [canvasInsertBehavior])
 
-  const addNode = useCallback((nodeType: 'process' | 'decision' | 'terminator' | 'text') => {
+  const getNodeLabel = useCallback((nodeType: InsertableCanvasNodeType) => {
+    const definition = CANVAS_SHAPE_DEFINITIONS.find(item => item.type === nodeType)
+    return definition ? t(`nodes.${definition.labelKey}`) : t('nodes.process')
+  }, [t])
+
+  const insertNodeAtScreenPosition = useCallback((
+    nodeType: InsertableCanvasNodeType,
+    clientX: number,
+    clientY: number,
+    options: { select?: boolean; sourceId?: string } = {}
+  ) => {
     pushHistory()
-    const position = screenToFlowPosition({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    })
-    setNodes(current => [...current, {
-      id: crypto.randomUUID(),
+    const position = screenToFlowPosition({ x: clientX, y: clientY })
+    const size = getCanvasNodeDefaultSize(nodeType)
+    const id = crypto.randomUUID()
+    setNodes(current => [...current.map(node => options.select ? { ...node, selected: false } : node), {
+      id,
       type: nodeType,
       position,
-      data: {
-        label: nodeType === 'decision'
-          ? t('nodes.decision')
-          : nodeType === 'terminator'
-            ? t('nodes.terminator')
-            : nodeType === 'text'
-              ? t('nodes.text')
-              : t('nodes.process'),
-      },
+      ...size,
+      selected: options.select,
+      data: { label: getNodeLabel(nodeType) },
     }])
+    if (options.sourceId) {
+      setEdges(current => addEdge({
+        id: crypto.randomUUID(),
+        source: options.sourceId!,
+        target: id,
+        type: 'smoothstep',
+      }, current))
+    }
     completeNodeInsertion()
-  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setNodes, t])
+  }, [completeNodeInsertion, getNodeLabel, pushHistory, screenToFlowPosition, setEdges, setNodes])
+
+  const addNode = useCallback((nodeType: InsertableCanvasNodeType) => {
+    const bounds = containerRef.current?.getBoundingClientRect()
+    insertNodeAtScreenPosition(
+      nodeType,
+      bounds ? bounds.left + bounds.width / 2 : window.innerWidth / 2,
+      bounds ? bounds.top + bounds.height / 2 : window.innerHeight / 2
+    )
+  }, [insertNodeAtScreenPosition])
+
+  const insertCustomComponentAtScreenPosition = useCallback((
+    component: CanvasCustomComponent,
+    clientX: number,
+    clientY: number
+  ) => {
+    if (component.nodes.length === 0) return
+    pushHistory()
+    const origin = screenToFlowPosition({ x: clientX, y: clientY })
+    const minX = Math.min(...component.nodes.map(node => node.position.x))
+    const minY = Math.min(...component.nodes.map(node => node.position.y))
+    const idMap = new Map(component.nodes.map(node => [node.id, crypto.randomUUID()]))
+    const nextNodes = component.nodes.map(node => ({
+      ...structuredClone(node),
+      id: idMap.get(node.id) || crypto.randomUUID(),
+      position: {
+        x: origin.x + node.position.x - minX,
+        y: origin.y + node.position.y - minY,
+      },
+      selected: true,
+      draggable: node.data.locked ? false : undefined,
+    })) as FlowCanvasNode[]
+    const nextEdges = component.edges.map(edge => ({
+      ...structuredClone(edge),
+      id: crypto.randomUUID(),
+      source: idMap.get(edge.source) || edge.source,
+      target: idMap.get(edge.target) || edge.target,
+      selected: true,
+    })) as Edge[]
+    setNodes(current => [...current.map(node => ({ ...node, selected: false })), ...nextNodes])
+    setEdges(current => [...current.map(edge => ({ ...edge, selected: false })), ...nextEdges])
+    completeNodeInsertion()
+  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setEdges, setNodes])
+
+  const insertCustomComponent = useCallback((component: CanvasCustomComponent) => {
+    const bounds = containerRef.current?.getBoundingClientRect()
+    insertCustomComponentAtScreenPosition(
+      component,
+      bounds ? bounds.left + bounds.width / 2 : window.innerWidth / 2,
+      bounds ? bounds.top + bounds.height / 2 : window.innerHeight / 2
+    )
+  }, [insertCustomComponentAtScreenPosition])
+
+  const insertMarkAtScreenPosition = useCallback((mark: Mark, clientX: number, clientY: number) => {
+    const content = (mark.content || '').trim()
+    const description = (mark.desc || '').trim()
+    const itemContent = getMarkListItemContent(mark)
+    const label = (itemContent.title || description || content || t('nodes.record')).slice(0, 120)
+    const recordDescription = mark.type === 'todo'
+      ? itemContent.todo?.description || ''
+      : mark.type === 'link'
+        ? ''
+        : mark.type === 'image' || mark.type === 'scan'
+          ? itemContent.preview || description
+          : content || itemContent.preview || description
+    const size = mark.type === 'image' || mark.type === 'scan'
+      ? { width: 300, height: 220 }
+      : mark.type === 'text'
+        ? { width: 300, height: 150 }
+        : mark.type === 'recording'
+          ? { width: 300, height: 140 }
+          : { width: 280, height: 112 }
+    const position = screenToFlowPosition({ x: clientX, y: clientY })
+
+    pushHistory()
+    setNodes(current => [
+      ...current.map(node => ({ ...node, selected: false })),
+      {
+        id: crypto.randomUUID(),
+        type: 'record',
+        position,
+        ...size,
+        selected: true,
+        data: {
+          label,
+          description: recordDescription,
+          recordId: mark.id,
+          recordType: mark.type,
+          url: mark.url,
+          checked: itemContent.todo?.completed,
+        },
+      },
+    ])
+    setEdges(current => current.map(edge => ({ ...edge, selected: false })))
+    completeNodeInsertion()
+  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setEdges, setNodes, t])
 
   const addImageNode = useCallback(async () => {
     const sourcePath = await open({
@@ -1202,6 +1400,75 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     updateSelectedNodeStyle({ color })
   }, [updateSelectedNodeStyle])
 
+  const copySelectedNodeStyle = useCallback(() => {
+    const selected = nodes.find(node => node.selected && node.type !== 'freehand')
+    if (!selected) return
+    const { color, borderStyle, borderWidth, fillColor, fillStyle } = selected.data
+    styleClipboardRef.current = { color, borderStyle, borderWidth, fillColor, fillStyle }
+    setHasStyleClipboard(true)
+    toast.success(t('selection.styleCopied'))
+  }, [nodes, t])
+
+  const pasteSelectedNodeStyle = useCallback(() => {
+    if (!styleClipboardRef.current || selectedNodeCount === 0) return
+    updateSelectedNodeStyle(styleClipboardRef.current)
+    toast.success(t('selection.stylePasted'))
+  }, [selectedNodeCount, t, updateSelectedNodeStyle])
+
+  const toggleSelectedNodeLock = useCallback(() => {
+    if (selectedNodeCount === 0) return
+    pushHistory()
+    const shouldLock = nodes.some(node => node.selected && !node.data.locked)
+    setNodes(current => current.map(node => node.selected
+      ? {
+          ...node,
+          draggable: shouldLock ? false : undefined,
+          data: { ...node.data, locked: shouldLock },
+        }
+      : node))
+  }, [nodes, pushHistory, selectedNodeCount, setNodes])
+
+  const openSaveCustomComponent = useCallback(() => {
+    if (selectedNodeCount === 0) return
+    setCustomComponentName(t('toolbox.customComponentDefaultName'))
+    setCustomComponentDialogOpen(true)
+  }, [selectedNodeCount, t])
+
+  const saveCustomComponent = useCallback(() => {
+    const selectedNodes = nodes.filter(node => node.selected)
+    if (selectedNodes.length === 0) return
+    const selectedIds = new Set(selectedNodes.map(node => node.id))
+    const component: CanvasCustomComponent = {
+      id: crypto.randomUUID(),
+      name: customComponentName.trim() || t('toolbox.customComponentDefaultName'),
+      nodes: serializeNodes(selectedNodes).map(node => ({
+        ...node,
+        selected: false,
+      })),
+      edges: edges
+        .filter(edge => selectedIds.has(edge.source) && selectedIds.has(edge.target))
+        .map(edge => ({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          label: typeof edge.label === 'string' ? edge.label : undefined,
+          type: edge.type,
+        })),
+      createdAt: Date.now(),
+    }
+    const next = [component, ...customComponents]
+    setCustomComponents(next)
+    localStorage.setItem(CUSTOM_COMPONENTS_KEY, JSON.stringify(next))
+    setCustomComponentDialogOpen(false)
+    toast.success(t('toolbox.customComponentSaved'))
+  }, [customComponentName, customComponents, edges, nodes, t])
+
+  const deleteCustomComponent = useCallback((id: string) => {
+    const next = customComponents.filter(component => component.id !== id)
+    setCustomComponents(next)
+    localStorage.setItem(CUSTOM_COMPONENTS_KEY, JSON.stringify(next))
+  }, [customComponents])
+
   const updateSelectedChartAppearance = useCallback((appearance: Partial<CanvasChartAppearance>) => {
     if (!selectedChartNode) return
     pushHistory()
@@ -1471,42 +1738,49 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     return () => emitter.off('canvas-auto-layout', autoLayout)
   }, [canvasId, layoutNodes])
 
+  const renderCanvasImage = useCallback(async (
+    format: 'png' | 'svg',
+    pixelRatio: number
+  ) => {
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    const viewport = containerRef.current?.querySelector<HTMLElement>('.react-flow__viewport')
+    if (!viewport) throw new Error('Canvas viewport is unavailable')
+    const bounds = getNodesBounds(nodes)
+    const maxCssDimension = Math.floor(8192 / Math.max(1, pixelRatio))
+    const imageWidth = Math.min(maxCssDimension, Math.max(1200, Math.ceil(bounds.width + 240)))
+    const imageHeight = Math.min(maxCssDimension, Math.max(800, Math.ceil(bounds.height + 240)))
+    const exportViewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.1, 2, 0.12)
+    const backgroundColor = globalThis.document.documentElement.classList.contains('dark') ? '#09090b' : '#ffffff'
+    const exportOptions = {
+      cacheBust: true,
+      width: imageWidth,
+      height: imageHeight,
+      backgroundColor,
+      filter: (node: HTMLElement) => {
+        if (!(node instanceof HTMLElement)) return true
+        return !node.classList.contains('react-flow__handle')
+          && !node.classList.contains('react-flow__resize-control')
+      },
+      style: {
+        width: `${imageWidth}px`,
+        height: `${imageHeight}px`,
+        transform: `translate(${exportViewport.x}px, ${exportViewport.y}px) scale(${exportViewport.zoom})`,
+      },
+    }
+    const dataUrl = format === 'svg'
+      ? await toSvg(viewport, exportOptions)
+      : await toPng(viewport, { ...exportOptions, pixelRatio })
+    const response = await fetch(dataUrl)
+    return new Uint8Array(await response.arrayBuffer())
+  }, [getNodesBounds, nodes])
+
   const exportCanvas = useCallback(async (
     format: 'png' | 'svg',
     pixelRatio: number
   ) => {
     setIsExporting(true)
     try {
-      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-      const viewport = containerRef.current?.querySelector<HTMLElement>('.react-flow__viewport')
-      if (!viewport) return
-      const bounds = getNodesBounds(nodes)
-      const maxCssDimension = Math.floor(8192 / Math.max(1, pixelRatio))
-      const imageWidth = Math.min(maxCssDimension, Math.max(1200, Math.ceil(bounds.width + 240)))
-      const imageHeight = Math.min(maxCssDimension, Math.max(800, Math.ceil(bounds.height + 240)))
-      const exportViewport = getViewportForBounds(bounds, imageWidth, imageHeight, 0.1, 2, 0.12)
-      const backgroundColor = globalThis.document.documentElement.classList.contains('dark') ? '#09090b' : '#ffffff'
-      const exportOptions = {
-        cacheBust: true,
-        width: imageWidth,
-        height: imageHeight,
-        backgroundColor,
-        filter: (node: HTMLElement) => {
-          if (!(node instanceof HTMLElement)) return true
-          return !node.classList.contains('react-flow__handle')
-            && !node.classList.contains('react-flow__resize-control')
-        },
-        style: {
-          width: `${imageWidth}px`,
-          height: `${imageHeight}px`,
-          transform: `translate(${exportViewport.x}px, ${exportViewport.y}px) scale(${exportViewport.zoom})`,
-        },
-      }
-      const dataUrl = format === 'svg'
-        ? await toSvg(viewport, exportOptions)
-        : await toPng(viewport, { ...exportOptions, pixelRatio })
-      const response = await fetch(dataUrl)
-      const bytes = new Uint8Array(await response.arrayBuffer())
+      const bytes = await renderCanvasImage(format, pixelRatio)
       const projectTitle = projects.find(project => project.id === canvasId)?.title || t('untitled')
       const safeTitle = projectTitle.replace(/[\\/:*?"<>|]/g, '-').trim() || 'NoteGen-Canvas'
       const extension = format
@@ -1524,7 +1798,42 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     } finally {
       setIsExporting(false)
     }
-  }, [canvasId, getNodesBounds, nodes, projects, t])
+  }, [canvasId, projects, renderCanvasImage, t])
+
+  const exportCanvasAsRecord = useCallback(async () => {
+    setIsExporting(true)
+    try {
+      const bytes = await renderCanvasImage('png', 2)
+      const fileName = `canvas-${crypto.randomUUID()}.png`
+      if (!await exists('image', { baseDir: BaseDirectory.AppData })) {
+        await mkdir('image', { baseDir: BaseDirectory.AppData, recursive: true })
+      }
+      await writeFile(`image/${fileName}`, bytes, { baseDir: BaseDirectory.AppData })
+      const projectTitle = projects.find(project => project.id === canvasId)?.title || t('untitled')
+      const tagId = await getDefaultRecordSaveTagId()
+      await insertMark({
+        tagId,
+        type: 'image',
+        url: fileName,
+        content: '',
+        desc: projectTitle,
+      })
+      await Promise.all([
+        useMarkStore.getState().fetchMarks(),
+        useMarkStore.getState().fetchAllMarks(),
+      ])
+      const sidebar = useSidebarStore.getState()
+      if (!sidebar.leftSidebarVisible) {
+        await sidebar.toggleLeftSidebar()
+      }
+      await sidebar.setLeftSidebarTab('notes')
+    } catch (error) {
+      console.error('Failed to export canvas as an illustration record:', error)
+      toast.error(t('footer.exportMenu.recordError'))
+    } finally {
+      setIsExporting(false)
+    }
+  }, [canvasId, projects, renderCanvasImage, t])
 
   const getCurrentDocument = useCallback((): CanvasDocument => ({
     ...document,
@@ -1684,7 +1993,13 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   }, [activeBrushColor, activeBrushStyle, pushHistory, setNodes, tool])
 
   const persistViewport = useCallback((viewport: CanvasDocument['viewport']) => {
-    if (!document) return
+    if (!document || suppressViewportPersistRef.current) return
+    const currentViewport = pendingDocumentRef.current?.viewport || document.viewport
+    if (
+      currentViewport.x === viewport.x
+      && currentViewport.y === viewport.y
+      && currentViewport.zoom === viewport.zoom
+    ) return
     if (pendingDocumentTimerRef.current) clearTimeout(pendingDocumentTimerRef.current)
     pendingDocumentTimerRef.current = null
     const nextDocument: CanvasDocument = {
@@ -1703,14 +2018,6 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     lastStoreDocumentRef.current = nextDocument
     updateDocument(canvasId, nextDocument)
   }, [canvasId, document, edges, nodes, updateDocument])
-
-  const tools = useMemo(() => [
-    { value: 'select', label: t('tools.select'), icon: MousePointer2 },
-    { value: 'hand', label: t('tools.hand'), icon: Hand },
-    { value: 'pen', label: t('tools.pen'), icon: Pencil },
-    { value: 'highlighter', label: t('tools.highlighter'), icon: Highlighter },
-    { value: 'eraser', label: t('tools.eraser'), icon: Eraser },
-  ] as const, [t])
 
   if (!document) {
     return <div className="flex size-full items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
@@ -1731,35 +2038,64 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
             <div className="size-full">
               <ReactFlow
         className={cn(
+          'notegen-canvas',
           tool === 'select' && '[&_.react-flow__pane]:!cursor-default',
           tool === 'hand' && '[&_.react-flow__node]:!cursor-grab [&_.react-flow__node:active]:!cursor-grabbing [&_.react-flow__pane]:!cursor-grab [&_.react-flow__pane.dragging]:!cursor-grabbing'
         )}
+        connectionRadius={28}
         nodes={displayNodes}
         edges={displayEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChangeTracked}
         onConnect={onConnect}
+        onDragOver={(event) => {
+          if (
+            event.dataTransfer.types.includes('application/x-notegen-canvas-node')
+            || event.dataTransfer.types.includes('application/x-notegen-canvas-component')
+            || event.dataTransfer.types.includes(CANVAS_MARK_DRAG_TYPE)
+          ) {
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+          }
+        }}
+        onDrop={(event) => {
+          const markData = event.dataTransfer.getData(CANVAS_MARK_DRAG_TYPE)
+          if (markData) {
+            event.preventDefault()
+            try {
+              const mark = JSON.parse(markData) as Mark
+              if (typeof mark.id === 'number' && typeof mark.type === 'string') {
+                insertMarkAtScreenPosition(mark, event.clientX, event.clientY)
+              }
+            } catch (error) {
+              console.error('Failed to parse dropped record:', error)
+            }
+            return
+          }
+          const nodeType = event.dataTransfer.getData('application/x-notegen-canvas-node')
+          if (CANVAS_SHAPE_DEFINITIONS.some(item => item.type === nodeType)) {
+            event.preventDefault()
+            insertNodeAtScreenPosition(nodeType as InsertableCanvasNodeType, event.clientX, event.clientY, { select: true })
+            return
+          }
+          const componentId = event.dataTransfer.getData('application/x-notegen-canvas-component')
+          const component = customComponents.find(item => item.id === componentId)
+          if (component) {
+            event.preventDefault()
+            insertCustomComponentAtScreenPosition(component, event.clientX, event.clientY)
+          }
+        }}
         onConnectEnd={(event, connectionState) => {
           if (connectionState.isValid || !connectionState.fromNode) return
           const clientX = 'clientX' in event ? event.clientX : event.changedTouches[0]?.clientX
           const clientY = 'clientY' in event ? event.clientY : event.changedTouches[0]?.clientY
           if (clientX === undefined || clientY === undefined) return
-          const id = crypto.randomUUID()
-          pushHistory()
-          setNodes(current => [...current, {
-            id,
-            type: 'process',
-            position: screenToFlowPosition({ x: clientX, y: clientY }),
-            data: { label: t('nodes.process') },
-          }])
-          setEdges(current => addEdge({
-            id: crypto.randomUUID(),
-            source: connectionState.fromNode.id,
-            target: id,
-            type: 'smoothstep',
-          }, current))
-          completeNodeInsertion()
+          setPendingConnection({
+            sourceId: connectionState.fromNode.id,
+            clientX,
+            clientY,
+          })
         }}
         onNodeContextMenu={(_event, targetNode) => {
           if (!targetNode.selected) {
@@ -1806,7 +2142,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         onNodeDragStop={() => { groupDragRef.current = null }}
         deleteKeyCode={null}
         nodesDraggable={!previewSnapshot && tool === 'select'}
-        nodesConnectable={!previewSnapshot && (tool === 'select' || tool === 'connector')}
+        nodesConnectable={!previewSnapshot && tool === 'select'}
         elementsSelectable={!previewSnapshot && tool === 'select'}
         panOnDrag={tool === 'hand'}
         selectionOnDrag={tool === 'select'}
@@ -1817,7 +2153,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         zoomOnScroll={canvasWheelBehavior === 'zoom'}
         panOnScroll={canvasWheelBehavior === 'pan'}
         onlyRenderVisibleElements={!isExporting && nodes.length >= 150}
-        colorMode="system"
+        colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         >
           {canvasGridVisible && (
             <Background
@@ -1884,116 +2220,441 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           </Badge>
         )}
 
-        <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg border bg-background p-1 shadow-sm">
-          <div role="toolbar" aria-label={t('tools.label')} className="flex items-center gap-0.5">
-            {tools.map(item => (
-              <Tooltip key={item.value}>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={item.label}
-                    aria-pressed={tool === item.value}
-                    className={cn(
-                      tool === item.value
-                      && '!bg-primary !text-primary-foreground shadow-sm hover:!bg-primary/90 hover:!text-primary-foreground'
-                    )}
-                    onClick={() => setTool(item.value)}
-                  >
-                    <item.icon />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">{item.label}</TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
+        <CanvasToolsSidebar
+          tool={tool}
+          customComponents={customComponents}
+          chartOpen={chartEditorOpen}
+          onToolChange={setTool}
+          onAddNode={addNode}
+          onAddImage={() => void addImageNode()}
+          onOpenChart={openChartCreator}
+          onCloseChart={() => setChartEditorOpen(false)}
+          onPanelOpenChange={setToolPanelOpen}
+          onInsertCustomComponent={insertCustomComponent}
+          onDeleteCustomComponent={deleteCustomComponent}
+          onShapePreferenceChange={setPreferredNodeType}
+        />
 
-          <CanvasToolbarTooltip label={t('nodes.process')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.process')} onClick={() => addNode('process')}>
-              <RectangleHorizontal />
-            </Button>
-          </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.decision')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.decision')} onClick={() => addNode('decision')}>
-              <Route />
-            </Button>
-          </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.terminator')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.terminator')} onClick={() => addNode('terminator')}>
-              <SquareRoundCorner />
-            </Button>
-          </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.text')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.text')} onClick={() => addNode('text')}>
-              <Type />
-            </Button>
-          </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.image')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.image')} onClick={() => void addImageNode()}>
-              <ImagePlus />
-            </Button>
-          </CanvasToolbarTooltip>
-          <CanvasToolbarTooltip label={t('nodes.chart')}>
-            <Button variant="ghost" size="icon-sm" aria-label={t('nodes.chart')} onClick={openChartCreator}>
-              <ChartNoAxesCombined />
-            </Button>
-          </CanvasToolbarTooltip>
-          <Popover>
-            <CanvasToolbarTooltip label={t('arrange.title')} disabled={selectedNodeCount < 2}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon-sm" aria-label={t('arrange.title')} disabled={selectedNodeCount < 2}>
-                  <FolderKanban />
-                </Button>
-              </PopoverTrigger>
-            </CanvasToolbarTooltip>
-            <PopoverContent align="center" className="w-56">
+        <ChartEditorPanel
+          open={chartEditorOpen}
+          initialRequest={editingChartRequest}
+          availableNotes={availableNotes}
+          onOpenChange={setChartEditorOpen}
+          onSubmit={saveChartNode}
+        />
+
+        {pendingConnection && (
+          <Popover open onOpenChange={open => !open && setPendingConnection(null)}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={t('toolbox.connectionShape')}
+                className="absolute size-1"
+                style={{
+                  left: pendingConnection.clientX - (containerRef.current?.getBoundingClientRect().left || 0),
+                  top: pendingConnection.clientY - (containerRef.current?.getBoundingClientRect().top || 0),
+                }}
+              />
+            </PopoverTrigger>
+            <PopoverContent align="start" side="bottom" className="w-72">
               <PopoverHeader>
-                <PopoverTitle>{t('arrange.title')}</PopoverTitle>
-                <PopoverDescription>{t('arrange.description')}</PopoverDescription>
+                <PopoverTitle>{t('toolbox.connectionShape')}</PopoverTitle>
+                <PopoverDescription>{t('toolbox.connectionShapeDescription')}</PopoverDescription>
               </PopoverHeader>
-              <div className="flex flex-col gap-1">
-                <Button variant="ghost" className="justify-start" onClick={() => alignSelection('horizontal')}><AlignCenterHorizontal data-icon="inline-start" />{t('arrange.alignHorizontal')}</Button>
-                <Button variant="ghost" className="justify-start" onClick={() => alignSelection('vertical')}><AlignCenterVertical data-icon="inline-start" />{t('arrange.alignVertical')}</Button>
-                <Button variant="ghost" className="justify-start" disabled={selectedNodeCount < 3} onClick={() => distributeSelection('horizontal')}><AlignHorizontalDistributeCenter data-icon="inline-start" />{t('arrange.distributeHorizontal')}</Button>
-                <Button variant="ghost" className="justify-start" disabled={selectedNodeCount < 3} onClick={() => distributeSelection('vertical')}><AlignVerticalDistributeCenter data-icon="inline-start" />{t('arrange.distributeVertical')}</Button>
-                <Button variant="ghost" className="justify-start" onClick={groupSelection}><FolderKanban data-icon="inline-start" />{t('arrange.group')}</Button>
-              </div>
+              <ScrollArea className="mt-2 h-64">
+                <div className="grid grid-cols-2 gap-2 pr-3">
+                  {[preferredNodeType, ...CANVAS_SHAPE_DEFINITIONS.map(item => item.type)]
+                    .filter((type, index, all) => all.indexOf(type) === index && type !== 'text')
+                    .map(type => {
+                      const definition = CANVAS_SHAPE_DEFINITIONS.find(item => item.type === type)
+                      if (!definition) return null
+                      const Icon = definition.icon
+                      return (
+                        <Button
+                          key={type}
+                          type="button"
+                          variant="outline"
+                          className="h-16 flex-col gap-1 font-normal"
+                          onClick={() => {
+                            insertNodeAtScreenPosition(type, pendingConnection.clientX, pendingConnection.clientY, {
+                              sourceId: pendingConnection.sourceId,
+                              select: true,
+                            })
+                            setPreferredNodeType(type)
+                            setPendingConnection(null)
+                          }}
+                        >
+                          <Icon data-icon="inline-start" />
+                          <span className="max-w-full truncate">{t(`nodes.${definition.labelKey}`)}</span>
+                        </Button>
+                      )
+                    })}
+                </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
-          {selectedEdgeCount > 0 && (
-            <Popover>
-              <CanvasToolbarTooltip label={t('edge.title')}>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label={t('edge.title')}><Route /></Button>
-                </PopoverTrigger>
-              </CanvasToolbarTooltip>
-              <PopoverContent align="center" className="w-52">
-                <PopoverHeader>
-                  <PopoverTitle>{t('edge.title')}</PopoverTitle>
-                  <PopoverDescription>{t('edge.description')}</PopoverDescription>
-                </PopoverHeader>
-                <div className="flex flex-col gap-1">
-                  <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('smoothstep')}>{t('edge.orthogonal')}</Button>
-                  <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('straight')}>{t('edge.straight')}</Button>
-                  <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('default')}>{t('edge.curve')}</Button>
-                  <Button variant="ghost" className="justify-start" onClick={editSelectedEdgeLabel}>{t('edge.editLabel')}</Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
+        )}
 
-        {(isDrawingTool || selectedOnlyFreehand) && (
-          <Card className="absolute bottom-3 left-3 z-10 w-64 gap-3 py-3 shadow-sm">
-            <CardHeader className="px-3">
-              <CardTitle className="text-sm">
-                {isDrawingTool
-                  ? t(brushPanelIsHighlighter ? 'brush.highlighterTitle' : 'brush.penTitle')
-                  : t('brush.strokeTitle')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 px-3">
+        {(selectedNodeCount > 0 || selectedEdgeCount > 0) && !toolPanelOpen && !chartEditorOpen && !isDrawingTool && (
+          <div className="absolute left-[4.25rem] top-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+            <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
+              <span className="text-sm font-medium">
+                {selectedNodeCount > 0 ? t('selection.tools') : t('edge.title')}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('toolbox.close')}
+                onClick={() => {
+                  setNodes(current => current.map(node => ({ ...node, selected: false })))
+                  setEdges(current => current.map(edge => ({ ...edge, selected: false })))
+                }}
+              >
+                <X data-icon="inline-start" />
+              </Button>
+            </div>
+            <Separator />
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="grid grid-cols-2 gap-1.5 p-2">
+            {selectedNodeCount > 0 && (
+              <>
+                <Button type="button" variant="ghost" className="justify-start" onClick={toggleSelectedNodeLock}>
+                  {selectedNodesAreLocked
+                    ? <Unlock data-icon="inline-start" />
+                    : <Lock data-icon="inline-start" />}
+                  {selectedNodesAreLocked ? t('selection.unlock') : t('selection.lock')}
+                </Button>
+                <Button type="button" variant="ghost" className="justify-start" onClick={openSaveCustomComponent}>
+                  <Blocks data-icon="inline-start" />
+                  {t('toolbox.saveCustomComponent')}
+                </Button>
+                <Button type="button" variant="ghost" className="justify-start" onClick={copySelectedNodeStyle}>
+                  <Paintbrush data-icon="inline-start" />
+                  {t('selection.copyStyle')}
+                </Button>
+                <Button type="button" variant="ghost" className="justify-start" disabled={!hasStyleClipboard} onClick={pasteSelectedNodeStyle}>
+                  <ClipboardPaste data-icon="inline-start" />
+                  {t('selection.pasteStyle')}
+                </Button>
+              </>
+            )}
+            {selectedNodeCount >= 2 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="col-span-2 justify-start">
+                    <FolderKanban data-icon="inline-start" />
+                    {t('arrange.title')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="right" className="w-56">
+                  <PopoverHeader>
+                    <PopoverTitle>{t('arrange.title')}</PopoverTitle>
+                    <PopoverDescription>{t('arrange.description')}</PopoverDescription>
+                  </PopoverHeader>
+                  <div className="flex flex-col gap-1">
+                    <Button variant="ghost" className="justify-start" onClick={() => alignSelection('horizontal')}><AlignCenterHorizontal data-icon="inline-start" />{t('arrange.alignHorizontal')}</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => alignSelection('vertical')}><AlignCenterVertical data-icon="inline-start" />{t('arrange.alignVertical')}</Button>
+                    <Button variant="ghost" className="justify-start" disabled={selectedNodeCount < 3} onClick={() => distributeSelection('horizontal')}><AlignHorizontalDistributeCenter data-icon="inline-start" />{t('arrange.distributeHorizontal')}</Button>
+                    <Button variant="ghost" className="justify-start" disabled={selectedNodeCount < 3} onClick={() => distributeSelection('vertical')}><AlignVerticalDistributeCenter data-icon="inline-start" />{t('arrange.distributeVertical')}</Button>
+                    <Button variant="ghost" className="justify-start" onClick={groupSelection}><FolderKanban data-icon="inline-start" />{t('arrange.group')}</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            {selectedEdgeCount > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="col-span-2 justify-start">
+                    <Route data-icon="inline-start" />
+                    {t('edge.title')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="right" className="w-52">
+                  <PopoverHeader>
+                    <PopoverTitle>{t('edge.title')}</PopoverTitle>
+                    <PopoverDescription>{t('edge.description')}</PopoverDescription>
+                  </PopoverHeader>
+                  <div className="flex flex-col gap-1">
+                    <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('smoothstep')}>{t('edge.orthogonal')}</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('straight')}>{t('edge.straight')}</Button>
+                    <Button variant="ghost" className="justify-start" onClick={() => updateSelectedEdges('default')}>{t('edge.curve')}</Button>
+                    <Button variant="ghost" className="justify-start" onClick={editSelectedEdgeLabel}>{t('edge.editLabel')}</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+              </div>
+              {selectedNodeCount > 0
+                && (selectedOnlyFreehand || Boolean(selectedChartNode) || selectedChartNodes.length === 0) && (
+                <>
+                  <Separator />
+                  <section className="flex flex-col gap-3 p-3">
+                    <h3 className="text-xs font-medium text-muted-foreground">
+                      {selectedOnlyFreehand
+                        ? t('brush.strokeTitle')
+                        : selectedChartNode
+                          ? t('chart.appearance.title')
+                          : t('selection.style')}
+                    </h3>
+
+                    {selectedOnlyFreehand && (
+                      <>
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-muted-foreground">{t('brush.color')}</span>
+                          <label
+                            className="relative size-8 cursor-pointer overflow-hidden rounded-full border shadow-sm"
+                            style={{ backgroundColor: brushPanelColor }}
+                          >
+                            <Input
+                              type="color"
+                              value={brushPanelColor}
+                              aria-label={t('brush.color')}
+                              onChange={event => updateSelectedFreehandColor(event.target.value)}
+                              className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex flex-col gap-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{t('brush.size')}</span>
+                            <span>{brushPanelWidth}px</span>
+                          </div>
+                          <Slider
+                            min={brushPanelIsHighlighter ? 8 : 1}
+                            max={brushPanelIsHighlighter ? 64 : 32}
+                            step={1}
+                            value={[brushPanelWidth]}
+                            onValueChange={value => {
+                              const size = value[0] ?? brushPanelWidth
+                              if (!freehandWidthHistoryRef.current) {
+                                pushHistory()
+                                freehandWidthHistoryRef.current = true
+                              }
+                              setSelectedStrokeWidth(size)
+                              updateSelectedFreehandWidth(size, false)
+                            }}
+                            onValueCommit={() => {
+                              freehandWidthHistoryRef.current = false
+                            }}
+                            aria-label={t('brush.size')}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {selectedChartNode && (
+                      <FieldGroup className="gap-3">
+                        <Field orientation="horizontal">
+                          <FieldLabel htmlFor="canvas-chart-variant">{t('chart.appearance.variant')}</FieldLabel>
+                          <Select
+                            value={selectedChartAppearance.variant}
+                            onValueChange={value => updateSelectedChartAppearance({
+                              variant: value as CanvasChartAppearance['variant'],
+                            })}
+                          >
+                            <SelectTrigger id="canvas-chart-variant" className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="card">{t('chart.appearance.variants.card')}</SelectItem>
+                                <SelectItem value="minimal">{t('chart.appearance.variants.minimal')}</SelectItem>
+                                <SelectItem value="transparent">{t('chart.appearance.variants.transparent')}</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field orientation="horizontal">
+                          <FieldLabel htmlFor="canvas-chart-palette">{t('chart.appearance.palette')}</FieldLabel>
+                          <Select
+                            value={selectedChartAppearance.palette}
+                            onValueChange={value => updateSelectedChartAppearance({
+                              palette: value as CanvasChartAppearance['palette'],
+                            })}
+                          >
+                            <SelectTrigger id="canvas-chart-palette" className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectGroup>
+                                <SelectItem value="system">{t('chart.appearance.palettes.system')}</SelectItem>
+                                <SelectItem value="cool">{t('chart.appearance.palettes.cool')}</SelectItem>
+                                <SelectItem value="warm">{t('chart.appearance.palettes.warm')}</SelectItem>
+                                <SelectItem value="monochrome">{t('chart.appearance.palettes.monochrome')}</SelectItem>
+                              </SelectGroup>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        {([
+                          ['showTitle', 'showTitle'],
+                          ['showLegend', 'showLegend'],
+                          ['showGrid', 'showGrid'],
+                          ['showXAxis', 'showXAxis'],
+                          ['showYAxis', 'showYAxis'],
+                        ] as const).map(([key, label]) => (
+                          <Field key={key} orientation="horizontal">
+                            <FieldLabel htmlFor={`canvas-chart-${key}`}>{t(`chart.appearance.${label}`)}</FieldLabel>
+                            <Switch
+                              id={`canvas-chart-${key}`}
+                              size="sm"
+                              checked={selectedChartAppearance[key]}
+                              onCheckedChange={checked => updateSelectedChartAppearance({ [key]: checked })}
+                            />
+                          </Field>
+                        ))}
+                      </FieldGroup>
+                    )}
+
+                    {!selectedOnlyFreehand && !selectedChartNode && selectedChartNodes.length === 0 && (
+                      <>
+                        <div className="flex flex-col gap-2 text-sm">
+                          <span className="text-muted-foreground">{t('selection.color')}</span>
+                          <div className="grid grid-cols-8 gap-1">
+                            <button
+                              type="button"
+                              aria-label={t('selection.transparent')}
+                              className="flex size-7 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm"
+                              onClick={() => updateSelectedNodeColor('transparent')}
+                            >
+                              <CircleSlash2 className="size-4" aria-hidden="true" />
+                            </button>
+                            {['#64748b', '#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'].map(color => (
+                              <button key={color} type="button" aria-label={color} className="size-7 rounded-full border shadow-sm" style={{ backgroundColor: color }} onClick={() => updateSelectedNodeColor(color)} />
+                            ))}
+                            <label
+                              className="relative flex size-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border bg-[conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#8b5cf6,#ef4444)] shadow-sm"
+                              aria-label={t('selection.customColor')}
+                            >
+                              <Palette className="relative size-3.5 text-white drop-shadow-sm" aria-hidden="true" />
+                              <Input
+                                type="color"
+                                value={customNodeColor}
+                                aria-label={t('selection.customColor')}
+                                onChange={event => {
+                                  setCustomNodeColor(event.target.value)
+                                  updateSelectedNodeColor(event.target.value)
+                                }}
+                                className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        {selectedBoxNode && (
+                          <div className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-muted-foreground">{t('selection.border')}</span>
+                            <ToggleGroup
+                              type="single"
+                              variant="outline"
+                              size="sm"
+                              spacing={0}
+                              value={selectedBorderStyle}
+                              onValueChange={value => {
+                                if (value === 'solid' || value === 'dashed' || value === 'dotted') {
+                                  updateSelectedNodeStyle({ borderStyle: value })
+                                }
+                              }}
+                            >
+                              <ToggleGroupItem value="solid">{t('selection.solid')}</ToggleGroupItem>
+                              <ToggleGroupItem value="dashed">{t('selection.dashed')}</ToggleGroupItem>
+                              <ToggleGroupItem value="dotted">{t('selection.dotted')}</ToggleGroupItem>
+                            </ToggleGroup>
+                          </div>
+                        )}
+                        {selectedBoxNode && (
+                          <div className="flex flex-col gap-2 text-sm">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">{t('selection.borderWidth')}</span>
+                              <span>{selectedNodeBorderWidth}px</span>
+                            </div>
+                            <Slider
+                              min={1}
+                              max={4}
+                              step={1}
+                              value={[selectedNodeBorderWidth]}
+                              onValueChange={value => setSelectedNodeBorderWidth(value[0] ?? 1)}
+                              onValueCommit={value => updateSelectedNodeStyle({ borderWidth: value[0] ?? 1 })}
+                              aria-label={t('selection.borderWidth')}
+                            />
+                          </div>
+                        )}
+                        {selectedBoxNode && (
+                          <div className="flex flex-col gap-2 text-sm">
+                            <span className="text-muted-foreground">{t('selection.fill')}</span>
+                            <div className="grid grid-cols-7 gap-1.5">
+                              <button
+                                type="button"
+                                aria-label={t('selection.transparent')}
+                                className={cn(
+                                  'flex size-7 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm',
+                                  selectedFillColor === 'transparent' && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
+                                )}
+                                onClick={() => updateSelectedNodeStyle({ fillColor: 'transparent', fillStyle: undefined })}
+                              >
+                                <CircleSlash2 className="size-4" aria-hidden="true" />
+                              </button>
+                              {['#ffffff', '#e2e8f0', '#dbeafe', '#ede9fe', '#dcfce7'].map(color => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  aria-label={color}
+                                  className={cn(
+                                    'size-7 rounded-full border shadow-sm',
+                                    selectedFillColor === color && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => updateSelectedNodeStyle({ fillColor: color, fillStyle: undefined })}
+                                />
+                              ))}
+                              <label
+                                className={cn(
+                                  'relative flex size-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border bg-[conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#8b5cf6,#ef4444)] shadow-sm',
+                                  selectedFillColor === customFillColor && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
+                                )}
+                                aria-label={t('selection.customFill')}
+                              >
+                                <Palette className="relative size-3.5 text-white drop-shadow-sm" aria-hidden="true" />
+                                <Input
+                                  type="color"
+                                  value={customFillColor}
+                                  aria-label={t('selection.customFill')}
+                                  onChange={event => {
+                                    setCustomFillColor(event.target.value)
+                                    updateSelectedNodeStyle({ fillColor: event.target.value, fillStyle: undefined })
+                                  }}
+                                  className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+                </>
+              )}
+            </ScrollArea>
+          </div>
+        )}
+
+        {isDrawingTool && !toolPanelOpen && !chartEditorOpen && (
+          <div className="absolute left-[4.25rem] top-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+            <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
+              <span className="text-sm font-medium">
+                {t(brushPanelIsHighlighter ? 'brush.highlighterTitle' : 'brush.penTitle')}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('toolbox.close')}
+                onClick={() => setTool('select')}
+              >
+                <X data-icon="inline-start" />
+              </Button>
+            </div>
+            <Separator />
+            <div className="flex flex-col gap-3 p-3">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-muted-foreground">{t('brush.color')}</span>
                 <label
@@ -2005,9 +2666,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
                     value={brushPanelColor}
                     aria-label={t('brush.color')}
                     onChange={event => {
-                      if (!isDrawingTool) {
-                        updateSelectedFreehandColor(event.target.value)
-                      } else if (brushPanelIsHighlighter) {
+                      if (brushPanelIsHighlighter) {
                         setHighlighterColor(event.target.value)
                       } else {
                         setPenColor(event.target.value)
@@ -2029,213 +2688,17 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
                   value={[brushPanelWidth]}
                   onValueChange={value => {
                     const size = value[0] ?? brushPanelWidth
-                    if (!isDrawingTool) {
-                      if (!freehandWidthHistoryRef.current) {
-                        pushHistory()
-                        freehandWidthHistoryRef.current = true
-                      }
-                      setSelectedStrokeWidth(size)
-                      updateSelectedFreehandWidth(size, false)
-                    } else if (brushPanelIsHighlighter) {
+                    if (brushPanelIsHighlighter) {
                       setHighlighterSize(size)
                     } else {
                       setPenSize(size)
                     }
                   }}
-                  onValueCommit={() => {
-                    if (!isDrawingTool) freehandWidthHistoryRef.current = false
-                  }}
                   aria-label={t('brush.size')}
                 />
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!isDrawingTool && selectedChartNode && (
-          <Card className="absolute bottom-3 left-3 z-10 w-72 gap-3 py-3 shadow-sm">
-            <CardHeader className="px-3">
-              <CardTitle className="text-sm">{t('chart.appearance.title')}</CardTitle>
-            </CardHeader>
-            <CardContent className="px-3">
-              <FieldGroup className="gap-3">
-                <Field orientation="horizontal">
-                  <FieldLabel htmlFor="canvas-chart-variant">{t('chart.appearance.variant')}</FieldLabel>
-                  <Select
-                    value={selectedChartAppearance.variant}
-                    onValueChange={value => updateSelectedChartAppearance({
-                      variant: value as CanvasChartAppearance['variant'],
-                    })}
-                  >
-                    <SelectTrigger id="canvas-chart-variant" className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="card">{t('chart.appearance.variants.card')}</SelectItem>
-                        <SelectItem value="minimal">{t('chart.appearance.variants.minimal')}</SelectItem>
-                        <SelectItem value="transparent">{t('chart.appearance.variants.transparent')}</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field orientation="horizontal">
-                  <FieldLabel htmlFor="canvas-chart-palette">{t('chart.appearance.palette')}</FieldLabel>
-                  <Select
-                    value={selectedChartAppearance.palette}
-                    onValueChange={value => updateSelectedChartAppearance({
-                      palette: value as CanvasChartAppearance['palette'],
-                    })}
-                  >
-                    <SelectTrigger id="canvas-chart-palette" className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="system">{t('chart.appearance.palettes.system')}</SelectItem>
-                        <SelectItem value="cool">{t('chart.appearance.palettes.cool')}</SelectItem>
-                        <SelectItem value="warm">{t('chart.appearance.palettes.warm')}</SelectItem>
-                        <SelectItem value="monochrome">{t('chart.appearance.palettes.monochrome')}</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                {([
-                  ['showTitle', 'showTitle'],
-                  ['showLegend', 'showLegend'],
-                  ['showGrid', 'showGrid'],
-                  ['showXAxis', 'showXAxis'],
-                  ['showYAxis', 'showYAxis'],
-                ] as const).map(([key, label]) => (
-                  <Field key={key} orientation="horizontal">
-                    <FieldLabel htmlFor={`canvas-chart-${key}`}>{t(`chart.appearance.${label}`)}</FieldLabel>
-                    <Switch
-                      id={`canvas-chart-${key}`}
-                      size="sm"
-                      checked={selectedChartAppearance[key]}
-                      onCheckedChange={checked => updateSelectedChartAppearance({ [key]: checked })}
-                    />
-                  </Field>
-                ))}
-              </FieldGroup>
-            </CardContent>
-          </Card>
-        )}
-
-        {!isDrawingTool && selectedNodeCount > 0 && !selectedOnlyFreehand && selectedChartNodes.length === 0 && (
-          <Card className="absolute bottom-3 left-3 z-10 w-64 gap-3 py-3 shadow-sm">
-            <CardHeader className="px-3">
-              <CardTitle className="text-sm">{t('selection.style')}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 px-3">
-              <div className="flex flex-col gap-2 text-sm">
-                <span className="text-muted-foreground">{t('selection.color')}</span>
-                <div className="grid grid-cols-7 gap-1.5">
-                  {['#64748b', '#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444'].map(color => (
-                    <button key={color} type="button" aria-label={color} className="size-7 rounded-full border shadow-sm" style={{ backgroundColor: color }} onClick={() => updateSelectedNodeColor(color)} />
-                  ))}
-                  <label
-                    className="relative flex size-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border bg-[conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#8b5cf6,#ef4444)] shadow-sm"
-                    aria-label={t('selection.customColor')}
-                  >
-                    <Palette className="relative size-3.5 text-white drop-shadow-sm" aria-hidden="true" />
-                    <Input
-                      type="color"
-                      value={customNodeColor}
-                      aria-label={t('selection.customColor')}
-                      onChange={event => {
-                        setCustomNodeColor(event.target.value)
-                        updateSelectedNodeColor(event.target.value)
-                      }}
-                      className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
-                    />
-                  </label>
-                </div>
-              </div>
-              {selectedBoxNode && <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">{t('selection.border')}</span>
-                <ToggleGroup
-                  type="single"
-                  variant="outline"
-                  size="sm"
-                  spacing={0}
-                  value={selectedBorderStyle}
-                  onValueChange={value => {
-                    if (value === 'solid' || value === 'dashed' || value === 'dotted') {
-                      updateSelectedNodeStyle({ borderStyle: value })
-                    }
-                  }}
-                >
-                  <ToggleGroupItem value="solid">{t('selection.solid')}</ToggleGroupItem>
-                  <ToggleGroupItem value="dashed">{t('selection.dashed')}</ToggleGroupItem>
-                  <ToggleGroupItem value="dotted">{t('selection.dotted')}</ToggleGroupItem>
-                </ToggleGroup>
-              </div>}
-              {selectedBoxNode && <div className="flex flex-col gap-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{t('selection.borderWidth')}</span>
-                  <span>{selectedNodeBorderWidth}px</span>
-                </div>
-                <Slider
-                  min={1}
-                  max={4}
-                  step={1}
-                  value={[selectedNodeBorderWidth]}
-                  onValueChange={value => setSelectedNodeBorderWidth(value[0] ?? 1)}
-                  onValueCommit={value => updateSelectedNodeStyle({ borderWidth: value[0] ?? 1 })}
-                  aria-label={t('selection.borderWidth')}
-                />
-              </div>}
-              {selectedBoxNode && <div className="flex flex-col gap-2 text-sm">
-                <span className="text-muted-foreground">{t('selection.fill')}</span>
-                <div className="grid grid-cols-7 gap-1.5">
-                  <button
-                    type="button"
-                    aria-label={t('selection.transparent')}
-                    className={cn(
-                      'flex size-7 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm',
-                      selectedFillColor === 'transparent' && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
-                    )}
-                    onClick={() => updateSelectedNodeStyle({ fillColor: 'transparent', fillStyle: undefined })}
-                  >
-                    <CircleSlash2 className="size-4" aria-hidden="true" />
-                  </button>
-                  {['#ffffff', '#e2e8f0', '#dbeafe', '#ede9fe', '#dcfce7'].map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      aria-label={color}
-                      className={cn(
-                        'size-7 rounded-full border shadow-sm',
-                        selectedFillColor === color && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
-                      )}
-                      style={{ backgroundColor: color }}
-                      onClick={() => updateSelectedNodeStyle({ fillColor: color, fillStyle: undefined })}
-                    />
-                  ))}
-                  <label
-                    className={cn(
-                      'relative flex size-7 cursor-pointer items-center justify-center overflow-hidden rounded-full border bg-[conic-gradient(#ef4444,#f59e0b,#22c55e,#3b82f6,#8b5cf6,#ef4444)] shadow-sm',
-                      selectedFillColor === customFillColor && 'ring-2 ring-ring ring-offset-1 ring-offset-background'
-                    )}
-                    aria-label={t('selection.customFill')}
-                  >
-                    <Palette className="relative size-3.5 text-white drop-shadow-sm" aria-hidden="true" />
-                    <Input
-                      type="color"
-                      value={customFillColor}
-                      aria-label={t('selection.customFill')}
-                      onChange={event => {
-                        setCustomFillColor(event.target.value)
-                        updateSelectedNodeStyle({ fillColor: event.target.value, fillStyle: undefined })
-                      }}
-                      className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0"
-                    />
-                  </label>
-                </div>
-              </div>}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
         {drawOverlayEnabled && (
@@ -2266,17 +2729,10 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         onFitView={() => void fitView({ padding: 0.2, duration: 300 })}
         onLayout={() => void layoutNodes()}
         onExport={(format, pixelRatio) => void exportCanvas(format, pixelRatio)}
+        onExportRecord={() => void exportCanvasAsRecord()}
         onExportSource={format => void exportPortableFile(format)}
         onImportFile={() => void importCanvasFile()}
         onImportContent={() => setImportContentOpen(true)}
-      />
-
-      <ChartEditorDialog
-        open={chartEditorOpen}
-        initialRequest={editingChartRequest}
-        availableNotes={availableNotes}
-        onOpenChange={setChartEditorOpen}
-        onSubmit={saveChartNode}
       />
 
       <Dialog open={edgeEditorOpen} onOpenChange={setEdgeEditorOpen}>
@@ -2293,6 +2749,31 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
             placeholder={t('edge.labelPrompt')}
           />
           <Button onClick={saveEdgeLabel}>{t('edge.saveLabel')}</Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={customComponentDialogOpen} onOpenChange={setCustomComponentDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t('toolbox.saveCustomComponent')}</DialogTitle>
+            <DialogDescription>{t('toolbox.saveCustomComponentDescription')}</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="canvas-custom-component-name">{t('toolbox.customComponentName')}</FieldLabel>
+              <Input
+                id="canvas-custom-component-name"
+                autoFocus
+                value={customComponentName}
+                onChange={event => setCustomComponentName(event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') saveCustomComponent() }}
+              />
+            </Field>
+          </FieldGroup>
+          <Button disabled={!customComponentName.trim()} onClick={saveCustomComponent}>
+            <Blocks data-icon="inline-start" />
+            {t('toolbox.saveCustomComponent')}
+          </Button>
         </DialogContent>
       </Dialog>
 

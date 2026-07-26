@@ -21,8 +21,22 @@ export type CanvasNodeType =
   | 'process'
   | 'decision'
   | 'terminator'
+  | 'input-output'
+  | 'document'
+  | 'multi-document'
+  | 'database'
+  | 'predefined-process'
+  | 'manual-input'
+  | 'preparation'
+  | 'delay'
+  | 'display'
+  | 'connector'
+  | 'off-page-connector'
+  | 'internal-storage'
+  | 'stored-data'
   | 'text'
   | 'note'
+  | 'record'
   | 'image'
   | 'link'
   | 'todo'
@@ -125,6 +139,8 @@ export interface CanvasNodeData extends Record<string, unknown> {
   height?: number
   drawingTool?: 'pen' | 'highlighter'
   filePath?: string
+  recordId?: number
+  recordType?: 'scan' | 'text' | 'image' | 'link' | 'file' | 'recording' | 'todo'
   imagePath?: string
   url?: string
   checked?: boolean
@@ -137,6 +153,7 @@ export interface CanvasNodeData extends Record<string, unknown> {
   chartStatus?: 'loading' | 'ready' | 'error'
   chartError?: string
   chartAppearance?: CanvasChartAppearance
+  locked?: boolean
   previewState?: 'add' | 'update' | 'delete'
 }
 
@@ -187,6 +204,30 @@ export interface CanvasHistorySnapshot {
 export interface CanvasHistoryState {
   undo: CanvasHistorySnapshot[]
   redo: CanvasHistorySnapshot[]
+}
+
+export interface CanvasCustomComponent {
+  id: string
+  name: string
+  nodes: CanvasNode[]
+  edges: CanvasEdge[]
+  createdAt: number
+}
+
+export interface CanvasSelectionContext {
+  canvasId: string
+  canvasTitle: string
+  nodes: Array<{
+    id: string
+    type: CanvasNodeType
+    label: string
+  }>
+  edges: Array<{
+    id: string
+    source: string
+    target: string
+    label?: string
+  }>
 }
 
 export interface CanvasProject {

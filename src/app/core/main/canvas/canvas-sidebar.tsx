@@ -6,7 +6,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
-import { ArrowDownAZ, ArrowLeft, BrainCircuit, CalendarDays, CloudAlert, CloudCheck, CloudUpload, Columns3, CopyPlus, DownloadCloud, EllipsisVertical, FileInput, FilePlus2, Grid2X2, LayoutGrid, List, Loader2, MoreHorizontal, PanelsTopLeft, Pencil, Pin, PinOff, RefreshCw, RotateCcw, ShieldQuestion, Timer, Trash2, Workflow } from 'lucide-react'
+import { ArrowDownAZ, ArrowLeft, BrainCircuit, CalendarDays, CloudAlert, CloudCheck, CloudUpload, Columns3, CopyPlus, DownloadCloud, EllipsisVertical, FileInput, FilePlus2, Grid2X2, LayoutGrid, List, Loader2, PanelsTopLeft, Pencil, Pin, PinOff, RefreshCw, RotateCcw, ShieldQuestion, Timer, Trash2, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -307,6 +307,7 @@ export function CanvasSidebar() {
   const loadProjects = useCanvasStore(state => state.loadProjects)
   const openProject = useCanvasStore(state => state.openProject)
   const createProject = useCanvasStore(state => state.createProject)
+  const createProjectFromDocument = useCanvasStore(state => state.createProjectFromDocument)
   const duplicateProject = useCanvasStore(state => state.duplicateProject)
   const deleteProject = useCanvasStore(state => state.deleteProject)
   const permanentlyDeleteProject = useCanvasStore(state => state.permanentlyDeleteProject)
@@ -423,6 +424,29 @@ export function CanvasSidebar() {
     if (project) await addTab(createCanvasTab(project))
   }
 
+  const handleImport = async () => {
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: t('import.fileType'), extensions: ['json', 'canvas', 'mmd', 'mermaid'] }],
+      })
+      if (!path || Array.isArray(path)) return
+      const source = await readTextFile(path)
+      const fileName = path.split(/[\\/]/).pop()?.replace(/\.(canvas\.)?json$|\.(mmd|mermaid)$/i, '') || t('import.defaultTitle')
+      const imported = /\.(mmd|mermaid)$/i.test(path)
+        ? { title: fileName, canvasType: 'flowchart' as const, document: mermaidToCanvasDocument(source) }
+        : parseCanvasProjectFile(source)
+      const project = await createProjectFromDocument(imported.document, imported.title, imported.canvasType)
+      if (project) {
+        await addTab(createCanvasTab(project))
+        toast.success(t('import.success'))
+      }
+    } catch (error) {
+      console.error('Failed to import canvas:', error)
+      toast.error(t('import.error'))
+    }
+  }
+
   const handleRestore = async (id: string) => {
     const project = await restoreProject(id)
     if (project) await addTab(createCanvasTab(project))
@@ -523,21 +547,30 @@ export function CanvasSidebar() {
               <EmptyDescription>{trashMode ? t('manager.trashEmptyDescription') : t('empty.description')}</EmptyDescription>
             </EmptyHeader>
             {!trashMode && (
-              <EmptyContent>
+              <EmptyContent className="flex-row justify-center">
                 <Button onClick={() => void handleCreate('blank')}>
                   <PanelsTopLeft data-icon="inline-start" />
                   {t('new')}
+                </Button>
+                <Button variant="outline" onClick={() => void handleImport()}>
+                  <FileInput data-icon="inline-start" />
+                  {t('import.action')}
                 </Button>
               </EmptyContent>
             )}
           </Empty>
         ) : (
-          <div className={cn('p-2', viewMode === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-1')}>
+          <div className={cn(
+            'p-2',
+            viewMode === 'grid'
+              ? 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2'
+              : 'flex flex-col gap-1'
+          )}>
         {visibleProjects.map(project => (
           <ContextMenu key={project.id}>
             <ContextMenuTrigger asChild>
           <div className={cn(
-            'group relative overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm',
+            'relative overflow-hidden rounded-lg border bg-card transition-[border-color,box-shadow] hover:border-foreground/20 hover:shadow-sm',
             viewMode === 'list' && 'flex items-center gap-2 p-1',
             !trashMode && activeCanvasId === project.id && 'border-primary ring-1 ring-primary/30',
             trashMode && 'opacity-75 hover:opacity-100'
@@ -546,9 +579,12 @@ export function CanvasSidebar() {
             onDragStart={event => !trashMode && setCanvasDragData(event.dataTransfer, project.id)}
           >
             {processingCanvas?.id === project.id && (
-              <div className="absolute inset-0 z-30 flex items-center justify-center gap-2 bg-background/80 px-2 text-sm font-medium backdrop-blur-sm">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span className="truncate">
+              <div className={cn(
+                'absolute z-30 flex flex-col items-center justify-center gap-1 bg-background/80 px-2 py-1 text-center text-xs font-medium leading-tight backdrop-blur-sm',
+                viewMode === 'grid' ? 'inset-x-0 top-0 aspect-[4/3]' : 'inset-0'
+              )}>
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                <span className="w-full whitespace-normal break-words text-center">
                   {processingCanvas.action === 'delete'
                     ? t('manager.sync.deleting')
                     : t('manager.sync.permanentlyDeleting')}
@@ -586,8 +622,8 @@ export function CanvasSidebar() {
               >
                 <CanvasThumbnail project={project} compact={viewMode === 'list'} />
                 <span className={cn(
-                  'block min-w-0 flex-1 truncate text-sm font-medium',
-                  viewMode === 'grid' ? 'px-2 py-2 pr-8' : 'pr-7'
+                  'block min-w-0 flex-1 truncate text-xs font-medium',
+                  viewMode === 'grid' ? 'px-2 py-2' : syncConfigured ? 'pr-7' : 'pr-2'
                 )}>{project.title}</span>
               </button>
             )}
@@ -607,68 +643,10 @@ export function CanvasSidebar() {
                   : undefined}
                 className={cn(
                   'absolute z-10',
-                  viewMode === 'grid' ? 'right-1 top-1' : 'right-8 top-1/2 -translate-y-1/2'
+                  viewMode === 'grid' ? 'right-1 top-1' : 'right-1 top-1/2 -translate-y-1/2'
                 )}
               />
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn(
-                    'absolute right-1 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100',
-                    viewMode === 'grid' ? 'bottom-1' : 'top-1/2 -translate-y-1/2'
-                  )}
-                >
-                  <MoreHorizontal />
-                  <span className="sr-only">{t('more')}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {trashMode ? (
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onClick={() => void handleRestore(project.id)}>
-                      <RotateCcw />
-                      {t('restore')}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onSelect={() => setPendingPermanentDelete(project)}
-                    >
-                      <Trash2 />
-                      {t('permanentDelete')}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                ) : (<>
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => void togglePin(project.id)}>
-                    {project.pinnedAt ? <PinOff /> : <Pin />}
-                    {project.pinnedAt ? t('manager.unpin') : t('manager.pin')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    setEditingId(project.id)
-                    setEditingTitle(project.title)
-                  }}>
-                    <Pencil />
-                    {t('rename')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleDuplicate(project)}>
-                    <CopyPlus />
-                    {t('duplicate')}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem variant="destructive" onSelect={() => setPendingDelete(project)}>
-                    <Trash2 />
-                    {t('delete')}
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                </>) }
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
             </ContextMenuTrigger>
             <ContextMenuContent>

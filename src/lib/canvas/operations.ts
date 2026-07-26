@@ -1,4 +1,5 @@
 import type { CanvasDocument, CanvasEdge, CanvasNodeType } from '@/types/canvas'
+import { FLOWCHART_NODE_TYPES } from '@/lib/canvas/shapes'
 
 type CanvasOperationType =
   | 'add_node'
@@ -7,6 +8,25 @@ type CanvasOperationType =
   | 'add_edge'
   | 'delete_edge'
   | 'clear'
+
+const DEFAULT_NODE_LABELS: Partial<Record<CanvasNodeType, string>> = {
+  decision: '判断条件',
+  terminator: '开始 / 结束',
+  'input-output': '输入 / 输出',
+  document: '文档',
+  'multi-document': '多文档',
+  database: '数据库',
+  'predefined-process': '子流程',
+  'manual-input': '手动输入',
+  preparation: '准备',
+  delay: '延迟',
+  display: '显示',
+  connector: '连接符',
+  'off-page-connector': '跨页连接符',
+  'internal-storage': '内部存储',
+  'stored-data': '存储数据',
+  text: '文本',
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -40,7 +60,7 @@ export function applyCanvasOperations(document: CanvasDocument, rawOperations: u
 
     if (type === 'add_node') {
       const requestedType = asString(operation.nodeType)
-      const nodeType: CanvasNodeType = ['process', 'decision', 'terminator', 'text'].includes(requestedType)
+      const nodeType: CanvasNodeType = [...FLOWCHART_NODE_TYPES, 'text'].includes(requestedType as CanvasNodeType)
         ? requestedType as CanvasNodeType
         : 'process'
       const id = asString(operation.id) || crypto.randomUUID()
@@ -54,7 +74,7 @@ export function applyCanvasOperations(document: CanvasDocument, rawOperations: u
           y: asFiniteNumber(operation.y, Math.floor(index / 4) * 140),
         },
         data: {
-          label: asString(operation.label) || (nodeType === 'decision' ? '判断条件' : nodeType === 'terminator' ? '开始 / 结束' : '处理步骤'),
+          label: asString(operation.label) || DEFAULT_NODE_LABELS[nodeType] || '处理步骤',
           description: asString(operation.description) || undefined,
         },
       })

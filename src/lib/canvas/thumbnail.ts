@@ -3,7 +3,7 @@ import { exists, mkdir, remove, writeFile } from '@tauri-apps/plugin-fs'
 import type { CanvasDocument } from '@/types/canvas'
 import { canvasDocumentToPngFile } from './static-export'
 
-export const CANVAS_THUMBNAIL_VERSION = 3
+export const CANVAS_THUMBNAIL_VERSION = 4
 
 export async function generateCanvasThumbnail(canvasId: string, document: CanvasDocument) {
   const directory = await join(await appDataDir(), 'canvas-thumbnails')

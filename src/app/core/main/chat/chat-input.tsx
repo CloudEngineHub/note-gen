@@ -3,8 +3,11 @@ import * as React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
 import useSettingStore from "@/stores/setting"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import useChatStore from "@/stores/chat"
 import useArticleStore from "@/stores/article"
+import useCanvasStore from "@/stores/canvas"
 import { useTranslations } from 'next-intl'
 import { useLocalStorage } from 'react-use';
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
@@ -15,7 +18,7 @@ import emitter from "@/lib/emitter"
 import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
 import { useIsMobile } from '@/hooks/use-mobile'
 import { ImageAttachments, ImageAttachment } from "./image-attachments"
-import { ImageIcon } from "lucide-react"
+import { ImageIcon, MousePointer2, X } from "lucide-react"
 import { isMobileDevice } from '@/lib/check'
 import { QuoteDisplay } from "./quote-display"
 import type { PendingQuote } from "@/stores/chat"
@@ -107,6 +110,8 @@ export const ChatInput = React.memo(function ChatInput() {
     isTemporaryConversation,
   } = useChatStore()
   const { activeFilePath, currentArticle } = useArticleStore()
+  const canvasSelectionContext = useCanvasStore(state => state.selectionContext)
+  const setCanvasSelectionContext = useCanvasStore(state => state.setSelectionContext)
   const [isComposing, setIsComposing] = useState(false)
   const t = useTranslations()
   const defaultPlaceholder = t('record.chat.input.placeholder.default')
@@ -168,12 +173,14 @@ export const ChatInput = React.memo(function ChatInput() {
       : '',
     activeQuote?.fullContent,
     contextUsageAgentRuntime,
+    canvasSelectionContext ? JSON.stringify(canvasSelectionContext) : '',
     ...fileAttachments.map(attachment => attachment.preview || ''),
   ].filter(Boolean).join('\n\n'), [
     activeQuote?.fullContent,
     activeFilePath,
     currentArticle,
     contextUsageAgentRuntime,
+    canvasSelectionContext,
     fileAttachments,
     contextUsageLinkedContent,
     linkedResource,
@@ -1044,6 +1051,29 @@ ${previewLines.join('\n')}
         {activeQuote && (
           <QuoteDisplay quoteData={activeQuote} onRemove={removeQuote} />
         )}
+        {canvasSelectionContext && (
+          <div className="flex px-1 pt-1">
+            <Badge variant="secondary" className="min-w-0 max-w-full gap-1.5 font-normal">
+              <MousePointer2 data-icon="inline-start" />
+              <span className="truncate">
+                {t('canvas.selection.chatContext', {
+                  nodes: canvasSelectionContext.nodes.length,
+                  edges: canvasSelectionContext.edges.length,
+                })}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="-mr-1"
+                aria-label={t('canvas.selection.removeChatContext')}
+                onClick={() => setCanvasSelectionContext(null)}
+              >
+                <X data-icon="inline-start" />
+              </Button>
+            </Badge>
+          </div>
+        )}
         <ImageAttachments images={attachedImages} onRemove={removeImage} />
         <PendingFileAttachments attachments={fileAttachments} onRemove={removeFileAttachment} />
         <div className="relative w-full flex items-start">
@@ -1129,7 +1159,17 @@ ${previewLines.join('\n')}
               imageCount={attachedImages.length}
             />
             <AgentPermissionModeSelect />
-            <ChatSend inputValue={text} onSent={handleSent} linkedResource={linkedResource} attachedImages={attachedImages} fileAttachments={fileAttachments} quoteData={activeQuote} dockStyle={isMobile} ref={chatSendRef} />
+            <ChatSend
+              inputValue={text}
+              onSent={handleSent}
+              linkedResource={linkedResource}
+              attachedImages={attachedImages}
+              fileAttachments={fileAttachments}
+              quoteData={activeQuote}
+              canvasSelectionContext={canvasSelectionContext}
+              dockStyle={isMobile}
+              ref={chatSendRef}
+            />
           </div>
         </div>
 
