@@ -18,6 +18,7 @@ import {
 import AboutPage from '../about/page'
 import AiPage from '../ai/page'
 import AudioPage from '../audio/page'
+import CanvasSettingPage from '../canvas/page'
 import EditorSettingPage from '../editor/page'
 import SettingFilePage from '../file/page'
 import GeneralSettingsPage from '../general/page'
@@ -38,8 +39,9 @@ import { SettingTab } from './setting-tab'
 const settingPages: Record<SettingSection, ComponentType> = {
   about: AboutPage,
   general: GeneralSettingsPage,
-  editor: EditorSettingPage,
   record: RecordSettingPage,
+  editor: EditorSettingPage,
+  canvas: CanvasSettingPage,
   sync: SyncPage,
   imageHosting: ImageHostingPage,
   ai: AiPage,

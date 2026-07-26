@@ -53,6 +53,30 @@ import {
   type RecordCompletionBehavior,
   type RecordSaveTargetMode,
 } from '@/lib/record-save-preferences'
+import {
+  DEFAULT_CANVAS_GRID_GAP,
+  DEFAULT_CANVAS_GRID_STYLE,
+  DEFAULT_CANVAS_GRID_VISIBLE,
+  DEFAULT_CANVAS_INSERT_BEHAVIOR,
+  DEFAULT_CANVAS_MANAGER_SORT_MODE,
+  DEFAULT_CANVAS_MANAGER_VIEW_MODE,
+  DEFAULT_CANVAS_MINIMAP_VISIBLE,
+  DEFAULT_CANVAS_SNAP_TO_GRID,
+  DEFAULT_CANVAS_WHEEL_BEHAVIOR,
+  DEFAULT_CANVAS_ZOOM,
+  normalizeCanvasGridGap,
+  normalizeCanvasGridStyle,
+  normalizeCanvasInsertBehavior,
+  normalizeCanvasManagerSortMode,
+  normalizeCanvasManagerViewMode,
+  normalizeCanvasWheelBehavior,
+  normalizeCanvasZoom,
+  type CanvasGridStyle,
+  type CanvasInsertBehavior,
+  type CanvasManagerSortMode,
+  type CanvasManagerViewMode,
+  type CanvasWheelBehavior,
+} from '@/lib/canvas/preferences'
 
 export enum GenTemplateRange {
   All = 'all',
@@ -331,6 +355,36 @@ interface SettingState {
   outlinePosition: OutlinePosition
   setOutlinePosition: (position: OutlinePosition) => Promise<void>
 
+  canvasGridVisible: boolean
+  setCanvasGridVisible: (visible: boolean) => Promise<void>
+
+  canvasSnapToGrid: boolean
+  setCanvasSnapToGrid: (enabled: boolean) => Promise<void>
+
+  canvasMinimapVisible: boolean
+  setCanvasMinimapVisible: (visible: boolean) => Promise<void>
+
+  canvasGridStyle: CanvasGridStyle
+  setCanvasGridStyle: (style: CanvasGridStyle) => Promise<void>
+
+  canvasGridGap: number
+  setCanvasGridGap: (gap: number) => Promise<void>
+
+  canvasDefaultZoom: number
+  setCanvasDefaultZoom: (zoom: number) => Promise<void>
+
+  canvasManagerViewMode: CanvasManagerViewMode
+  setCanvasManagerViewMode: (mode: CanvasManagerViewMode) => Promise<void>
+
+  canvasManagerSortMode: CanvasManagerSortMode
+  setCanvasManagerSortMode: (mode: CanvasManagerSortMode) => Promise<void>
+
+  canvasWheelBehavior: CanvasWheelBehavior
+  setCanvasWheelBehavior: (behavior: CanvasWheelBehavior) => Promise<void>
+
+  canvasInsertBehavior: CanvasInsertBehavior
+  setCanvasInsertBehavior: (behavior: CanvasInsertBehavior) => Promise<void>
+
 }
 
 export interface RecordToolbarItem {
@@ -476,6 +530,65 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const normalizedRecordCompletionBehavior = normalizeRecordCompletionBehavior(storedRecordCompletionBehavior)
     if (normalizedRecordCompletionBehavior !== storedRecordCompletionBehavior) {
       await store.set('recordCompletionBehavior', normalizedRecordCompletionBehavior)
+      preferencesChanged = true
+    }
+
+    const storedCanvasGridStyle = await store.get('canvasGridStyle')
+    const normalizedCanvasGridStyle = normalizeCanvasGridStyle(storedCanvasGridStyle)
+    if (normalizedCanvasGridStyle !== storedCanvasGridStyle) {
+      await store.set('canvasGridStyle', normalizedCanvasGridStyle)
+      preferencesChanged = true
+    }
+
+    const storedCanvasGridGap = await store.get('canvasGridGap')
+    const normalizedCanvasGridGap = normalizeCanvasGridGap(storedCanvasGridGap)
+    if (normalizedCanvasGridGap !== storedCanvasGridGap) {
+      await store.set('canvasGridGap', normalizedCanvasGridGap)
+      preferencesChanged = true
+    }
+
+    const storedCanvasDefaultZoom = await store.get('canvasDefaultZoom')
+    const normalizedCanvasDefaultZoom = normalizeCanvasZoom(storedCanvasDefaultZoom)
+    if (normalizedCanvasDefaultZoom !== storedCanvasDefaultZoom) {
+      await store.set('canvasDefaultZoom', normalizedCanvasDefaultZoom)
+      preferencesChanged = true
+    }
+
+    const storedCanvasManagerViewMode = await store.get('canvasManagerViewMode')
+    const legacyCanvasManagerViewMode = typeof window !== 'undefined'
+      ? window.localStorage.getItem('canvas-manager-view-mode')
+      : null
+    const normalizedCanvasManagerViewMode = normalizeCanvasManagerViewMode(
+      storedCanvasManagerViewMode ?? legacyCanvasManagerViewMode
+    )
+    if (normalizedCanvasManagerViewMode !== storedCanvasManagerViewMode) {
+      await store.set('canvasManagerViewMode', normalizedCanvasManagerViewMode)
+      preferencesChanged = true
+    }
+
+    const storedCanvasManagerSortMode = await store.get('canvasManagerSortMode')
+    const legacyCanvasManagerSortMode = typeof window !== 'undefined'
+      ? window.localStorage.getItem('canvas-manager-sort-mode')
+      : null
+    const normalizedCanvasManagerSortMode = normalizeCanvasManagerSortMode(
+      storedCanvasManagerSortMode ?? legacyCanvasManagerSortMode
+    )
+    if (normalizedCanvasManagerSortMode !== storedCanvasManagerSortMode) {
+      await store.set('canvasManagerSortMode', normalizedCanvasManagerSortMode)
+      preferencesChanged = true
+    }
+
+    const storedCanvasWheelBehavior = await store.get('canvasWheelBehavior')
+    const normalizedCanvasWheelBehavior = normalizeCanvasWheelBehavior(storedCanvasWheelBehavior)
+    if (normalizedCanvasWheelBehavior !== storedCanvasWheelBehavior) {
+      await store.set('canvasWheelBehavior', normalizedCanvasWheelBehavior)
+      preferencesChanged = true
+    }
+
+    const storedCanvasInsertBehavior = await store.get('canvasInsertBehavior')
+    const normalizedCanvasInsertBehavior = normalizeCanvasInsertBehavior(storedCanvasInsertBehavior)
+    if (normalizedCanvasInsertBehavior !== storedCanvasInsertBehavior) {
+      await store.set('canvasInsertBehavior', normalizedCanvasInsertBehavior)
       preferencesChanged = true
     }
 
@@ -1495,6 +1608,93 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ outlinePosition })
     const store = await Store.load('store.json')
     await store.set('outlinePosition', outlinePosition)
+    await store.save()
+  },
+
+  canvasGridVisible: DEFAULT_CANVAS_GRID_VISIBLE,
+  setCanvasGridVisible: async (canvasGridVisible) => {
+    set({ canvasGridVisible })
+    const store = await Store.load('store.json')
+    await store.set('canvasGridVisible', canvasGridVisible)
+    await store.save()
+  },
+
+  canvasSnapToGrid: DEFAULT_CANVAS_SNAP_TO_GRID,
+  setCanvasSnapToGrid: async (canvasSnapToGrid) => {
+    set({ canvasSnapToGrid })
+    const store = await Store.load('store.json')
+    await store.set('canvasSnapToGrid', canvasSnapToGrid)
+    await store.save()
+  },
+
+  canvasMinimapVisible: DEFAULT_CANVAS_MINIMAP_VISIBLE,
+  setCanvasMinimapVisible: async (canvasMinimapVisible) => {
+    set({ canvasMinimapVisible })
+    const store = await Store.load('store.json')
+    await store.set('canvasMinimapVisible', canvasMinimapVisible)
+    await store.save()
+  },
+
+  canvasGridStyle: DEFAULT_CANVAS_GRID_STYLE,
+  setCanvasGridStyle: async (style) => {
+    const canvasGridStyle = normalizeCanvasGridStyle(style)
+    set({ canvasGridStyle })
+    const store = await Store.load('store.json')
+    await store.set('canvasGridStyle', canvasGridStyle)
+    await store.save()
+  },
+
+  canvasGridGap: DEFAULT_CANVAS_GRID_GAP,
+  setCanvasGridGap: async (gap) => {
+    const canvasGridGap = normalizeCanvasGridGap(gap)
+    set({ canvasGridGap })
+    const store = await Store.load('store.json')
+    await store.set('canvasGridGap', canvasGridGap)
+    await store.save()
+  },
+
+  canvasDefaultZoom: DEFAULT_CANVAS_ZOOM,
+  setCanvasDefaultZoom: async (zoom) => {
+    const canvasDefaultZoom = normalizeCanvasZoom(zoom)
+    set({ canvasDefaultZoom })
+    const store = await Store.load('store.json')
+    await store.set('canvasDefaultZoom', canvasDefaultZoom)
+    await store.save()
+  },
+
+  canvasManagerViewMode: DEFAULT_CANVAS_MANAGER_VIEW_MODE,
+  setCanvasManagerViewMode: async (mode) => {
+    const canvasManagerViewMode = normalizeCanvasManagerViewMode(mode)
+    set({ canvasManagerViewMode })
+    const store = await Store.load('store.json')
+    await store.set('canvasManagerViewMode', canvasManagerViewMode)
+    await store.save()
+  },
+
+  canvasManagerSortMode: DEFAULT_CANVAS_MANAGER_SORT_MODE,
+  setCanvasManagerSortMode: async (mode) => {
+    const canvasManagerSortMode = normalizeCanvasManagerSortMode(mode)
+    set({ canvasManagerSortMode })
+    const store = await Store.load('store.json')
+    await store.set('canvasManagerSortMode', canvasManagerSortMode)
+    await store.save()
+  },
+
+  canvasWheelBehavior: DEFAULT_CANVAS_WHEEL_BEHAVIOR,
+  setCanvasWheelBehavior: async (behavior) => {
+    const canvasWheelBehavior = normalizeCanvasWheelBehavior(behavior)
+    set({ canvasWheelBehavior })
+    const store = await Store.load('store.json')
+    await store.set('canvasWheelBehavior', canvasWheelBehavior)
+    await store.save()
+  },
+
+  canvasInsertBehavior: DEFAULT_CANVAS_INSERT_BEHAVIOR,
+  setCanvasInsertBehavior: async (behavior) => {
+    const canvasInsertBehavior = normalizeCanvasInsertBehavior(behavior)
+    set({ canvasInsertBehavior })
+    const store = await Store.load('store.json')
+    await store.set('canvasInsertBehavior', canvasInsertBehavior)
     await store.save()
   },
 }))

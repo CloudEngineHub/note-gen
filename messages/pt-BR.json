@@ -571,6 +571,84 @@
         }
       }
     },
+    "canvas": {
+      "title": "Configurações da tela",
+      "desc": "Configure a exibição, a interação e as preferências do gerenciador de telas. As alterações são aplicadas imediatamente.",
+      "display": {
+        "title": "Exibição da tela",
+        "desc": "Ajuste a grade, o minimapa e o zoom em todas as telas.",
+        "showGrid": {
+          "title": "Mostrar grade",
+          "desc": "Mostra uma grade auxiliar no fundo da tela."
+        },
+        "snapToGrid": {
+          "title": "Alinhar à grade",
+          "desc": "Alinha os nós à posição de grade mais próxima ao movê-los."
+        },
+        "minimap": {
+          "title": "Mostrar minimapa",
+          "desc": "Mostra uma visão geral e a posição atual no canto inferior direito."
+        },
+        "gridStyle": {
+          "title": "Estilo da grade",
+          "desc": "Escolha o padrão de grade usado no fundo da tela.",
+          "options": {
+            "dots": "Pontos",
+            "lines": "Linhas",
+            "none": "Desativada"
+          }
+        },
+        "gridGap": {
+          "title": "Espaçamento da grade",
+          "desc": "Ajuste a distância entre as marcas da grade e as posições de alinhamento."
+        },
+        "defaultZoom": {
+          "title": "Zoom padrão",
+          "desc": "Define o zoom ao abrir uma tela. As alterações também são aplicadas à tela atual."
+        }
+      },
+      "interaction": {
+        "title": "Interação",
+        "desc": "Configure o comportamento da roda do mouse e o que acontece após inserir um nó.",
+        "wheel": {
+          "title": "Comportamento da roda do mouse",
+          "desc": "Escolha se a roda do mouse amplia ou move a tela.",
+          "options": {
+            "zoom": "Ampliar a tela",
+            "pan": "Mover a tela"
+          }
+        },
+        "afterInsert": {
+          "title": "Após inserir um nó",
+          "desc": "Mantenha a ferramenta atual ou retorne à ferramenta de seleção após adicionar um nó.",
+          "options": {
+            "keep": "Manter ferramenta atual",
+            "select": "Voltar à seleção"
+          }
+        }
+      },
+      "manager": {
+        "title": "Gerenciador de telas",
+        "desc": "Configure como as telas são exibidas e ordenadas no gerenciador.",
+        "view": {
+          "title": "Visualização padrão",
+          "desc": "Escolha como as telas são exibidas no gerenciador.",
+          "options": {
+            "grid": "Grade",
+            "list": "Lista"
+          }
+        },
+        "sort": {
+          "title": "Ordenação padrão",
+          "desc": "Escolha como as telas são ordenadas no gerenciador.",
+          "options": {
+            "updated": "Atualizadas recentemente",
+            "created": "Data de criação",
+            "name": "Nome"
+          }
+        }
+      }
+    },
     "record": {
       "title": "Configurações de Registro",
       "desc": "Configure as configurações relacionadas a registros aqui, incluindo descrição de registro e configuração da barra de ferramentas.",

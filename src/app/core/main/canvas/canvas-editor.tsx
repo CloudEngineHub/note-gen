@@ -98,6 +98,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import useCanvasStore from '@/stores/canvas'
 import useArticleStore from '@/stores/article'
+import useSettingStore from '@/stores/setting'
 import type {
   CanvasDocument,
   CanvasHistorySnapshot,
@@ -265,6 +266,16 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const initialHistory = projects.find(project => project.id === canvasId)?.history
   const fileTree = useArticleStore(state => state.fileTree)
   const loadFileTree = useArticleStore(state => state.loadFileTree)
+  const canvasGridVisible = useSettingStore(state => state.canvasGridVisible)
+  const canvasSnapToGrid = useSettingStore(state => state.canvasSnapToGrid)
+  const canvasMinimapVisible = useSettingStore(state => state.canvasMinimapVisible)
+  const canvasGridStyle = useSettingStore(state => state.canvasGridStyle)
+  const canvasGridGap = useSettingStore(state => state.canvasGridGap)
+  const canvasDefaultZoom = useSettingStore(state => state.canvasDefaultZoom)
+  const canvasWheelBehavior = useSettingStore(state => state.canvasWheelBehavior)
+  const canvasInsertBehavior = useSettingStore(state => state.canvasInsertBehavior)
+  const setCanvasGridVisible = useSettingStore(state => state.setCanvasGridVisible)
+  const setCanvasSnapToGrid = useSettingStore(state => state.setCanvasSnapToGrid)
   const [nodes, setNodes, onNodesChangeBase] = useNodesState<FlowCanvasNode>(
     ((document?.nodes || []) as FlowCanvasNode[]).map(node => (
       node.draggable === false ? { ...node, draggable: true } : node
@@ -312,6 +323,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   const pendingDocumentRef = useRef<CanvasDocument | null>(null)
   const pendingDocumentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastStoreDocumentRef = useRef(document)
+  const appliedDefaultZoomRef = useRef('')
   const { screenToFlowPosition, getViewport, getNodesBounds, fitView, setViewport } = useReactFlow()
   const viewport = useViewport()
   const activeBrushColor = tool === 'highlighter' ? highlighterColor : penColor
@@ -417,6 +429,17 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
   }, [agentPreviewOperations, document, edges, nodes])
   const displayNodes = previewSnapshot?.nodes || nodes
   const displayEdges = previewSnapshot?.edges || edges
+
+  useEffect(() => {
+    if (!document) return
+    const preferenceKey = `${canvasId}:${canvasDefaultZoom}`
+    if (appliedDefaultZoomRef.current === preferenceKey) return
+    appliedDefaultZoomRef.current = preferenceKey
+    void setViewport(
+      { ...getViewport(), zoom: canvasDefaultZoom },
+      { duration: 120 },
+    )
+  }, [canvasDefaultZoom, canvasId, document, getViewport, setViewport])
 
   useEffect(() => {
     if (!document) {
@@ -769,6 +792,10 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     }
   }, [canvasId, copySelection, deleteSelection, duplicateSelection, fitView, pasteSelection, redo, selectAll, undo])
 
+  const completeNodeInsertion = useCallback(() => {
+    if (canvasInsertBehavior === 'select') setTool('select')
+  }, [canvasInsertBehavior])
+
   const addNode = useCallback((nodeType: 'process' | 'decision' | 'terminator' | 'text') => {
     pushHistory()
     const position = screenToFlowPosition({
@@ -789,7 +816,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
               : t('nodes.process'),
       },
     }])
-  }, [pushHistory, screenToFlowPosition, setNodes, t])
+    completeNodeInsertion()
+  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setNodes, t])
 
   const addNoteNode = useCallback((filePath: string, name: string) => {
     pushHistory()
@@ -804,8 +832,9 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       data: { label: name, filePath },
     }])
     setNotePickerOpen(false)
+    completeNodeInsertion()
     toast.success(t('noteNode.added', { name }))
-  }, [pushHistory, screenToFlowPosition, setNodes, t])
+  }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setNodes, t])
 
   const addImageNode = useCallback(async () => {
     const sourcePath = await open({
@@ -835,7 +864,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       position,
       data: { label: sourcePath.split(/[\\/]/).pop() || t('nodes.image'), imagePath: relativePath },
     }])
-  }, [loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
+    completeNodeInsertion()
+  }, [completeNodeInsertion, loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
 
   useEffect(() => {
     const handlePaste = async (event: ClipboardEvent) => {
@@ -869,6 +899,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           position: screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }),
           data: { label: image.name || t('nodes.image'), imagePath: relativePath },
         }])
+        completeNodeInsertion()
         toast.success(t('selection.imagePasted'))
       } catch (error) {
         console.error('Failed to paste image into canvas:', error)
@@ -877,7 +908,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     }
     window.addEventListener('paste', handlePaste)
     return () => window.removeEventListener('paste', handlePaste)
-  }, [canvasId, loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
+  }, [canvasId, completeNodeInsertion, loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
 
   const alignSelection = useCallback((axis: 'horizontal' | 'vertical') => {
     const selected = nodes.filter(node => node.selected)
@@ -1217,25 +1248,6 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     return () => emitter.off('canvas-auto-layout', autoLayout)
   }, [canvasId, layoutNodes])
 
-  const updateCanvasSettings = useCallback((settings: Partial<CanvasDocument['settings']>) => {
-    if (!document) return
-    const nextDocument: CanvasDocument = {
-      ...document,
-      nodes: serializeNodes(nodes),
-      edges: edges.map(edge => ({
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        label: typeof edge.label === 'string' ? edge.label : undefined,
-        type: edge.type,
-      })),
-      viewport: getViewport(),
-      settings: { ...document.settings, ...settings },
-    }
-    lastStoreDocumentRef.current = nextDocument
-    updateDocument(canvasId, nextDocument)
-  }, [canvasId, document, edges, getViewport, nodes, updateDocument])
-
   const exportCanvas = useCallback(async (
     format: 'png' | 'svg',
     pixelRatio: number
@@ -1524,6 +1536,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
             target: id,
             type: 'smoothstep',
           }, current))
+          completeNodeInsertion()
         }}
         onNodeContextMenu={(_event, targetNode) => {
           if (!targetNode.selected) {
@@ -1570,14 +1583,22 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         panOnDrag={tool === 'hand'}
         selectionOnDrag={tool === 'select'}
         selectionMode={SelectionMode.Partial}
-        snapToGrid={document.settings.snapToGrid}
-        snapGrid={[20, 20]}
-        defaultViewport={document.viewport}
+        snapToGrid={canvasSnapToGrid}
+        snapGrid={[canvasGridGap, canvasGridGap]}
+        defaultViewport={{ ...document.viewport, zoom: canvasDefaultZoom }}
+        zoomOnScroll={canvasWheelBehavior === 'zoom'}
+        panOnScroll={canvasWheelBehavior === 'pan'}
         onlyRenderVisibleElements={!isExporting && nodes.length >= 150}
         colorMode="system"
         >
-          {document.settings.showGrid && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
-          <MiniMap pannable zoomable />
+          {canvasGridVisible && (
+            <Background
+              variant={canvasGridStyle === 'lines' ? BackgroundVariant.Lines : BackgroundVariant.Dots}
+              gap={canvasGridGap}
+              size={1}
+            />
+          )}
+          {canvasMinimapVisible && <MiniMap pannable zoomable />}
               </ReactFlow>
             </div>
           </ContextMenuTrigger>
@@ -1938,11 +1959,11 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       </div>
 
       <CanvasFooter
-        showGrid={document.settings.showGrid}
-        snapToGrid={document.settings.snapToGrid}
+        showGrid={canvasGridVisible}
+        snapToGrid={canvasSnapToGrid}
         zoom={viewport.zoom}
-        onToggleGrid={() => updateCanvasSettings({ showGrid: !document.settings.showGrid })}
-        onToggleSnap={() => updateCanvasSettings({ snapToGrid: !document.settings.snapToGrid })}
+        onToggleGrid={() => void setCanvasGridVisible(!canvasGridVisible)}
+        onToggleSnap={() => void setCanvasSnapToGrid(!canvasSnapToGrid)}
         onZoomChange={zoom => void setViewport({ ...getViewport(), zoom }, { duration: 120 })}
         onFitView={() => void fitView({ padding: 0.2, duration: 300 })}
         onLayout={() => void layoutNodes()}

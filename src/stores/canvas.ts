@@ -39,7 +39,6 @@ function hasCurrentThumbnail(project: Pick<CanvasProject, 'thumbnailPath'>) {
   return Boolean(project.thumbnailPath?.endsWith(`-v${CANVAS_THUMBNAIL_VERSION}.png`))
 }
 
-export type CanvasSortMode = 'updated' | 'created' | 'name'
 export type CanvasDeleteResult = 'local' | 'synced' | 'pending'
 
 interface CanvasState {
@@ -48,8 +47,6 @@ interface CanvasState {
   documents: Record<string, CanvasDocument>
   activeCanvasId: string | null
   loading: boolean
-  viewMode: 'grid' | 'list'
-  sortMode: CanvasSortMode
   trashMode: boolean
   loadProjects: () => Promise<void>
   createProject: (canvasType?: CanvasProjectType, title?: string) => Promise<CanvasProject | null>
@@ -62,8 +59,6 @@ interface CanvasState {
   saveProject: (id: string) => Promise<void>
   refreshThumbnail: (id: string) => Promise<void>
   refreshAllThumbnails: () => Promise<void>
-  setViewMode: (mode: 'grid' | 'list') => void
-  setSortMode: (mode: CanvasSortMode) => void
   setTrashMode: (open: boolean) => void
   togglePin: (id: string) => Promise<void>
   renameProject: (id: string, title: string) => Promise<void>
@@ -78,8 +73,6 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
   documents: {},
   activeCanvasId: null,
   loading: false,
-  viewMode: 'grid',
-  sortMode: 'updated',
   trashMode: false,
 
   loadProjects: async () => {
@@ -237,10 +230,6 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       await get().refreshThumbnail(project.id)
     }
   },
-
-  setViewMode: (viewMode) => set({ viewMode }),
-
-  setSortMode: (sortMode) => set({ sortMode }),
 
   setTrashMode: (trashMode) => set({ trashMode }),
 

@@ -52,9 +52,13 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import useCanvasStore from '@/stores/canvas'
-import type { CanvasSortMode } from '@/stores/canvas'
 import type { CanvasProject, CanvasProjectType } from '@/types/canvas'
 import useArticleStore from '@/stores/article'
+import useSettingStore from '@/stores/setting'
+import type {
+  CanvasManagerSortMode,
+  CanvasManagerViewMode,
+} from '@/lib/canvas/preferences'
 import {
   getAutoDataSyncState,
   isAutoDataSyncProviderConfigured,
@@ -146,11 +150,11 @@ export function CanvasActions() {
   const t = useTranslations('canvas')
   const createProject = useCanvasStore(state => state.createProject)
   const createProjectFromDocument = useCanvasStore(state => state.createProjectFromDocument)
-  const viewMode = useCanvasStore(state => state.viewMode)
-  const setViewMode = useCanvasStore(state => state.setViewMode)
+  const viewMode = useSettingStore(state => state.canvasManagerViewMode)
+  const setViewMode = useSettingStore(state => state.setCanvasManagerViewMode)
   const refreshAllThumbnails = useCanvasStore(state => state.refreshAllThumbnails)
-  const sortMode = useCanvasStore(state => state.sortMode)
-  const setSortMode = useCanvasStore(state => state.setSortMode)
+  const sortMode = useSettingStore(state => state.canvasManagerSortMode)
+  const setSortMode = useSettingStore(state => state.setCanvasManagerSortMode)
   const trashMode = useCanvasStore(state => state.trashMode)
   const setTrashMode = useCanvasStore(state => state.setTrashMode)
   const addTab = useArticleStore(state => state.addTab)
@@ -172,8 +176,7 @@ export function CanvasActions() {
 
   const changeViewMode = (mode: string) => {
     if (mode !== 'grid' && mode !== 'list') return
-    setViewMode(mode)
-    window.localStorage.setItem('canvas-manager-view-mode', mode)
+    void setViewMode(mode as CanvasManagerViewMode)
   }
 
   const handleRefreshThumbnails = async () => {
@@ -211,8 +214,7 @@ export function CanvasActions() {
 
   const changeSortMode = (mode: string) => {
     if (mode !== 'updated' && mode !== 'created' && mode !== 'name') return
-    setSortMode(mode as CanvasSortMode)
-    window.localStorage.setItem('canvas-manager-sort-mode', mode)
+    void setSortMode(mode as CanvasManagerSortMode)
   }
 
   return (
@@ -312,8 +314,7 @@ export function CanvasSidebar() {
   const restoreProject = useCanvasStore(state => state.restoreProject)
   const togglePin = useCanvasStore(state => state.togglePin)
   const activeCanvasId = useCanvasStore(state => state.activeCanvasId)
-  const sortMode = useCanvasStore(state => state.sortMode)
-  const setSortMode = useCanvasStore(state => state.setSortMode)
+  const sortMode = useSettingStore(state => state.canvasManagerSortMode)
   const trashMode = useCanvasStore(state => state.trashMode)
   const setTrashMode = useCanvasStore(state => state.setTrashMode)
   const addTab = useArticleStore(state => state.addTab)
@@ -333,8 +334,7 @@ export function CanvasSidebar() {
   const [syncedVersions, setSyncedVersions] = useState<Record<string, number>>({})
   const [uploadingCanvasId, setUploadingCanvasId] = useState<string | null>(null)
   const [failedCanvasIds, setFailedCanvasIds] = useState<Set<string>>(() => new Set())
-  const viewMode = useCanvasStore(state => state.viewMode)
-  const setViewMode = useCanvasStore(state => state.setViewMode)
+  const viewMode = useSettingStore(state => state.canvasManagerViewMode)
 
   useEffect(() => {
     let active = true
@@ -362,11 +362,7 @@ export function CanvasSidebar() {
 
   useEffect(() => {
     void loadProjects()
-    const savedMode = window.localStorage.getItem('canvas-manager-view-mode')
-    if (savedMode === 'grid' || savedMode === 'list') setViewMode(savedMode)
-    const savedSort = window.localStorage.getItem('canvas-manager-sort-mode')
-    if (savedSort === 'updated' || savedSort === 'created' || savedSort === 'name') setSortMode(savedSort)
-  }, [loadProjects, setSortMode, setViewMode])
+  }, [loadProjects])
 
   const visibleProjects = useMemo(() => {
     const source = trashMode ? deletedProjects : projects

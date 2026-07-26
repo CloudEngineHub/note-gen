@@ -3,8 +3,9 @@ import { create } from 'zustand'
 export type SettingSection =
   | 'about'
   | 'general'
-  | 'editor'
   | 'record'
+  | 'editor'
+  | 'canvas'
   | 'sync'
   | 'imageHosting'
   | 'ai'
@@ -23,8 +24,9 @@ export type SettingSection =
 export const settingSections: SettingSection[] = [
   'about',
   'general',
-  'editor',
   'record',
+  'editor',
+  'canvas',
   'sync',
   'imageHosting',
   'ai',

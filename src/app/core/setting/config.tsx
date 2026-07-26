@@ -17,6 +17,7 @@ import {
   PenTool,
   Brain,
   Globe2,
+  PanelsTopLeft,
 } from "lucide-react"
 
 const baseConfig = [
@@ -29,12 +30,16 @@ const baseConfig = [
     anchor: 'general',
   },
   {
+    icon: <PenTool className="size-4" />,
+    anchor: 'record',
+  },
+  {
     icon: <FileCog className="size-4" />,
     anchor: 'editor',
   },
   {
-    icon: <PenTool className="size-4" />,
-    anchor: 'record',
+    icon: <PanelsTopLeft className="size-4" />,
+    anchor: 'canvas',
   },
   '-',
   {

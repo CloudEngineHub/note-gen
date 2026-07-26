@@ -634,6 +634,84 @@
         }
       }
     },
+    "canvas": {
+      "title": "Canvas Settings",
+      "desc": "Configure canvas display, interaction, and manager preferences. Changes take effect immediately.",
+      "display": {
+        "title": "Canvas Display",
+        "desc": "Adjust the grid, minimap, and zoom behavior across all canvases.",
+        "showGrid": {
+          "title": "Show grid",
+          "desc": "Show a guide grid in the canvas background."
+        },
+        "snapToGrid": {
+          "title": "Snap to grid",
+          "desc": "Align nodes to the nearest grid position while moving them."
+        },
+        "minimap": {
+          "title": "Show minimap",
+          "desc": "Show an overview and current position in the lower-right corner."
+        },
+        "gridStyle": {
+          "title": "Grid style",
+          "desc": "Choose the grid pattern used in the canvas background.",
+          "options": {
+            "dots": "Dots",
+            "lines": "Lines",
+            "none": "Off"
+          }
+        },
+        "gridGap": {
+          "title": "Grid spacing",
+          "desc": "Adjust the distance between grid marks and snap positions."
+        },
+        "defaultZoom": {
+          "title": "Default zoom",
+          "desc": "Set the zoom used when opening a canvas. Changes also apply to the current canvas."
+        }
+      },
+      "interaction": {
+        "title": "Interaction",
+        "desc": "Configure mouse wheel behavior and what happens after inserting a node.",
+        "wheel": {
+          "title": "Mouse wheel behavior",
+          "desc": "Choose whether the mouse wheel zooms or pans the canvas.",
+          "options": {
+            "zoom": "Zoom canvas",
+            "pan": "Pan canvas"
+          }
+        },
+        "afterInsert": {
+          "title": "After inserting a node",
+          "desc": "Keep the current tool or return to the selection tool after adding a node.",
+          "options": {
+            "keep": "Keep current tool",
+            "select": "Return to selection"
+          }
+        }
+      },
+      "manager": {
+        "title": "Canvas Manager",
+        "desc": "Configure how canvases are displayed and ordered in the manager.",
+        "view": {
+          "title": "Default view",
+          "desc": "Choose how canvases are displayed in the manager.",
+          "options": {
+            "grid": "Grid",
+            "list": "List"
+          }
+        },
+        "sort": {
+          "title": "Default sort",
+          "desc": "Choose how canvases are ordered in the manager.",
+          "options": {
+            "updated": "Recently updated",
+            "created": "Creation time",
+            "name": "Name"
+          }
+        }
+      }
+    },
     "record": {
       "title": "Record Settings",
       "desc": "Configure record-related settings here, including record description and toolbar configuration.",
