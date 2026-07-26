@@ -1,7 +1,7 @@
 import type { Mark } from '@/db/marks'
+import type { RecordSortMode } from '@/lib/record-display-preferences'
 
 type RecordTimePreset = 'all' | 'today' | 'last7Days' | 'last30Days'
-export type RecordSortMode = 'newest' | 'oldest' | 'type'
 
 type RecordFiltersLike = {
   search: string

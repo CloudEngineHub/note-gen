@@ -16,13 +16,9 @@ import { useSettingsDialogStore } from "@/stores/settings-dialog"
 
 export function NoteSidebar() {
   const t = useTranslations();
-  const { trashState, marks, setMarks, initRecordViewMode, initRecordSortMode } = useMarkStore()
+  const { trashState, marks, setMarks } = useMarkStore()
   const visibleTrashMarks = React.useMemo(() => filterMarks(marks, getTrashRecordFilters()), [marks])
   const { openSettings } = useSettingsDialogStore()
-
-  useEffect(() => {
-    void Promise.all([initRecordViewMode(), initRecordSortMode()])
-  }, [initRecordSortMode, initRecordViewMode])
 
   async function handleClearTrash() {
     const res = await confirm(`${t('record.trash.confirm')}\n${t('record.trash.syncWarning')}`, {

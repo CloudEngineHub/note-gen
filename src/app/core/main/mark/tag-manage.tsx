@@ -21,6 +21,7 @@ import { initTagsDb, insertTag, Tag, delTag, updateTag, updateTagsOrder } from "
 import type { Mark } from "@/db/marks"
 import useTagStore from "@/stores/tag"
 import useMarkStore from "@/stores/mark"
+import useSettingStore from "@/stores/setting"
 import useChatStore from "@/stores/chat"
 import { MarkLoading } from './mark-loading'
 import { ImageGallery } from './image-gallery'
@@ -182,8 +183,6 @@ export function TagManage() {
     queues,
     fetchMarks,
     recordFilters,
-    recordViewMode,
-    recordSortMode,
     hasActiveRecordFilters,
     setVisibleMarkIds,
     pendingScrollMarkId,
@@ -191,6 +190,7 @@ export function TagManage() {
     highlightedMarkId,
     setHighlightedMarkId,
   } = useMarkStore()
+  const { recordViewMode, recordSortMode } = useSettingStore()
 
   async function handleAddTag() {
     if (!newTagName.trim()) return

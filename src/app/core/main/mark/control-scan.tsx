@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/hooks/use-toast"
 import { useRecordCompletion } from './use-record-completion'
 import { uploadImage } from "@/lib/imageHosting"
+import { getRecordSaveTagIdFromTags } from '@/lib/record-save-target'
 
 const SCREENSHOT_DIR = 'screenshot'
 const TITLE_BAR_HEIGHT_PX = 36
@@ -116,23 +117,34 @@ export function ControlScan() {
   const captureRequestIdRef = useRef(0)
   const { currentTagId, tags, fetchTags, initTags } = useTagStore()
   const { addQueue, removeQueue, setQueue, fetchMarks } = useMarkStore()
-  const { primaryModel, enableImageRecognition } = useSettingStore()
+  const {
+    primaryModel,
+    enableImageRecognition,
+    recordSaveTargetMode,
+    fixedRecordTagId,
+    lastRecordTagId,
+  } = useSettingStore()
   const completeRecord = useRecordCompletion()
 
   const visibleFiles = useMemo(() => (
     files.filter(isWindowScreenshot)
   ), [files])
-  const selectedSaveTargetId = useMemo(() => {
-    if (selectedSaveTagId && tags.some((tag) => tag.id === selectedSaveTagId)) {
-      return selectedSaveTagId
-    }
-
-    if (tags.some((tag) => tag.id === currentTagId)) {
-      return currentTagId
-    }
-
-    return tags[0]?.id ?? currentTagId ?? null
-  }, [currentTagId, selectedSaveTagId, tags])
+  const defaultSaveTargetId = useMemo(() => getRecordSaveTagIdFromTags({
+    mode: recordSaveTargetMode,
+    currentTagId,
+    lastTagId: lastRecordTagId,
+    fixedTagId: fixedRecordTagId,
+    tagIds: tags.map((tag) => tag.id),
+  }), [
+    currentTagId,
+    fixedRecordTagId,
+    lastRecordTagId,
+    recordSaveTargetMode,
+    tags,
+  ])
+  const selectedSaveTargetId = selectedSaveTagId && tags.some((tag) => tag.id === selectedSaveTagId)
+    ? selectedSaveTagId
+    : defaultSaveTargetId
   const recognitionLabel = enableImageRecognition
     ? t('record.capture.screenshotRecognitionAuto')
     : t('record.capture.screenshotRecognitionOff')
@@ -415,10 +427,18 @@ export function ControlScan() {
     let cancelled = false
     const prepareTags = async () => {
       await initTags()
-      if (!cancelled) {
-        setSelectedSaveTagId(useTagStore.getState().currentTagId)
-      }
       await fetchTags()
+      if (!cancelled) {
+        const tagState = useTagStore.getState()
+        const settingState = useSettingStore.getState()
+        setSelectedSaveTagId(getRecordSaveTagIdFromTags({
+          mode: settingState.recordSaveTargetMode,
+          currentTagId: tagState.currentTagId,
+          lastTagId: settingState.lastRecordTagId,
+          fixedTagId: settingState.fixedRecordTagId,
+          tagIds: tagState.tags.map((tag) => tag.id),
+        }))
+      }
     }
 
     void prepareTags()

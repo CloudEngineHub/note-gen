@@ -581,6 +581,52 @@
           "desc": "Para processar registros reconhecidos por OCR e gerar descrições de registros"
         }
       },
+      "display": {
+        "title": "Navegação",
+        "desc": "Defina a visualização e a ordenação padrão das listas de registros",
+        "view": {
+          "title": "Visualização padrão",
+          "desc": "Escolha a densidade de exibição padrão das listas de registros",
+          "options": {
+            "list": "Lista",
+            "compact": "Compacta",
+            "cards": "Cartões"
+          }
+        },
+        "sort": {
+          "title": "Ordenação padrão",
+          "desc": "Escolha a ordem padrão dos registros nas listas",
+          "options": {
+            "newest": "Mais recentes",
+            "oldest": "Mais antigos",
+            "type": "Por tipo"
+          }
+        }
+      },
+      "save": {
+        "title": "Salvamento de registros",
+        "desc": "Defina onde os novos registros são salvos e o que acontece após salvar",
+        "target": {
+          "title": "Local padrão",
+          "desc": "Aplica-se a todas as formas de criar registros; ainda é possível escolher outra categoria antes de salvar",
+          "fixedLabel": "Categoria fixa",
+          "fixedPlaceholder": "Selecione uma categoria fixa",
+          "options": {
+            "current": "Atual",
+            "last": "Última usada",
+            "fixed": "Fixa"
+          }
+        },
+        "completion": {
+          "title": "Após salvar",
+          "desc": "Escolha como a interface reage após um registro ser salvo",
+          "options": {
+            "stay": "Permanecer aqui",
+            "highlight": "Localizar e destacar",
+            "open": "Abrir detalhes"
+          }
+        }
+      },
       "toolbar": {
         "title": "Configurações da Barra de Ferramentas",
         "recordToolbar": {

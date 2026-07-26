@@ -644,6 +644,52 @@
           "desc": "用于处理 OCR 识别后的记录，生成记录描述"
         }
       },
+      "display": {
+        "title": "浏览方式",
+        "desc": "设置记录列表的默认视图和排序方式",
+        "view": {
+          "title": "默认视图",
+          "desc": "选择记录列表的默认展示密度",
+          "options": {
+            "list": "列表",
+            "compact": "紧凑",
+            "cards": "卡片"
+          }
+        },
+        "sort": {
+          "title": "默认排序",
+          "desc": "选择记录在列表中的默认排列顺序",
+          "options": {
+            "newest": "最新优先",
+            "oldest": "最早优先",
+            "type": "按类型"
+          }
+        }
+      },
+      "save": {
+        "title": "记录保存",
+        "desc": "设置新记录的默认保存位置和保存后的行为",
+        "target": {
+          "title": "默认保存位置",
+          "desc": "用于所有新建记录入口，保存前仍可临时选择其他分类",
+          "fixedLabel": "固定分类",
+          "fixedPlaceholder": "选择固定分类",
+          "options": {
+            "current": "当前分类",
+            "last": "上次使用",
+            "fixed": "固定分类"
+          }
+        },
+        "completion": {
+          "title": "保存后的行为",
+          "desc": "选择记录保存成功后界面的响应方式",
+          "options": {
+            "stay": "留在当前位置",
+            "highlight": "定位并高亮",
+            "open": "打开详情"
+          }
+        }
+      },
       "toolbar": {
         "title": "工具栏设置",
         "recordToolbar": {

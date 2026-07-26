@@ -581,6 +581,52 @@
           "desc": "用於處理 OCR 識別後的記錄，生成記錄描述"
         }
       },
+      "display": {
+        "title": "瀏覽方式",
+        "desc": "設定記錄列表的預設檢視與排序方式",
+        "view": {
+          "title": "預設檢視",
+          "desc": "選擇記錄列表的預設顯示密度",
+          "options": {
+            "list": "列表",
+            "compact": "精簡",
+            "cards": "卡片"
+          }
+        },
+        "sort": {
+          "title": "預設排序",
+          "desc": "選擇記錄在列表中的預設排列順序",
+          "options": {
+            "newest": "最新優先",
+            "oldest": "最早優先",
+            "type": "依類型"
+          }
+        }
+      },
+      "save": {
+        "title": "記錄儲存",
+        "desc": "設定新記錄的預設儲存位置與儲存後行為",
+        "target": {
+          "title": "預設儲存位置",
+          "desc": "套用至所有新增記錄入口，儲存前仍可暫時選擇其他分類",
+          "fixedLabel": "固定分類",
+          "fixedPlaceholder": "選擇固定分類",
+          "options": {
+            "current": "目前分類",
+            "last": "上次使用",
+            "fixed": "固定分類"
+          }
+        },
+        "completion": {
+          "title": "儲存後行為",
+          "desc": "選擇記錄儲存成功後介面的回應方式",
+          "options": {
+            "stay": "留在目前位置",
+            "highlight": "定位並醒目提示",
+            "open": "開啟詳細資料"
+          }
+        }
+      },
       "toolbar": {
         "title": "工具欄設置",
         "recordToolbar": {

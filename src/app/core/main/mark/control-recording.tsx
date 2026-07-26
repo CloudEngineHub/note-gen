@@ -1,6 +1,5 @@
 import { insertMark } from "@/db/marks"
 import useMarkStore from "@/stores/mark"
-import useTagStore from "@/stores/tag"
 import useSettingStore from "@/stores/setting"
 import useRecordingStore from "@/stores/recording"
 import { Mic } from "lucide-react"
@@ -9,7 +8,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
 import { transcribeRecording } from '@/lib/audio'
-import { useRouter } from 'next/navigation'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readFile, writeFile, BaseDirectory, exists, mkdir } from '@tauri-apps/plugin-fs'
 import { useRef } from 'react'
@@ -17,13 +15,12 @@ import { isMobileDevice } from '@/lib/check'
 import { convertToWav } from '@/lib/audio-converter'
 import { useEffect } from 'react'
 import emitter from '@/lib/emitter'
-import { handleRecordComplete } from '@/lib/record-navigation'
 import { getTranscriptionFallbackMessage } from '@/lib/speech/transcription-fallback.ts'
 import { useRecordCompletion } from './use-record-completion'
+import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
 
 export function ControlRecording() {
   const t = useTranslations();
-  const router = useRouter();
   const { sttModel } = useSettingStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = isMobileDevice();
@@ -31,7 +28,6 @@ export function ControlRecording() {
   const clickTimer = useRef<NodeJS.Timeout | null>(null);
   const completeRecord = useRecordCompletion();
 
-  const { currentTagId } = useTagStore()
   const { addQueue, removeQueue } = useMarkStore()
   
   // 大模型录音
@@ -93,20 +89,19 @@ export function ControlRecording() {
       
       // 创建队列ID
       const queueId = `recording-${Date.now()}`
+      const tagId = await getDefaultRecordSaveTagId()
       
       // 添加到队列中显示识别中的状态
       addQueue({
         queueId,
-        tagId: currentTagId,
+        tagId,
         type: 'recording',
         progress: t('recording.processing'),
         startTime: Date.now()
       })
 
-      handleRecordComplete(router)
-      
       // 后台异步识别（使用转换后的 WAV）
-      processTranscription(wavBlob, queueId)
+      processTranscription(wavBlob, queueId, tagId)
       
     } catch (error) {
       console.error('停止录音失败:', error)
@@ -153,6 +148,7 @@ export function ControlRecording() {
   const processTranscription = async (
     audioBlob: Blob,
     queueId: string,
+    tagId: number,
   ) => {
     let audioPath = ''
     try {
@@ -178,7 +174,7 @@ export function ControlRecording() {
       const displayContent = noContent ? (fallbackMessage || t('recording.noContentDetected')) : transcription
       
       const result = await insertMark({
-        tagId: currentTagId,
+        tagId,
         type: 'recording',
         desc: displayContent.substring(0, 100),
         content: displayContent,
@@ -191,7 +187,7 @@ export function ControlRecording() {
 
       await completeRecord({
         markId,
-        tagId: currentTagId,
+        tagId,
         typeLabel: t('record.mark.type.recording'),
       })
       
@@ -251,18 +247,19 @@ export function ControlRecording() {
 
       // 创建队列ID
       const queueId = `recording-${Date.now()}`
+      const tagId = await getDefaultRecordSaveTagId()
       
       // 添加到队列中显示识别中的状态
       addQueue({
         queueId,
-        tagId: currentTagId,
+        tagId,
         type: 'recording',
         progress: t('recording.processing'),
         startTime: Date.now()
       })
       
       // 后台异步识别
-      processTranscription(audioBlob, queueId)
+      processTranscription(audioBlob, queueId, tagId)
       
     } catch (error) {
       console.error('文件选择失败:', error)
@@ -282,18 +279,19 @@ export function ControlRecording() {
     try {
       // 创建队列ID
       const queueId = `recording-${Date.now()}`
+      const tagId = await getDefaultRecordSaveTagId()
       
       // 添加到队列中显示识别中的状态
       addQueue({
         queueId,
-        tagId: currentTagId,
+        tagId,
         type: 'recording',
         progress: t('recording.processing'),
         startTime: Date.now()
       })
       
       // 后台异步识别（File 对象就是 Blob，直接传递）
-      processTranscription(file, queueId)
+      processTranscription(file, queueId, tagId)
       
       // 重置 input
       event.target.value = ''

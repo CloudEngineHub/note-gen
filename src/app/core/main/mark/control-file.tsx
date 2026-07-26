@@ -3,7 +3,6 @@ import { FilePlus } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from "@tauri-apps/plugin-fs";
-import useTagStore from "@/stores/tag";
 import useMarkStore from "@/stores/mark";
 import { insertMark } from "@/db/marks";
 import { useEffect, useCallback } from 'react'
@@ -12,6 +11,7 @@ import { extractTextFromPDF } from '@/lib/pdf'
 import { v4 as uuid } from 'uuid'
 import { toast } from '@/hooks/use-toast'
 import { useRecordCompletion } from './use-record-completion'
+import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
 
 // 常见的代码格式
 const codeExtensions = [
@@ -31,7 +31,6 @@ const pdfExtensions = ['pdf'];
 
 export function ControlFile() {
   const t = useTranslations();
-  const { currentTagId } = useTagStore()
   const { addQueue, setQueue, removeQueue } = useMarkStore()
   const completeRecord = useRecordCompletion()
 
@@ -56,9 +55,9 @@ export function ControlFile() {
     await readFileByPath(filePath)
   }
 
-  async function saveFileRecord(path: string, desc: string, content: string) {
+  async function saveFileRecord(path: string, desc: string, content: string, tagId: number) {
     const result = await insertMark({
-      tagId: currentTagId,
+      tagId,
       type: 'file',
       desc,
       content,
@@ -67,12 +66,13 @@ export function ControlFile() {
     const markId = Number(result.lastInsertId || 0) || null
     await completeRecord({
       markId,
-      tagId: currentTagId,
+      tagId,
       typeLabel: t('record.mark.type.file'),
     })
   }
 
   async function readFileByPath(path: string) {
+    const tagId = await getDefaultRecordSaveTagId()
     const ext = path.substring(path.lastIndexOf('.') + 1)
     // 提取文件名（不含路径）
     const fileName = path.split('/').pop() || path.split('\\').pop() || path
@@ -84,7 +84,7 @@ export function ControlFile() {
     if (pdfExtensions.includes(ext)) {
       const queueId = uuid()
       try {
-        addQueue({ queueId, tagId: currentTagId!, progress: t('record.mark.progress.cacheFile'), type: 'file', startTime: Date.now() })
+        addQueue({ queueId, tagId, progress: t('record.mark.progress.cacheFile'), type: 'file', startTime: Date.now() })
         content = await extractTextFromPDF(path, (progress) => {
           setQueue(queueId, { progress })
         })
@@ -96,7 +96,7 @@ export function ControlFile() {
       removeQueue(queueId)
 
       // 将完整路径存储在 url 字段，用于点击时打开文件夹
-      await saveFileRecord(path, desc, content)
+      await saveFileRecord(path, desc, content, tagId)
       return
     }
     // 处理文本文件和代码文件
@@ -119,7 +119,7 @@ export function ControlFile() {
     }
 
     // 将完整路径存储在 url 字段，用于点击时打开文件夹
-    await saveFileRecord(path, desc, content)
+    await saveFileRecord(path, desc, content, tagId)
   }
 
   return (

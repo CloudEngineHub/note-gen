@@ -76,6 +76,7 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   'autoDataSyncLastAppliedRemoteMeta',
   'autoDataSyncRecordSnapshots',
   'autoDataSyncBaselineFingerprints',
+  'lastRecordTagId',
 ]
 
 export const SENSITIVE_SYNC_EXCLUDED_FIELDS: string[] = [

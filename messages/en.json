@@ -644,6 +644,52 @@
           "desc": "For processing OCR-recognized records and generating record descriptions"
         }
       },
+      "display": {
+        "title": "Browsing",
+        "desc": "Set the default view and sort order for record lists",
+        "view": {
+          "title": "Default View",
+          "desc": "Choose the default display density for record lists",
+          "options": {
+            "list": "List",
+            "compact": "Compact",
+            "cards": "Cards"
+          }
+        },
+        "sort": {
+          "title": "Default Sort",
+          "desc": "Choose the default order of records in lists",
+          "options": {
+            "newest": "Newest",
+            "oldest": "Oldest",
+            "type": "By Type"
+          }
+        }
+      },
+      "save": {
+        "title": "Record Saving",
+        "desc": "Set where new records are saved and what happens after saving",
+        "target": {
+          "title": "Default Save Location",
+          "desc": "Applies to every new-record entry point; you can still choose another category before saving",
+          "fixedLabel": "Fixed category",
+          "fixedPlaceholder": "Select a fixed category",
+          "options": {
+            "current": "Current",
+            "last": "Last Used",
+            "fixed": "Fixed"
+          }
+        },
+        "completion": {
+          "title": "After Saving",
+          "desc": "Choose how the interface responds after a record is saved",
+          "options": {
+            "stay": "Stay Here",
+            "highlight": "Locate & Highlight",
+            "open": "Open Details"
+          }
+        }
+      },
       "toolbar": {
         "title": "Toolbar Settings",
         "recordToolbar": {

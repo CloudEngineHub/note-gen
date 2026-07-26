@@ -3,7 +3,6 @@ import { insertMark, Mark } from "@/db/marks"
 import { useTranslations } from 'next-intl'
 import { recognizeImageWithFallback } from "@/lib/image-recognition"
 import useMarkStore from "@/stores/mark"
-import useTagStore from "@/stores/tag"
 import { BaseDirectory, exists, mkdir, readFile, writeFile } from "@tauri-apps/plugin-fs"
 import { ImagePlus } from "lucide-react"
 import useSettingStore from "@/stores/setting"
@@ -17,6 +16,7 @@ import emitter from '@/lib/emitter'
 import { toast } from '@/hooks/use-toast'
 import { useRecordCompletion } from './use-record-completion'
 import { getImageRecognitionProgressText } from "@/lib/image-recognition-progress"
+import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
 
 function isPickerCancelError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
@@ -150,7 +150,6 @@ function getImageMimeType(extension: string) {
 
 export function ControlImage() {
   const t = useTranslations();
-  const { currentTagId } = useTagStore()
   const { primaryModel, enableImageRecognition } = useSettingStore()
   const { addQueue, setQueue, removeQueue } = useMarkStore()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -226,9 +225,10 @@ export function ControlImage() {
   // 移动端文件上传
   async function uploadMobileFile(file: File) {
     const queueId = uuid()
+    const tagId = await getDefaultRecordSaveTagId()
     
     try {
-      addQueue({ queueId, tagId: currentTagId!, progress: t('record.mark.progress.cacheImage'), type: 'image', startTime: Date.now() })
+      addQueue({ queueId, tagId, progress: t('record.mark.progress.cacheImage'), type: 'image', startTime: Date.now() })
       
       const fileData = new Uint8Array(await file.arrayBuffer())
       const ext = getImageExtension(file.name, fileData)
@@ -266,7 +266,7 @@ export function ControlImage() {
       }
       
       const mark: Partial<Mark> = {
-        tagId: currentTagId,
+        tagId,
         type: 'image',
         content,
         url: filename,
@@ -290,7 +290,7 @@ export function ControlImage() {
       const markId = Number(result.lastInsertId || 0) || null
       await completeRecord({
         markId,
-        tagId: currentTagId,
+        tagId,
         typeLabel: t('record.mark.type.image'),
       })
     } catch (error) {
@@ -306,8 +306,9 @@ export function ControlImage() {
 
   async function upload(path: string) {
     const queueId = uuid()
+    const tagId = await getDefaultRecordSaveTagId()
     try {
-      addQueue({ queueId, tagId: currentTagId!, progress: t('record.mark.progress.cacheImage'), type: 'image', startTime: Date.now() })
+      addQueue({ queueId, tagId, progress: t('record.mark.progress.cacheImage'), type: 'image', startTime: Date.now() })
       const isImageFolderExists = await exists('image', { baseDir: BaseDirectory.AppData})
       if (!isImageFolderExists) {
         await mkdir('image', { baseDir: BaseDirectory.AppData})
@@ -340,7 +341,7 @@ export function ControlImage() {
       }
       
       const mark: Partial<Mark> = {
-        tagId: currentTagId,
+        tagId,
         type: 'image',
         content,
         url: filename,
@@ -368,7 +369,7 @@ export function ControlImage() {
       const markId = Number(result.lastInsertId || 0) || null
       await completeRecord({
         markId,
-        tagId: currentTagId,
+        tagId,
         typeLabel: t('record.mark.type.image'),
       })
     } catch (error) {

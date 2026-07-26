@@ -34,6 +34,8 @@ import { Store } from '@tauri-apps/plugin-store'
 import { toast } from '@/hooks/use-toast'
 import { RecordSaveTarget } from './record-save-target'
 import { useRecordCompletion } from './use-record-completion'
+import useSettingStore from '@/stores/setting'
+import { getRecordSaveTagIdFromTags } from '@/lib/record-save-target'
 
 export function ControlText() {
   const t = useTranslations();
@@ -177,10 +179,18 @@ export function ControlText() {
     let cancelled = false
     const prepareTags = async () => {
       await initTags()
-      if (!cancelled) {
-        setSelectedTagId(useTagStore.getState().currentTagId)
-      }
       await fetchTags()
+      if (!cancelled) {
+        const tagState = useTagStore.getState()
+        const settingState = useSettingStore.getState()
+        setSelectedTagId(getRecordSaveTagIdFromTags({
+          mode: settingState.recordSaveTargetMode,
+          currentTagId: tagState.currentTagId,
+          lastTagId: settingState.lastRecordTagId,
+          fixedTagId: settingState.fixedRecordTagId,
+          tagIds: tagState.tags.map((tag) => tag.id),
+        }))
+      }
     }
 
     void prepareTags()

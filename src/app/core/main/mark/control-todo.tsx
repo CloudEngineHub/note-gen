@@ -28,6 +28,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { isMobileDevice as checkIsMobileDevice } from '@/lib/check'
 import { TodoForm, TodoFormData } from "./todo-form"
 import { useRecordCompletion } from './use-record-completion'
+import useSettingStore from '@/stores/setting'
+import { getRecordSaveTagIdFromTags } from '@/lib/record-save-target'
 
 export function ControlTodo() {
   const t = useTranslations();
@@ -102,10 +104,18 @@ export function ControlTodo() {
     let cancelled = false
     const prepareTags = async () => {
       await initTags()
-      if (!cancelled) {
-        setSelectedTagId(useTagStore.getState().currentTagId)
-      }
       await fetchTags()
+      if (!cancelled) {
+        const tagState = useTagStore.getState()
+        const settingState = useSettingStore.getState()
+        setSelectedTagId(getRecordSaveTagIdFromTags({
+          mode: settingState.recordSaveTargetMode,
+          currentTagId: tagState.currentTagId,
+          lastTagId: settingState.lastRecordTagId,
+          fixedTagId: settingState.fixedRecordTagId,
+          tagIds: tagState.tags.map((tag) => tag.id),
+        }))
+      }
     }
 
     void prepareTags()

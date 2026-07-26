@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { Mark } from "@/db/marks";
 import { Badge } from "@/components/ui/badge";
 import useMarkStore from "@/stores/mark";
+import useSettingStore from "@/stores/setting";
 import { MarkLoading } from "./mark-loading";
 import MarkEmpty from "./mark-empty";
 import { buildRecordFilterSummary, filterMarks, getTrashRecordFilters, sortMarks } from "./mark-filters";
@@ -20,11 +21,10 @@ export const MarkList = React.memo(function MarkList() {
     queues,
     trashState,
     recordFilters,
-    recordViewMode,
-    recordSortMode,
     hasActiveRecordFilters,
     setVisibleMarkIds,
   } = useMarkStore()
+  const { recordViewMode, recordSortMode } = useSettingStore()
 
   const effectiveFilters = React.useMemo(() => (
     trashState ? getTrashRecordFilters() : recordFilters

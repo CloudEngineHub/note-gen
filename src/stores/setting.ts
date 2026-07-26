@@ -36,6 +36,23 @@ import {
   normalizeOutlinePosition,
   type OutlinePosition,
 } from '@/lib/outline-preferences'
+import {
+  DEFAULT_RECORD_SORT_MODE,
+  DEFAULT_RECORD_VIEW_MODE,
+  normalizeRecordSortMode,
+  normalizeRecordViewMode,
+  type RecordSortMode,
+  type RecordViewMode,
+} from '@/lib/record-display-preferences'
+import {
+  DEFAULT_RECORD_COMPLETION_BEHAVIOR,
+  DEFAULT_RECORD_SAVE_TARGET_MODE,
+  normalizeRecordCompletionBehavior,
+  normalizeRecordSaveTargetMode,
+  normalizeRecordTagId,
+  type RecordCompletionBehavior,
+  type RecordSaveTargetMode,
+} from '@/lib/record-save-preferences'
 
 export enum GenTemplateRange {
   All = 'all',
@@ -271,6 +288,24 @@ interface SettingState {
   recordToolbarConfig: RecordToolbarItem[]
   setRecordToolbarConfig: (config: RecordToolbarItem[]) => Promise<void>
 
+  recordViewMode: RecordViewMode
+  setRecordViewMode: (mode: RecordViewMode) => Promise<void>
+
+  recordSortMode: RecordSortMode
+  setRecordSortMode: (mode: RecordSortMode) => Promise<void>
+
+  recordSaveTargetMode: RecordSaveTargetMode
+  setRecordSaveTargetMode: (mode: RecordSaveTargetMode) => Promise<void>
+
+  fixedRecordTagId: number | null
+  setFixedRecordTagId: (tagId: number | null) => Promise<void>
+
+  lastRecordTagId: number | null
+  setLastRecordTagId: (tagId: number | null) => Promise<void>
+
+  recordCompletionBehavior: RecordCompletionBehavior
+  setRecordCompletionBehavior: (behavior: RecordCompletionBehavior) => Promise<void>
+
   // 编辑器撤销/重做按钮显示设置
   showEditorUndoRedo: boolean
   setShowEditorUndoRedo: (show: boolean) => Promise<void>
@@ -364,7 +399,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const store = await Store.load('store.json');
     await get().setVersion()
 
-    let editorPreferencesChanged = false
+    let preferencesChanged = false
     const storedEditorContentWidth = await store.get('editorContentWidth')
     if (storedEditorContentWidth === undefined) {
       const legacyCenteredContent = await store.get<boolean>('centeredContent')
@@ -372,12 +407,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
         'editorContentWidth',
         legacyCenteredContent === true ? 'standard' : DEFAULT_EDITOR_CONTENT_WIDTH
       )
-      editorPreferencesChanged = true
+      preferencesChanged = true
     } else {
       const normalizedContentWidth = normalizeEditorContentWidth(storedEditorContentWidth)
       if (normalizedContentWidth !== storedEditorContentWidth) {
         await store.set('editorContentWidth', normalizedContentWidth)
-        editorPreferencesChanged = true
+        preferencesChanged = true
       }
     }
 
@@ -385,24 +420,66 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const normalizedLineHeight = normalizeEditorLineHeight(storedEditorLineHeight)
     if (normalizedLineHeight !== storedEditorLineHeight) {
       await store.set('editorLineHeight', normalizedLineHeight)
-      editorPreferencesChanged = true
+      preferencesChanged = true
     }
 
     const storedEditorViewMode = await store.get('editorViewMode')
     const normalizedViewMode = normalizeEditorViewMode(storedEditorViewMode)
     if (normalizedViewMode !== storedEditorViewMode) {
       await store.set('editorViewMode', normalizedViewMode)
-      editorPreferencesChanged = true
+      preferencesChanged = true
     }
 
     const storedOutlinePosition = await store.get('outlinePosition')
     const normalizedOutlinePosition = normalizeOutlinePosition(storedOutlinePosition)
     if (normalizedOutlinePosition !== storedOutlinePosition) {
       await store.set('outlinePosition', normalizedOutlinePosition)
-      editorPreferencesChanged = true
+      preferencesChanged = true
     }
 
-    if (editorPreferencesChanged) {
+    const storedRecordViewMode = await store.get('recordViewMode')
+    const normalizedRecordViewMode = normalizeRecordViewMode(storedRecordViewMode)
+    if (normalizedRecordViewMode !== storedRecordViewMode) {
+      await store.set('recordViewMode', normalizedRecordViewMode)
+      preferencesChanged = true
+    }
+
+    const storedRecordSortMode = await store.get('recordSortMode')
+    const normalizedRecordSortMode = normalizeRecordSortMode(storedRecordSortMode)
+    if (normalizedRecordSortMode !== storedRecordSortMode) {
+      await store.set('recordSortMode', normalizedRecordSortMode)
+      preferencesChanged = true
+    }
+
+    const storedRecordSaveTargetMode = await store.get('recordSaveTargetMode')
+    const normalizedRecordSaveTargetMode = normalizeRecordSaveTargetMode(storedRecordSaveTargetMode)
+    if (normalizedRecordSaveTargetMode !== storedRecordSaveTargetMode) {
+      await store.set('recordSaveTargetMode', normalizedRecordSaveTargetMode)
+      preferencesChanged = true
+    }
+
+    const storedFixedRecordTagId = await store.get('fixedRecordTagId')
+    const normalizedFixedRecordTagId = normalizeRecordTagId(storedFixedRecordTagId)
+    if (normalizedFixedRecordTagId !== storedFixedRecordTagId) {
+      await store.set('fixedRecordTagId', normalizedFixedRecordTagId)
+      preferencesChanged = true
+    }
+
+    const storedLastRecordTagId = await store.get('lastRecordTagId')
+    const normalizedLastRecordTagId = normalizeRecordTagId(storedLastRecordTagId)
+    if (normalizedLastRecordTagId !== storedLastRecordTagId) {
+      await store.set('lastRecordTagId', normalizedLastRecordTagId)
+      preferencesChanged = true
+    }
+
+    const storedRecordCompletionBehavior = await store.get('recordCompletionBehavior')
+    const normalizedRecordCompletionBehavior = normalizeRecordCompletionBehavior(storedRecordCompletionBehavior)
+    if (normalizedRecordCompletionBehavior !== storedRecordCompletionBehavior) {
+      await store.set('recordCompletionBehavior', normalizedRecordCompletionBehavior)
+      preferencesChanged = true
+    }
+
+    if (preferencesChanged) {
       await store.save()
     }
 
@@ -1299,6 +1376,60 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ recordToolbarConfig: config })
     const store = await Store.load('store.json');
     await store.set('recordToolbarConfig', config)
+    await store.save()
+  },
+
+  recordViewMode: DEFAULT_RECORD_VIEW_MODE,
+  setRecordViewMode: async (mode) => {
+    const recordViewMode = normalizeRecordViewMode(mode)
+    set({ recordViewMode })
+    const store = await Store.load('store.json')
+    await store.set('recordViewMode', recordViewMode)
+    await store.save()
+  },
+
+  recordSortMode: DEFAULT_RECORD_SORT_MODE,
+  setRecordSortMode: async (mode) => {
+    const recordSortMode = normalizeRecordSortMode(mode)
+    set({ recordSortMode })
+    const store = await Store.load('store.json')
+    await store.set('recordSortMode', recordSortMode)
+    await store.save()
+  },
+
+  recordSaveTargetMode: DEFAULT_RECORD_SAVE_TARGET_MODE,
+  setRecordSaveTargetMode: async (mode) => {
+    const recordSaveTargetMode = normalizeRecordSaveTargetMode(mode)
+    set({ recordSaveTargetMode })
+    const store = await Store.load('store.json')
+    await store.set('recordSaveTargetMode', recordSaveTargetMode)
+    await store.save()
+  },
+
+  fixedRecordTagId: null,
+  setFixedRecordTagId: async (tagId) => {
+    const fixedRecordTagId = normalizeRecordTagId(tagId)
+    set({ fixedRecordTagId })
+    const store = await Store.load('store.json')
+    await store.set('fixedRecordTagId', fixedRecordTagId)
+    await store.save()
+  },
+
+  lastRecordTagId: null,
+  setLastRecordTagId: async (tagId) => {
+    const lastRecordTagId = normalizeRecordTagId(tagId)
+    set({ lastRecordTagId })
+    const store = await Store.load('store.json')
+    await store.set('lastRecordTagId', lastRecordTagId)
+    await store.save()
+  },
+
+  recordCompletionBehavior: DEFAULT_RECORD_COMPLETION_BEHAVIOR,
+  setRecordCompletionBehavior: async (behavior) => {
+    const recordCompletionBehavior = normalizeRecordCompletionBehavior(behavior)
+    set({ recordCompletionBehavior })
+    const store = await Store.load('store.json')
+    await store.set('recordCompletionBehavior', recordCompletionBehavior)
     await store.save()
   },
 

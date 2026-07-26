@@ -26,8 +26,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import useMarkStore, { type RecordViewMode } from "@/stores/mark"
-import type { RecordSortMode } from "./mark-filters"
+import useMarkStore from "@/stores/mark"
+import useSettingStore from "@/stores/setting"
+import type { RecordSortMode, RecordViewMode } from "@/lib/record-display-preferences"
 
 type MarkMoreMenuProps = {
   trashState: boolean
@@ -45,11 +46,13 @@ export function MarkMoreMenu({ trashState, onToggleTrash }: MarkMoreMenuProps) {
     selectAll,
     clearSelection,
     setMultiSelectMode,
+  } = useMarkStore()
+  const {
     recordViewMode,
     setRecordViewMode,
     recordSortMode,
     setRecordSortMode,
-  } = useMarkStore()
+  } = useSettingStore()
   const visibleCount = visibleMarkIds.length > 0 ? visibleMarkIds.length : marks.length
   const isAllSelected = visibleCount > 0 && selectedMarkIds.size === visibleCount
 
@@ -80,7 +83,7 @@ export function MarkMoreMenu({ trashState, onToggleTrash }: MarkMoreMenuProps) {
           <DropdownMenuLabel>{t('sort.title')}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={recordSortMode}
-            onValueChange={(value) => setRecordSortMode(value as RecordSortMode)}
+            onValueChange={(value) => void setRecordSortMode(value as RecordSortMode)}
           >
             <DropdownMenuRadioItem value="newest">
               <ArrowDownNarrowWide />
@@ -101,7 +104,7 @@ export function MarkMoreMenu({ trashState, onToggleTrash }: MarkMoreMenuProps) {
           <DropdownMenuLabel>{t('view.title')}</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={recordViewMode}
-            onValueChange={(value) => setRecordViewMode(value as RecordViewMode)}
+            onValueChange={(value) => void setRecordViewMode(value as RecordViewMode)}
           >
             <DropdownMenuRadioItem value="list">
               <List />
