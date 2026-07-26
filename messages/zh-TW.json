@@ -2157,6 +2157,13 @@
         }
       }
     },
+    "navigationGroups": {
+      "basic": "基礎設定",
+      "aiExtensions": "AI 與擴充",
+      "data": "資料與儲存"
+    },
+    "searchPlaceholder": "搜尋設定...",
+    "noSearchResults": "找不到相關設定",
     "title": "設定"
   },
   "record": {

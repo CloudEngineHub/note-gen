@@ -2181,6 +2181,13 @@
         }
       }
     },
+    "navigationGroups": {
+      "basic": "Basic",
+      "aiExtensions": "AI & Extensions",
+      "data": "Data & Storage"
+    },
+    "searchPlaceholder": "Search settings...",
+    "noSearchResults": "No matching settings found",
     "title": "Settings"
   },
   "record": {

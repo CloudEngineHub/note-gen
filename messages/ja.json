@@ -2157,6 +2157,13 @@
         }
       }
     },
+    "navigationGroups": {
+      "basic": "基本設定",
+      "aiExtensions": "AI と拡張機能",
+      "data": "データとストレージ"
+    },
+    "searchPlaceholder": "設定を検索...",
+    "noSearchResults": "該当する設定がありません",
     "title": "設定"
   },
   "record": {

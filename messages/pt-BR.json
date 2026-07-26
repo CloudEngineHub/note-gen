@@ -2150,6 +2150,13 @@
       "deleteSkillDesc": "Tem certeza de que deseja excluir esta Skill? Esta ação não pode ser desfeita.",
       "skillDeleted": "Skill excluída com sucesso"
     },
+    "navigationGroups": {
+      "basic": "Configurações básicas",
+      "aiExtensions": "IA e extensões",
+      "data": "Dados e armazenamento"
+    },
+    "searchPlaceholder": "Pesquisar configurações...",
+    "noSearchResults": "Nenhuma configuração encontrada",
     "title": "Configurações"
   },
   "record": {

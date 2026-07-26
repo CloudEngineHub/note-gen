@@ -2201,6 +2201,13 @@
         }
       }
     },
+    "navigationGroups": {
+      "basic": "基础设置",
+      "aiExtensions": "AI 与扩展",
+      "data": "数据与存储"
+    },
+    "searchPlaceholder": "搜索设置...",
+    "noSearchResults": "没有找到相关设置",
     "title": "设置"
   },
   "record": {

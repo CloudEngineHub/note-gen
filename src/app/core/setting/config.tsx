@@ -19,8 +19,27 @@ import {
   Globe2,
   PanelsTopLeft,
 } from "lucide-react"
+import type { ReactNode } from 'react'
+import type { SettingSection } from '@/stores/settings-dialog'
 
-const baseConfig = [
+export type SettingNavigationGroup =
+  | 'basic'
+  | 'aiExtensions'
+  | 'data'
+
+export type SettingNavigationItem =
+  | {
+      icon: ReactNode
+      anchor: SettingSection
+    }
+  | {
+      group: SettingNavigationGroup
+    }
+
+const baseConfig: SettingNavigationItem[] = [
+  {
+    group: 'basic',
+  },
   {
     icon: <Store className="size-4" />,
     anchor: 'about',
@@ -41,16 +60,21 @@ const baseConfig = [
     icon: <PanelsTopLeft className="size-4" />,
     anchor: 'canvas',
   },
-  '-',
   {
-    icon: <DatabaseBackup className="size-4" />,
-    anchor: 'sync',
+    icon: <KeyboardIcon className="size-4" />,
+    anchor: 'shortcuts',
   },
   {
-    icon: <ImageUp className="size-4" />,
-    anchor: 'imageHosting',
+    icon: <ScanText className="size-4" />,
+    anchor: 'imageMethod',
   },
-  '-',
+  {
+    icon: <Volume2 className="size-4" />,
+    anchor: 'audio',
+  },
+  {
+    group: 'aiExtensions',
+  },
   {
     icon: <BotMessageSquare className="size-4" />,
     anchor: 'ai',
@@ -64,6 +88,14 @@ const baseConfig = [
     anchor: 'rag',
   },
   {
+    icon: <Brain className="size-4" />,
+    anchor: 'memories',
+  },
+  {
+    icon: <Drama className="size-4" />,
+    anchor: 'prompt',
+  },
+  {
     icon: <Puzzle className="size-4" />,
     anchor: 'mcp',
   },
@@ -72,33 +104,23 @@ const baseConfig = [
     anchor: 'skills',
   },
   {
-    icon: <Drama className="size-4" />,
-    anchor: 'prompt',
-  },
-  {
-    icon: <Brain className="size-4" />,
-    anchor: 'memories',
-  },
-  {
     icon: <LayoutTemplate className="size-4" />,
     anchor: 'template',
   },
-  '-',
+  {
+    group: 'data',
+  },
+  {
+    icon: <DatabaseBackup className="size-4" />,
+    anchor: 'sync',
+  },
+  {
+    icon: <ImageUp className="size-4" />,
+    anchor: 'imageHosting',
+  },
   {
     icon: <FolderOpen className="size-4" />,
     anchor: 'file',
-  },
-  {
-    icon: <KeyboardIcon className="size-4" />,
-    anchor: 'shortcuts',
-  },
-  {
-    icon: <ScanText className="size-4" />,
-    anchor: 'imageMethod',
-  },
-  {
-    icon: <Volume2 className="size-4" />,
-    anchor: 'audio',
   }
 ]
 
