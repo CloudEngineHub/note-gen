@@ -96,3 +96,6 @@ docs/.vitepress/cache
 
 # worktrees
 .worktrees
+
+# Local Remotion video workspace
+/remotion/*

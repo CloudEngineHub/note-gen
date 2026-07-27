@@ -78,9 +78,10 @@ interface RailButtonProps {
   active?: boolean
   onClick: () => void
   icon: LucideIcon
+  mobile?: boolean
 }
 
-function RailButton({ label, active, onClick, icon: Icon }: RailButtonProps) {
+function RailButton({ label, active, onClick, icon: Icon, mobile = false }: RailButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -91,11 +92,12 @@ function RailButton({ label, active, onClick, icon: Icon }: RailButtonProps) {
           aria-label={label}
           aria-pressed={active}
           onClick={onClick}
+          className={cn(mobile && 'h-12 min-w-0 flex-1 rounded-none')}
         >
           <Icon data-icon="inline-start" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side={mobile ? 'top' : 'right'}>{label}</TooltipContent>
     </Tooltip>
   )
 }
@@ -170,17 +172,19 @@ export function CanvasToolsSidebar({
   }
   return (
     <div className={cn(
-      'absolute z-10 flex max-w-[calc(100%-1.5rem)]',
+      'absolute z-10 flex',
       mobile
-        ? 'inset-x-3 bottom-3 flex-col-reverse items-stretch gap-2'
-        : 'inset-y-3 left-3 items-start'
+        ? 'inset-x-0 bottom-0 max-w-none flex-col-reverse items-stretch'
+        : 'inset-y-3 left-3 max-w-[calc(100%-1.5rem)] items-start'
     )}>
       <div
         role="toolbar"
         aria-label={t('tools.label')}
         className={cn(
-          'flex shrink-0 items-center gap-1 rounded-xl border bg-background p-1 shadow-sm',
-          mobile ? 'h-12 w-full flex-row justify-start overflow-x-auto' : 'w-12 flex-col'
+          'flex shrink-0 items-center bg-background',
+          mobile
+            ? 'h-[calc(3.5rem+env(safe-area-inset-bottom))] w-full flex-row border-t px-1 pb-[env(safe-area-inset-bottom)]'
+            : 'w-12 flex-col gap-1 rounded-xl border p-1 shadow-sm'
         )}
       >
         <RailButton
@@ -188,6 +192,7 @@ export function CanvasToolsSidebar({
           active={tool === 'select'}
           icon={MousePointer2}
           onClick={() => selectTool('select')}
+          mobile={mobile}
         />
         {!mobile && (
           <RailButton
@@ -197,31 +202,35 @@ export function CanvasToolsSidebar({
             onClick={() => selectTool('hand')}
           />
         )}
-        <Separator orientation={mobile ? 'vertical' : 'horizontal'} />
+        {!mobile && <Separator />}
         <RailButton
           label={t('tools.pen')}
           active={tool === 'pen'}
           icon={Pencil}
           onClick={() => selectTool('pen')}
+          mobile={mobile}
         />
         <RailButton
           label={t('tools.highlighter')}
           active={tool === 'highlighter'}
           icon={Highlighter}
           onClick={() => selectTool('highlighter')}
+          mobile={mobile}
         />
         <RailButton
           label={t('tools.eraser')}
           active={tool === 'eraser'}
           icon={Eraser}
           onClick={() => selectTool('eraser')}
+          mobile={mobile}
         />
-        <Separator orientation={mobile ? 'vertical' : 'horizontal'} />
+        {!mobile && <Separator />}
         <RailButton
           label={t('toolbox.shapes')}
           active={panel === 'shapes'}
           icon={Shapes}
           onClick={() => openPanel('shapes')}
+          mobile={mobile}
         />
         {customComponents.length > 0 && (
           <RailButton
@@ -229,6 +238,7 @@ export function CanvasToolsSidebar({
             active={panel === 'customComponents'}
             icon={Layers3}
             onClick={() => openPanel('customComponents')}
+            mobile={mobile}
           />
         )}
         <RailButton
@@ -241,6 +251,7 @@ export function CanvasToolsSidebar({
             setPanel(null)
             onPanelOpenChange(false)
           }}
+          mobile={mobile}
         />
         <RailButton
           label={t('nodes.image')}
@@ -251,6 +262,7 @@ export function CanvasToolsSidebar({
             onPanelOpenChange(false)
             onAddImage()
           }}
+          mobile={mobile}
         />
       </div>
 
@@ -258,7 +270,7 @@ export function CanvasToolsSidebar({
         <div className={cn(
           'flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
           mobile
-            ? 'max-h-[min(60vh,32rem)] w-full'
+            ? 'mx-3 mb-2 max-h-[min(60vh,32rem)] w-[calc(100%-1.5rem)]'
             : 'ml-2 max-h-full w-[min(18rem,calc(100vw-5.5rem))]'
         )}>
           <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">

@@ -365,6 +365,12 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const pasteOffsetRef = useRef(0)
   const resizingRef = useRef(false)
   const freehandWidthHistoryRef = useRef(false)
+  const mobileNodePinchRef = useRef<{
+    initialDistance: number
+    initialZoom: number
+    anchor: CanvasPoint
+    bounds: DOMRect
+  } | null>(null)
   const groupDragRef = useRef<{
     groupId: string
     start: { x: number; y: number }
@@ -2025,6 +2031,98 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     updateDocument(canvasId, nextDocument)
   }, [canvasId, document, edges, nodes, updateDocument])
 
+  const persistGestureViewportRef = useRef(persistViewport)
+
+  useEffect(() => {
+    persistGestureViewportRef.current = persistViewport
+  }, [persistViewport])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!mobile || !container) return
+
+    const getTouchMetrics = (touches: TouchList) => {
+      const first = touches[0]
+      const second = touches[1]
+      if (!first || !second) return null
+      return {
+        distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+        midpoint: {
+          x: (first.clientX + second.clientX) / 2,
+          y: (first.clientY + second.clientY) / 2,
+        },
+      }
+    }
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return
+      const touchesNode = Array.from(event.touches).some(touch => (
+        touch.target instanceof Element && Boolean(touch.target.closest('.react-flow__node'))
+      ))
+      if (!touchesNode) return
+
+      const metrics = getTouchMetrics(event.touches)
+      const flowElement = container.querySelector<HTMLElement>('.react-flow')
+      if (!metrics || !flowElement || metrics.distance === 0) return
+
+      const bounds = flowElement.getBoundingClientRect()
+      const currentViewport = getViewport()
+      mobileNodePinchRef.current = {
+        initialDistance: metrics.distance,
+        initialZoom: currentViewport.zoom,
+        anchor: {
+          x: (metrics.midpoint.x - bounds.left - currentViewport.x) / currentViewport.zoom,
+          y: (metrics.midpoint.y - bounds.top - currentViewport.y) / currentViewport.zoom,
+        },
+        bounds,
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const gesture = mobileNodePinchRef.current
+      if (!gesture || event.touches.length < 2) return
+      const metrics = getTouchMetrics(event.touches)
+      if (!metrics || metrics.distance === 0) return
+
+      const zoom = Math.min(2, Math.max(0.5, (
+        gesture.initialZoom * metrics.distance / gesture.initialDistance
+      )))
+      const midpoint = {
+        x: metrics.midpoint.x - gesture.bounds.left,
+        y: metrics.midpoint.y - gesture.bounds.top,
+      }
+
+      event.preventDefault()
+      void setViewport({
+        x: midpoint.x - gesture.anchor.x * zoom,
+        y: midpoint.y - gesture.anchor.y * zoom,
+        zoom,
+      })
+    }
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (!mobileNodePinchRef.current || event.touches.length >= 2) return
+      mobileNodePinchRef.current = null
+      window.requestAnimationFrame(() => persistGestureViewportRef.current(getViewport()))
+    }
+
+    container.addEventListener('touchstart', handleTouchStart, { capture: true, passive: false })
+    container.addEventListener('touchmove', handleTouchMove, { capture: true, passive: false })
+    container.addEventListener('touchend', handleTouchEnd, { capture: true })
+    container.addEventListener('touchcancel', handleTouchEnd, { capture: true })
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart, { capture: true })
+      container.removeEventListener('touchmove', handleTouchMove, { capture: true })
+      container.removeEventListener('touchend', handleTouchEnd, { capture: true })
+      container.removeEventListener('touchcancel', handleTouchEnd, { capture: true })
+      mobileNodePinchRef.current = null
+    }
+  }, [getViewport, mobile, setViewport])
+
   if (!document) {
     return <div className="flex size-full items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
   }
@@ -2157,6 +2255,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
         snapGrid={[canvasGridGap, canvasGridGap]}
         defaultViewport={{ ...document.viewport, zoom: canvasDefaultZoom }}
         zoomOnScroll={canvasWheelBehavior === 'zoom'}
+        zoomOnPinch
         panOnScroll={canvasWheelBehavior === 'pan'}
         onlyRenderVisibleElements={!isExporting && nodes.length >= 150}
         colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
@@ -2307,7 +2406,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           <div className={cn(
             'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
             mobile
-              ? 'inset-x-3 bottom-[4.25rem] max-h-[min(60vh,32rem)]'
+              ? 'inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(60vh,32rem)]'
               : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
           )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
@@ -2654,7 +2753,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           <div className={cn(
             'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
             mobile
-              ? 'inset-x-3 bottom-[4.25rem] max-h-[min(60vh,32rem)]'
+              ? 'inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(60vh,32rem)]'
               : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
           )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
