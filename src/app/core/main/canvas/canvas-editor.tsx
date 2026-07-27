@@ -368,7 +368,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const mobileNodePinchRef = useRef<{
     initialDistance: number
     initialZoom: number
-    anchor: CanvasPoint
+    anchor: Pick<CanvasPoint, 'x' | 'y'>
     bounds: DOMRect
   } | null>(null)
   const groupDragRef = useRef<{
