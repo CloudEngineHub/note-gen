@@ -120,7 +120,7 @@ export function AgentContextTray({
             >
               <MarkerIcon><Sparkles /></MarkerIcon>
               <MarkerContent className="flex-1 truncate">
-                已使用 {loadedSkills.length} 个技能
+                {t('skillsUsed', { count: loadedSkills.length })}
               </MarkerContent>
               <MarkerIcon>
                 <ChevronRight className={cn("transition-transform", showSkills && "rotate-90")} />
@@ -156,7 +156,8 @@ export function AgentContextTray({
                           type="button"
                           className="mt-0.5 shrink-0 rounded px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                           onClick={() => toggleSkillDescription(skill.id)}
-                          title={descriptionExpanded ? "收起描述" : "展开描述"}
+                          title={descriptionExpanded ? t('collapseDescription') : t('expandDescription')}
+                          aria-label={descriptionExpanded ? t('collapseDescription') : t('expandDescription')}
                         >
                           <MoreHorizontal className="size-3.5" />
                         </button>

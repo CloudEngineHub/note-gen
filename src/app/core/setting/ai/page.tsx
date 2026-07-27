@@ -7,14 +7,7 @@ import { v4 } from 'uuid';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { ResponsiveSelect } from "@/components/responsive-select"
 import { SettingType } from "../components/setting-base";
 import { AiConfig, ModelConfig, ProxyMode, builtinProviderTemplates } from "../config";
 import useSettingStore from "@/stores/setting";
@@ -406,32 +399,28 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <div className="lg:hidden">
-                  <Select value={selectedAiConfig} onValueChange={value => {
-                    if (value.startsWith('template:')) {
-                      const templateKey = value.slice('template:'.length)
-                      const template = availableProviderTemplates.find(item => (item.templateKey || item.key) === templateKey)
-                      if (template) void addProviderFromTemplate(template)
-                    } else {
-                      setSelectedAiConfig(value)
-                      setActiveTab('connection')
-                    }
-                  }}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={t('selectConfig')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {sortedUserCustomModels.map(provider => (
-                          <SelectItem value={provider.key} key={provider.key}>{provider.title}</SelectItem>
-                        ))}
-                        {availableProviderTemplates.map(template => (
-                          <SelectItem value={`template:${template.templateKey || template.key}`} key={template.templateKey || template.key}>
-                            {template.title}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                  <ResponsiveSelect
+                    title={t('selectConfig')}
+                    value={selectedAiConfig || ''}
+                    placeholder={t('selectConfig')}
+                    onValueChange={value => {
+                      if (value.startsWith('template:')) {
+                        const templateKey = value.slice('template:'.length)
+                        const template = availableProviderTemplates.find(item => (item.templateKey || item.key) === templateKey)
+                        if (template) void addProviderFromTemplate(template)
+                      } else {
+                        setSelectedAiConfig(value)
+                        setActiveTab('connection')
+                      }
+                    }}
+                    options={[
+                      ...sortedUserCustomModels.map(provider => ({ value: provider.key, label: provider.title })),
+                      ...availableProviderTemplates.map(template => ({
+                        value: `template:${template.templateKey || template.key}`,
+                        label: template.title,
+                      })),
+                    ]}
+                  />
                 </div>
 
                 <div className="hidden max-h-[52vh] flex-col gap-3 overflow-y-auto pr-1 lg:flex">
@@ -626,19 +615,16 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
 
                           <Field data-invalid={proxyURLInvalid || undefined}>
                             <FieldLabel>{t('proxyModeTitle')}</FieldLabel>
-                            <Select
+                            <ResponsiveSelect
+                              title={t('proxyModeTitle')}
                               value={currentConfig.proxyMode || 'inherit'}
-                              onValueChange={(value: ProxyMode) => void updateAiConfig({ ...currentConfig, proxyMode: value })}
-                            >
-                              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectGroup>
-                                  <SelectItem value="inherit">{t('proxyModeInherit')}</SelectItem>
-                                  <SelectItem value="direct">{t('proxyModeDirect')}</SelectItem>
-                                  <SelectItem value="custom">{t('proxyModeCustom')}</SelectItem>
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
+                              onValueChange={value => void updateAiConfig({ ...currentConfig, proxyMode: value as ProxyMode })}
+                              options={[
+                                { value: 'inherit', label: t('proxyModeInherit') },
+                                { value: 'direct', label: t('proxyModeDirect') },
+                                { value: 'custom', label: t('proxyModeCustom') },
+                              ]}
+                            />
                             {currentConfig.proxyMode === 'custom' ? (
                               <Input
                                 id="ai-provider-proxy-url"

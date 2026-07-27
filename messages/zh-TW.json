@@ -2811,12 +2811,16 @@
       },
       "ragSources": {
         "label": "參考了 {count} 篇筆記",
-        "openFile": "打開文件"
+        "openFile": "打開文件",
+        "skillsUsed": "已使用 {count} 個技能",
+        "expandDescription": "展開描述",
+        "collapseDescription": "收起描述"
       },
       "preview": {
         "close": "關閉",
         "copy": "複製",
-        "copied": "已複製！"
+        "copied": "已複製！",
+        "image": "圖片預覽"
       },
       "control": {
         "edit": "編輯",

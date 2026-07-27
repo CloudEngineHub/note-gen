@@ -3,15 +3,7 @@
 import { Eye, ShieldCheck, ShieldQuestion } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ResponsiveActionMenu } from "@/components/responsive-action-menu"
 import type { AgentPermissionMode } from "@/lib/agent/types"
 import useChatStore from "@/stores/chat"
 import useSettingStore from "@/stores/setting"
@@ -35,8 +27,10 @@ export function AgentPermissionModeSelect() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <ResponsiveActionMenu
+      title={t("label")}
+      desktopClassName="w-64"
+      trigger={
         <Button
           type="button"
           variant="ghost"
@@ -48,27 +42,22 @@ export function AgentPermissionModeSelect() {
           <Icon className="size-4" />
           <span className="hidden md:inline">{t(`modes.${agentPermissionMode}.title`)}</span>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel>{t("label")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup value={agentPermissionMode} onValueChange={handleChange}>
-          {(["read-only", "ask", "auto-edit"] as const).map((mode) => {
-            const ModeIcon = MODE_ICONS[mode]
-            return (
-              <DropdownMenuRadioItem key={mode} value={mode} className="items-start gap-2 py-2">
-                <ModeIcon className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  <span className="block text-sm">{t(`modes.${mode}.title`)}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {t(`modes.${mode}.description`)}
-                  </span>
-                </span>
-              </DropdownMenuRadioItem>
-            )
-          })}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      }
+      items={(["read-only", "ask", "auto-edit"] as const).map(mode => {
+        const ModeIcon = MODE_ICONS[mode]
+        return {
+          key: mode,
+          icon: <ModeIcon />,
+          label: (
+            <span className="flex min-w-0 flex-col items-start">
+              <span>{t(`modes.${mode}.title`)}</span>
+              <span className="text-xs text-muted-foreground">{t(`modes.${mode}.description`)}</span>
+            </span>
+          ),
+          selected: mode === agentPermissionMode,
+          onSelect: () => handleChange(mode),
+        }
+      })}
+    />
   )
 }

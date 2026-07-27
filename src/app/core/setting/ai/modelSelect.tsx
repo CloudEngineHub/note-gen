@@ -4,7 +4,11 @@ import { createOpenAIClient } from "@/lib/ai/utils";
 import type OpenAI from "openai";
 import { ChevronsUpDown, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  ResponsivePopover,
+  ResponsivePopoverContent,
+  ResponsivePopoverTrigger,
+} from "@/components/responsive-popover";
 import {
   Command,
   CommandEmpty,
@@ -147,8 +151,8 @@ export default function ModelSelect(
   
   return (<>
     {list.length ? (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger className="w-full" asChild>
+        <ResponsivePopover open={open} onOpenChange={setOpen} mobileTitle={t('selectModel')}>
+          <ResponsivePopoverTrigger className="w-full" asChild>
             <Button
               variant="outline"
               role="combobox"
@@ -160,8 +164,8 @@ export default function ModelSelect(
                 : t('selectModel')}
               <ChevronsUpDown />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0" align="start">
+          </ResponsivePopoverTrigger>
+          <ResponsivePopoverContent className="w-[300px] p-0" align="start">
             <Command className="w-full">
               <CommandInput
                 placeholder={t('searchModels')}
@@ -199,8 +203,8 @@ export default function ModelSelect(
                 </CommandGroup>
               </CommandList>
             </Command>
-          </PopoverContent>
-        </Popover>
+          </ResponsivePopoverContent>
+        </ResponsivePopover>
       ) :
         <div className="flex flex-col gap-2">
           <InputGroup>

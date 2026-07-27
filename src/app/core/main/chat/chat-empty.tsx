@@ -126,10 +126,11 @@ export default function ChatEmpty() {
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground px-1">{t('quickPrompts.title') || '快速开始'}</p>
           {quickPrompts.map((prompt) => (
-            <div
+            <button
+              type="button"
               key={prompt.id}
               onClick={() => handleQuickPrompt(prompt.text)}
-              className="w-full bg-primary-foreground px-4 h-10 rounded-lg border hover:border-primary/50 transition-colors text-left group cursor-pointer flex items-center"
+              className="group flex h-11 w-full cursor-pointer items-center rounded-lg border bg-primary-foreground px-4 text-left transition-colors hover:border-primary/50"
             >
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -138,9 +139,9 @@ export default function ChatEmpty() {
                     {prompt.text}
                   </span>
                 </div>
-                <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ArrowRight className="w-4 h-4 text-muted-foreground opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" />
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -151,18 +152,22 @@ export default function ChatEmpty() {
             {recentConversations.map(conv => (
               <div
                 key={conv.id}
-                onClick={() => handleSwitchConversation(conv.id)}
-                className="w-full px-1 h-5 rounded-lg transition-colors text-left group cursor-pointer flex items-center"
+                className="group flex min-h-11 w-full items-stretch rounded-lg px-1 text-left transition-colors md:min-h-5"
               >
-                <div className="flex items-center justify-between w-full">
+                <button
+                  type="button"
+                  className="flex min-h-11 min-w-0 flex-1 items-center text-left md:min-h-5"
+                  onClick={() => void handleSwitchConversation(conv.id)}
+                >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-xs font-medium truncate group-hover:text-primary transition-colors pr-14">
                       {conv.title}
                     </span>
                   </div>
-                  <div className="shrink-0 ml-auto flex items-center justify-end relative">
+                </button>
+                <div className="relative ml-auto flex shrink-0 items-center justify-end">
                     {/* 时间戳 - 悬停时隐藏 */}
-                    <span className="absolute right-0 text-xs text-muted-foreground opacity-100 group-hover:opacity-0 transition-opacity duration-200 ease-out whitespace-nowrap">
+                    <span className="absolute right-0 hidden whitespace-nowrap text-xs text-muted-foreground opacity-100 transition-opacity duration-200 ease-out md:inline md:group-hover:opacity-0">
                       {formatRelativeTime(conv.updatedAt, language)}
                     </span>
                     {/* 删除按钮 - 悬停时显示 */}
@@ -171,14 +176,14 @@ export default function ChatEmpty() {
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDelete(conv.id)
+                        void handleDelete(conv.id)
                       }}
-                      className="opacity-0 group-hover:opacity-100 z-50 transition-all duration-200 ease-out hover:text-destructive h-6 w-6"
+                      className="z-50 size-8 opacity-100 transition-all duration-200 ease-out hover:text-destructive md:size-6 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label={t('deleteConversation')}
                       title={t('deleteConversation')}
                     >
                       <Trash2 className="w-3 h-3 transition-transform duration-150 group-hover/button:scale-110" />
                     </Button>
-                  </div>
                 </div>
               </div>
             ))}

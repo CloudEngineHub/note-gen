@@ -20,13 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { useMcpStore } from '@/stores/mcp'
@@ -64,6 +58,7 @@ export function ServerConfigDialog({
   const [enabled, setEnabled] = useState(true)
   const [trustToolAnnotations, setTrustToolAnnotations] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [saving, setSaving] = useState(false)
   
   useEffect(() => {
     if (open) {
@@ -117,7 +112,7 @@ export function ServerConfigDialog({
       // 使用临时 ID 进行测试
       const config = buildConfig(true)
       const result = await mcpServerManager.testConnectionDetailed(config)
-      
+
       if (result.success) {
         toast({ description: t('testSuccess') })
       } else {
@@ -143,7 +138,7 @@ export function ServerConfigDialog({
       trustToolAnnotations,
       createdAt: editingServer?.createdAt || Date.now(),
     }
-    
+
     if (type === 'stdio') {
       // 智能解析命令：如果 command 包含空格且 args 为空，自动分割
       const commandParts = command.trim().split(/\s+/)
@@ -156,7 +151,7 @@ export function ServerConfigDialog({
         config.command = command.trim()
         config.args = args.split(' ').filter(Boolean)
       }
-      
+
       try {
         config.env = env ? JSON.parse(env) : {}
       } catch {
@@ -195,42 +190,47 @@ export function ServerConfigDialog({
       return
     }
     
-    const config = buildConfig()
-    
-    if (editingServer) {
-      const wasEnabled = editingServer.enabled ?? true
+    setSaving(true)
+    try {
+      const config = buildConfig()
 
-      if (wasEnabled && !config.enabled) {
-        await mcpServerManager.disconnectServer(editingServer.id)
-        if (selectedServerIds.includes(editingServer.id)) {
-          await setSelectedServers(selectedServerIds.filter(id => id !== editingServer.id))
+      if (editingServer) {
+        const wasEnabled = editingServer.enabled ?? true
+
+        if (wasEnabled && !config.enabled) {
+          await mcpServerManager.disconnectServer(editingServer.id)
+          if (selectedServerIds.includes(editingServer.id)) {
+            await setSelectedServers(selectedServerIds.filter(id => id !== editingServer.id))
+          }
+        }
+
+        await updateServer(editingServer.id, config)
+        toast({ description: t('serverUpdated') })
+
+        if (config.enabled) {
+          try {
+            await mcpServerManager.reconnectServer(config)
+          } catch (error) {
+            console.error('Failed to reconnect after save:', error)
+          }
+        }
+      } else {
+        await addServer(config)
+        toast({ description: t('serverAdded') })
+
+        if (config.enabled) {
+          try {
+            await mcpServerManager.connectServer(config)
+          } catch (error) {
+            console.error('Failed to auto-connect after save:', error)
+          }
         }
       }
 
-      await updateServer(editingServer.id, config)
-      toast({ description: t('serverUpdated') })
-
-      if (config.enabled) {
-        try {
-          await mcpServerManager.reconnectServer(config)
-        } catch (error) {
-          console.error('Failed to reconnect after save:', error)
-        }
-      }
-    } else {
-      await addServer(config)
-      toast({ description: t('serverAdded') })
-
-      if (config.enabled) {
-        try {
-          await mcpServerManager.connectServer(config)
-        } catch (error) {
-          console.error('Failed to auto-connect after save:', error)
-        }
-      }
+      onOpenChange(false)
+    } finally {
+      setSaving(false)
     }
-
-    onOpenChange(false)
   }
 
   const unsupportedMobileSection = isUnsupportedMobileStdio ? (
@@ -256,7 +256,7 @@ export function ServerConfigDialog({
               </DrawerTitle>
             </DrawerHeader>
 
-            <div className="space-y-4 px-4 overflow-y-auto">
+            <div className="flex flex-col gap-4 px-4">
               {/* 服务器名称 */}
               <div className="space-y-2">
                 <Label htmlFor="name">{t('serverName')}</Label>
@@ -294,15 +294,15 @@ export function ServerConfigDialog({
                 {isUnsupportedMobileStdio ? (
                   <Input value={t('stdio')} disabled />
                 ) : (
-                  <Select value={type} onValueChange={(v) => setType(v as MCPServerType)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="http">{t('http')}</SelectItem>
-                      {!isActualMobile && <SelectItem value="stdio">{t('stdio')}</SelectItem>}
-                    </SelectContent>
-                  </Select>
+                  <ResponsiveSelect
+                    title={t('serverType')}
+                    value={type}
+                    onValueChange={value => setType(value as MCPServerType)}
+                    options={[
+                      { value: 'http', label: t('http') },
+                      ...(!isActualMobile ? [{ value: 'stdio', label: t('stdio') }] : []),
+                    ]}
+                  />
                 )}
               </div>
 
@@ -385,7 +385,10 @@ export function ServerConfigDialog({
                 {testing && <Loader2 className="mr-2 size-4 animate-spin" />}
                 {t('testConnection')}
               </Button>
-              <Button onClick={handleSave} disabled={isUnsupportedMobileStdio}>{t('save')}</Button>
+              <Button onClick={handleSave} disabled={saving || isUnsupportedMobileStdio}>
+                {saving && <Loader2 className="animate-spin" />}
+                {t('save')}
+              </Button>
             </DrawerFooter>
           </DrawerContent>
         </Drawer>
@@ -436,15 +439,15 @@ export function ServerConfigDialog({
                 {isUnsupportedMobileStdio ? (
                   <Input value={t('stdio')} disabled />
                 ) : (
-                  <Select value={type} onValueChange={(v) => setType(v as MCPServerType)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="http">{t('http')}</SelectItem>
-                      {!isActualMobile && <SelectItem value="stdio">{t('stdio')}</SelectItem>}
-                    </SelectContent>
-                  </Select>
+                  <ResponsiveSelect
+                    title={t('serverType')}
+                    value={type}
+                    onValueChange={value => setType(value as MCPServerType)}
+                    options={[
+                      { value: 'http', label: t('http') },
+                      ...(!isActualMobile ? [{ value: 'stdio', label: t('stdio') }] : []),
+                    ]}
+                  />
                 )}
               </div>
 

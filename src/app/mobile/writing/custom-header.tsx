@@ -59,6 +59,9 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const tContext = useTranslations('article.file.context')
   const tMobile = useTranslations('article.file.mobile')
   const tToolbar = useTranslations('article.file.toolbar')
+  const tEditor = useTranslations('article.editor')
+  const tOutline = useTranslations('editor.outline')
+  const tEditorCommands = useTranslations('settings.shortcuts.editorShortcuts.commands')
   const {
     activeFilePath,
     setActiveFilePath,
@@ -1011,7 +1014,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           className="size-9 rounded-full"
           onClick={handleUndo}
           disabled={!canUndo}
-          aria-label="撤销"
+          aria-label={tEditorCommands('undo.title')}
         >
           <Undo2 className="size-4" />
         </Button>
@@ -1021,7 +1024,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           className="size-9 rounded-full"
           onClick={handleRedo}
           disabled={!canRedo}
-          aria-label="重做"
+          aria-label={tEditorCommands('redo.title')}
         >
           <Redo2 className="size-4" />
         </Button>
@@ -1033,7 +1036,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           size="icon"
           className="size-9 rounded-full"
           onClick={handleSearchReplace}
-          aria-label="搜索替换"
+          aria-label={tEditor('search.placeholder')}
         >
           <SearchCode className="size-4" />
         </Button>
@@ -1042,7 +1045,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           size="icon"
           className="size-9 rounded-full"
           onClick={handleToggleOutline}
-          aria-label="大纲"
+          aria-label={tOutline('open')}
         >
           <List className="size-4" />
         </Button>

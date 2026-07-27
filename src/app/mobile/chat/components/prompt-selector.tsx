@@ -95,7 +95,7 @@ export function PromptSelector() {
           <DrawerHeader>
             <DrawerTitle>{t('tooltip')}</DrawerTitle>
           </DrawerHeader>
-          <div className="p-4 overflow-auto">
+          <div className="p-4">
             <PromptListContent
               promptList={promptList.map(({ id, title }) => ({ id, title }))}
               currentPromptId={currentPrompt?.id}

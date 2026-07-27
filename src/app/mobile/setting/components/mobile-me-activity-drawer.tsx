@@ -39,7 +39,7 @@ export function MobileMeActivityDrawer({
           <DrawerTitle>{day?.day || labels.title}</DrawerTitle>
           <DrawerDescription>{day ? summaryText : labels.description}</DrawerDescription>
         </DrawerHeader>
-        <div className="overflow-y-auto px-4 pb-6">
+        <div className="px-4 pb-6">
           <ActivityDayDetail
             day={day}
             compact

@@ -1,17 +1,11 @@
 'use client'
 
-import { Fragment, ReactNode, useRef, useState } from 'react'
+import { ReactNode, useRef, useState } from 'react'
 import { Cloud, FileText, Folder, LoaderCircle, MoreVertical } from 'lucide-react'
 import { BrowserEntry } from './types'
+import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
 type EntryAction = {
   key: string
@@ -250,8 +244,9 @@ export function EntryListItem({
               <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>
             )}
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <MobileActionDrawer
+            title={entry.name}
+            trigger={
               <Button
                 type="button"
                 variant="ghost"
@@ -264,23 +259,17 @@ export function EntryListItem({
               >
                 <MoreVertical />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {actions.map((action) => (
-                <Fragment key={action.key}>
-                  {action.separatorBefore && <DropdownMenuSeparator />}
-                  <DropdownMenuItem
-                    disabled={action.disabled}
-                    className={cn(action.variant === 'destructive' && 'text-destructive focus:text-destructive')}
-                    onSelect={() => void action.onClick()}
-                  >
-                    {action.icon}
-                    {action.label}
-                  </DropdownMenuItem>
-                </Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            items={actions.map(action => ({
+              key: action.key,
+              label: action.label,
+              icon: action.icon,
+              onSelect: action.onClick,
+              disabled: action.disabled,
+              destructive: action.variant === 'destructive',
+              separatorBefore: action.separatorBefore,
+            }))}
+          />
         </div>
       </div>
     </div>

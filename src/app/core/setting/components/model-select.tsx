@@ -5,10 +5,10 @@ import { Store } from "@tauri-apps/plugin-store"
 import useSettingStore from "@/stores/setting"
 import { ChevronsUpDown, X } from "lucide-react"
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+  ResponsivePopover,
+  ResponsivePopoverContent,
+  ResponsivePopoverTrigger,
+} from "@/components/responsive-popover"
 import {
   Command,
   CommandEmpty,
@@ -227,9 +227,9 @@ export function ModelSelect({
   }, [])
   
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <ResponsivePopover open={open} onOpenChange={setOpen} mobileTitle={t('tooltip')}>
       <div className="flex w-full min-w-0 gap-2 sm:w-auto">
-        <PopoverTrigger asChild>
+        <ResponsivePopoverTrigger asChild>
           <div className="min-w-0 flex-1 overflow-hidden">
             <Button
               variant="outline"
@@ -243,7 +243,7 @@ export function ModelSelect({
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </div>
-        </PopoverTrigger>
+        </ResponsivePopoverTrigger>
         <TooltipButton
           disabled={!model}
           icon={<X className="h-4 w-4" />}
@@ -252,7 +252,7 @@ export function ModelSelect({
           tooltipText={clearTooltip || t('tooltip')}
         />
       </div>
-      <PopoverContent align="end" className="p-0">
+      <ResponsivePopoverContent align="end" className="p-0">
         <Command>
           <CommandInput placeholder={t('placeholder')} className="h-9" />
           <CommandList>
@@ -276,7 +276,7 @@ export function ModelSelect({
             ))}
           </CommandList>
         </Command>
-      </PopoverContent>
-    </Popover>
+      </ResponsivePopoverContent>
+    </ResponsivePopover>
   )
 }

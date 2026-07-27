@@ -32,7 +32,7 @@ export function ChatToolsDrawer() {
         <DrawerHeader>
           <DrawerTitle>{t('tools.title')}</DrawerTitle>
         </DrawerHeader>
-        <div className="p-4 overflow-auto">
+        <div className="p-4">
           <div className="divide-y">
             <div className="h-16 flex items-center w-full">
               <ModelSelector />

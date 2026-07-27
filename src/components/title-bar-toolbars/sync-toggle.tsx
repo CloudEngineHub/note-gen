@@ -955,7 +955,7 @@ export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
           <DrawerHeader className="text-left">
             <DrawerTitle>{t('common.sync')}</DrawerTitle>
           </DrawerHeader>
-          <div className="overflow-y-auto px-4 pb-6">
+          <div className="px-4 pb-6">
             {syncPanel}
           </div>
         </DrawerContent>

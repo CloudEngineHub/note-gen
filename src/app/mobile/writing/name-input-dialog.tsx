@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useCallback, useRef } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/responsive-dialog'
 
 interface NameInputDialogProps {
   open: boolean
@@ -49,15 +49,15 @@ export function NameInputDialog({
   }, [open])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="w-[92vw] max-w-sm p-4"
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent
+        className="p-4 sm:max-w-sm"
         onOpenAutoFocus={handleOpenAutoFocus}
         onAnimationEnd={handleAnimationEnd}
       >
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <Input
           ref={inputRef}
           value={value}
@@ -70,7 +70,7 @@ export function NameInputDialog({
             }
           }}
         />
-        <DialogFooter className="flex-row justify-end gap-2 sm:space-x-0">
+        <ResponsiveDialogFooter className="flex-row justify-end gap-2 sm:space-x-0">
           <Button
             variant="outline"
             size="sm"
@@ -85,8 +85,8 @@ export function NameInputDialog({
           >
             {confirmText}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }

@@ -16,6 +16,32 @@ input, textarea, select, [contenteditable] {
   --mobile-footbar-fade-height: calc(var(--mobile-footbar-reserved-space) + 2rem);
 }
 
+/*
+ * Keep the visual icon compact while giving primary controls a reliable
+ * finger-sized hit area. The class is added to the document root so the rule
+ * also reaches controls rendered through portals (drawers and dialogs).
+ */
+.mobile-app-active [data-slot="button"],
+.mobile-app-active [data-slot="input"],
+.mobile-app-active [data-slot="select-trigger"],
+.mobile-app-active [data-slot="tabs-trigger"],
+.mobile-app-active button:not([data-slot]) {
+  min-height: 2.75rem;
+}
+
+.mobile-app-active [data-slot="button"][data-size^="icon"] {
+  min-width: 2.75rem;
+}
+
+.mobile-app-active button:not([data-slot])[aria-label] {
+  min-width: 2.75rem;
+}
+
+.mobile-app-active header [data-slot="button"][data-size^="icon"] > svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 html,
 body {
   width: 100%;
@@ -141,6 +167,41 @@ select,
   box-shadow: none;
 }
 
+.mobile-setting-screen [data-setting-page] {
+  gap: 1.25rem;
+}
+
+.mobile-setting-screen [data-mobile-setting-section="true"] {
+  border-radius: var(--radius-xl);
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--card) / 0.45);
+  padding: 0.875rem;
+}
+
+@media (max-width: 639px) {
+  .mobile-setting-screen [data-setting-section-header] {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .mobile-setting-screen [data-setting-section-actions] {
+    width: 100%;
+  }
+
+  .mobile-setting-screen [data-setting-section-actions] > [data-slot="button"] {
+    width: 100%;
+  }
+
+  .mobile-setting-screen [data-slot="item"] {
+    align-items: flex-start;
+  }
+
+  .mobile-setting-screen [data-slot="item-actions"] {
+    margin-left: auto;
+    max-width: 100%;
+  }
+}
+
 .mobile-chat-input-wrapper {
   position: absolute;
   z-index: 30;
@@ -200,7 +261,27 @@ input, textarea, select {
 
 /* Keep top-level mobile page headers visually consistent */
 .mobile-page-header {
-  height: 3rem;
-  min-height: 3rem;
-  max-height: 3rem;
+  height: 3.5rem;
+  min-height: 3.5rem;
+  max-height: 3.5rem;
+}
+
+@media (min-width: 768px) {
+  .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"],
+  .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="top"] {
+    width: min(100%, 42rem);
+    margin-inline: auto;
+    border-inline: 1px solid hsl(var(--border) / 0.7);
+  }
+
+  .mobile-page-header {
+    padding-inline: max(1rem, calc((100vw - 48rem) / 2));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"],
+  .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="top"] {
+    max-height: min(92vh, var(--mobile-viewport-height, 100dvh));
+  }
 }

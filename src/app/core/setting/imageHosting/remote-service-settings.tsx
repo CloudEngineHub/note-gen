@@ -11,14 +11,7 @@ import {
 import { useStoredImageConfig } from './use-stored-image-config'
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   isCloudinaryConfigComplete,
@@ -235,20 +228,15 @@ export function CustomHttpImageHosting() {
       </Field>
       <Field>
         <FieldLabel>{t('method')}</FieldLabel>
-        <Select
+        <ResponsiveSelect
+          title={t('method')}
           value={config.method}
-          onValueChange={(method: 'POST' | 'PUT') => void update({ ...config, method })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="POST">POST</SelectItem>
-              <SelectItem value="PUT">PUT</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          onValueChange={value => void update({ ...config, method: value as 'POST' | 'PUT' })}
+          options={[
+            { value: 'POST', label: 'POST' },
+            { value: 'PUT', label: 'PUT' },
+          ]}
+        />
       </Field>
       {config.method === 'POST' ? (
         <Field>

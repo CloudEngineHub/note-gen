@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 interface SwipeBackProps {
   children: React.ReactNode
-  edgeWidth?: number // 左侧边缘触发区域宽度（百分比）
+  edgeWidth?: number // 左侧边缘触发区域宽度（像素）
   threshold?: number // 触发返回的滑动距离阈值（像素）
   enabled?: boolean
   onBack?: () => void
@@ -13,8 +13,8 @@ interface SwipeBackProps {
 
 export function SwipeBack({
   children,
-  edgeWidth = 15,
-  threshold = 80,
+  edgeWidth = 24,
+  threshold = 72,
   enabled = true,
   onBack,
 }: SwipeBackProps) {
@@ -33,12 +33,29 @@ export function SwipeBack({
   }, [onBack])
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
+    const target = e.target
+    if (
+      target instanceof HTMLElement
+      && target.closest(
+        '[data-slot="drawer-content"], [data-slot="dialog-content"], [data-swipe-back-ignore], input, textarea, select, [contenteditable]:not([contenteditable="false"]), .ProseMirror'
+      )
+    ) {
+      return
+    }
+
+    if (
+      document.querySelector(
+        '[data-slot="drawer-content"][data-state="open"], [data-slot="dialog-content"][data-state="open"]'
+      )
+    ) {
+      return
+    }
+
     const touch = e.touches[0]
-    const screenWidth = window.innerWidth
     const touchX = touch.clientX
 
     // 只在左侧边缘区域响应
-    if (touchX < screenWidth * (edgeWidth / 100)) {
+    if (touchX <= edgeWidth) {
       touchStartX.current = touch.clientX
       touchStartY.current = touch.clientY
       isDragging.current = true

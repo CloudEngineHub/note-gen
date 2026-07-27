@@ -3014,12 +3014,16 @@
       },
       "ragSources": {
         "label": "Referenced {count} notes",
-        "openFile": "Open file"
+        "openFile": "Open file",
+        "skillsUsed": "{count, plural, one {Used # skill} other {Used # skills}}",
+        "expandDescription": "Expand description",
+        "collapseDescription": "Collapse description"
       },
       "preview": {
         "close": "Close",
         "copy": "Copy",
-        "copied": "Copied!"
+        "copied": "Copied!",
+        "image": "Image preview"
       },
       "control": {
         "edit": "Edit",

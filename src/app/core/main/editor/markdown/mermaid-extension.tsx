@@ -6,13 +6,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import mermaid from 'mermaid'
 import { Code, Check } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -164,18 +158,16 @@ function MermaidDiagramView({ node, updateAttributes }: ReactNodeViewProps) {
       {isEditing && (
         <div className="mermaid-editor rounded-lg border border-border bg-card">
           <div className="flex items-center gap-2 p-2 border-b bg-muted/50">
-            <Select value={diagramType} onValueChange={setDiagramType}>
-              <SelectTrigger className="w-35 h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DIAGRAM_TYPES.map((item) => (
-                  <SelectItem key={item.type} value={item.type}>
-                    {getLabel(item.type)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ResponsiveSelect
+              title={t('title')}
+              value={diagramType}
+              onValueChange={setDiagramType}
+              className="h-8 w-35 text-xs"
+              options={DIAGRAM_TYPES.map(item => ({
+                value: item.type,
+                label: getLabel(item.type),
+              }))}
+            />
 
             <div className="flex-1" />
 

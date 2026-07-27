@@ -10,6 +10,8 @@ import useSettingStore from '@/stores/setting'
 import { HSLValue } from '@/types/theme'
 import { applyThemeColors, hslToHex } from '@/lib/theme-utils'
 import { Store } from '@tauri-apps/plugin-store'
+import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 
 interface ColorScheme {
   name: string
@@ -301,7 +303,23 @@ const presets: ColorScheme[] = [
   },
 ]
 
+const presetNameKeys = [
+  'default',
+  'ocean',
+  'forest',
+  'sunset',
+  'lavender',
+  'midnight',
+  'deepSea',
+  'darkForest',
+  'darkViolet',
+  'coralWarm',
+  'slateGray',
+  'darkGold',
+] as const
+
 export default function ThemeSettingsPage() {
+  const t = useTranslations('settings.general.interface.customTheme')
   const { customThemeColors } = useSettingStore()
   const [activeTab, setActiveTab] = useState<'custom' | 'presets' | 'import-export'>('custom')
   const [importCode, setImportCode] = useState('')
@@ -431,26 +449,28 @@ export default function ThemeSettingsPage() {
         await applyPreset(importData)
         setImportCode('')
         setActiveTab('custom')
+        toast.success(t('import.button'))
       }
     } catch (error) {
       console.error('Import failed:', error)
+      toast.error(t('import.title'))
     }
   }
 
   const colorConfig: Array<{ key: string; label: string; defaultColor: string }> = [
-    { key: 'background', label: '背景色', defaultColor: '#ffffff' },
-    { key: 'foreground', label: '前景色', defaultColor: '#0a0a0a' },
-    { key: 'card', label: '卡片背景', defaultColor: '#ffffff' },
-    { key: 'cardForeground', label: '卡片前景', defaultColor: '#0a0a0a' },
-    { key: 'primary', label: '主色调', defaultColor: '#171717' },
-    { key: 'primaryForeground', label: '主色前景', defaultColor: '#fafafa' },
-    { key: 'secondary', label: '次要色', defaultColor: '#f5f5f5' },
-    { key: 'secondaryForeground', label: '次要前景', defaultColor: '#171717' },
-    { key: 'muted', label: '柔和色', defaultColor: '#f5f5f5' },
-    { key: 'mutedForeground', label: '柔和前景', defaultColor: '#737373' },
-    { key: 'accent', label: '强调色', defaultColor: '#f5f5f5' },
-    { key: 'accentForeground', label: '强调前景', defaultColor: '#171717' },
-    { key: 'border', label: '边框色', defaultColor: '#e5e5e5' },
+    { key: 'background', label: t('colors.background'), defaultColor: '#ffffff' },
+    { key: 'foreground', label: t('colors.foreground'), defaultColor: '#0a0a0a' },
+    { key: 'card', label: t('colors.card'), defaultColor: '#ffffff' },
+    { key: 'cardForeground', label: t('colors.cardForeground'), defaultColor: '#0a0a0a' },
+    { key: 'primary', label: t('colors.primary'), defaultColor: '#171717' },
+    { key: 'primaryForeground', label: t('colors.primaryForeground'), defaultColor: '#fafafa' },
+    { key: 'secondary', label: t('colors.secondary'), defaultColor: '#f5f5f5' },
+    { key: 'secondaryForeground', label: t('colors.secondaryForeground'), defaultColor: '#171717' },
+    { key: 'muted', label: t('colors.muted'), defaultColor: '#f5f5f5' },
+    { key: 'mutedForeground', label: t('colors.mutedForeground'), defaultColor: '#737373' },
+    { key: 'accent', label: t('colors.accent'), defaultColor: '#f5f5f5' },
+    { key: 'accentForeground', label: t('colors.accentForeground'), defaultColor: '#171717' },
+    { key: 'border', label: t('colors.border'), defaultColor: '#e5e5e5' },
   ]
 
   const hexToHsl = (hex: string): HSLValue | null => {
@@ -481,14 +501,14 @@ export default function ThemeSettingsPage() {
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-1.5">
-        <h1 className="text-xl font-semibold tracking-tight">自定义主题色</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
       </header>
       <div className="min-w-0">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'custom' | 'presets' | 'import-export')} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-4">
-            <TabsTrigger value="custom">自定义</TabsTrigger>
-            <TabsTrigger value="presets">预设</TabsTrigger>
-            <TabsTrigger value="import-export">导入/导出</TabsTrigger>
+            <TabsTrigger value="custom">{t('tabs.custom')}</TabsTrigger>
+            <TabsTrigger value="presets">{t('tabs.presets')}</TabsTrigger>
+            <TabsTrigger value="import-export">{t('tabs.importExport')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="custom" className="space-y-3">
@@ -518,7 +538,7 @@ export default function ThemeSettingsPage() {
 
           <TabsContent value="presets" className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              {presets.map((preset) => (
+              {presets.map((preset, index) => (
                 <button
                   key={preset.name}
                   onClick={() => applyPreset(preset)}
@@ -535,7 +555,7 @@ export default function ThemeSettingsPage() {
                     <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                       {preset.mode === 'light' ? 'Light' : 'Dark'}
                     </span>
-                    <span className="text-xs font-medium">{preset.name}</span>
+                    <span className="text-xs font-medium">{t(`presets.${presetNameKeys[index]}.name`)}</span>
                   </div>
                 </button>
               ))}
@@ -545,16 +565,16 @@ export default function ThemeSettingsPage() {
           <TabsContent value="import-export" className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold">导出配色</h3>
+                <h3 className="text-sm font-semibold">{t('export.title')}</h3>
                 <Button variant="outline" size="sm" onClick={handleExport}>
                   <Download className="h-4 w-4 mr-1" />
-                  生成
+                  {t('export.button')}
                 </Button>
               </div>
               <Textarea
                 value={exportCode}
                 onChange={(e) => setExportCode(e.target.value)}
-                placeholder="点击生成按钮导出当前配色"
+                placeholder={t('export.placeholder')}
                 className="font-mono text-xs"
                 rows={6}
                 maxRows={14}
@@ -564,16 +584,16 @@ export default function ThemeSettingsPage() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold">导入配色</h3>
+                <h3 className="text-sm font-semibold">{t('import.title')}</h3>
                 <Button variant="outline" size="sm" onClick={handleImport} disabled={!importCode.trim()}>
                   <Upload className="h-4 w-4 mr-1" />
-                  导入
+                  {t('import.button')}
                 </Button>
               </div>
               <Textarea
                 value={importCode}
                 onChange={(e) => setImportCode(e.target.value)}
-                placeholder="粘贴配色代码..."
+                placeholder={t('import.placeholder')}
                 className="font-mono text-xs"
                 rows={6}
                 maxRows={14}

@@ -13,9 +13,9 @@ import { S3Sync } from '@/app/core/setting/sync/s3-sync'
 import { WebDAVSync } from '@/app/core/setting/sync/webdav-sync'
 import { UsePlatformButton } from '@/app/core/setting/sync/components/use-platform-button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { toast } from '@/hooks/use-toast'
 import { SyncStateEnum } from '@/lib/sync/github.types'
@@ -239,20 +239,16 @@ export default function SyncPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">{t('settings.sync.platformSettings')}</h2>
-        <Select value={tab} onValueChange={handleTabChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t('settings.sync.selectPlatform')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {SYNC_PLATFORMS.map((platform) => (
-                <SelectItem key={platform} value={platform}>
-                  {getProviderLabel(platform)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <MobileSelectDrawer
+          title={t('settings.sync.selectPlatform')}
+          value={tab}
+          onValueChange={handleTabChange}
+          placeholder={t('settings.sync.selectPlatform')}
+          options={SYNC_PLATFORMS.map(platform => ({
+            value: platform,
+            label: getProviderLabel(platform),
+          }))}
+        />
         <div className="flex justify-end">
           <UsePlatformButton
             platform={tab}
@@ -272,28 +268,25 @@ export default function SyncPage() {
             <ItemDescription>{t('settings.sync.autoSyncDesc')}</ItemDescription>
           </ItemContent>
           <ItemActions>
-            <Select
+            <MobileSelectDrawer
+              title={t('settings.sync.autoSync')}
               value={autoSync}
               onValueChange={(value) => setAutoSync(value)}
               disabled={isFileAutoSyncDisabled}
-            >
-              <SelectTrigger className="min-w-32">
-                <SelectValue placeholder={t('settings.sync.autoSyncOptions.placeholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="disabled">{t('settings.sync.autoSyncOptions.disabled')}</SelectItem>
-                  <SelectItem value="2">{t('settings.sync.autoSyncOptions.2s')}</SelectItem>
-                  <SelectItem value="3">{t('settings.sync.autoSyncOptions.3s')}</SelectItem>
-                  <SelectItem value="5">{t('settings.sync.autoSyncOptions.5s')}</SelectItem>
-                  <SelectItem value="10">{t('settings.sync.autoSyncOptions.10s')}</SelectItem>
-                  <SelectItem value="20">{t('settings.sync.autoSyncOptions.20s')}</SelectItem>
-                  <SelectItem value="30">{t('settings.sync.autoSyncOptions.30s')}</SelectItem>
-                  <SelectItem value="60">{t('settings.sync.autoSyncOptions.1m')}</SelectItem>
-                  <SelectItem value="120">{t('settings.sync.autoSyncOptions.2m')}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              className="min-w-32"
+              placeholder={t('settings.sync.autoSyncOptions.placeholder')}
+              options={[
+                { value: 'disabled', label: t('settings.sync.autoSyncOptions.disabled') },
+                { value: '2', label: t('settings.sync.autoSyncOptions.2s') },
+                { value: '3', label: t('settings.sync.autoSyncOptions.3s') },
+                { value: '5', label: t('settings.sync.autoSyncOptions.5s') },
+                { value: '10', label: t('settings.sync.autoSyncOptions.10s') },
+                { value: '20', label: t('settings.sync.autoSyncOptions.20s') },
+                { value: '30', label: t('settings.sync.autoSyncOptions.30s') },
+                { value: '60', label: t('settings.sync.autoSyncOptions.1m') },
+                { value: '120', label: t('settings.sync.autoSyncOptions.2m') },
+              ]}
+            />
           </ItemActions>
         </Item>
 

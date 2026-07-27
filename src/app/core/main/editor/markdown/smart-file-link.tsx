@@ -26,6 +26,8 @@ import { getContextForQuery } from '@/lib/rag'
 import { toWorkspaceRelativePath } from '@/lib/workspace'
 import useArticleStore from '@/stores/article'
 import useRagSettingsStore from '@/stores/ragSettings'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
 interface SmartFileLinkProps {
   editor: Editor
@@ -80,6 +82,7 @@ function findFileForRagPath(files: MarkdownFile[], ragPath: string): MarkdownFil
 
 export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
   const t = useTranslations('editor.smartFileLink')
+  const isMobile = useIsMobile()
   const automaticSearchEnabled = useRagSettingsStore(state => state.automaticSearchEnabled)
   const [context, setContext] = useState<MarkdownLinkInputContext | null>(null)
   const [files, setFiles] = useState<MarkdownFile[]>([])
@@ -292,8 +295,13 @@ export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
 
   return createPortal(
     <div
-      className="fixed w-[360px] max-w-[calc(100vw-16px)]"
-      style={{ left: position.left, top: position.top }}
+      className={cn(
+        'fixed',
+        isMobile
+          ? 'inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))]'
+          : 'w-[360px] max-w-[calc(100vw-16px)]',
+      )}
+      style={isMobile ? undefined : { left: position.left, top: position.top }}
       onMouseDown={event => event.preventDefault()}
     >
       <Command value={entries[selectedIndex]?.id} shouldFilter={false} className="border shadow-lg">

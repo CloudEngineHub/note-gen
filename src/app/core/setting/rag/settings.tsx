@@ -480,7 +480,7 @@ export function Settings() {
           <Button variant="destructive" onClick={() => void handleDeleteIndex()}>
             <Trash className="size-4" /> {t('deleteVector')}
           </Button>
-          <div className="flex min-w-60 flex-1 items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex min-w-0 flex-1 basis-60 items-center gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="size-4 shrink-0 text-destructive" />
             {t('deleteVectorHint')}
           </div>

@@ -4,36 +4,77 @@ import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
+import dynamic from "next/dynamic"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { applyAppFontFamily } from "@/lib/font-settings"
-import { initAllDatabases } from "@/db"
 import dayjs from "dayjs"
 import zh from "dayjs/locale/zh-cn";
 import en from "dayjs/locale/en";
 import { useI18n } from "@/hooks/useI18n"
 import useVectorStore from "@/stores/vector"
-import { AppFootbar } from "@/components/app-footbar"
 import { TooltipProvider } from "@/components/ui/tooltip";
 import './mobile-styles.css'
 import useImageStore from "@/stores/imageHosting";
-import { initMcp } from "@/lib/mcp/init"
-import { reportAppStart } from "@/lib/event-report"
+import { AppFootbar } from "@/components/app-footbar"
 import { MobileStatusBar } from "@/components/mobile-statusbar"
 import { TextSizeProvider } from "@/contexts/text-size-context"
-import { MemoryAutoNotifications } from "@/components/memories/memory-auto-notifications"
-import { SyncConfirmDialog } from "@/components/sync-confirm-dialog"
-import { AutoDataSyncConflictDialog } from "@/components/auto-data-sync-conflict-dialog"
 import { MobileViewport } from "@/components/mobile-viewport"
-import { ControlText } from "@/app/core/main/mark/control-text"
-import { ControlRecording } from "@/app/core/main/mark/control-recording"
-import { ControlImage } from "@/app/core/main/mark/control-image"
-import { ControlLink } from "@/app/core/main/mark/control-link"
-import { ControlFile } from "@/app/core/main/mark/control-file"
-import { ControlTodo } from "@/app/core/main/mark/control-todo"
-import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
 import useArticleStore from "@/stores/article"
-import { WritingScreen } from "./writing/writing-screen"
-import { MobileUpdateChecker } from "./components/mobile-update-prompt"
+import { MobileModeProvider } from "@/hooks/use-mobile"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const WritingScreen = dynamic(
+  () => import('./writing/writing-screen').then(module => module.WritingScreen),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full flex-col gap-3 p-3" aria-busy="true">
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="min-h-0 flex-1 w-full" />
+      </div>
+    ),
+  },
+)
+const MemoryAutoNotifications = dynamic(
+  () => import('@/components/memories/memory-auto-notifications').then(module => module.MemoryAutoNotifications),
+  { ssr: false },
+)
+const SyncConfirmDialog = dynamic(
+  () => import('@/components/sync-confirm-dialog').then(module => module.SyncConfirmDialog),
+  { ssr: false },
+)
+const AutoDataSyncConflictDialog = dynamic(
+  () => import('@/components/auto-data-sync-conflict-dialog').then(module => module.AutoDataSyncConflictDialog),
+  { ssr: false },
+)
+const MobileUpdateChecker = dynamic(
+  () => import('./components/mobile-update-prompt').then(module => module.MobileUpdateChecker),
+  { ssr: false },
+)
+const ControlText = dynamic(
+  () => import('@/app/core/main/mark/control-text').then(module => module.ControlText),
+  { ssr: false },
+)
+const ControlRecording = dynamic(
+  () => import('@/app/core/main/mark/control-recording').then(module => module.ControlRecording),
+  { ssr: false },
+)
+const ControlImage = dynamic(
+  () => import('@/app/core/main/mark/control-image').then(module => module.ControlImage),
+  { ssr: false },
+)
+const ControlLink = dynamic(
+  () => import('@/app/core/main/mark/control-link').then(module => module.ControlLink),
+  { ssr: false },
+)
+const ControlFile = dynamic(
+  () => import('@/app/core/main/mark/control-file').then(module => module.ControlFile),
+  { ssr: false },
+)
+const ControlTodo = dynamic(
+  () => import('@/app/core/main/mark/control-todo').then(module => module.ControlTodo),
+  { ssr: false },
+)
 
 export default function RootLayout({
   children,
@@ -69,10 +110,19 @@ export default function RootLayout({
   useEffect(() => {
     let cancelled = false
 
-    void reportAppStart()
+    void import('@/lib/event-report').then(({ reportAppStart }) => reportAppStart())
 
     const initializeApp = async () => {
       try {
+        const [
+          { initAllDatabases },
+          { initAutoDataSyncRuntime },
+          { initMcp },
+        ] = await Promise.all([
+          import('@/db'),
+          import('@/lib/sync/auto-data-sync-queue'),
+          import('@/lib/mcp/init'),
+        ])
         await initSettingData()
         initMainHosting()
         await initAllDatabases()
@@ -135,49 +185,51 @@ export default function RootLayout({
     || pathname === '/mobile/canvas/editor'
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <TextSizeProvider>
-        <MobileViewport />
-        <MobileStatusBar />
-        <TooltipProvider>
-          <div className="mobile-app-shell flex flex-col">
-            <main className="mobile-app-main flex flex-1 w-full overflow-hidden">
-              {hasWritingCache ? (
-                <div
-                  className={isWritingRoute ? "h-full w-full min-w-0" : "hidden"}
-                  aria-hidden={!isWritingRoute}
-                >
-                  <WritingScreen />
+    <MobileModeProvider mobile>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <TextSizeProvider>
+          <MobileViewport />
+          <MobileStatusBar />
+          <TooltipProvider>
+            <div className="mobile-app-shell flex flex-col">
+              <main className="mobile-app-main flex flex-1 w-full overflow-hidden">
+                {hasWritingCache ? (
+                  <div
+                    className={isWritingRoute ? "h-full w-full min-w-0" : "hidden"}
+                    aria-hidden={!isWritingRoute}
+                  >
+                    <WritingScreen />
+                  </div>
+                ) : null}
+                {!isWritingRoute ? children : null}
+              </main>
+              {!hideFootbar ? (
+                <div className="mobile-footbar">
+                  <AppFootbar />
                 </div>
               ) : null}
-              {!isWritingRoute ? children : null}
-            </main>
-            {!hideFootbar ? (
-              <div className="mobile-footbar">
-                <AppFootbar />
-              </div>
-            ) : null}
-          </div>
-          {/* 隐藏的记录工具组件，用于监听事件 */}
-          <div className="absolute opacity-0 pointer-events-none -z-50">
-            <ControlText />
-            <ControlRecording />
-            <ControlImage />
-            <ControlLink />
-            <ControlFile />
-            <ControlTodo />
-          </div>
-        </TooltipProvider>
-        <SyncConfirmDialog />
-        <AutoDataSyncConflictDialog />
-        <MobileUpdateChecker />
-        <MemoryAutoNotifications />
-      </TextSizeProvider>
-    </ThemeProvider>
+            </div>
+            {/* 隐藏的记录工具组件，用于监听事件 */}
+            <div className="absolute opacity-0 pointer-events-none -z-50">
+              <ControlText />
+              <ControlRecording />
+              <ControlImage />
+              <ControlLink />
+              <ControlFile />
+              <ControlTodo />
+            </div>
+          </TooltipProvider>
+          <SyncConfirmDialog />
+          <AutoDataSyncConflictDialog />
+          <MobileUpdateChecker />
+          <MemoryAutoNotifications />
+        </TextSizeProvider>
+      </ThemeProvider>
+    </MobileModeProvider>
   );
 }

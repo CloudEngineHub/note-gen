@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Type } from 'lucide-react'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import {
   APP_FONT_GENERIC_FAMILIES,
   APP_FONT_SYSTEM_VALUE,
@@ -100,53 +100,42 @@ export function FontFamilySettings() {
         <ItemDescription>{t('fontFamily.desc')}</ItemDescription>
       </ItemContent>
       <ItemActions className="basis-full sm:ml-auto sm:basis-auto">
-        <Select value={appFontFamily} onValueChange={handleFontChange}>
-          <SelectTrigger className="w-full sm:w-[220px]">
-            <SelectValue placeholder={t('fontFamily.placeholder')} />
-          </SelectTrigger>
-          <SelectContent className="max-h-80">
-            <SelectGroup>
-              <SelectLabel>{t('fontFamily.groups.default')}</SelectLabel>
-              {defaultOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  <span className="block truncate" style={{ fontFamily: option.previewFamily }}>
-                    {option.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>{t('fontFamily.groups.generic')}</SelectLabel>
-              {genericOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  <span className="block truncate" style={{ fontFamily: option.previewFamily }}>
-                    {option.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>{t('fontFamily.groups.system')}</SelectLabel>
-              {isLoading ? (
-                <SelectItem value={STATUS_OPTION_LOADING} disabled>
-                  {t('fontFamily.loading')}
-                </SelectItem>
-              ) : null}
-              {!isLoading && systemOptions.length === 0 ? (
-                <SelectItem value={STATUS_OPTION_UNAVAILABLE} disabled>
-                  {t('fontFamily.noSystemFonts')}
-                </SelectItem>
-              ) : null}
-              {systemOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  <span className="block truncate" style={{ fontFamily: option.previewFamily }}>
-                    {option.label}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          title={t('fontFamily.title')}
+          value={appFontFamily}
+          onValueChange={handleFontChange}
+          className="w-full sm:w-[220px]"
+          placeholder={t('fontFamily.placeholder')}
+          options={[
+            ...defaultOptions.map(option => ({
+              value: option.value,
+              label: <span style={{ fontFamily: option.previewFamily }}>{option.label}</span>,
+              group: t('fontFamily.groups.default'),
+            })),
+            ...genericOptions.map(option => ({
+              value: option.value,
+              label: <span style={{ fontFamily: option.previewFamily }}>{option.label}</span>,
+              group: t('fontFamily.groups.generic'),
+            })),
+            ...(isLoading ? [{
+              value: STATUS_OPTION_LOADING,
+              label: t('fontFamily.loading'),
+              group: t('fontFamily.groups.system'),
+              disabled: true,
+            }] : []),
+            ...(!isLoading && systemOptions.length === 0 ? [{
+              value: STATUS_OPTION_UNAVAILABLE,
+              label: t('fontFamily.noSystemFonts'),
+              group: t('fontFamily.groups.system'),
+              disabled: true,
+            }] : []),
+            ...systemOptions.map(option => ({
+              value: option.value,
+              label: <span style={{ fontFamily: option.previewFamily }}>{option.label}</span>,
+              group: t('fontFamily.groups.system'),
+            })),
+          ]}
+        />
       </ItemActions>
     </Item>
   )

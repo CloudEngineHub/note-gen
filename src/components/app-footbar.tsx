@@ -2,6 +2,7 @@
 
 import { Highlighter, MessageSquare, Palette, Plus, Square, SquarePen } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Store } from '@tauri-apps/plugin-store'
 import { useTranslations } from 'next-intl'
 import { useRef, useState } from 'react'
@@ -11,14 +12,19 @@ import {
   type InteractiveMenuItem,
 } from '@/components/ui/modern-mobile-menu'
 import {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from '@/components/ui/popover'
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer'
 import { MobileRecordTools } from '@/components/mobile-record-tools'
-import { OrganizeNotes } from '@/app/core/main/mark/organize-notes'
 import useRecordingStore from '@/stores/recording'
 import emitter from '@/lib/emitter'
+
+const OrganizeNotes = dynamic(
+  () => import('@/app/core/main/mark/organize-notes').then(module => module.OrganizeNotes),
+  { ssr: false },
+)
 
 type FootbarItem = InteractiveMenuItem & {
   url: string
@@ -120,35 +126,30 @@ export function AppFootbar() {
 
   return (
     <div className="flex h-full w-full items-center justify-center px-2 min-[380px]:px-3">
-      <Popover open={quickActionOpen} onOpenChange={setQuickActionOpen}>
-        <PopoverAnchor asChild>
-          <InteractiveMenu
-            accentColor={isRecording ? 'rgb(239 68 68)' : undefined}
-            activeIndex={activeIndex}
-            aria-label={t('navigation.navigate')}
-            className="w-full"
-            items={items}
-            onActiveIndexChange={index => {
-              const item = items[index]
-              if (item) void menuHandler(item)
-            }}
-          />
-        </PopoverAnchor>
-        <PopoverContent
-          align="center"
-          side="top"
-          sideOffset={10}
-          collisionPadding={12}
-          className="origin-bottom w-[min(92vw,360px)] rounded-[1.35rem] border-border/60 bg-background/70 p-2 text-foreground shadow-[0_18px_48px_rgb(0_0_0/0.18)] backdrop-blur-xl will-change-[transform,opacity] supports-[backdrop-filter]:bg-background/60 data-[state=open]:duration-[220ms] data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in data-[state=closed]:slide-out-to-bottom-2 dark:shadow-[0_22px_54px_rgb(0_0_0/0.36)]"
-          onOpenAutoFocus={event => event.preventDefault()}
-          onCloseAutoFocus={event => event.preventDefault()}
-        >
-          <MobileRecordTools
-            onClose={() => setQuickActionOpen(false)}
-            onOrganize={handleMobileOrganize}
-          />
-        </PopoverContent>
-      </Popover>
+      <InteractiveMenu
+        accentColor={isRecording ? 'rgb(239 68 68)' : undefined}
+        activeIndex={activeIndex}
+        aria-label={t('navigation.navigate')}
+        className="w-full"
+        items={items}
+        onActiveIndexChange={index => {
+          const item = items[index]
+          if (item) void menuHandler(item)
+        }}
+      />
+      <Drawer open={quickActionOpen} onOpenChange={setQuickActionOpen}>
+        <DrawerContent>
+          <DrawerHeader className="sr-only">
+            <DrawerTitle>{t('navigation.mobileDock.quickRecord')}</DrawerTitle>
+          </DrawerHeader>
+          <div className="px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+            <MobileRecordTools
+              onClose={() => setQuickActionOpen(false)}
+              onOrganize={handleMobileOrganize}
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
       <OrganizeNotes ref={organizeRef} />
     </div>
   )

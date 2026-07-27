@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ResponsiveSelect } from "@/components/responsive-select";
 import { confirm } from '@tauri-apps/plugin-dialog';
 import {
   Dialog,
@@ -156,21 +156,13 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                         />
                       </div>
                     </div>
-                    <Select
+                    <ResponsiveSelect
+                      title={t('settings.template.scope')}
                       value={templateRange}
-                      onValueChange={(value: GenTemplateRange) => setTemplateRange(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('settings.template.selectScope')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {getTemplateRangeOptions(t).map((option) => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      onValueChange={value => setTemplateRange(value as GenTemplateRange)}
+                      placeholder={t('settings.template.selectScope')}
+                      options={getTemplateRangeOptions(t)}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="content">{t('settings.template.content')}</Label>
@@ -229,21 +221,13 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                         />
                       </div>
                     </div>
-                    <Select
+                    <ResponsiveSelect
+                      title={t('settings.template.scope')}
                       value={templateRange}
-                      onValueChange={(value: GenTemplateRange) => setTemplateRange(value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t('settings.template.selectScope')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {getTemplateRangeOptions(t).map((option) => (
-                            <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      onValueChange={value => setTemplateRange(value as GenTemplateRange)}
+                      placeholder={t('settings.template.selectScope')}
+                      options={getTemplateRangeOptions(t)}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="content">{t('settings.template.content')}</Label>
@@ -298,21 +282,13 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                       />
                     </div>
                   </div>
-                  <Select
+                  <ResponsiveSelect
+                    title={t('settings.template.scope')}
                     value={templateRange}
-                    onValueChange={(value: GenTemplateRange) => setTemplateRange(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('settings.template.selectScope')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {getTemplateRangeOptions(t).map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    onValueChange={value => setTemplateRange(value as GenTemplateRange)}
+                    placeholder={t('settings.template.selectScope')}
+                    options={getTemplateRangeOptions(t)}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-content">{t('settings.template.content')}</Label>
@@ -363,21 +339,13 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                       />
                     </div>
                   </div>
-                  <Select
+                  <ResponsiveSelect
+                    title={t('settings.template.scope')}
                     value={templateRange}
-                    onValueChange={(value: GenTemplateRange) => setTemplateRange(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t('settings.template.selectScope')} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        {getTemplateRangeOptions(t).map((option) => (
-                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    onValueChange={value => setTemplateRange(value as GenTemplateRange)}
+                    placeholder={t('settings.template.selectScope')}
+                    options={getTemplateRangeOptions(t)}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="edit-content">{t('settings.template.content')}</Label>

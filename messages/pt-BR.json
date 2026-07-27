@@ -2885,12 +2885,16 @@
       },
       "ragSources": {
         "label": "{count} notas referenciadas",
-        "openFile": "Abrir arquivo"
+        "openFile": "Abrir arquivo",
+        "skillsUsed": "{count, plural, one {# habilidade usada} other {# habilidades usadas}}",
+        "expandDescription": "Expandir descrição",
+        "collapseDescription": "Recolher descrição"
       },
       "preview": {
         "close": "Fechar",
         "copy": "Copiar",
-        "copied": "Copiado!"
+        "copied": "Copiado!",
+        "image": "Pré-visualização da imagem"
       },
       "control": {
         "edit": "Editar",

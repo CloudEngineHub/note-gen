@@ -9,7 +9,11 @@ import useArticleStore from "@/stores/article"
 import { useSkillsStore } from "@/stores/skills"
 import { X, FolderOpen, History, Trash2, ChevronDown } from "lucide-react"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  ResponsivePopover,
+  ResponsivePopoverContent,
+  ResponsivePopoverTrigger,
+} from "@/components/responsive-popover"
 import { useState } from "react"
 import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
 
@@ -88,8 +92,8 @@ export function SettingWorkspace() {
       <FieldTitle>{t('workspace.current')}</FieldTitle>
         <div className="flex flex-col gap-3">
           {/* 当前工作区路径显示和选择 */}
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
+          <ResponsivePopover open={open} onOpenChange={setOpen} mobileTitle={t('workspace.current')}>
+            <ResponsivePopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
@@ -104,8 +108,8 @@ export function SettingWorkspace() {
                 </div>
                 <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
+            </ResponsivePopoverTrigger>
+            <ResponsivePopoverContent className="w-full p-0" align="start">
               <Command>
                 <CommandInput placeholder={t('workspace.searchPlaceholder')} />
                 <CommandList>
@@ -158,7 +162,7 @@ export function SettingWorkspace() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="opacity-0 group-hover:opacity-100 h-6 w-6 p-0 hover:text-destructive"
+                                className="size-8 p-0 text-destructive md:size-6 md:opacity-0 md:group-hover:opacity-100"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   removeWorkspaceHistory(path)
@@ -186,8 +190,8 @@ export function SettingWorkspace() {
                   )}
                 </CommandList>
               </Command>
-            </PopoverContent>
-          </Popover>
+            </ResponsivePopoverContent>
+          </ResponsivePopover>
           
         </div>
       <FieldDescription>{t('workspace.desc')}</FieldDescription>

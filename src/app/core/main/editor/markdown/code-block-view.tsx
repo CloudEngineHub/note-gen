@@ -5,12 +5,7 @@ import { TextSelection } from '@tiptap/pm/state'
 import { Check, Copy } from 'lucide-react'
 import { useCallback, useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { toast } from '@/hooks/use-toast'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
 const AUTO_LANGUAGE_VALUE = '__auto__'
@@ -214,27 +209,21 @@ export function CodeBlockView({ editor, node, updateAttributes, getPos }: ReactN
         onKeyDown={handleToolbarKeyDown}
         onPointerDown={(event) => event.stopPropagation()}
       >
-        <Select value={selectedLanguageValue} onValueChange={handleLanguageChange}>
-          <SelectTrigger
-            className="code-block-language-trigger"
-            aria-label="选择代码块语言"
-            title="选择代码块语言"
-          >
-            <span className="code-block-language-trigger-label">
-              {selectedLanguageOption.shortLabel}
-            </span>
-          </SelectTrigger>
-          <SelectContent align="end" className="max-h-72">
-            {languageOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                <span className="code-block-language-option">
-                  <span className="code-block-language-option-code">{option.shortLabel}</span>
-                  <span>{option.label}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          title="选择代码块语言"
+          value={selectedLanguageValue}
+          onValueChange={handleLanguageChange}
+          className="code-block-language-trigger"
+          options={languageOptions.map(option => ({
+            value: option.value,
+            label: (
+              <span className="code-block-language-option">
+                <span className="code-block-language-option-code">{option.shortLabel}</span>
+                <span>{option.label}</span>
+              </span>
+            ),
+          }))}
+        />
         <button
           type="button"
           className="code-block-copy-button"

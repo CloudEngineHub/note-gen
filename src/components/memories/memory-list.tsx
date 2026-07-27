@@ -6,13 +6,13 @@ import { toast } from 'sonner'
 import { Brain, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+  ResponsiveDialog as Dialog,
+  ResponsiveDialogContent as DialogContent,
+  ResponsiveDialogDescription as DialogDescription,
+  ResponsiveDialogHeader as DialogHeader,
+  ResponsiveDialogTitle as DialogTitle,
+  ResponsiveDialogTrigger as DialogTrigger,
+} from '@/components/responsive-dialog'
 import {
   Empty,
   EmptyDescription,
@@ -29,14 +29,7 @@ import {
   ItemGroup,
   ItemTitle,
 } from '@/components/ui/item'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -153,28 +146,28 @@ export function MemoryList() {
               placeholder={t('filters.search')}
             />
           </InputGroup>
-          <Select value={kind} onValueChange={value => setKind(value as FilterValue<MemoryKind>)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">{t('filters.allKinds')}</SelectItem>
-                <SelectItem value="preference">{t('kinds.preference')}</SelectItem>
-                <SelectItem value="fact">{t('kinds.fact')}</SelectItem>
-                <SelectItem value="experience">{t('kinds.experience')}</SelectItem>
-                <SelectItem value="decision">{t('kinds.decision')}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <Select value={scope} onValueChange={value => setScope(value as FilterValue<MemoryScopeType>)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">{t('filters.allScopes')}</SelectItem>
-                <SelectItem value="global">{t('scopes.global')}</SelectItem>
-                <SelectItem value="workspace">{t('scopes.workspace')}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <ResponsiveSelect
+            title={t('filters.allKinds')}
+            value={kind}
+            onValueChange={value => setKind(value as FilterValue<MemoryKind>)}
+            options={[
+              { value: 'all', label: t('filters.allKinds') },
+              { value: 'preference', label: t('kinds.preference') },
+              { value: 'fact', label: t('kinds.fact') },
+              { value: 'experience', label: t('kinds.experience') },
+              { value: 'decision', label: t('kinds.decision') },
+            ]}
+          />
+          <ResponsiveSelect
+            title={t('filters.allScopes')}
+            value={scope}
+            onValueChange={value => setScope(value as FilterValue<MemoryScopeType>)}
+            options={[
+              { value: 'all', label: t('filters.allScopes') },
+              { value: 'global', label: t('scopes.global') },
+              { value: 'workspace', label: t('scopes.workspace') },
+            ]}
+          />
         </div>
 
         {(['active', 'pending', 'archived'] as MemoryStatus[]).map(tab => (

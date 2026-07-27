@@ -20,21 +20,14 @@ import { LocalImage } from '@/components/local-image'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { SwipeBack } from '@/components/ui/swipe-back'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
+import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -321,42 +314,42 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
           </Badge>
           {isSaving || hasChanges ? <span className="truncate text-xs text-muted-foreground">{t('common.saving')}</span> : null}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <MobileActionDrawer
+          title={t('record.mark.detail.moreActions')}
+          trigger={
             <Button variant="ghost" size="icon" aria-label={t('record.mark.detail.moreActions')}>
               <EllipsisVertical />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuGroup>
-              {mark.url ? (
-                <DropdownMenuItem onClick={() => void handleCopyLink()}>
-                  <Copy />
-                  {t('record.mark.toolbar.copyLink')}
-                </DropdownMenuItem>
-              ) : null}
-              {isHttpUrl(draft.url) ? (
-                <DropdownMenuItem onClick={() => void handleOpenLink(draft.url)}>
-                  <ExternalLink />
-                  {t('common.open')}
-                </DropdownMenuItem>
-              ) : null}
-              {isReadOnly ? (
-                <DropdownMenuItem onClick={() => void handleRestore()}>
-                  <RotateCcw />
-                  {t('record.mark.toolbar.restore')}
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteDialogOpen(true)}>
-                <Trash2 />
-                {isReadOnly ? t('record.mark.toolbar.deleteForever') : t('record.mark.toolbar.delete')}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+          items={[
+            ...(mark.url ? [{
+              key: 'copy-link',
+              label: t('record.mark.toolbar.copyLink'),
+              icon: <Copy />,
+              onSelect: handleCopyLink,
+            }] : []),
+            ...(isHttpUrl(draft.url) ? [{
+              key: 'open-link',
+              label: t('common.open'),
+              icon: <ExternalLink />,
+              onSelect: () => handleOpenLink(draft.url),
+            }] : []),
+            ...(isReadOnly ? [{
+              key: 'restore',
+              label: t('record.mark.toolbar.restore'),
+              icon: <RotateCcw />,
+              onSelect: handleRestore,
+            }] : []),
+            {
+              key: 'delete',
+              label: isReadOnly ? t('record.mark.toolbar.deleteForever') : t('record.mark.toolbar.delete'),
+              icon: <Trash2 />,
+              onSelect: () => setDeleteDialogOpen(true),
+              destructive: true,
+              separatorBefore: true,
+            },
+          ]}
+        />
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-allow-text-selection>
@@ -403,22 +396,15 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
           <div className="flex flex-col gap-5">
             <DetailField label={t('record.mark.detail.tag')} htmlFor="record-tag">
-              <Select
+              <MobileSelectDrawer
+                id="record-tag"
+                title={t('record.mark.detail.tag')}
                 value={String(draft.tagId)}
                 onValueChange={(value) => setDraft((current) => current ? { ...current, tagId: Number(value) } : current)}
                 disabled={isReadOnly}
-              >
-                <SelectTrigger id="record-tag" className="h-11">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {tags.map((tag) => (
-                      <SelectItem key={tag.id} value={String(tag.id)}>{tag.name}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                className="h-11"
+                options={tags.map(tag => ({ value: String(tag.id), label: tag.name }))}
+              />
             </DetailField>
 
             {mark.type === 'todo' ? (

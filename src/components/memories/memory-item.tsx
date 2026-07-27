@@ -26,20 +26,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  ResponsiveDialog as Dialog,
+  ResponsiveDialogContent as DialogContent,
+  ResponsiveDialogDescription as DialogDescription,
+  ResponsiveDialogHeader as DialogHeader,
+  ResponsiveDialogTitle as DialogTitle,
+} from '@/components/responsive-dialog'
+import { ResponsiveActionMenu } from '@/components/responsive-action-menu'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
 import { MemoryForm } from './memory-form'
 import useMemoriesStore from '@/stores/memories'
@@ -123,66 +116,38 @@ export function MemoryItem({ memory }: MemoryItemProps) {
           </ItemDescription>
         </ItemContent>
         <ItemActions>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <ResponsiveActionMenu
+            title={t('actions.more')}
+            trigger={
               <Button variant="ghost" size="icon-sm" aria-label={t('actions.more')}>
                 <Ellipsis />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-max min-w-48 whitespace-nowrap"
-            >
-              <DropdownMenuGroup>
-                {memory.status === 'pending' && (
-                  <DropdownMenuItem onSelect={() => void approveMemory(memory.id)}>
-                    <Check />
-                    {t('actions.approve')}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onSelect={() => setEditing(true)}>
-                  <Pencil />
-                  {t('actions.edit')}
-                </DropdownMenuItem>
-                {isPromoted ? (
-                  <DropdownMenuItem onSelect={() => void removeFromGuidance()}>
-                    <PinOff />
-                    {t('actions.demote')}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onSelect={() => void promoteToGuidance()}>
-                    <Pin />
-                    {t('actions.promote')}
-                  </DropdownMenuItem>
-                )}
-                {memory.status === 'archived' ? (
-                  <DropdownMenuItem onSelect={() => void restoreMemory(memory.id)}>
-                    <RotateCcw />
-                    {t('actions.restore')}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onSelect={() => void archive()}>
-                    <Trash2 />
-                    {t('actions.archive')}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuGroup>
-              {memory.status === 'archived' && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onSelect={() => setDeleteOpen(true)}
-                    >
-                      <Trash2 />
-                      {t('actions.deletePermanently')}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            desktopClassName="w-max min-w-48 whitespace-nowrap"
+            items={[
+              ...(memory.status === 'pending' ? [{
+                key: 'approve',
+                label: t('actions.approve'),
+                icon: <Check />,
+                onSelect: () => approveMemory(memory.id),
+              }] : []),
+              { key: 'edit', label: t('actions.edit'), icon: <Pencil />, onSelect: () => setEditing(true) },
+              isPromoted
+                ? { key: 'demote', label: t('actions.demote'), icon: <PinOff />, onSelect: removeFromGuidance }
+                : { key: 'promote', label: t('actions.promote'), icon: <Pin />, onSelect: promoteToGuidance },
+              memory.status === 'archived'
+                ? { key: 'restore', label: t('actions.restore'), icon: <RotateCcw />, onSelect: () => restoreMemory(memory.id) }
+                : { key: 'archive', label: t('actions.archive'), icon: <Trash2 />, onSelect: archive },
+              ...(memory.status === 'archived' ? [{
+                key: 'delete',
+                label: t('actions.deletePermanently'),
+                icon: <Trash2 />,
+                destructive: true,
+                separatorBefore: true,
+                onSelect: () => setDeleteOpen(true),
+              }] : []),
+            ]}
+          />
         </ItemActions>
       </Item>
 

@@ -17,14 +17,7 @@ import {
   ItemDescription,
   ItemTitle,
 } from '@/components/ui/item'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
@@ -125,34 +118,32 @@ export function MemoryForm({ memory, onSuccess }: MemoryFormProps) {
 
       <Field orientation="responsive">
         <FieldLabel htmlFor="memory-kind">{t('form.kindLabel')}</FieldLabel>
-        <Select value={kind} onValueChange={value => setKind(value as MemoryKind)}>
-          <SelectTrigger id="memory-kind">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="preference">{t('kinds.preference')}</SelectItem>
-              <SelectItem value="fact">{t('kinds.fact')}</SelectItem>
-              <SelectItem value="experience">{t('kinds.experience')}</SelectItem>
-              <SelectItem value="decision">{t('kinds.decision')}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          id="memory-kind"
+          title={t('form.kindLabel')}
+          value={kind}
+          onValueChange={value => setKind(value as MemoryKind)}
+          options={[
+            { value: 'preference', label: t('kinds.preference') },
+            { value: 'fact', label: t('kinds.fact') },
+            { value: 'experience', label: t('kinds.experience') },
+            { value: 'decision', label: t('kinds.decision') },
+          ]}
+        />
       </Field>
 
       <Field orientation="responsive">
         <FieldLabel htmlFor="memory-scope">{t('form.scopeLabel')}</FieldLabel>
-        <Select value={scopeType} onValueChange={value => setScopeType(value as MemoryScopeType)}>
-          <SelectTrigger id="memory-scope">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="global">{t('scopes.global')}</SelectItem>
-              <SelectItem value="workspace">{t('scopes.workspace')}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          id="memory-scope"
+          title={t('form.scopeLabel')}
+          value={scopeType}
+          onValueChange={value => setScopeType(value as MemoryScopeType)}
+          options={[
+            { value: 'global', label: t('scopes.global') },
+            { value: 'workspace', label: t('scopes.workspace') },
+          ]}
+        />
       </Field>
 
       <Item variant="outline">

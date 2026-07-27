@@ -41,7 +41,7 @@ export function ImageAttachments({ images, onRemove }: ImageAttachmentsProps) {
             <Button
               variant="destructive"
               size="icon"
-              className="absolute top-0 right-0 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-0 top-0 size-6 opacity-100 transition-opacity md:size-4 md:opacity-0 md:group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation()
                 onRemove(image.id)

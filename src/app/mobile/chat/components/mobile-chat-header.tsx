@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { History, MessageSquareDashed, MessageSquarePlus, Search, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import dayjs from "dayjs"
@@ -18,7 +19,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer"
-import { SearchDialog } from "@/components/search-dialog"
 import {
   getAutoDataSyncState,
   subscribeAutoDataSyncState,
@@ -26,6 +26,11 @@ import {
 } from "@/lib/sync/auto-data-sync-queue"
 import useUpdateStore from "@/stores/update"
 import { MobileMeSheet } from "./mobile-me-sheet"
+
+const SearchDialog = dynamic(
+  () => import('@/components/search-dialog').then(module => module.SearchDialog),
+  { ssr: false },
+)
 
 dayjs.extend(relativeTime)
 
@@ -102,7 +107,7 @@ export function MobileChatHeader() {
           type="button"
           aria-label={tSearch("placeholder")}
           onClick={() => setSearchOpen(true)}
-          className="flex h-9 min-w-0 flex-1 items-center rounded-md border bg-muted/30 px-3 text-left"
+          className="flex h-11 min-w-0 flex-1 items-center rounded-md border bg-muted/30 px-3 text-left"
         >
           <Search className="size-4 shrink-0 text-muted-foreground" />
           <span className="ml-2 truncate text-sm text-muted-foreground">
@@ -140,36 +145,36 @@ export function MobileChatHeader() {
                     </div>
                   ) : (
                     filteredConversations.map((conversation) => (
-                      <button
+                      <div
                         key={conversation.id}
-                        className="w-full text-left p-3 rounded-lg border mb-2 active:bg-accent transition-colors"
-                        onClick={() => {
-                          switchConversation(conversation.id)
-                          setDrawerOpen(false)
-                        }}
+                        className="mb-2 flex min-h-11 w-full items-stretch rounded-lg border transition-colors focus-within:bg-accent active:bg-accent"
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 p-3 text-left"
+                          onClick={() => {
+                            switchConversation(conversation.id)
+                            setDrawerOpen(false)
+                          }}
+                        >
                           <div className="min-w-0">
                             <p className="text-sm font-medium truncate">{conversation.title}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {formatRelativeTime(conversation.updatedAt, language)}
                             </p>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 size-8 text-muted-foreground active:text-destructive"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              deleteConversation(conversation.id)
-                            }}
-                            aria-label={tEmpty("deleteConversation")}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </button>
+                        </button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="my-auto shrink-0 text-muted-foreground active:text-destructive"
+                          onClick={() => deleteConversation(conversation.id)}
+                          aria-label={tEmpty("deleteConversation")}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
                     ))
                   )}
                 </div>
@@ -199,7 +204,7 @@ export function MobileChatHeader() {
 
         </div>
       </header>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      {searchOpen ? <SearchDialog open onOpenChange={setSearchOpen} /> : null}
     </>
   )
 }

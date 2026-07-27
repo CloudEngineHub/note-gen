@@ -26,6 +26,8 @@ export function MobileViewport() {
   useEffect(() => {
     const root = document.documentElement
     const body = document.body
+    root.classList.add('mobile-app-active')
+    body.classList.add('mobile-app-active')
     const timers = new Set<number>()
     let stableViewportHeight = window.visualViewport?.height ?? window.innerHeight
     let recentEditablePointerAt = 0
@@ -156,6 +158,8 @@ export function MobileViewport() {
       timers.forEach((id) => window.clearTimeout(id))
       root.classList.remove('mobile-keyboard-open')
       body.classList.remove('mobile-keyboard-open')
+      root.classList.remove('mobile-app-active')
+      body.classList.remove('mobile-app-active')
       root.style.removeProperty('--mobile-viewport-height')
       root.style.removeProperty('--mobile-viewport-width')
       root.style.removeProperty('--mobile-viewport-offset-top')

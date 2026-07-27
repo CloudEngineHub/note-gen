@@ -1,5 +1,8 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 
 export function TooltipButton(
@@ -27,13 +30,29 @@ export function TooltipButton(
     buttonId?: string;
   })
 {
+  const isMobile = useIsMobile()
+  const button = (
+    <Button
+      id={buttonId}
+      className={cn("relative", buttonClassName)}
+      disabled={disabled}
+      size={size}
+      variant={variant}
+      aria-label={tooltipText}
+      title={isMobile ? tooltipText : undefined}
+      onClick={onClick}
+    >
+      {icon}
+    </Button>
+  )
+
+  if (isMobile) return button
+
   return (
     <TooltipProvider>
       <Tooltip {...props}>
         <TooltipTrigger asChild>
-          <Button id={buttonId} className={cn("relative", buttonClassName)} disabled={disabled} size={size} variant={variant} onClick={onClick}>
-            {icon}
-          </Button>
+          {button}
         </TooltipTrigger>
         <TooltipContent side={side}>
           <p>{tooltipText}</p>

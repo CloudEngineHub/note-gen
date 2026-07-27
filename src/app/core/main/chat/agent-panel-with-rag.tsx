@@ -177,9 +177,11 @@ export function AgentPanelWithRag({
           {hasRag && (
             <>
               <li>
-                <div
-                  className="group flex items-center gap-2 py-2 cursor-pointer"
+                <button
+                  type="button"
+                  className="group flex min-h-11 w-full items-center gap-2 py-2 text-left"
                   onClick={() => setIsRagExpanded(!isRagExpanded)}
+                  aria-expanded={isRagExpanded}
                 >
                   <div className="shrink-0">
                     <Database className="size-4.5 text-blue-500" />
@@ -194,7 +196,7 @@ export function AgentPanelWithRag({
                       }`}
                     />
                   </div>
-                </div>
+                </button>
               </li>
 
               {/* 文件列表 */}
@@ -205,9 +207,12 @@ export function AgentPanelWithRag({
 
                 return (
                   <li key={source} className="mt-1">
-                    <div
-                      className="group flex items-center gap-2 py-1 cursor-pointer"
+                    <button
+                      type="button"
+                      className="group flex min-h-11 w-full items-center gap-2 py-1 text-left disabled:cursor-default"
                       onClick={() => hasDetail && toggleFileExpansion(source)}
+                      disabled={!hasDetail}
+                      aria-expanded={hasDetail ? isFileExpanded : undefined}
                     >
                       <div className="shrink-0">
                         <div className="size-4.5" />
@@ -233,7 +238,7 @@ export function AgentPanelWithRag({
                           />
                         )}
                       </div>
-                    </div>
+                    </button>
 
                     {/* 展开的详情内容 */}
                     {isFileExpanded && hasDetail && detail?.content && (
@@ -242,7 +247,7 @@ export function AgentPanelWithRag({
                           <div className="flex items-center justify-between gap-2 py-1">
                             <div className="flex items-center gap-2">
                               <Database className="size-3.5 text-blue-500 shrink-0" />
-                              <span className="font-medium text-xs">引用内容</span>
+                              <span className="font-medium text-xs">{t('record.chat.agent.observation')}</span>
                             </div>
                             {detail?.filepath && (
                               <button
@@ -251,7 +256,7 @@ export function AgentPanelWithRag({
                                 title={t("record.chat.ragSources.openFile", { defaultValue: "Open file" })}
                               >
                                 <ExternalLink className="size-3" />
-                                <span>打开文件</span>
+                                <span>{t('record.chat.ragSources.openFile')}</span>
                               </button>
                             )}
                           </div>

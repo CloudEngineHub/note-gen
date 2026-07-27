@@ -2,7 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { useTranslations } from 'next-intl';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ResponsiveSelect } from "@/components/responsive-select";
 import useSettingStore from "@/stores/setting";
 import { Store } from "@tauri-apps/plugin-store";
 import useSyncStore from "@/stores/sync";
@@ -199,29 +199,16 @@ export function GiteaSync() {
       {/* 实例类型选择 */}
       <div className="space-y-2 mb-4">
         <label className="text-sm font-medium">{t('settings.sync.giteaInstanceType')}</label>
-        <Select value={giteaInstanceType} onValueChange={instanceTypeChangeHandler}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t('settings.sync.giteaInstanceTypePlaceholder')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={GiteaInstanceType.OFFICIAL}>
-              <div className="flex items-center gap-2">
-                <Globe className="size-4" />
-                <div>
-                  <div className="font-medium">Gitea.com</div>
-                </div>
-              </div>
-            </SelectItem>
-            <SelectItem value={GiteaInstanceType.SELF_HOSTED}>
-              <div className="flex items-center gap-2">
-                <Server className="size-4" />
-                <div>
-                  <div className="font-medium">{t('settings.sync.giteaInstanceTypeOptions.selfHosted')}</div>
-                </div>
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <ResponsiveSelect
+          title={t('settings.sync.giteaInstanceType')}
+          value={giteaInstanceType}
+          onValueChange={value => instanceTypeChangeHandler(value as GiteaInstanceType)}
+          placeholder={t('settings.sync.giteaInstanceTypePlaceholder')}
+          options={[
+            { value: GiteaInstanceType.OFFICIAL, label: <span className="flex items-center gap-2"><Globe />Gitea.com</span> },
+            { value: GiteaInstanceType.SELF_HOSTED, label: <span className="flex items-center gap-2"><Server />{t('settings.sync.giteaInstanceTypeOptions.selfHosted')}</span> },
+          ]}
+        />
         <p className="text-xs text-muted-foreground">{t('settings.sync.giteaInstanceTypeDesc')}</p>
       </div>
 

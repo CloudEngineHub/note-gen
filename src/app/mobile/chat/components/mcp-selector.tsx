@@ -134,7 +134,7 @@ export function McpSelector() {
           <DrawerHeader>
             <DrawerTitle>{t('selectServers')}</DrawerTitle>
           </DrawerHeader>
-          <div className="p-4 overflow-auto">
+          <div className="p-4">
             <McpListContent />
           </div>
         </DrawerContent>

@@ -166,7 +166,7 @@ export function ModelSelector() {
           <DrawerHeader>
             <DrawerTitle>{t('tooltip')}</DrawerTitle>
           </DrawerHeader>
-          <div className="p-4 overflow-auto">
+          <div className="p-4">
             <ModelListContent
               groupedByConfig={groupedByConfig}
               primaryModel={primaryModel}

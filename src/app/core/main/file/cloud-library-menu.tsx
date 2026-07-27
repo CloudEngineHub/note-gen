@@ -1,19 +1,12 @@
 'use client'
 
 import { confirm } from '@tauri-apps/plugin-dialog'
-import { BookOpenCheck, Cloud, Database, DatabaseZap, Download, EllipsisVertical, LoaderCircle, PackageOpen, Upload } from 'lucide-react'
+import { Cloud, Database, DatabaseZap, Download, EllipsisVertical, LoaderCircle, PackageOpen, Upload } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { ResponsiveActionMenu } from '@/components/responsive-action-menu'
 import { toast } from '@/hooks/use-toast'
 import useArticleStore from '@/stores/article'
 import useCloudLibraryStore from '@/stores/cloud-library'
@@ -37,9 +30,6 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
   const { processAllDocuments, isProcessing, isAutoVectorEnabled, setAutoVectorEnabled } = useVectorStore()
   const {
     operation,
-    progressCurrent,
-    progressTotal,
-    progressPath,
     pullAllFiles,
     uploadAllFiles,
     uploadKnowledgeBase,
@@ -160,8 +150,11 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <ResponsiveActionMenu
+      title={t('title')}
+      desktopAlign="start"
+      desktopClassName="w-72"
+      trigger={
         <Button
           type="button"
           variant="ghost"
@@ -173,94 +166,63 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
         >
           {busy ? <LoaderCircle className="size-4 animate-spin" /> : <EllipsisVertical className="size-4" />}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72">
-        <DropdownMenuLabel>{t('files')}</DropdownMenuLabel>
-        <DropdownMenuItem
-          onSelect={(event) => {
-            event.preventDefault()
-            void setShowCloudFiles(!showCloudFiles)
-          }}
-        >
-          <Cloud className="mr-2 size-4" />
-          <span>{t('showRemoteFiles')}</span>
-          <Switch
-            className="ml-auto"
-            checked={showCloudFiles}
-            onClick={(event) => event.stopPropagation()}
-            onCheckedChange={(checked) => void setShowCloudFiles(checked)}
-            aria-label={t('showRemoteFiles')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={(event) => {
-            event.preventDefault()
-            void setSyncStaticAssets(!syncStaticAssets)
-          }}
-        >
-          <PackageOpen className="mr-2 size-4" />
-          <span>{t('syncStaticAssets')}</span>
-          <Switch
-            className="ml-auto"
-            checked={syncStaticAssets}
-            onClick={(event) => event.stopPropagation()}
-            onCheckedChange={(checked) => void setSyncStaticAssets(checked)}
-            aria-label={t('syncStaticAssets')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void handleUploadAll()} disabled={busy}>
-          <Upload className="mr-2 size-4" />
-          {t('uploadFiles')}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void handlePullAll()} disabled={busy}>
-          <Download className="mr-2 size-4" />
-          {t('downloadFiles')}
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>{t('knowledgeBase')}</DropdownMenuLabel>
-        <DropdownMenuItem
-          onSelect={(event) => {
-            event.preventDefault()
-            void setAutoVectorEnabled(!isAutoVectorEnabled)
-          }}
-        >
-          <DatabaseZap className="mr-2 size-4" />
-          <span>{t('autoUpdate')}</span>
-          <Switch
-            className="ml-auto"
-            checked={isAutoVectorEnabled}
-            onClick={(event) => event.stopPropagation()}
-            onCheckedChange={(checked) => void setAutoVectorEnabled(checked)}
-            aria-label={t('autoUpdate')}
-          />
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void processAllDocuments()} disabled={busy}>
-          <Database className="mr-2 size-4" />
-          {t('recalculate')}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void handleUploadKnowledgeBase()} disabled={busy}>
-          <Upload className="mr-2 size-4" />
-          {t('uploadKnowledgeBase')}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void handleDownloadKnowledgeBase()} disabled={busy}>
-          <Download className="mr-2 size-4" />
-          {t('downloadKnowledgeBase')}
-        </DropdownMenuItem>
-
-        {operation && (
-          <>
-            <DropdownMenuSeparator />
-            <div className="px-2 py-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <BookOpenCheck className="size-3.5 shrink-0" />
-                <span>{t(`operations.${operation}`)} {progressCurrent}/{progressTotal || '—'}</span>
-              </div>
-              {progressPath && <div className="mt-1 truncate" title={progressPath}>{progressPath}</div>}
-            </div>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      }
+      items={[
+        {
+          key: 'show-remote',
+          label: t('showRemoteFiles'),
+          icon: <Cloud />,
+          keepOpen: true,
+          onSelect: () => setShowCloudFiles(!showCloudFiles),
+          end: (
+            <Switch
+              className="ml-auto"
+              checked={showCloudFiles}
+              onClick={event => event.stopPropagation()}
+              onCheckedChange={checked => void setShowCloudFiles(checked)}
+              aria-label={t('showRemoteFiles')}
+            />
+          ),
+        },
+        {
+          key: 'static-assets',
+          label: t('syncStaticAssets'),
+          icon: <PackageOpen />,
+          keepOpen: true,
+          onSelect: () => setSyncStaticAssets(!syncStaticAssets),
+          end: (
+            <Switch
+              className="ml-auto"
+              checked={syncStaticAssets}
+              onClick={event => event.stopPropagation()}
+              onCheckedChange={checked => void setSyncStaticAssets(checked)}
+              aria-label={t('syncStaticAssets')}
+            />
+          ),
+        },
+        { key: 'upload-files', label: t('uploadFiles'), icon: <Upload />, onSelect: handleUploadAll, disabled: busy },
+        { key: 'download-files', label: t('downloadFiles'), icon: <Download />, onSelect: handlePullAll, disabled: busy },
+        {
+          key: 'auto-vector',
+          label: t('autoUpdate'),
+          icon: <DatabaseZap />,
+          separatorBefore: true,
+          keepOpen: true,
+          onSelect: () => setAutoVectorEnabled(!isAutoVectorEnabled),
+          end: (
+            <Switch
+              className="ml-auto"
+              checked={isAutoVectorEnabled}
+              onClick={event => event.stopPropagation()}
+              onCheckedChange={checked => void setAutoVectorEnabled(checked)}
+              aria-label={t('autoUpdate')}
+            />
+          ),
+        },
+        { key: 'recalculate', label: t('recalculate'), icon: <Database />, onSelect: processAllDocuments, disabled: busy },
+        { key: 'upload-kb', label: t('uploadKnowledgeBase'), icon: <Upload />, onSelect: handleUploadKnowledgeBase, disabled: busy },
+        { key: 'download-kb', label: t('downloadKnowledgeBase'), icon: <Download />, onSelect: handleDownloadKnowledgeBase, disabled: busy },
+      ]}
+    />
   )
 }

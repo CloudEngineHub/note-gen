@@ -18,14 +18,7 @@ import {
   ItemDescription,
   ItemTitle,
 } from '@/components/ui/item';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { ResponsiveSelect } from '@/components/responsive-select';
 import type {
   ObjectStorageAddressingStyle,
   ObjectStoragePreset,
@@ -177,25 +170,17 @@ export function S3ImageHosting() {
           <FieldGroup>
             <Field>
               <FieldLabel>{t('settings.imageHosting.s3.provider')}</FieldLabel>
-              <Select
+              <ResponsiveSelect
+                title={t('settings.imageHosting.s3.provider')}
                 value={config.preset || 'custom'}
-                onValueChange={(preset: ObjectStoragePreset) => {
-                  void handleConfigChange(applyObjectStoragePreset(preset, config))
+                onValueChange={value => {
+                  void handleConfigChange(applyObjectStoragePreset(value as ObjectStoragePreset, config))
                 }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {OBJECT_STORAGE_PRESETS.map((preset) => (
-                      <SelectItem key={preset} value={preset}>
-                        {t(`settings.imageHosting.s3.providers.${preset}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                options={OBJECT_STORAGE_PRESETS.map(preset => ({
+                  value: preset,
+                  label: t(`settings.imageHosting.s3.providers.${preset}`),
+                }))}
+              />
               <FieldDescription>{t('settings.imageHosting.s3.providerDesc')}</FieldDescription>
             </Field>
             <Item variant="muted">
@@ -307,23 +292,18 @@ export function S3ImageHosting() {
             {preset === 'custom' ? (
               <Field>
                 <FieldLabel>{t('settings.imageHosting.s3.addressingStyle')}</FieldLabel>
-                <Select
+                <ResponsiveSelect
+                  title={t('settings.imageHosting.s3.addressingStyle')}
                   value={config.addressingStyle || 'auto'}
-                  onValueChange={(addressingStyle: ObjectStorageAddressingStyle) => {
-                    void handleConfigChange({ ...config, addressingStyle })
+                  onValueChange={value => {
+                    void handleConfigChange({ ...config, addressingStyle: value as ObjectStorageAddressingStyle })
                   }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="auto">{t('settings.imageHosting.s3.addressingStyles.auto')}</SelectItem>
-                      <SelectItem value="path">{t('settings.imageHosting.s3.addressingStyles.path')}</SelectItem>
-                      <SelectItem value="virtual">{t('settings.imageHosting.s3.addressingStyles.virtual')}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: 'auto', label: t('settings.imageHosting.s3.addressingStyles.auto') },
+                    { value: 'path', label: t('settings.imageHosting.s3.addressingStyles.path') },
+                    { value: 'virtual', label: t('settings.imageHosting.s3.addressingStyles.virtual') },
+                  ]}
+                />
                 <FieldDescription>{t('settings.imageHosting.s3.addressingStyleDesc')}</FieldDescription>
               </Field>
             ) : null}

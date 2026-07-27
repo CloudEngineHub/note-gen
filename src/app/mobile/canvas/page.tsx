@@ -24,21 +24,14 @@ import {
 import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
+import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuGroup,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/responsive-dialog'
 import {
   Drawer,
   DrawerContent,
@@ -47,14 +40,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Empty,
   EmptyContent,
@@ -171,38 +156,37 @@ export default function MobileCanvasPage() {
           <h1 className="truncate text-base font-semibold">{t('manager.title')}</h1>
         </div>
         <div className="flex shrink-0 items-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <MobileActionDrawer
+            title={t('more')}
+            trigger={
               <Button variant="ghost" size="icon" aria-label={t('more')}>
                 <EllipsisVertical />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuRadioGroup
-                  value={sortMode}
-                  onValueChange={value => {
-                    if (value === 'updated' || value === 'created' || value === 'name') {
-                      void setSortMode(value)
-                    }
-                  }}
-                >
-                  <DropdownMenuRadioItem value="updated">
-                    <EllipsisVertical />
-                    {t('manager.sort.updated')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="created">
-                    <CalendarDays />
-                    {t('manager.sort.created')}
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="name">
-                    <Pencil />
-                    {t('manager.sort.name')}
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+            items={[
+              {
+                key: 'updated',
+                label: t('manager.sort.updated'),
+                icon: <EllipsisVertical />,
+                selected: sortMode === 'updated',
+                onSelect: () => setSortMode('updated'),
+              },
+              {
+                key: 'created',
+                label: t('manager.sort.created'),
+                icon: <CalendarDays />,
+                selected: sortMode === 'created',
+                onSelect: () => setSortMode('created'),
+              },
+              {
+                key: 'name',
+                label: t('manager.sort.name'),
+                icon: <Pencil />,
+                selected: sortMode === 'name',
+                onSelect: () => setSortMode('name'),
+              },
+            ]}
+          />
           <Drawer open={templateOpen} onOpenChange={setTemplateOpen}>
             <DrawerTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={t('new')}>
@@ -265,11 +249,10 @@ export default function MobileCanvasPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 min-[700px]:grid-cols-3 min-[980px]:grid-cols-4">
             {visibleProjects.map(project => (
-              <ContextMenu key={project.id}>
-                <ContextMenuTrigger asChild>
+              <div key={project.id} className="relative">
                   <button
                     type="button"
-                    className="relative min-w-0 overflow-hidden rounded-xl border bg-card text-left transition-colors active:bg-accent"
+                    className="w-full min-w-0 overflow-hidden rounded-xl border bg-card text-left transition-colors active:bg-accent"
                     onClick={() => void handleOpen(project.id)}
                   >
                     <MobileCanvasThumbnail project={project} />
@@ -280,45 +263,65 @@ export default function MobileCanvasPage() {
                       </span>
                     ) : null}
                   </button>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuGroup>
-                    <ContextMenuItem onSelect={() => void togglePin(project.id)}>
-                      {project.pinnedAt ? <PinOff /> : <Pin />}
-                      {project.pinnedAt ? t('manager.unpin') : t('manager.pin')}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onSelect={() => {
-                        setEditingProject(project)
-                        setEditingTitle(project.title)
-                      }}
-                    >
-                      <Pencil />
-                      {t('rename')}
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void duplicateProject(project.id, t('duplicateTitle', { title: project.title }))}>
-                      <CopyPlus />
-                      {t('duplicate')}
-                    </ContextMenuItem>
-                  </ContextMenuGroup>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem variant="destructive" onSelect={() => void handleDelete(project.id)}>
-                    <Trash2 />
-                    {t('delete')}
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
+                  <div className="absolute right-1.5 top-1.5">
+                    <MobileActionDrawer
+                      title={project.title}
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon-sm"
+                          aria-label={t('more')}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          <EllipsisVertical />
+                        </Button>
+                      }
+                      items={[
+                        {
+                          key: 'pin',
+                          label: project.pinnedAt ? t('manager.unpin') : t('manager.pin'),
+                          icon: project.pinnedAt ? <PinOff /> : <Pin />,
+                          onSelect: () => togglePin(project.id),
+                        },
+                        {
+                          key: 'rename',
+                          label: t('rename'),
+                          icon: <Pencil />,
+                          onSelect: () => {
+                            setEditingProject(project)
+                            setEditingTitle(project.title)
+                          },
+                        },
+                        {
+                          key: 'duplicate',
+                          label: t('duplicate'),
+                          icon: <CopyPlus />,
+                          onSelect: () => duplicateProject(project.id, t('duplicateTitle', { title: project.title })),
+                        },
+                        {
+                          key: 'delete',
+                          label: t('delete'),
+                          icon: <Trash2 />,
+                          onSelect: () => handleDelete(project.id),
+                          destructive: true,
+                          separatorBefore: true,
+                        },
+                      ]}
+                    />
+                  </div>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      <Dialog open={Boolean(editingProject)} onOpenChange={open => !open && setEditingProject(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('rename')}</DialogTitle>
-            <DialogDescription>{t('manager.title')}</DialogDescription>
-          </DialogHeader>
+      <ResponsiveDialog open={Boolean(editingProject)} onOpenChange={open => !open && setEditingProject(null)}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{t('rename')}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>{t('manager.title')}</ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           <Input
             autoFocus
             value={editingTitle}
@@ -330,8 +333,8 @@ export default function MobileCanvasPage() {
           <Button disabled={!editingTitle.trim()} onClick={() => void finishRename()}>
             {t('rename')}
           </Button>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   )
 }

@@ -9,13 +9,7 @@ import { openPath } from '@tauri-apps/plugin-opener'
 import { useTranslations } from 'next-intl'
 import { ChevronDown, FileArchive, FolderInput, FolderOpen, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { ResponsiveActionMenu } from '@/components/responsive-action-menu'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/use-toast'
 import { getWorkspacePath } from '@/lib/workspace'
@@ -114,8 +108,9 @@ export function SkillInstallActions({
           {t('openSkillsFolder')}
         </Button>
       ) : null}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <ResponsiveActionMenu
+        title={t('installSkill')}
+        trigger={
           <Button variant="outline" size="sm" disabled={isImporting}>
             {isImporting ? (
               <Spinner data-icon="inline-start" />
@@ -125,22 +120,22 @@ export function SkillInstallActions({
             {isImporting ? t('importing') : t('installSkill')}
             <ChevronDown data-icon="inline-end" />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuGroup>
-            {showFileActions ? (
-              <DropdownMenuItem onSelect={() => void handleImport('directory')}>
-                <FolderInput />
-                {t('installFromFolder')}
-              </DropdownMenuItem>
-            ) : null}
-            <DropdownMenuItem onSelect={() => void handleImport('zip')}>
-              <FileArchive />
-              {t('installFromZip')}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        }
+        items={[
+          ...(showFileActions ? [{
+            key: 'directory',
+            label: t('installFromFolder'),
+            icon: <FolderInput />,
+            onSelect: () => handleImport('directory'),
+          }] : []),
+          {
+            key: 'zip',
+            label: t('installFromZip'),
+            icon: <FileArchive />,
+            onSelect: () => handleImport('zip'),
+          },
+        ]}
+      />
     </div>
   )
 }

@@ -35,7 +35,7 @@ export function SettingType(
           </h1>
           {desc && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{desc}</p>}
         </header>
-        <div className="flex min-w-0 flex-col gap-6">{children}</div>
+        <div data-setting-sections className="flex min-w-0 flex-col gap-5">{children}</div>
       </div>
     )
   }
@@ -71,14 +71,19 @@ export function SettingSection({
   actions?: React.ReactNode
   children?: React.ReactNode
 }) {
+  const mobile = useContext(MobileSettingLayoutContext)
+
   return (
-    <section className="flex flex-col gap-3">
+    <section
+      data-mobile-setting-section={mobile || undefined}
+      className="flex min-w-0 flex-col gap-3"
+    >
       <header data-setting-section-header className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h3 className="text-base font-semibold">{title}</h3>
           {desc ? <p className="text-sm text-muted-foreground">{desc}</p> : null}
         </div>
-        {actions}
+        {actions ? <div data-setting-section-actions className="shrink-0">{actions}</div> : null}
       </header>
       {children ?? null}
     </section>

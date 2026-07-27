@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { LocalImage } from '@/components/local-image'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle, ImageIcon } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
@@ -505,7 +505,7 @@ export function MobileRecordStream() {
               <DrawerHeader>
                 <DrawerTitle>{t('record.mark.toolbar.filter.tag')}</DrawerTitle>
               </DrawerHeader>
-              <div className="px-4 pb-4 space-y-2 overflow-auto">
+              <div className="flex flex-col gap-2 px-4 pb-4">
                 {tags.map((tag) => (
                   <Button
                     key={tag.id}
@@ -552,8 +552,9 @@ export function MobileRecordStream() {
               >
                 <ListChecks className="size-4" />
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <MobileActionDrawer
+                title={t('record.mark.toolbar.moveTag')}
+                trigger={
                   <Button
                     variant="ghost"
                     size="icon"
@@ -563,15 +564,13 @@ export function MobileRecordStream() {
                   >
                     <MoveRight className="size-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {tags.map((tag) => (
-                    <DropdownMenuItem key={tag.id} onClick={() => handleMoveSelected(tag.id)}>
-                      {tag.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                }
+                items={tags.map(tag => ({
+                  key: String(tag.id),
+                  label: tag.name,
+                  onSelect: () => handleMoveSelected(tag.id),
+                }))}
+              />
               <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" disabled={selectedCount === 0} onClick={handleDeleteSelected} title={t('record.mark.toolbar.delete')}>
                 <Trash2 className="size-4" />
               </Button>
@@ -843,7 +842,7 @@ export function MobileRecordStream() {
           <DrawerHeader>
             <DrawerTitle>{t('record.mark.toolbar.filter.title')}</DrawerTitle>
           </DrawerHeader>
-          <div className="px-4 pb-4 space-y-3 overflow-auto">
+          <div className="flex flex-col gap-3 px-4 pb-4">
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('record.mark.toolbar.filter.search')}</div>

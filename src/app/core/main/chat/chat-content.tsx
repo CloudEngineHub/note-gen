@@ -208,7 +208,7 @@ const ChatContent = React.memo(function ChatContent() {
                 <div className="flex w-full min-w-0">
                   <div className="flex flex-1 items-center gap-2 text-sm leading-6 text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                    <span>正在思考...</span>
+                    <span>{t('record.chat.agent.thinking')}</span>
                   </div>
                 </div>
               </MessageScrollerItem>
@@ -372,7 +372,16 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
         <Separator className='flex-1' />
         <div className="flex justify-center items-center gap-2 w-32 group h-8">
           <p className="text-sm text-center text-muted-foreground">{t('record.chat.input.clearContext.tooltip')}</p>
-          <X className="size-4 hidden group-hover:flex cursor-pointer" onClick={handleRemoveClearContext} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 md:hidden md:group-hover:inline-flex"
+            aria-label={t('common.delete')}
+            onClick={handleRemoveClearContext}
+          >
+            <X />
+          </Button>
         </div>
         <Separator className='flex-1' />
       </div>

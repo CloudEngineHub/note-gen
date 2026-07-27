@@ -22,6 +22,7 @@ import {
 } from "./agent-display-utils"
 import { estimateTokens } from "@/lib/ai/token-counter"
 import ChatPreview from "./chat-preview"
+import { useTranslations } from "next-intl"
 
 interface AgentRunTimelineProps {
   status?: AgentRunStatus
@@ -289,6 +290,7 @@ export function AgentRunTimeline({
   ragSourceDetails = [],
   loadedSkills = [],
 }: AgentRunTimelineProps) {
+  const t = useTranslations('record.chat')
   const [expandedEvents, setExpandedEvents] = React.useState<string[]>([])
   const [processOpen, setProcessOpen] = React.useState(false)
 
@@ -445,7 +447,7 @@ export function AgentRunTimeline({
                   <div className="flex flex-col gap-2 pb-2 pl-6 text-xs">
                     {visibleMessage && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">描述</div>
+                        <div className="font-medium text-muted-foreground">{t('agent.thought')}</div>
                         <div className="rounded bg-muted/60 p-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-muted-foreground">
                           {visibleMessage}
                         </div>
@@ -453,13 +455,13 @@ export function AgentRunTimeline({
                     )}
                     {inputDetail !== undefined && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">参数</div>
+                        <div className="font-medium text-muted-foreground">{t('agent.confirmation.parameters')}</div>
                         <pre className={traceDetailClassName(event)}>{formatTraceDetail(inputDetail)}</pre>
                       </div>
                     )}
                     {outputDetail !== undefined && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">结果</div>
+                        <div className="font-medium text-muted-foreground">{t('mcp.result')}</div>
                         <pre className={traceDetailClassName(event)}>{formatTraceDetail(outputDetail)}</pre>
                       </div>
                     )}

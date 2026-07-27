@@ -1,6 +1,7 @@
 'use client'
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import type { ActivityDaySummary, ActivityHeatmapWeek } from '@/lib/activity/types'
 
@@ -40,6 +41,8 @@ export function ActivityHeatmap({
   adaptive = false,
   labels,
 }: ActivityHeatmapProps) {
+  const isMobile = useIsMobile()
+
   return (
     <TooltipProvider>
       <div className="w-full overflow-visible px-1 py-1">
@@ -53,26 +56,29 @@ export function ActivityHeatmap({
                   ? `${day.day} · ${day.totalCount} ${labels.dayCount}`
                   : `${day.day} · ${labels.emptyDay}`
 
-                return (
+                const dayButton = (
+                  <button
+                    key={day.day}
+                    type="button"
+                    onClick={() => onSelectDay(day)}
+                    className={cn(
+                      adaptive
+                        ? 'aspect-square w-full rounded-[4px] border border-black/5 transition-colors'
+                        : compact
+                          ? 'h-3 w-3 rounded-[3px] border border-black/5 transition-colors'
+                          : 'h-4 w-4 rounded-[4px] border border-black/5 transition-colors',
+                      LEVEL_CLASSES[level],
+                      isSelected && (compact
+                        ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                        : 'ring-2 ring-primary ring-offset-2 ring-offset-background')
+                    )}
+                    aria-label={tooltipText}
+                  />
+                )
+
+                return isMobile ? dayButton : (
                   <Tooltip key={day.day}>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={() => onSelectDay(day)}
-                        className={cn(
-                          adaptive
-                            ? 'aspect-square w-full rounded-[4px] border border-black/5 transition-colors'
-                            : compact
-                              ? 'h-3 w-3 rounded-[3px] border border-black/5 transition-colors'
-                              : 'h-4 w-4 rounded-[4px] border border-black/5 transition-colors',
-                          LEVEL_CLASSES[level],
-                          isSelected && (compact
-                            ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-                            : 'ring-2 ring-primary ring-offset-2 ring-offset-background')
-                        )}
-                        aria-label={tooltipText}
-                      />
-                    </TooltipTrigger>
+                    <TooltipTrigger asChild>{dayButton}</TooltipTrigger>
                     <TooltipContent side="top">
                       <p>{tooltipText}</p>
                     </TooltipContent>

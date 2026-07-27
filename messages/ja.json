@@ -2811,12 +2811,16 @@
       },
       "ragSources": {
         "label": "{count} 件のノートを参照",
-        "openFile": "ファイルを開く"
+        "openFile": "ファイルを開く",
+        "skillsUsed": "{count} 個のスキルを使用",
+        "expandDescription": "説明を展開",
+        "collapseDescription": "説明を折りたたむ"
       },
       "preview": {
         "close": "閉じる",
         "copy": "コピー",
-        "copied": "コピーしました！"
+        "copied": "コピーしました！",
+        "image": "画像プレビュー"
       },
       "control": {
         "edit": "編集",

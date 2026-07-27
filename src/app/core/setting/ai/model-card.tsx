@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ResponsiveSelect } from "@/components/responsive-select"
 import {
   ChartScatter,
   ChevronDown,
@@ -354,26 +355,38 @@ export default function ModelCard({
 
               <Field>
                 <FieldLabel>{t('modelType.title')}</FieldLabel>
-                <Tabs
-                  className="w-full"
-                  orientation="horizontal"
-                  value={modelConfig.modelType}
-                  onValueChange={(value) => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
-                >
-                  <TabsList className="grid h-8 w-full grid-cols-5">
-                    {modelTypeOptions.map(({ value, icon: Icon }) => (
-                      <TabsTrigger
-                        key={value}
-                        value={value}
-                        title={t(`modelType.${value}`)}
-                        className="min-w-0 !w-auto !justify-center px-1"
-                      >
-                        {mobile ? null : <Icon data-icon="inline-start" />}
-                        <span className="truncate">{t(`modelType.${value}`)}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
+                {mobile ? (
+                  <ResponsiveSelect
+                    title={t('modelType.title')}
+                    value={modelConfig.modelType}
+                    onValueChange={value => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
+                    options={modelTypeOptions.map(({ value }) => ({
+                      value,
+                      label: t(`modelType.${value}`),
+                    }))}
+                  />
+                ) : (
+                  <Tabs
+                    className="w-full"
+                    orientation="horizontal"
+                    value={modelConfig.modelType}
+                    onValueChange={(value) => onUpdate(modelConfig.id, 'modelType', value as ModelType)}
+                  >
+                    <TabsList className="grid h-8 w-full grid-cols-5">
+                      {modelTypeOptions.map(({ value, icon: Icon }) => (
+                        <TabsTrigger
+                          key={value}
+                          value={value}
+                          title={t(`modelType.${value}`)}
+                          className="min-w-0 !w-auto !justify-center px-1"
+                        >
+                          <Icon data-icon="inline-start" />
+                          <span className="truncate">{t(`modelType.${value}`)}</span>
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                )}
               </Field>
 
               {modelConfig.modelType === 'chat' && (
