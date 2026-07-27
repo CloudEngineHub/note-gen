@@ -3155,7 +3155,8 @@
       "record": "记录",
       "quickRecord": "快捷",
       "write": "写作",
-      "me": "我的"
+      "me": "我的",
+      "canvas": "画布"
     },
     "search": "搜索",
     "githubImageHosting": "Github 图床",

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { History, MessageSquareDashed, MessageSquarePlus, Search, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import dayjs from "dayjs"
@@ -19,6 +19,13 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer"
 import { SearchDialog } from "@/components/search-dialog"
+import {
+  getAutoDataSyncState,
+  subscribeAutoDataSyncState,
+  type AutoDataSyncState,
+} from "@/lib/sync/auto-data-sync-queue"
+import useUpdateStore from "@/stores/update"
+import { MobileMeSheet } from "./mobile-me-sheet"
 
 dayjs.extend(relativeTime)
 
@@ -40,6 +47,8 @@ export function MobileChatHeader() {
     loading,
   } = useChatStore()
   const { language } = useSettingStore()
+  const autoDataSyncEnabled = useSettingStore(state => state.autoDataSyncEnabled)
+  const hasMobileUpdate = useUpdateStore(state => Boolean(state.mobileUpdate))
   const tEmpty = useTranslations("record.chat.empty")
   const tInput = useTranslations("record.chat.input")
   const tSearch = useTranslations("search")
@@ -47,6 +56,21 @@ export function MobileChatHeader() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [autoDataSyncState, setAutoDataSyncState] = useState<AutoDataSyncState>(
+    getAutoDataSyncState()
+  )
+
+  useEffect(() => subscribeAutoDataSyncState(setAutoDataSyncState), [])
+
+  const meIndicator = hasMobileUpdate
+    || (
+      autoDataSyncEnabled
+      && (
+        autoDataSyncState.phase === "failed"
+        || autoDataSyncState.phase === "conflict"
+        || autoDataSyncState.phase === "waiting_provider"
+      )
+    )
 
   const hasCurrentMessages = isTemporaryConversation
     ? chats.length > 0
@@ -72,6 +96,8 @@ export function MobileChatHeader() {
   return (
     <>
       <header className="mobile-page-header w-full border-b px-2 flex items-center gap-2 bg-background">
+        <MobileMeSheet indicator={meIndicator} />
+
         <button
           type="button"
           aria-label={tSearch("placeholder")}
@@ -170,6 +196,7 @@ export function MobileChatHeader() {
           >
             <MessageSquarePlus className="size-4" />
           </Button>
+
         </div>
       </header>
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />

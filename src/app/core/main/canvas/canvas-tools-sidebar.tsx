@@ -39,6 +39,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { CanvasCustomComponent, CanvasTool } from '@/types/canvas'
 import type { CanvasFlowchartNodeType } from '@/lib/canvas/shapes'
+import { cn } from '@/lib/utils'
 
 export type InsertableCanvasNodeType = CanvasFlowchartNodeType | 'text'
 
@@ -112,6 +113,7 @@ export function CanvasToolsSidebar({
   onInsertCustomComponent,
   onDeleteCustomComponent,
   onShapePreferenceChange,
+  mobile = false,
 }: {
   tool: CanvasTool
   customComponents: CanvasCustomComponent[]
@@ -125,6 +127,7 @@ export function CanvasToolsSidebar({
   onInsertCustomComponent: (component: CanvasCustomComponent) => void
   onDeleteCustomComponent: (id: string) => void
   onShapePreferenceChange: (nodeType: InsertableCanvasNodeType) => void
+  mobile?: boolean
 }) {
   const t = useTranslations('canvas')
   const [panel, setPanel] = useState<ToolPanel | null>(null)
@@ -166,11 +169,19 @@ export function CanvasToolsSidebar({
     onPanelOpenChange(false)
   }
   return (
-    <div className="absolute inset-y-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] items-start">
+    <div className={cn(
+      'absolute z-10 flex max-w-[calc(100%-1.5rem)]',
+      mobile
+        ? 'inset-x-3 bottom-3 flex-col-reverse items-stretch gap-2'
+        : 'inset-y-3 left-3 items-start'
+    )}>
       <div
         role="toolbar"
         aria-label={t('tools.label')}
-        className="flex w-12 shrink-0 flex-col items-center gap-1 rounded-xl border bg-background p-1 shadow-sm"
+        className={cn(
+          'flex shrink-0 items-center gap-1 rounded-xl border bg-background p-1 shadow-sm',
+          mobile ? 'h-12 w-full flex-row justify-start overflow-x-auto' : 'w-12 flex-col'
+        )}
       >
         <RailButton
           label={t('tools.select')}
@@ -178,13 +189,15 @@ export function CanvasToolsSidebar({
           icon={MousePointer2}
           onClick={() => selectTool('select')}
         />
-        <RailButton
-          label={t('tools.hand')}
-          active={tool === 'hand'}
-          icon={Hand}
-          onClick={() => selectTool('hand')}
-        />
-        <Separator />
+        {!mobile && (
+          <RailButton
+            label={t('tools.hand')}
+            active={tool === 'hand'}
+            icon={Hand}
+            onClick={() => selectTool('hand')}
+          />
+        )}
+        <Separator orientation={mobile ? 'vertical' : 'horizontal'} />
         <RailButton
           label={t('tools.pen')}
           active={tool === 'pen'}
@@ -203,7 +216,7 @@ export function CanvasToolsSidebar({
           icon={Eraser}
           onClick={() => selectTool('eraser')}
         />
-        <Separator />
+        <Separator orientation={mobile ? 'vertical' : 'horizontal'} />
         <RailButton
           label={t('toolbox.shapes')}
           active={panel === 'shapes'}
@@ -242,7 +255,12 @@ export function CanvasToolsSidebar({
       </div>
 
       {panel && (
-        <div className="ml-2 flex max-h-full w-[min(18rem,calc(100vw-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+        <div className={cn(
+          'flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
+          mobile
+            ? 'max-h-[min(60vh,32rem)] w-full'
+            : 'ml-2 max-h-full w-[min(18rem,calc(100vw-5.5rem))]'
+        )}>
           <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
             <span className="text-sm font-medium">{t(`toolbox.${panel}`)}</span>
             <Button

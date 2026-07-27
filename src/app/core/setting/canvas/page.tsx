@@ -9,7 +9,7 @@ import {
   Map,
   Mouse,
   MousePointer2,
-  PanelsTopLeft,
+  Palette,
   Scan,
   Scaling,
 } from 'lucide-react'
@@ -94,7 +94,7 @@ export default function CanvasSettingPage() {
   return (
     <SettingType
       id="canvas"
-      icon={<PanelsTopLeft />}
+      icon={<Palette />}
       title={t('title')}
       desc={t('desc')}
     >

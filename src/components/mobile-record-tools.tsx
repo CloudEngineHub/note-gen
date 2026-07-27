@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast'
 import { useTranslations } from 'next-intl'
 import { Separator } from '@/components/ui/separator'
 import useRecordingStore from '@/stores/recording'
+import useCanvasStore from '@/stores/canvas'
 
 interface MobileRecordToolsProps {
   onClose?: () => void
@@ -21,6 +22,7 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
   const t = useTranslations()
   const { loadFileTree, setActiveFilePath } = useArticleStore()
   const { isRecording } = useRecordingStore()
+  const createCanvasProject = useCanvasStore(state => state.createProject)
 
   const recordTools = [
     { id: 'text' },
@@ -73,6 +75,15 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
   }
 
   const handleToolClick = async (toolId: string) => {
+    if (toolId === 'canvas') {
+      const project = await createCanvasProject('blank', t('canvas.templates.blank'))
+      if (project) {
+        router.push(`/mobile/canvas/editor?id=${encodeURIComponent(project.id)}`)
+        onClose?.()
+      }
+      return
+    }
+
     if (toolId === 'write') {
       await handleQuickWrite()
       return
@@ -105,6 +116,10 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
         />
         <SimpleMobileTool
           toolId="organize"
+          onToolClick={handleToolClick}
+        />
+        <SimpleMobileTool
+          toolId="canvas"
           onToolClick={handleToolClick}
         />
       </div>

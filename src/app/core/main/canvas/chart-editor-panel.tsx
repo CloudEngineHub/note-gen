@@ -168,12 +168,14 @@ export function ChartEditorPanel({
   availableNotes,
   onOpenChange,
   onSubmit,
+  mobile = false,
 }: {
   open: boolean
   initialRequest: CanvasChartRequest | null
   availableNotes: Array<{ name: string; path: string }>
   onOpenChange: (open: boolean) => void
   onSubmit: (request: CanvasChartRequest) => void
+  mobile?: boolean
 }) {
   const t = useTranslations('canvas')
   const [title, setTitle] = useState('')
@@ -213,7 +215,12 @@ export function ChartEditorPanel({
   if (!open) return null
 
   return (
-    <div className="absolute inset-y-3 left-[4.25rem] z-20 flex w-[min(30rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+    <div className={cn(
+      'absolute z-20 flex flex-col overflow-hidden border bg-background shadow-lg',
+      mobile
+        ? 'inset-0 w-full'
+        : 'inset-y-3 left-[4.25rem] w-[min(30rem,calc(100%-5.5rem))] rounded-xl'
+    )}>
       <div className="flex min-h-14 shrink-0 items-start justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
           <h2 className="text-sm font-medium">{t(initialRequest ? 'chart.editTitle' : 'chart.createTitle')}</h2>

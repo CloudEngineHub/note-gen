@@ -210,6 +210,7 @@ const nodeTypes: NodeTypes = {
 
 interface CanvasEditorProps {
   canvasId: string
+  mobile?: boolean
 }
 
 interface CanvasSnapshot {
@@ -291,7 +292,7 @@ function havePersistentEdgesChanged(previous: Edge[], current: Edge[]) {
   })
 }
 
-function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
+function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const t = useTranslations('canvas')
   const { resolvedTheme } = useTheme()
   const document = useCanvasStore(state => state.documents[canvasId])
@@ -442,12 +443,15 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     })
   }, [activeCanvasId, canvasId, edges, nodes, projects, setCanvasSelectionContext, t])
 
-  useEffect(() => () => {
-    const selectionContext = useCanvasStore.getState().selectionContext
-    if (selectionContext?.canvasId === canvasId) {
-      useCanvasStore.getState().setSelectionContext(null)
+  useEffect(() => {
+    if (mobile) return
+    return () => {
+      const selectionContext = useCanvasStore.getState().selectionContext
+      if (selectionContext?.canvasId === canvasId) {
+        useCanvasStore.getState().setSelectionContext(null)
+      }
     }
-  }, [canvasId])
+  }, [canvasId, mobile])
 
   useEffect(() => {
     try {
@@ -921,7 +925,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       } else if (!modifier && event.key.toLowerCase() === 'f') {
         event.preventDefault()
         void fitView({ padding: 0.2, duration: 300 })
-      } else if (!modifier && event.code === 'Space') {
+      } else if (!mobile && !modifier && event.code === 'Space') {
         event.preventDefault()
         setTool(current => current === 'select' ? 'hand' : current)
       } else if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -931,7 +935,9 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
     }
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (event.code === 'Space') setTool(current => current === 'hand' ? 'select' : current)
+      if (!mobile && event.code === 'Space') {
+        setTool(current => current === 'hand' ? 'select' : current)
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -940,7 +946,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [canvasId, copySelection, deleteSelection, duplicateSelection, fitView, pasteSelection, redo, selectAll, undo])
+  }, [canvasId, copySelection, deleteSelection, duplicateSelection, fitView, mobile, pasteSelection, redo, selectAll, undo])
 
   const completeNodeInsertion = useCallback(() => {
     if (canvasInsertBehavior === 'select') setTool('select')
@@ -2042,7 +2048,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           tool === 'select' && '[&_.react-flow__pane]:!cursor-default',
           tool === 'hand' && '[&_.react-flow__node]:!cursor-grab [&_.react-flow__node:active]:!cursor-grabbing [&_.react-flow__pane]:!cursor-grab [&_.react-flow__pane.dragging]:!cursor-grabbing'
         )}
-        connectionRadius={28}
+        connectionRadius={mobile ? 36 : 28}
         nodes={displayNodes}
         edges={displayEdges}
         nodeTypes={nodeTypes}
@@ -2144,8 +2150,8 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         nodesDraggable={!previewSnapshot && tool === 'select'}
         nodesConnectable={!previewSnapshot && tool === 'select'}
         elementsSelectable={!previewSnapshot && tool === 'select'}
-        panOnDrag={tool === 'hand'}
-        selectionOnDrag={tool === 'select'}
+        panOnDrag={mobile ? tool === 'select' : tool === 'hand'}
+        selectionOnDrag={!mobile && tool === 'select'}
         selectionMode={SelectionMode.Partial}
         snapToGrid={canvasSnapToGrid}
         snapGrid={[canvasGridGap, canvasGridGap]}
@@ -2233,6 +2239,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           onInsertCustomComponent={insertCustomComponent}
           onDeleteCustomComponent={deleteCustomComponent}
           onShapePreferenceChange={setPreferredNodeType}
+          mobile={mobile}
         />
 
         <ChartEditorPanel
@@ -2241,6 +2248,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
           availableNotes={availableNotes}
           onOpenChange={setChartEditorOpen}
           onSubmit={saveChartNode}
+          mobile={mobile}
         />
 
         {pendingConnection && (
@@ -2296,7 +2304,12 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         )}
 
         {(selectedNodeCount > 0 || selectedEdgeCount > 0) && !toolPanelOpen && !chartEditorOpen && !isDrawingTool && (
-          <div className="absolute left-[4.25rem] top-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+          <div className={cn(
+            'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
+            mobile
+              ? 'inset-x-3 bottom-[4.25rem] max-h-[min(60vh,32rem)]'
+              : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
+          )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
               <span className="text-sm font-medium">
                 {selectedNodeCount > 0 ? t('selection.tools') : t('edge.title')}
@@ -2638,7 +2651,12 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         )}
 
         {isDrawingTool && !toolPanelOpen && !chartEditorOpen && (
-          <div className="absolute left-[4.25rem] top-3 z-10 flex max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-lg">
+          <div className={cn(
+            'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
+            mobile
+              ? 'inset-x-3 bottom-[4.25rem] max-h-[min(60vh,32rem)]'
+              : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
+          )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
               <span className="text-sm font-medium">
                 {t(brushPanelIsHighlighter ? 'brush.highlighterTitle' : 'brush.penTitle')}
@@ -2719,7 +2737,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         )}
       </div>
 
-      <CanvasFooter
+      {!mobile && <CanvasFooter
         showGrid={canvasGridVisible}
         snapToGrid={canvasSnapToGrid}
         zoom={viewport.zoom}
@@ -2733,7 +2751,7 @@ function CanvasEditorInner({ canvasId }: CanvasEditorProps) {
         onExportSource={format => void exportPortableFile(format)}
         onImportFile={() => void importCanvasFile()}
         onImportContent={() => setImportContentOpen(true)}
-      />
+      />}
 
       <Dialog open={edgeEditorOpen} onOpenChange={setEdgeEditorOpen}>
         <DialogContent className="sm:max-w-sm">

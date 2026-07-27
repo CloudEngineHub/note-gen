@@ -6,7 +6,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
-import { ArrowDownAZ, ArrowLeft, BrainCircuit, CalendarDays, CloudAlert, CloudCheck, CloudUpload, Columns3, CopyPlus, DownloadCloud, EllipsisVertical, FileInput, FilePlus2, Grid2X2, LayoutGrid, List, Loader2, PanelsTopLeft, Pencil, Pin, PinOff, RefreshCw, RotateCcw, ShieldQuestion, Timer, Trash2, Workflow } from 'lucide-react'
+import { ArrowDownAZ, ArrowLeft, BrainCircuit, CalendarDays, CloudAlert, CloudCheck, CloudUpload, Columns3, CopyPlus, DownloadCloud, EllipsisVertical, FileInput, FilePlus2, Grid2X2, LayoutGrid, List, Loader2, Palette, Pencil, Pin, PinOff, RefreshCw, RotateCcw, ShieldQuestion, Timer, Trash2, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
@@ -125,7 +125,11 @@ function CanvasSyncIndicator({
 
 function CanvasThumbnail({ project, compact = false }: { project: CanvasProject; compact?: boolean }) {
   const fallback = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(canvasDocumentToSvg(project.document))}`
-  const source = project.thumbnailPath
+  const repairThumbnail = useCanvasStore(state => state.repairThumbnail)
+  const [failedSourceKey, setFailedSourceKey] = useState<string | null>(null)
+  const thumbnailSourceKey = `${project.thumbnailPath || 'missing'}:${project.thumbnailRevision || project.updatedAt}`
+  const fallbackActive = failedSourceKey === thumbnailSourceKey
+  const source = project.thumbnailPath && !fallbackActive
     ? `${convertFileSrc(project.thumbnailPath)}?v=${project.thumbnailRevision || project.updatedAt}`
     : fallback
 
@@ -141,6 +145,11 @@ function CanvasThumbnail({ project, compact = false }: { project: CanvasProject;
         unoptimized
         sizes={compact ? '56px' : '140px'}
         className={cn('object-contain', compact ? 'p-1' : 'p-2')}
+        onError={() => {
+          if (fallbackActive || !project.thumbnailPath) return
+          setFailedSourceKey(thumbnailSourceKey)
+          void repairThumbnail(project.id)
+        }}
       />
     </span>
   )
@@ -542,14 +551,14 @@ export function CanvasSidebar() {
         {visibleProjects.length === 0 ? (
           <Empty className="min-h-72 border-0">
             <EmptyHeader>
-              <EmptyMedia variant="icon">{trashMode ? <Trash2 /> : <PanelsTopLeft />}</EmptyMedia>
+              <EmptyMedia variant="icon">{trashMode ? <Trash2 /> : <Palette />}</EmptyMedia>
               <EmptyTitle>{trashMode ? t('manager.trashEmpty') : t('empty.title')}</EmptyTitle>
               <EmptyDescription>{trashMode ? t('manager.trashEmptyDescription') : t('empty.description')}</EmptyDescription>
             </EmptyHeader>
             {!trashMode && (
               <EmptyContent className="flex-row justify-center">
                 <Button onClick={() => void handleCreate('blank')}>
-                  <PanelsTopLeft data-icon="inline-start" />
+                  <Palette data-icon="inline-start" />
                   {t('new')}
                 </Button>
                 <Button variant="outline" onClick={() => void handleImport()}>

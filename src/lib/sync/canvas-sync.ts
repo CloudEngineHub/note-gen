@@ -219,7 +219,7 @@ function mergeCanvasProjects(
           id: conflictId,
           title: `${older.title}（同步冲突·${origin}副本）`,
           pinnedAt: null,
-          thumbnailPath: origin === '本地' ? older.thumbnailPath || null : null,
+          thumbnailPath: null,
           deletedAt: null,
         })
       }

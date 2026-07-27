@@ -26,7 +26,10 @@ import type {
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const thumbnailTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const thumbnailGenerationPromises = new Map<string, Promise<void>>()
+const thumbnailRepairAttempts = new Set<string>()
 const historySaveChains = new Map<string, Promise<void>>()
+const MAX_THUMBNAIL_REPAIR_ATTEMPTS = 256
 
 function persistCanvasHistory(id: string, history: CanvasHistoryState) {
   const previousSave = historySaveChains.get(id) || Promise.resolve()
@@ -43,6 +46,17 @@ function persistCanvasHistory(id: string, history: CanvasHistoryState) {
 
 function hasCurrentThumbnail(project: Pick<CanvasProject, 'thumbnailPath'>) {
   return Boolean(project.thumbnailPath?.endsWith(`-v${CANVAS_THUMBNAIL_VERSION}.png`))
+}
+
+function getThumbnailRepairKey(project: Pick<CanvasProject, 'id' | 'updatedAt' | 'thumbnailPath'>) {
+  return `${project.id}:${project.updatedAt}:${project.thumbnailPath || 'missing'}`
+}
+
+function rememberThumbnailRepairAttempt(key: string) {
+  thumbnailRepairAttempts.add(key)
+  if (thumbnailRepairAttempts.size <= MAX_THUMBNAIL_REPAIR_ATTEMPTS) return
+  const oldestKey = thumbnailRepairAttempts.values().next().value
+  if (oldestKey) thumbnailRepairAttempts.delete(oldestKey)
 }
 
 export type CanvasDeleteResult = 'local' | 'synced' | 'pending'
@@ -66,6 +80,7 @@ interface CanvasState {
   updateHistory: (id: string, history: CanvasHistoryState) => void
   saveProject: (id: string) => Promise<void>
   refreshThumbnail: (id: string) => Promise<void>
+  repairThumbnail: (id: string) => Promise<void>
   refreshAllThumbnails: () => Promise<void>
   setTrashMode: (open: boolean) => void
   togglePin: (id: string) => Promise<void>
@@ -96,7 +111,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     })
     void (async () => {
       for (const project of projects.filter(project => !hasCurrentThumbnail(project))) {
-        await get().refreshThumbnail(project.id)
+        await get().repairThumbnail(project.id)
       }
     })()
   },
@@ -224,22 +239,46 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   refreshThumbnail: async (id) => {
-    const document = get().documents[id]
+    const pendingGeneration = thumbnailGenerationPromises.get(id)
+    if (pendingGeneration) return pendingGeneration
+    const project = get().projects.find(item => item.id === id)
+      || get().deletedProjects.find(item => item.id === id)
+    const document = get().documents[id] || project?.document
     if (!document) return
+    const generation = (async () => {
+      try {
+        const thumbnailPath = await generateCanvasThumbnail(id, document)
+        await updateCanvasThumbnailPath(id, thumbnailPath)
+        set(state => ({
+          projects: state.projects.map(project => project.id === id
+            ? { ...project, thumbnailPath, thumbnailRevision: Date.now() }
+            : project),
+          deletedProjects: state.deletedProjects.map(project => project.id === id
+            ? { ...project, thumbnailPath, thumbnailRevision: Date.now() }
+            : project),
+        }))
+      } catch (error) {
+        console.error('Failed to generate canvas thumbnail:', error)
+      }
+    })()
+    thumbnailGenerationPromises.set(id, generation)
     try {
-      const thumbnailPath = await generateCanvasThumbnail(id, document)
-      await updateCanvasThumbnailPath(id, thumbnailPath)
-      set(state => ({
-        projects: state.projects.map(project => project.id === id
-          ? { ...project, thumbnailPath, thumbnailRevision: Date.now() }
-          : project),
-        deletedProjects: state.deletedProjects.map(project => project.id === id
-          ? { ...project, thumbnailPath, thumbnailRevision: Date.now() }
-          : project),
-      }))
-    } catch (error) {
-      console.error('Failed to generate canvas thumbnail:', error)
+      await generation
+    } finally {
+      if (thumbnailGenerationPromises.get(id) === generation) {
+        thumbnailGenerationPromises.delete(id)
+      }
     }
+  },
+
+  repairThumbnail: async (id) => {
+    const project = get().projects.find(item => item.id === id)
+      || get().deletedProjects.find(item => item.id === id)
+    if (!project) return
+    const repairKey = getThumbnailRepairKey(project)
+    if (thumbnailRepairAttempts.has(repairKey)) return
+    rememberThumbnailRepairAttempt(repairKey)
+    await get().refreshThumbnail(id)
   },
 
   refreshAllThumbnails: async () => {
@@ -278,6 +317,9 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     const thumbnailTimer = thumbnailTimers.get(id)
     if (thumbnailTimer) clearTimeout(thumbnailTimer)
     thumbnailTimers.delete(id)
+    for (const key of thumbnailRepairAttempts) {
+      if (key.startsWith(`${id}:`)) thumbnailRepairAttempts.delete(key)
+    }
     const deletedAt = await softDeleteCanvasProject(id, { enqueueSync: false })
     const syncConfigured = configured ?? await isAutoDataSyncProviderConfigured()
     let synced = false

@@ -3135,7 +3135,8 @@
       "record": "Record",
       "quickRecord": "Quick",
       "write": "Write",
-      "me": "Me"
+      "me": "Me",
+      "canvas": "Canvas"
     },
     "search": "Search",
     "githubImageHosting": "Github Image Hosting",

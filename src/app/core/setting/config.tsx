@@ -17,7 +17,7 @@ import {
   PenTool,
   Brain,
   Globe2,
-  PanelsTopLeft,
+  Palette,
 } from "lucide-react"
 import type { ReactNode } from 'react'
 import type { SettingSection } from '@/stores/settings-dialog'
@@ -57,7 +57,7 @@ const baseConfig: SettingNavigationItem[] = [
     anchor: 'editor',
   },
   {
-    icon: <PanelsTopLeft className="size-4" />,
+    icon: <Palette className="size-4" />,
     anchor: 'canvas',
   },
   {

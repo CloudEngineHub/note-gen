@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { Store } from '@tauri-apps/plugin-store'
 
@@ -16,6 +17,7 @@ import { testWebDAVConnection } from '@/lib/sync/webdav'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
+import { cn } from '@/lib/utils'
 import { MobileMeActivityDrawer } from './mobile-me-activity-drawer'
 import { buildActivityDaySummaryText, buildProfileCardData, getBackupMethodStatus, getBackupProviderName, getCurrentActivityStreak, getCurrentWeekActivityCount } from './mobile-me-helpers'
 import { MobileMeProfileCard } from './mobile-me-profile-card'
@@ -25,9 +27,34 @@ import { MobileUpdateSettings } from './mobile-update-settings'
 const MOBILE_HEATMAP_WEEKS = 16
 const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
 
-export function MobileMePage() {
+const embeddedContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      delayChildren: 0.14,
+      staggerChildren: 0.06,
+    },
+  },
+}
+
+const embeddedItemVariants: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.985 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.4,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+}
+
+export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
   const tActivity = useTranslations('activity')
   const tMe = useTranslations('mobile.me')
+  const reduceMotion = useReducedMotion()
 
   const [activityData, setActivityData] = useState<ActivityCalendarData | null>(null)
   const [selectedDay, setSelectedDay] = useState<ActivityDaySummary | undefined>(undefined)
@@ -369,24 +396,36 @@ export function MobileMePage() {
     <div
       id="mobile-me"
       ref={containerRef}
-      className="mobile-setting-screen mobile-under-dock-scroll flex h-full w-full flex-col overflow-y-auto"
+      className={cn(
+        "mobile-setting-screen flex h-full w-full flex-col overflow-y-auto",
+        !embedded && "mobile-under-dock-scroll"
+      )}
       onScroll={(event) => {
         window.sessionStorage.setItem(MOBILE_ME_SCROLL_KEY, String(event.currentTarget.scrollTop))
       }}
     >
-      <div className="flex-1 space-y-4 px-3 py-4">
-        <MobileUpdateSettings />
+      <motion.div
+        className="flex flex-1 flex-col gap-4 px-3 py-4"
+        variants={embeddedContainerVariants}
+        initial={embedded && !reduceMotion ? "hidden" : false}
+        animate="visible"
+      >
+        <motion.div variants={embeddedItemVariants}>
+          <MobileUpdateSettings />
+        </motion.div>
 
-        <MobileMeProfileCard
-          name={profileCardName}
-          subtitle={profileCardSubtitle}
-          avatarUrl={profile.avatarUrl}
-          syncStatus={syncStatus}
-          providerName={providerName}
-          providerType={profileProviderType}
-        />
+        <motion.div variants={embeddedItemVariants}>
+          <MobileMeProfileCard
+            name={profileCardName}
+            subtitle={profileCardSubtitle}
+            avatarUrl={profile.avatarUrl}
+            syncStatus={syncStatus}
+            providerName={providerName}
+            providerType={profileProviderType}
+          />
+        </motion.div>
 
-        <section className="mobile-dock-surface rounded-[1.35rem] p-4">
+        <motion.section variants={embeddedItemVariants} className="mobile-dock-surface rounded-[1.35rem] p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold">{tActivity('drawer.title')}</h2>
@@ -419,9 +458,9 @@ export function MobileMePage() {
           ) : (
             <div className="py-10 text-center text-sm text-muted-foreground">{tActivity('empty')}</div>
           )}
-        </section>
+        </motion.section>
 
-        <section className="grid grid-cols-2 gap-3">
+        <motion.section variants={embeddedItemVariants} className="grid grid-cols-2 gap-3">
           <div className="mobile-dock-surface rounded-[1.35rem] p-4">
             <p className="text-xs text-muted-foreground">{tMe('stats.weekly')}</p>
             <p className="mt-2 text-2xl font-semibold">{currentWeekCount}</p>
@@ -432,16 +471,16 @@ export function MobileMePage() {
             <p className="mt-2 text-2xl font-semibold">{currentStreak}</p>
             <p className="mt-1 text-xs text-muted-foreground">{tMe('stats.streakHint')}</p>
           </div>
-        </section>
+        </motion.section>
 
-        <section className="mobile-dock-surface rounded-[1.35rem] overflow-hidden">
+        <motion.section variants={embeddedItemVariants} className="mobile-dock-surface overflow-hidden rounded-[1.35rem]">
           <div className="border-b border-border/60 px-4 py-3">
             <h2 className="text-base font-semibold">{tMe('settings.title')}</h2>
             <p className="mt-1 text-xs text-muted-foreground">{tMe('settings.description')}</p>
           </div>
           <SettingTab />
-        </section>
-      </div>
+        </motion.section>
+      </motion.div>
 
       <MobileMeActivityDrawer
         day={selectedDay}
