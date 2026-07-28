@@ -92,7 +92,7 @@ function RailButton({ label, active, onClick, icon: Icon, mobile = false }: Rail
           aria-label={label}
           aria-pressed={active}
           onClick={onClick}
-          className={cn(mobile && 'h-12 min-w-0 flex-1 rounded-none')}
+          className={cn(mobile && 'h-12 min-w-0 flex-1 rounded-md')}
         >
           <Icon data-icon="inline-start" />
         </Button>

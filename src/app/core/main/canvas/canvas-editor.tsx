@@ -336,6 +336,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const [canRedo, setCanRedo] = useState(Boolean(initialHistory?.redo.length))
   const [hasClipboard, setHasClipboard] = useState(false)
   const [hasStyleClipboard, setHasStyleClipboard] = useState(false)
+  const [mobileSelectionCommitted, setMobileSelectionCommitted] = useState(false)
   const [chartEditorOpen, setChartEditorOpen] = useState(false)
   const [toolPanelOpen, setToolPanelOpen] = useState(false)
   const [editingChartNodeId, setEditingChartNodeId] = useState<string | null>(null)
@@ -395,6 +396,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const selectedNodeCount = nodes.filter(node => node.selected).length
   const selectedEdgeCount = edges.filter(edge => edge.selected).length
   const selectedCount = selectedNodeCount + selectedEdgeCount
+  const selectionToolsVisible = selectedCount > 0 && (!mobile || mobileSelectionCommitted)
   const selectedNodesAreLocked = selectedNodeCount > 0
     && nodes.filter(node => node.selected).every(node => node.data.locked)
   const selectedFreehandNodes = nodes.filter(node => node.selected && node.type === 'freehand')
@@ -448,6 +450,11 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
       })),
     })
   }, [activeCanvasId, canvasId, edges, nodes, projects, setCanvasSelectionContext, t])
+
+  useEffect(() => {
+    if (!mobile || (selectedCount > 0 && tool === 'select')) return
+    setMobileSelectionCommitted(false)
+  }, [mobile, selectedCount, tool])
 
   useEffect(() => {
     if (mobile) return
@@ -2206,12 +2213,32 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
             setNodes(current => current.map(node => ({ ...node, selected: node.id === targetNode.id })))
             setEdges(current => current.map(edge => ({ ...edge, selected: false })))
           }
+          if (mobile) setMobileSelectionCommitted(true)
         }}
         onEdgeContextMenu={(_event, targetEdge) => {
           if (!targetEdge.selected) {
             setNodes(current => current.map(node => ({ ...node, selected: false })))
             setEdges(current => current.map(edge => ({ ...edge, selected: edge.id === targetEdge.id })))
           }
+          if (mobile) setMobileSelectionCommitted(true)
+        }}
+        onNodeClick={(_event, targetNode) => {
+          if (!mobile) return
+          setNodes(current => current.map(node => ({ ...node, selected: node.id === targetNode.id })))
+          setEdges(current => current.map(edge => ({ ...edge, selected: false })))
+          setMobileSelectionCommitted(true)
+        }}
+        onEdgeClick={(_event, targetEdge) => {
+          if (!mobile) return
+          setNodes(current => current.map(node => ({ ...node, selected: false })))
+          setEdges(current => current.map(edge => ({ ...edge, selected: edge.id === targetEdge.id })))
+          setMobileSelectionCommitted(true)
+        }}
+        onPaneClick={() => {
+          if (!mobile) return
+          setNodes(current => current.map(node => ({ ...node, selected: false })))
+          setEdges(current => current.map(edge => ({ ...edge, selected: false })))
+          setMobileSelectionCommitted(false)
         }}
         onEdgeDoubleClick={(_event, targetEdge) => {
           setEditingEdgeId(targetEdge.id)
@@ -2225,6 +2252,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
         }}
         onMoveEnd={(_event, viewport) => persistViewport(viewport)}
         onNodeDragStart={(_event, node) => {
+          if (mobile) setMobileSelectionCommitted(false)
           pushHistory()
           if (node.type !== 'group' || !Array.isArray(node.data.childIds)) return
           const childIds = new Set(node.data.childIds.filter((id): id is string => typeof id === 'string'))
@@ -2247,7 +2275,9 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
         deleteKeyCode={null}
         nodesDraggable={!previewSnapshot && tool === 'select'}
         nodesConnectable={!previewSnapshot && tool === 'select'}
-        elementsSelectable={!previewSnapshot && tool === 'select'}
+        elementsSelectable={!previewSnapshot && tool === 'select' && !mobile}
+        nodeDragThreshold={mobile ? 6 : 1}
+        nodeClickDistance={mobile ? 6 : 0}
         panOnDrag={mobile ? tool === 'select' : tool === 'hand'}
         selectionOnDrag={!mobile && tool === 'select'}
         selectionMode={SelectionMode.Partial}
@@ -2402,7 +2432,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           </Popover>
         )}
 
-        {(selectedNodeCount > 0 || selectedEdgeCount > 0) && !toolPanelOpen && !chartEditorOpen && !isDrawingTool && (
+        {selectionToolsVisible && !toolPanelOpen && !chartEditorOpen && !isDrawingTool && (
           <div className={cn(
             'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
             mobile

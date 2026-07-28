@@ -85,7 +85,7 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="drawer-header"
       className={cn(
-        "sticky top-0 z-10 flex shrink-0 flex-col gap-0.5 border-b bg-popover/95 p-4 backdrop-blur group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-0.5 md:text-left",
+        "sticky top-0 z-10 flex shrink-0 flex-col gap-0.5 bg-popover/95 p-4 backdrop-blur group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center md:gap-0.5 md:text-left",
         className
       )}
       {...props}

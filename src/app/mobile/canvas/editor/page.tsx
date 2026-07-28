@@ -2,11 +2,12 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, MessageSquare } from 'lucide-react'
-import { useEffect } from 'react'
+import { ArrowLeft, Redo2, Undo2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
+import emitter from '@/lib/emitter'
 import useCanvasStore from '@/stores/canvas'
 
 const CanvasEditor = dynamic(
@@ -19,14 +20,52 @@ export default function MobileCanvasEditorPage() {
   const canvasId = searchParams.get('id') || ''
   const router = useRouter()
   const t = useTranslations('canvas')
-  const tNavigation = useTranslations('navigation')
   const project = useCanvasStore(state => state.projects.find(item => item.id === canvasId))
-  const selectionContext = useCanvasStore(state => state.selectionContext)
   const openProject = useCanvasStore(state => state.openProject)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
 
   useEffect(() => {
     if (canvasId) void openProject(canvasId)
   }, [canvasId, openProject])
+
+  const queryCanUndoRedo = useCallback(() => {
+    if (!canvasId) return
+    emitter.emit('canvas-can-undo-redo', {
+      canvasId,
+      resolve: can => {
+        setCanUndo(can.undo)
+        setCanRedo(can.redo)
+      },
+    })
+  }, [canvasId])
+
+  useEffect(() => {
+    setCanUndo(false)
+    setCanRedo(false)
+
+    const handleUndoRedoChanged = ({
+      canvasId: changedCanvasId,
+      undo,
+      redo,
+    }: {
+      canvasId: string
+      undo: boolean
+      redo: boolean
+    }) => {
+      if (changedCanvasId !== canvasId) return
+      setCanUndo(undo)
+      setCanRedo(redo)
+    }
+
+    emitter.on('canvas-undo-redo-changed', handleUndoRedoChanged)
+    const frame = window.requestAnimationFrame(queryCanUndoRedo)
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      emitter.off('canvas-undo-redo-changed', handleUndoRedoChanged)
+    }
+  }, [canvasId, queryCanUndoRedo])
 
   if (!canvasId) {
     return (
@@ -46,17 +85,22 @@ export default function MobileCanvasEditorPage() {
           {project?.title || t('loading')}
         </h1>
         <Button
-          variant={selectionContext?.canvasId === canvasId ? 'secondary' : 'ghost'}
+          variant="ghost"
           size="icon"
-          aria-label={selectionContext?.canvasId === canvasId
-            ? t('selection.chatContext', {
-              nodes: selectionContext.nodes.length,
-              edges: selectionContext.edges.length,
-            })
-            : tNavigation('chat')}
-          onClick={() => router.push('/mobile/chat')}
+          aria-label={t('undo')}
+          disabled={!canUndo}
+          onClick={() => emitter.emit('canvas-undo', { canvasId })}
         >
-          <MessageSquare />
+          <Undo2 />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('redo')}
+          disabled={!canRedo}
+          onClick={() => emitter.emit('canvas-redo', { canvasId })}
+        >
+          <Redo2 />
         </Button>
       </header>
       <div className="min-h-0 flex-1">

@@ -60,10 +60,11 @@ export function ActivityHeatmap({
                   <button
                     key={day.day}
                     type="button"
+                    data-slot="activity-heatmap-day"
                     onClick={() => onSelectDay(day)}
                     className={cn(
                       adaptive
-                        ? 'aspect-square w-full rounded-[4px] border border-black/5 transition-colors'
+                        ? 'aspect-square w-full min-w-0 rounded-[4px] border border-black/5 transition-colors'
                         : compact
                           ? 'h-3 w-3 rounded-[3px] border border-black/5 transition-colors'
                           : 'h-4 w-4 rounded-[4px] border border-black/5 transition-colors',

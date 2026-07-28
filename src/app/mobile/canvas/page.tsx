@@ -156,6 +156,36 @@ export default function MobileCanvasPage() {
           <h1 className="truncate text-base font-semibold">{t('manager.title')}</h1>
         </div>
         <div className="flex shrink-0 items-center">
+          <Drawer open={templateOpen} onOpenChange={setTemplateOpen}>
+            <DrawerTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label={t('new')}>
+                <FilePlus2 />
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>{t('chooseTemplate')}</DrawerTitle>
+                <DrawerDescription>{t('empty.description')}</DrawerDescription>
+              </DrawerHeader>
+              <div className="grid grid-cols-2 gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                {(Object.keys(TEMPLATE_ICONS) as CanvasProjectType[]).map(canvasType => {
+                  const Icon = TEMPLATE_ICONS[canvasType]
+                  return (
+                    <Button
+                      key={canvasType}
+                      type="button"
+                      variant="outline"
+                      className="h-14 justify-start"
+                      onClick={() => void handleCreate(canvasType)}
+                    >
+                      <Icon data-icon="inline-start" />
+                      {t(`templates.${canvasType}`)}
+                    </Button>
+                  )
+                })}
+              </div>
+            </DrawerContent>
+          </Drawer>
           <MobileActionDrawer
             title={t('more')}
             trigger={
@@ -187,36 +217,6 @@ export default function MobileCanvasPage() {
               },
             ]}
           />
-          <Drawer open={templateOpen} onOpenChange={setTemplateOpen}>
-            <DrawerTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={t('new')}>
-                <FilePlus2 />
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>{t('chooseTemplate')}</DrawerTitle>
-                <DrawerDescription>{t('empty.description')}</DrawerDescription>
-              </DrawerHeader>
-              <div className="grid grid-cols-2 gap-2 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                {(Object.keys(TEMPLATE_ICONS) as CanvasProjectType[]).map(canvasType => {
-                  const Icon = TEMPLATE_ICONS[canvasType]
-                  return (
-                    <Button
-                      key={canvasType}
-                      type="button"
-                      variant="outline"
-                      className="h-14 justify-start"
-                      onClick={() => void handleCreate(canvasType)}
-                    >
-                      <Icon data-icon="inline-start" />
-                      {t(`templates.${canvasType}`)}
-                    </Button>
-                  )
-                })}
-              </div>
-            </DrawerContent>
-          </Drawer>
         </div>
       </header>
 
