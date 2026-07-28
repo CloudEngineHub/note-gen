@@ -103,19 +103,16 @@ export function MobileChatHeader() {
       <header className="mobile-page-header w-full border-b px-2 flex items-center gap-2 bg-background">
         <MobileMeSheet indicator={meIndicator} />
 
-        <button
-          type="button"
-          aria-label={tSearch("placeholder")}
-          onClick={() => setSearchOpen(true)}
-          className="flex h-11 min-w-0 flex-1 items-center rounded-md border bg-muted/30 px-3 text-left"
-        >
-          <Search className="size-4 shrink-0 text-muted-foreground" />
-          <span className="ml-2 truncate text-sm text-muted-foreground">
-            {tSearch("placeholder")}
-          </span>
-        </button>
+        <div className="ml-auto flex shrink-0 items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={tSearch("placeholder")}
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search />
+          </Button>
 
-        <div className="flex items-center shrink-0">
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DrawerTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={tEmpty("conversationHistory")}>
