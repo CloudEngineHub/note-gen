@@ -11,7 +11,6 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { uploadImage } from "@/lib/imageHosting"
 import { useRef, useEffect, useCallback } from 'react'
 import { isMobileDevice } from '@/lib/check'
-import { platform } from '@tauri-apps/plugin-os'
 import emitter from '@/lib/emitter'
 import { toast } from '@/hooks/use-toast'
 import { useRecordCompletion } from './use-record-completion'
@@ -21,18 +20,6 @@ import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
 function isPickerCancelError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   return message.toLowerCase().includes('cancel')
-}
-
-function isIosDevice() {
-  try {
-    return platform() === 'ios'
-  } catch {
-    if (typeof navigator === 'undefined') {
-      return false
-    }
-
-    return /iphone|ipad|ipod/i.test(navigator.userAgent)
-  }
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -169,7 +156,7 @@ export function ControlImage() {
 
   async function selectImages() {
     try {
-      if (isMobile && isIosDevice()) {
+      if (isMobile) {
         fileInputRef.current?.removeAttribute('capture')
         fileInputRef.current?.click()
         return

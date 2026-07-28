@@ -37,6 +37,8 @@ import { handleImageUpload } from '@/lib/image-handler'
 import useArticleStore from '@/stores/article'
 import { toast } from '@/hooks/use-toast'
 import { getWorkspacePath, isAbsoluteFsPath } from '@/lib/workspace'
+import { isMobileDevice } from '@/lib/check'
+import { pickImagesFromPhotoLibrary } from '@/lib/image-picker'
 
 export interface SlashCommandItem {
   title: string
@@ -598,36 +600,37 @@ export const suggestionItems = (t?: SlashCommandTranslations): SlashCommandItem[
         const placeholderEnd = rangeStart + 'Uploading... '.length
 
         try {
-          const file = await open({
-            multiple: false,
-            filters: [
-              {
-                name: 'Images',
-                extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
-              },
-            ],
-          })
+          let fileObj: File | null = null
 
-          if (!file) {
+          if (isMobileDevice()) {
+            fileObj = (await pickImagesFromPhotoLibrary())[0] || null
+          } else {
+            const file = await open({
+              multiple: false,
+              filters: [
+                {
+                  name: 'Images',
+                  extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+                },
+              ],
+            })
+
+            if (typeof file === 'string') {
+              const fileData = await readFile(file)
+              const ext = file.split('.').pop() || 'png'
+              const fileName = file.split('/').pop() || `image.${ext}`
+              const arrayBuffer = new Uint8Array(fileData).buffer
+              fileObj = new File([arrayBuffer], fileName, { type: `image/${ext}` })
+            }
+          }
+
+          if (!fileObj) {
             // User cancelled, remove placeholder
             editor.chain().focus().deleteRange({ from: placeholderStart, to: placeholderEnd }).run()
             return
           }
 
           const activeFilePath = useArticleStore.getState().activeFilePath
-          // open 返回的是文件路径字符串，需要读取文件内容并转换为 File 对象
-          let fileObj: File
-          if (typeof file === 'string') {
-            const fileData = await readFile(file)
-            const ext = file.split('.').pop() || 'png'
-            const fileName = file.split('/').pop() || `image.${ext}`
-            // 创建 ArrayBuffer 副本以避免类型问题
-            const arrayBuffer = new Uint8Array(fileData).buffer
-            fileObj = new File([arrayBuffer], fileName, { type: `image/${ext}` })
-          } else {
-            fileObj = file
-          }
-
           const result = await handleImageUpload(fileObj, activeFilePath)
 
           // Delete the placeholder text

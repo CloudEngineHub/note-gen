@@ -43,6 +43,7 @@ import { cn, convertImageByWorkspace } from '@/lib/utils'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
 import { getFilePathOptions, getWorkspacePath, isAbsoluteFsPath } from '@/lib/workspace'
 import { isMobileDevice } from '@/lib/check'
+import { pickImagesFromPhotoLibrary } from '@/lib/image-picker'
 import { useTranslations } from 'next-intl'
 import { replaceLinesInRange } from '@/lib/agent/react-diff-helpers'
 import { BubbleMenu as BubbleMenuComponent } from './bubble-menu'
@@ -3626,31 +3627,33 @@ export function TipTapEditor({
     const placeholderEnd = insertPos + placeholder.length
 
     try {
-      const file = await open({
-        multiple: false,
-        filters: [
-          {
-            name: 'Images',
-            extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
-          },
-        ],
-      })
+      let fileObject: File | null = null
 
-      if (!file) {
-        editor.chain().focus().deleteRange({ from: insertPos, to: placeholderEnd }).run()
-        return
+      if (isMobile) {
+        fileObject = (await pickImagesFromPhotoLibrary())[0] || null
+      } else {
+        const file = await open({
+          multiple: false,
+          filters: [
+            {
+              name: 'Images',
+              extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+            },
+          ],
+        })
+
+        if (typeof file === 'string') {
+          const fileData = await readFile(file)
+          const ext = file.split('.').pop() || 'png'
+          const fileName = file.split('/').pop() || `image.${ext}`
+          const arrayBuffer = new Uint8Array(fileData).buffer
+          fileObject = new File([arrayBuffer], fileName, { type: `image/${ext}` })
+        }
       }
 
-      let fileObject: File
-
-      if (typeof file === 'string') {
-        const fileData = await readFile(file)
-        const ext = file.split('.').pop() || 'png'
-        const fileName = file.split('/').pop() || `image.${ext}`
-        const arrayBuffer = new Uint8Array(fileData).buffer
-        fileObject = new File([arrayBuffer], fileName, { type: `image/${ext}` })
-      } else {
-        fileObject = file
+      if (!fileObject) {
+        editor.chain().focus().deleteRange({ from: insertPos, to: placeholderEnd }).run()
+        return
       }
 
       const result = await handleImageUpload(fileObject, activeFilePath)
@@ -3672,7 +3675,7 @@ export function TipTapEditor({
         variant: 'destructive',
       })
     }
-  }, [activeFilePath, editor, tImage])
+  }, [activeFilePath, editor, isMobile, tImage])
 
   useEffect(() => {
     const handleInsertImage = () => {

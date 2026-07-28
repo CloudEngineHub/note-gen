@@ -171,6 +171,7 @@ import { serializeCanvasChartData } from '@/lib/canvas/chart-data'
 import { getCanvasNodeDefaultSize } from '@/lib/canvas/shapes'
 import { CANVAS_MARK_DRAG_TYPE } from '@/lib/canvas/drag-data'
 import { getDefaultRecordSaveTagId } from '@/lib/record-save-target'
+import { pickImagesFromPhotoLibrary } from '@/lib/image-picker'
 
 const elk = new ELK()
 const CUSTOM_COMPONENTS_KEY = 'canvas-custom-components'
@@ -1095,35 +1096,54 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   }, [completeNodeInsertion, pushHistory, screenToFlowPosition, setEdges, setNodes, t])
 
   const addImageNode = useCallback(async () => {
-    const sourcePath = await open({
-      multiple: false,
-      filters: [{ name: t('nodes.image'), extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }],
-    })
-    if (!sourcePath || Array.isArray(sourcePath)) return
-    const extension = sourcePath.split('.').pop()?.toLowerCase() || 'png'
-    const relativePath = `画布资源/${crypto.randomUUID()}.${extension}`
-    const directoryOptions = await getFilePathOptions('画布资源')
-    await mkdir(
-      directoryOptions.path,
-      directoryOptions.baseDir ? { baseDir: directoryOptions.baseDir, recursive: true } : { recursive: true }
-    )
-    const targetOptions = await getFilePathOptions(relativePath)
-    await writeFile(
-      targetOptions.path,
-      await readFile(sourcePath),
-      targetOptions.baseDir ? { baseDir: targetOptions.baseDir } : undefined
-    )
-    await loadFileTree({ skipRemoteSync: true })
-    pushHistory()
-    const position = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
-    setNodes(current => [...current, {
-      id: crypto.randomUUID(),
-      type: 'image',
-      position,
-      data: { label: sourcePath.split(/[\\/]/).pop() || t('nodes.image'), imagePath: relativePath },
-    }])
-    completeNodeInsertion()
-  }, [completeNodeInsertion, loadFileTree, pushHistory, screenToFlowPosition, setNodes, t])
+    try {
+      let imageName: string
+      let imageData: Uint8Array
+
+      if (mobile) {
+        const [file] = await pickImagesFromPhotoLibrary()
+        if (!file) return
+        imageName = file.name
+        imageData = new Uint8Array(await file.arrayBuffer())
+      } else {
+        const sourcePath = await open({
+          multiple: false,
+          filters: [{ name: t('nodes.image'), extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'] }],
+        })
+        if (!sourcePath || Array.isArray(sourcePath)) return
+        imageName = sourcePath.split(/[\\/]/).pop() || t('nodes.image')
+        imageData = await readFile(sourcePath)
+      }
+
+      const sourceExtension = imageName.split('.').pop()?.toLowerCase()
+      const extension = sourceExtension === 'jpeg' ? 'jpg' : sourceExtension || 'png'
+      const relativePath = `画布资源/${crypto.randomUUID()}.${extension}`
+      const directoryOptions = await getFilePathOptions('画布资源')
+      await mkdir(
+        directoryOptions.path,
+        directoryOptions.baseDir ? { baseDir: directoryOptions.baseDir, recursive: true } : { recursive: true }
+      )
+      const targetOptions = await getFilePathOptions(relativePath)
+      await writeFile(
+        targetOptions.path,
+        imageData,
+        targetOptions.baseDir ? { baseDir: targetOptions.baseDir } : undefined
+      )
+      await loadFileTree({ skipRemoteSync: true })
+      pushHistory()
+      const position = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+      setNodes(current => [...current, {
+        id: crypto.randomUUID(),
+        type: 'image',
+        position,
+        data: { label: imageName, imagePath: relativePath },
+      }])
+      completeNodeInsertion()
+    } catch (error) {
+      console.error('Failed to insert image into canvas:', error)
+      toast.error(t('selection.imagePasteError'))
+    }
+  }, [completeNodeInsertion, loadFileTree, mobile, pushHistory, screenToFlowPosition, setNodes, t])
 
   const openChartCreator = useCallback(() => {
     setEditingChartNodeId(null)
