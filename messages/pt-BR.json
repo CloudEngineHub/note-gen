@@ -494,9 +494,17 @@
         "title": "Exibição do editor",
         "desc": "Escolha como o sumário e os controles do editor são exibidos por padrão"
       },
+      "reading": {
+        "title": "Layout de leitura",
+        "desc": "Ajuste o tamanho do texto e o espaçamento entre linhas"
+      },
+      "editing": {
+        "title": "Edição",
+        "desc": "Escolha o modo padrão e as ferramentas de escrita móvel"
+      },
       "mode": {
         "title": "Modo de edição padrão",
-        "desc": "Escolha o modo padrão do editor para desktop; você também pode alterná-lo no rodapé do editor",
+        "desc": "Escolha o modo padrão do editor; você também pode alterná-lo no rodapé do editor",
         "options": {
           "visual": "Visual",
           "source": "Código Markdown"
@@ -516,6 +524,14 @@
         "title": "Números de linha",
         "desc": "Mostra números de linha ao lado do editor de código Markdown"
       },
+      "sourceWrap": {
+        "title": "Quebrar linhas do código",
+        "desc": "Quebre linhas longas quando excederem a largura do editor"
+      },
+      "mobileToolbar": {
+        "title": "Barra de formatação inferior",
+        "desc": "Mostre ferramentas de formatação e inserção no editor móvel"
+      },
       "outlineEnable": "Sumário habilitado por padrão",
       "outlineEnableDesc": "Habilitar esta opção tornará o sumário visível por padrão.",
       "outlinePosition": "Posição do Sumário",
@@ -525,7 +541,7 @@
         "right": "Direita"
       },
       "showUndoRedo": "Botões Desfazer/Refazer",
-      "showUndoRedoDesc": "Mostrar botões de desfazer e refazer na barra de guias do editor.",
+      "showUndoRedoDesc": "Mostrar ações de desfazer e refazer na barra de ferramentas do editor.",
       "completion": {
         "title": "Auto Completar",
         "model": {
@@ -940,7 +956,8 @@
       "title": "Modelo Padrão",
       "desc": "Aqui, você pode usar diferentes modelos para diferentes cenários, para melhorar a eficiência e reduzir custos.",
       "tooltip": "Usar modelo principal",
-      "noModel": "Não usar",
+      "noModel": "Seguir o modelo principal",
+      "modelUnavailable": "Modelo selecionado indisponível",
       "placeholder": "Por favor, selecione ou procure por modelos",
       "options": {
         "primaryModel": {
@@ -1029,6 +1046,7 @@
       "promptTitle": "Título do Prompt",
       "desc": "Aqui, você pode adicionar e gerenciar prompts, ajudando a IA a entender melhor suas necessidades.",
       "addPrompt": "Adicionar Prompt",
+      "promptLibrary": "Biblioteca de Prompts",
       "selectPrompt": "Selecionar Prompt",
       "configPrompt": "Configurar Prompt",
       "noContent": "Nenhum conteúdo",
@@ -1526,6 +1544,8 @@
       "desc": "Aqui você pode criar e gerenciar templates de organização personalizados para ajudar a IA a organizar o conteúdo dos registros de acordo com suas necessidades.",
       "customTemplate": "Template Personalizado",
       "addTemplate": "Adicionar Template Personalizado",
+      "emptyTitle": "Nenhum template ainda",
+      "emptyDesc": "Crie um template para a IA organizar registros com uma estrutura consistente.",
       "deleteConfirm": "Tem certeza de que deseja excluir este template?",
       "status": "Estado",
       "name": "Nome",
@@ -1818,7 +1838,7 @@
         "desc": "Defina o diretório do workspace do aplicativo onde os arquivos serão salvos",
         "current": "Caminho Atual do Workspace",
         "defaultPath": "Workspace Padrão",
-        "default": "Usando caminho do workspace padrão",
+        "default": "Workspace padrão",
         "custom": "Usando caminho do workspace personalizado",
         "select": "Selecionar Diretório do Workspace",
         "reset": "Redefinir para Caminho Padrão",

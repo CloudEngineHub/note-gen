@@ -190,8 +190,14 @@ export function GiteaSync() {
         <div className="flex gap-2 items-center">
           <span className="font-semibold">Gitea {t('settings.sync.settings')}</span>
         </div>
-        <Badge className={`${giteaSyncRepoState === SyncStateEnum.success ? 'bg-green-600' : 'bg-zinc-500'}`}>
-          {giteaSyncRepoState === SyncStateEnum.success ? 'Connected' : giteaSyncRepoState === SyncStateEnum.checking ? 'Checking' : giteaSyncRepoState === SyncStateEnum.creating ? 'Creating' : 'Not Connected'}
+        <Badge variant={giteaSyncRepoState === SyncStateEnum.success ? 'default' : 'secondary'}>
+          {giteaSyncRepoState === SyncStateEnum.success
+            ? t('settings.sync.status.connected')
+            : giteaSyncRepoState === SyncStateEnum.checking
+              ? t('settings.sync.checking')
+              : giteaSyncRepoState === SyncStateEnum.creating
+                ? t('settings.sync.creating')
+                : t('settings.sync.status.disconnected')}
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-4">{t('settings.sync.platformDesc')}</p>

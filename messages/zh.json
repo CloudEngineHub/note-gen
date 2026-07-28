@@ -465,21 +465,21 @@
       "runtimeNoGuidedSupport": "当前命令暂不支持引导式运行时辅助。"
     },
     "skills": {
-      "title": "Skills",
-      "desc": "Skills 是可重用的 AI 能力包，让 AI 助手能够根据任务自动应用特定的行为模式。",
-      "enable": "启用 Skills 功能",
-      "enableDesc": "启用后，AI 可以使用已配置的 Skills",
-      "autoMatch": "自动匹配 Skills",
-      "autoMatchDesc": "根据用户输入自动选择合适的 Skills",
-      "project": "工作区 Skills",
-      "global": "全局 Skills",
-      "globalPath": "全局 Skills 存储位置",
+      "title": "技能",
+      "desc": "技能是可重用的 AI 能力包，让 AI 助手能够根据任务自动应用特定的行为模式。",
+      "enable": "启用技能功能",
+      "enableDesc": "启用后，AI 可以使用已配置的技能",
+      "autoMatch": "自动匹配技能",
+      "autoMatchDesc": "根据用户输入自动选择合适的技能",
+      "project": "工作区技能",
+      "global": "全局技能",
+      "globalPath": "全局技能存储位置",
       "openInFileManager": "在文件管理器中打开",
-      "createSkill": "创建 Skill",
-      "deleteSkill": "删除 Skill",
-      "exportSkill": "导出 Skill",
-      "importSkill": "导入 Skill",
-      "installSkill": "安装 Skill",
+      "createSkill": "创建技能",
+      "deleteSkill": "删除技能",
+      "exportSkill": "导出技能",
+      "importSkill": "导入技能",
+      "installSkill": "安装技能",
       "installFromFolder": "从文件夹安装",
       "installFromZip": "从 ZIP 安装",
       "openSkillsFolder": "打开目录",
@@ -502,14 +502,14 @@
       "globalInstallHelp": "安装到 NoteGen 的全局 Skills 目录，可供所有工作区使用。",
       "metadata": "元数据",
       "content": "指令内容",
-      "noSkills": "还没有 Skills",
-      "noSkillsDesc": "创建或导入 Skills 以开始使用",
-      "noSkillsGlobal": "还没有全局 Skills",
-      "noSkillsGlobalDesc": "创建或导入 Skills 以在所有项目中使用",
-      "emptyWorkspace": "工作区中没有 Skills",
-      "emptyWorkspaceDesc": "在 skills 文件夹中创建 SKILL.md 文件来添加 Skill",
+      "noSkills": "还没有技能",
+      "noSkillsDesc": "创建或导入技能以开始使用",
+      "noSkillsGlobal": "还没有全局技能",
+      "noSkillsGlobalDesc": "创建或导入技能以在所有项目中使用",
+      "emptyWorkspace": "工作区中没有技能",
+      "emptyWorkspaceDesc": "在 skills 文件夹中创建 SKILL.md 文件来添加技能",
       "basicSettings": "基础设置",
-      "installedGlobalSkills": "已安装的全局 Skills",
+      "installedGlobalSkills": "已安装的全局技能",
       "nameRequired": "请输入 Skill 名称",
       "descriptionRequired": "请输入描述",
       "namePlaceholder": "note-organizer",
@@ -557,9 +557,17 @@
         "title": "编辑器显示",
         "desc": "设置大纲和编辑器工具的默认显示方式"
       },
+      "reading": {
+        "title": "阅读排版",
+        "desc": "调整正文的字号和行间距"
+      },
+      "editing": {
+        "title": "编辑方式",
+        "desc": "设置默认编辑模式和移动端写作工具"
+      },
       "mode": {
         "title": "默认编辑模式",
-        "desc": "设置桌面编辑器默认使用的编辑方式，也可在编辑器底部随时切换",
+        "desc": "设置编辑器默认使用的编辑方式，也可在编辑器底部随时切换",
         "options": {
           "visual": "所见即所得",
           "source": "Markdown 源码"
@@ -579,6 +587,14 @@
         "title": "源码行号",
         "desc": "在 Markdown 源码模式左侧显示行号"
       },
+      "sourceWrap": {
+        "title": "源码自动换行",
+        "desc": "长行超过编辑器宽度时自动换到下一行"
+      },
+      "mobileToolbar": {
+        "title": "底部格式工具栏",
+        "desc": "在移动编辑器底部显示格式和插入工具"
+      },
       "outlineEnable": "默认启用大纲",
       "outlineEnableDesc": "启用后，编辑器将默认显示大纲。",
       "outlinePosition": "大纲位置",
@@ -588,7 +604,7 @@
         "right": "右侧"
       },
       "showUndoRedo": "撤销/重做按钮",
-      "showUndoRedoDesc": "在编辑器标签栏显示撤销和重做按钮。",
+      "showUndoRedoDesc": "在编辑器工具栏显示撤销和重做按钮。",
       "completion": {
         "title": "快速补全",
         "model": {
@@ -807,10 +823,11 @@
       "download": "下载配置"
     },
     "prompt": {
-      "title": "Prompt",
-      "promptTitle": "Prompt 名称",
-      "desc": "在这里，你可以添加和管理 Prompt，帮助 AI 更好地理解你的需求。",
-      "addPrompt": "新增 Prompt",
+      "title": "提示词",
+      "promptTitle": "提示词名称",
+      "desc": "在这里，你可以添加和管理提示词，帮助 AI 更好地理解你的需求。",
+      "addPrompt": "新增提示词",
+      "promptLibrary": "提示词资源库",
       "selectPrompt": "选择 Prompt",
       "configPrompt": "配置 Prompt",
       "noContent": "暂无内容",
@@ -964,7 +981,8 @@
       "title": "默认模型",
       "desc": "在这里，你可以针对不同的场景使用不同的模型，提高效率降低成本。",
       "tooltip": "使用主要模型",
-      "noModel": "不使用模型",
+      "noModel": "跟随主要模型",
+      "modelUnavailable": "已选模型不可用",
       "placeholder": "请选择或搜索模型",
       "mainModel": "主要模型",
       "options": {
@@ -1613,6 +1631,8 @@
       "desc": "在这里，你可以创建和管理自定义整理模板，帮助 AI 按照你的需求整理记录内容。",
       "customTemplate": "自定义模板",
       "addTemplate": "新增模板",
+      "emptyTitle": "还没有整理模板",
+      "emptyDesc": "创建模板后，可以让 AI 按照固定结构整理记录。",
       "deleteConfirm": "确认删除模板吗?",
       "status": "状态",
       "name": "名称",
@@ -1928,7 +1948,7 @@
         "desc": "设置应用程序的工作区目录，文件将保存在该目录中。",
         "current": "工作区路径",
         "defaultPath": "默认工作区",
-        "default": "当前使用默认工作区路径。",
+        "default": "默认工作区",
         "custom": "当前使用自定义工作区路径。",
         "select": "选择工作区目录",
         "reset": "重置为默认路径",

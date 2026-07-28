@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { getTemplateRangeLabel, getTemplateRangeOptions } from '@/lib/template-range-utils';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash, Pencil } from "lucide-react";
+import { LayoutTemplate, Plus, Trash, Pencil } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +32,14 @@ import {
 import { Label } from "@/components/ui/label";
 import { useIsMobile } from '@/hooks/use-mobile'
 import { isMobileDevice as checkIsMobileDevice } from '@/lib/check'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 
 export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}) {
   const t = useTranslations();
@@ -125,7 +133,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                   {t('settings.template.addTemplate')}
                 </Button>
               </DrawerTrigger>
-              <DrawerContent>
+              <DrawerContent className="max-h-[92vh]">
                 <DrawerHeader>
                   <DrawerTitle>
                     {t('settings.template.addTemplate')}
@@ -134,7 +142,7 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
                     {t('settings.template.addTemplateDesc') || t('settings.template.customTemplate')}
                   </DrawerDescription>
                 </DrawerHeader>
-                <div className="grid gap-4 px-4">
+                <div className="grid min-h-0 gap-4 overflow-y-auto px-4">
                   <div className="grid gap-2">
                     <Label htmlFor="title">{t('settings.template.name')}</Label>
                     <Input
@@ -250,16 +258,32 @@ export function SettingTemplate({id, icon}: {id: string, icon?: React.ReactNode}
           )}
         </div>
 
+        {templateList.length === 0 ? (
+          <Empty className="min-h-72 border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><LayoutTemplate /></EmptyMedia>
+              <EmptyTitle>{t('settings.template.emptyTitle')}</EmptyTitle>
+              <EmptyDescription>{t('settings.template.emptyDesc')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={openAddDialog}>
+                <Plus data-icon="inline-start" />
+                {t('settings.template.addTemplate')}
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : null}
+
         {/* Edit Template Dialog/Drawer */}
         {isMobile ? (
           <Drawer open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <DrawerContent>
+            <DrawerContent className="max-h-[92vh]">
               <DrawerHeader>
                 <DrawerTitle>
                   {t('settings.template.editTemplate') || 'Edit Template'}
                 </DrawerTitle>
               </DrawerHeader>
-              <div className="grid gap-4 px-4">
+              <div className="grid min-h-0 gap-4 overflow-y-auto px-4">
                 <div className="grid gap-2">
                   <Label htmlFor="edit-title">{t('settings.template.name')}</Label>
                   <Input

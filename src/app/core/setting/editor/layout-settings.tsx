@@ -8,7 +8,6 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
-  ItemGroup,
   ItemMedia,
   ItemTitle,
 } from '@/components/ui/item'
@@ -22,7 +21,11 @@ import useSettingStore from '@/stores/setting'
 const contentWidthOptions: EditorContentWidth[] = ['narrow', 'standard', 'wide', 'full']
 const lineHeightOptions: EditorLineHeight[] = ['compact', 'comfortable', 'relaxed']
 
-export default function LayoutSettings() {
+export default function LayoutSettings({
+  showContentWidth = true,
+}: {
+  showContentWidth?: boolean
+}) {
   const t = useTranslations('settings.editor.layout')
   const {
     editorContentWidth,
@@ -32,8 +35,8 @@ export default function LayoutSettings() {
   } = useSettingStore()
 
   return (
-    <ItemGroup>
-      <Item variant="outline">
+    <>
+      {showContentWidth ? <Item variant="outline">
         <ItemMedia variant="icon">
           <AlignCenterHorizontal />
         </ItemMedia>
@@ -64,7 +67,7 @@ export default function LayoutSettings() {
             ))}
           </ToggleGroup>
         </ItemActions>
-      </Item>
+      </Item> : null}
 
       <Item variant="outline">
         <ItemMedia variant="icon">
@@ -98,6 +101,6 @@ export default function LayoutSettings() {
           </ToggleGroup>
         </ItemActions>
       </Item>
-    </ItemGroup>
+    </>
   )
 }

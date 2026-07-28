@@ -163,8 +163,14 @@ export function GitlabSync() {
         <div className="flex gap-2 items-center">
           <span className="font-semibold">GitLab {t('settings.sync.settings')}</span>
         </div>
-        <Badge className={`${gitlabSyncProjectState === SyncStateEnum.success ? 'bg-green-600' : 'bg-zinc-500'}`}>
-          {gitlabSyncProjectState === SyncStateEnum.success ? 'Connected' : gitlabSyncProjectState === SyncStateEnum.checking ? 'Checking' : gitlabSyncProjectState === SyncStateEnum.creating ? 'Creating' : 'Not Connected'}
+        <Badge variant={gitlabSyncProjectState === SyncStateEnum.success ? 'default' : 'secondary'}>
+          {gitlabSyncProjectState === SyncStateEnum.success
+            ? t('settings.sync.status.connected')
+            : gitlabSyncProjectState === SyncStateEnum.checking
+              ? t('settings.sync.checking')
+              : gitlabSyncProjectState === SyncStateEnum.creating
+                ? t('settings.sync.creating')
+                : t('settings.sync.status.disconnected')}
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-4">{t('settings.sync.platformDesc')}</p>

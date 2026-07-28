@@ -64,11 +64,15 @@ export function ModelSetting() {
     <ItemGroup className="gap-4">
       {
         modelOptions.map((option) => (
-          <Item key={option.modelKey} className='max-md:flex-col max-md:items-start' variant="outline">
+          <Item
+            key={option.modelKey}
+            className="max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:items-start"
+            variant="outline"
+          >
             <ItemMedia variant="icon">{option.icon}</ItemMedia>
-            <ItemContent>
-              <ItemTitle>
-                {option.title}
+            <ItemContent className="min-w-0">
+              <ItemTitle className="max-w-full min-w-0">
+                <span className="truncate">{option.title}</span>
                 <Badge variant={option.modelKey === 'embedding' ? (hasEmbeddingModel ? 'secondary' : 'outline') : (hasRerankModel ? 'secondary' : 'outline')}>
                   {option.modelKey === 'embedding'
                     ? (hasEmbeddingModel ? ragT('modelAvailable') : configuredModels.embedding ? ragT('modelUnavailable') : ragT('modelNotConfigured'))
@@ -77,7 +81,7 @@ export function ModelSetting() {
               </ItemTitle>
               <ItemDescription>{option.desc}</ItemDescription>
             </ItemContent>
-            <ItemActions>
+            <ItemActions className="max-md:col-span-2 max-md:w-full">
               <ModelSelect modelKey={option.modelKey} onValueChange={model => handleModelChange(option.modelKey, model)} />
             </ItemActions>
           </Item>

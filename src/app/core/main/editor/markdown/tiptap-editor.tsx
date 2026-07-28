@@ -1150,9 +1150,13 @@ export function TipTapEditor({
     editorLineHeight,
     editorViewMode,
     showSourceLineNumbers,
+    editorSourceWrap,
+    showEditorUndoRedo,
+    showMobileEditorToolbar,
+    enableOutline,
     setEditorViewMode,
   } = useSettingStore()
-  const viewMode: EditorViewMode = applyLayoutPreferences && !isMobile
+  const viewMode: EditorViewMode = applyLayoutPreferences
     ? editorViewMode
     : 'visual'
   const previousViewModeRef = useRef<EditorViewMode>(viewMode)
@@ -1177,7 +1181,9 @@ export function TipTapEditor({
 
     let frameId: number | null = null
     const measureLines = () => {
-      mirror.style.width = `${Math.max(0, textarea.clientWidth - 32)}px`
+      mirror.style.width = editorSourceWrap
+        ? `${Math.max(0, textarea.clientWidth - 32)}px`
+        : 'max-content'
       const nextHeights = Array.from(
         mirror.children,
         (line) => line.getBoundingClientRect().height
@@ -1206,7 +1212,7 @@ export function TipTapEditor({
       resizeObserver.disconnect()
       if (frameId !== null) cancelAnimationFrame(frameId)
     }
-  }, [editorLineHeight, sourceLines, viewMode])
+  }, [editorLineHeight, editorSourceWrap, sourceLines, viewMode])
 
   // Math dialog state
   const [mathDialogOpen, setMathDialogOpen] = useState(false)
@@ -1216,7 +1222,7 @@ export function TipTapEditor({
   const [searchReplaceOpen, setSearchReplaceOpen] = useState(false)
   const [mobileContext, setMobileContext] = useState<MobileSelectionContext>(null)
   const [mobileSheetMode, setMobileSheetMode] = useState<MobileSheetMode>(null)
-  const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false)
+  const [mobileOutlineOpen, setMobileOutlineOpen] = useState(isMobile && enableOutline)
   const [showMobileScrollTop, setShowMobileScrollTop] = useState(false)
   const [imageSrcDraft, setImageSrcDraft] = useState('')
   const [imageAltDraft, setImageAltDraft] = useState('')
@@ -2560,6 +2566,12 @@ export function TipTapEditor({
         return
       case 'open-format-sheet':
         openSheet('format')
+        return
+      case 'undo':
+        runCommand(() => editor.chain().focus().undo().run())
+        return
+      case 'redo':
+        runCommand(() => editor.chain().focus().redo().run())
         return
       case 'toggle-heading-2':
       case 'insert-heading-2':
@@ -5163,9 +5175,9 @@ export function TipTapEditor({
         scrollable ? "h-full" : "h-auto min-h-full",
         !contentInset && "tiptap-editor-no-inset"
       )}
-      data-editor-line-height={applyLayoutPreferences && !isMobile ? editorLineHeight : undefined}
+      data-editor-line-height={applyLayoutPreferences ? editorLineHeight : undefined}
       style={
-        applyLayoutPreferences && !isMobile
+        applyLayoutPreferences
           ? {
               '--editor-line-height': EDITOR_LINE_HEIGHT_VALUES[editorLineHeight],
             } as CSSProperties
@@ -5230,7 +5242,7 @@ export function TipTapEditor({
               : undefined
           }
         >
-        {viewMode === 'source' && applyLayoutPreferences && !isMobile ? (
+        {viewMode === 'source' && applyLayoutPreferences ? (
           <div className="relative flex min-h-full w-full">
             {showSourceLineNumbers ? (
               <div
@@ -5253,11 +5265,15 @@ export function TipTapEditor({
             <div
               ref={sourceMirrorRef}
               aria-hidden="true"
-              className="pointer-events-none invisible absolute left-0 top-0 whitespace-pre-wrap break-words font-mono text-sm"
+              className={cn(
+                'pointer-events-none invisible absolute left-0 top-0 font-mono',
+                editorSourceWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'
+              )}
               style={{
                 lineHeight: 'var(--editor-line-height)',
-                overflowWrap: 'anywhere',
+                overflowWrap: editorSourceWrap ? 'anywhere' : 'normal',
                 tabSize: 2,
+                fontSize: `${(14 * contentTextScale) / 100}px`,
               }}
             >
               {sourceLines.map((line, index) => (
@@ -5271,15 +5287,21 @@ export function TipTapEditor({
               value={sourceMarkdown}
               disabled={!editable}
               spellCheck={false}
-              wrap="soft"
+              wrap={editorSourceWrap ? 'soft' : 'off'}
               rows={sourceLines.length}
               aria-label={tSourceMode('source')}
-              className="block min-h-full min-w-0 flex-1 resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent px-4 py-6 font-mono text-sm text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className={cn(
+                'block min-h-full min-w-0 flex-1 resize-none bg-transparent px-4 py-6 font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60',
+                editorSourceWrap
+                  ? 'overflow-hidden whitespace-pre-wrap break-words'
+                  : 'overflow-x-auto overflow-y-hidden whitespace-pre'
+              )}
               style={{
                 height: measuredSourceHeight,
                 lineHeight: 'var(--editor-line-height)',
-                overflowWrap: 'anywhere',
+                overflowWrap: editorSourceWrap ? 'anywhere' : 'normal',
                 tabSize: 2,
+                fontSize: `${(14 * contentTextScale) / 100}px`,
               }}
               onChange={(event) => handleSourceMarkdownChange(event.target.value)}
               onKeyDown={handleSourceKeyDown}
@@ -5335,9 +5357,10 @@ export function TipTapEditor({
         </Button>
       )}
 
-      {isMobile && !mobileContext && (
+      {isMobile && viewMode === 'visual' && showMobileEditorToolbar && !mobileContext && (
         <MobileWritingToolbar
           activeActions={mobileWritingActiveActions}
+          showUndoRedo={showEditorUndoRedo}
           onAction={runMobileWritingAction}
         />
       )}
@@ -5399,7 +5422,7 @@ export function TipTapEditor({
           outlineOpen={effectiveOutlineOpen}
           onToggleOutline={handleOutlineToggle}
           viewMode={viewMode}
-          onToggleViewMode={applyLayoutPreferences && !isMobile ? handleToggleViewMode : undefined}
+          onToggleViewMode={applyLayoutPreferences ? handleToggleViewMode : undefined}
           sourceMarkdown={viewMode === 'source' ? sourceMarkdown : undefined}
         />
       ) : null}

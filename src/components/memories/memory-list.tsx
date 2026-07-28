@@ -126,7 +126,7 @@ export function MemoryList() {
                   {t('addMemory')}
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{t('form.title')}</DialogTitle>
                   <DialogDescription>{t('form.description')}</DialogDescription>

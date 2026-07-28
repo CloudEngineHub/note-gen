@@ -29,6 +29,7 @@ const PULL_REFRESH_THRESHOLD = 72
 const PULL_REFRESH_MAX_DISTANCE = 112
 const INITIAL_RENDER_COUNT = 40
 const RENDER_BATCH_SIZE = 40
+let mobileRecordScrollTop = 0
 
 function getMarkPreview(mark: Mark): string {
   if (mark.type === 'text') return mark.content?.trim() || mark.desc?.trim() || ''
@@ -49,7 +50,11 @@ function getMarkImageSrc(mark: Mark) {
   return `/${mark.type === 'scan' ? 'screenshot' : 'image'}/${mark.url}`
 }
 
-export function MobileRecordStream() {
+interface MobileRecordStreamProps {
+  preview?: boolean
+}
+
+export function MobileRecordStream({ preview = false }: MobileRecordStreamProps = {}) {
   const t = useTranslations()
   const router = useRouter()
   const {
@@ -94,9 +99,11 @@ export function MobileRecordStream() {
   const isPullGestureRef = useRef(false)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
   const [visibleRecordCount, setVisibleRecordCount] = useState(INITIAL_RENDER_COUNT)
-  const [isRecordDataReady, setIsRecordDataReady] = useState(false)
+  const [isRecordDataReady, setIsRecordDataReady] = useState(preview)
 
   useEffect(() => {
+    if (preview) return
+
     let cancelled = false
 
     const prepareRecordData = async () => {
@@ -111,17 +118,27 @@ export function MobileRecordStream() {
     return () => {
       cancelled = true
     }
-  }, [fetchTags, initRecordFilters, initTags])
+  }, [fetchTags, initRecordFilters, initTags, preview])
 
   useEffect(() => {
-    if (!isRecordDataReady) return
+    if (!isRecordDataReady || preview) return
 
     if (trashState) {
       void fetchTrashMarkPreviews()
     } else {
       void fetchMarkPreviews()
     }
-  }, [currentTagId, fetchMarkPreviews, fetchTrashMarkPreviews, isRecordDataReady, trashState])
+  }, [currentTagId, fetchMarkPreviews, fetchTrashMarkPreviews, isRecordDataReady, preview, trashState])
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = mobileRecordScrollTop
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
 
   useEffect(() => {
     if (!multiMode) {
@@ -190,12 +207,14 @@ export function MobileRecordStream() {
   }, [filteredRecords.length, visibleRecordCount])
 
   useEffect(() => {
+    if (preview) return
+
     setVisibleMarkIds(filteredRecords.map((mark: Mark) => mark.id))
     return () => setVisibleMarkIds([])
-  }, [filteredRecords, setVisibleMarkIds])
+  }, [filteredRecords, preview, setVisibleMarkIds])
 
   useEffect(() => {
-    if (!pendingScrollMarkId) return
+    if (!pendingScrollMarkId || preview) return
     const targetIndex = filteredRecords.findIndex((mark: Mark) => mark.id === pendingScrollMarkId)
     if (targetIndex < 0) return
 
@@ -228,7 +247,7 @@ export function MobileRecordStream() {
     return () => {
       cancelled = true
     }
-  }, [filteredRecords, pendingScrollMarkId, setPendingScrollMarkId])
+  }, [filteredRecords, pendingScrollMarkId, preview, setPendingScrollMarkId])
 
   function getDayLabel(day: string) {
     if (dayjs(day).isSame(dayjs(), 'day')) return t('common.today')
@@ -602,6 +621,9 @@ export function MobileRecordStream() {
       <div
         ref={scrollContainerRef}
         className="mobile-under-dock-scroll min-h-0 flex-1 overscroll-y-contain overflow-y-auto px-3 py-2"
+        onScroll={(event) => {
+          mobileRecordScrollTop = event.currentTarget.scrollTop
+        }}
         onTouchStart={handlePullTouchStart}
         onTouchMove={handlePullTouchMove}
         onTouchEnd={handlePullTouchEnd}

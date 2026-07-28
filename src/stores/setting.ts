@@ -340,6 +340,12 @@ interface SettingState {
   showSourceLineNumbers: boolean
   setShowSourceLineNumbers: (show: boolean) => Promise<void>
 
+  editorSourceWrap: boolean
+  setEditorSourceWrap: (wrap: boolean) => Promise<void>
+
+  showMobileEditorToolbar: boolean
+  setShowMobileEditorToolbar: (show: boolean) => Promise<void>
+
   editorContentWidth: EditorContentWidth
   setEditorContentWidth: (width: EditorContentWidth) => Promise<void>
 
@@ -1568,6 +1574,22 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ showSourceLineNumbers })
     const store = await Store.load('store.json')
     await store.set('showSourceLineNumbers', showSourceLineNumbers)
+    await store.save()
+  },
+
+  editorSourceWrap: true,
+  setEditorSourceWrap: async (editorSourceWrap) => {
+    set({ editorSourceWrap })
+    const store = await Store.load('store.json')
+    await store.set('editorSourceWrap', editorSourceWrap)
+    await store.save()
+  },
+
+  showMobileEditorToolbar: true,
+  setShowMobileEditorToolbar: async (showMobileEditorToolbar) => {
+    set({ showMobileEditorToolbar })
+    const store = await Store.load('store.json')
+    await store.set('showMobileEditorToolbar', showMobileEditorToolbar)
     await store.save()
   },
 

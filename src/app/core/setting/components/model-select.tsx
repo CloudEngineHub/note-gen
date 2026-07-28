@@ -238,7 +238,7 @@ export function ModelSelect({
               className="w-full min-w-0 justify-between sm:w-[280px]"
             >
               {model
-                ? findSelectedModelDisplay() || model
+                ? findSelectedModelDisplay() || t('modelUnavailable')
                 : emptyLabel || (modelKey === 'primaryModel' ? t('noModel') : t('tooltip'))}
               <ChevronsUpDown className="opacity-50" />
             </Button>
@@ -248,7 +248,7 @@ export function ModelSelect({
           disabled={!model}
           icon={<X className="h-4 w-4" />}
           onClick={resetDefaultModel}
-          variant="default"
+          variant="outline"
           tooltipText={clearTooltip || t('tooltip')}
         />
       </div>

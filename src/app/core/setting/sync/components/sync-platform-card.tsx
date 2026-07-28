@@ -208,11 +208,13 @@ export function SyncPlatformCard({
 
 // 状态徽章组件
 function StatusBadge({ state }: { state: SyncStateEnum }) {
+  const t = useTranslations()
+
   if (state === SyncStateEnum.success) {
     return (
       <Badge>
         <CheckCircle2 data-icon="inline-start" />
-        Connected
+        {t('settings.sync.status.connected')}
       </Badge>
     )
   }
@@ -221,7 +223,9 @@ function StatusBadge({ state }: { state: SyncStateEnum }) {
     return (
       <Badge variant="secondary">
         <Loader2 data-icon="inline-start" className="animate-spin" />
-        {state === SyncStateEnum.checking ? 'Checking' : 'Creating'}
+        {state === SyncStateEnum.checking
+          ? t('settings.sync.checking')
+          : t('settings.sync.creating')}
       </Badge>
     )
   }
@@ -230,7 +234,7 @@ function StatusBadge({ state }: { state: SyncStateEnum }) {
     return (
       <Badge variant="outline">
         <XCircle data-icon="inline-start" />
-        Not Connected
+        {t('settings.sync.status.disconnected')}
       </Badge>
     )
   }

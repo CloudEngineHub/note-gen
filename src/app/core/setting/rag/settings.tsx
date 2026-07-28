@@ -254,13 +254,20 @@ export function Settings() {
   function renderNumericSetting(setting: NumericSetting) {
     const Icon = setting.icon;
     return (
-      <Item key={setting.key} className={`max-md:flex-col max-md:items-start${setting.disabled ? ' opacity-60' : ''}`} variant="outline">
+      <Item
+        key={setting.key}
+        className={cn(
+          'max-md:grid max-md:grid-cols-[auto_minmax(0,1fr)] max-md:items-start',
+          setting.disabled && 'opacity-60'
+        )}
+        variant="outline"
+      >
         <ItemMedia variant="icon"><Icon className="size-4" /></ItemMedia>
-        <ItemContent>
+        <ItemContent className="min-w-0">
           <ItemTitle>{setting.title}</ItemTitle>
           <ItemDescription>{setting.desc}</ItemDescription>
         </ItemContent>
-        <ItemActions className="w-[180px] max-md:w-full">
+        <ItemActions className="w-[180px] max-md:col-span-2 max-md:w-full">
           <div className="w-full space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{setting.min}</span>
@@ -294,7 +301,7 @@ export function Settings() {
           </Button>
         )}
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
             [t('vectorDocuments'), indexStats.documentCount],
             [t('vectorChunks'), indexStats.chunkCount],

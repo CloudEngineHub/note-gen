@@ -45,7 +45,7 @@ const insertBehaviorOptions: CanvasInsertBehavior[] = ['keep', 'select']
 const viewModeOptions: CanvasManagerViewMode[] = ['grid', 'list']
 const sortModeOptions: CanvasManagerSortMode[] = ['updated', 'created', 'name']
 
-export default function CanvasSettingPage() {
+export default function CanvasSettingPage({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.canvas')
   const {
     canvasGridVisible,
@@ -238,7 +238,7 @@ export default function CanvasSettingPage() {
 
       <SettingSection title={t('interaction.title')} desc={t('interaction.desc')}>
         <ItemGroup>
-          <Item variant="outline">
+          {!mobile ? <Item variant="outline">
             <ItemMedia variant="icon">
               <Mouse />
             </ItemMedia>
@@ -268,7 +268,7 @@ export default function CanvasSettingPage() {
                 ))}
               </ToggleGroup>
             </ItemActions>
-          </Item>
+          </Item> : null}
 
           <Item variant="outline">
             <ItemMedia variant="icon">
@@ -306,7 +306,7 @@ export default function CanvasSettingPage() {
 
       <SettingSection title={t('manager.title')} desc={t('manager.desc')}>
         <ItemGroup>
-          <Item variant="outline">
+          {!mobile ? <Item variant="outline">
             <ItemMedia variant="icon">
               <LayoutGrid />
             </ItemMedia>
@@ -336,7 +336,7 @@ export default function CanvasSettingPage() {
                 ))}
               </ToggleGroup>
             </ItemActions>
-          </Item>
+          </Item> : null}
 
           <Item variant="outline">
             <ItemMedia variant="icon">

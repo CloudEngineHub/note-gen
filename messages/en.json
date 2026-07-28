@@ -557,9 +557,17 @@
         "title": "Editor Display",
         "desc": "Choose how the outline and editor controls appear by default"
       },
+      "reading": {
+        "title": "Reading layout",
+        "desc": "Adjust body text size and line spacing"
+      },
+      "editing": {
+        "title": "Editing",
+        "desc": "Choose the default mode and mobile writing tools"
+      },
       "mode": {
         "title": "Default editing mode",
-        "desc": "Choose the default desktop editing mode; you can also switch it from the editor footer",
+        "desc": "Choose the default editing mode; you can also switch it from the editor footer",
         "options": {
           "visual": "Visual",
           "source": "Markdown source"
@@ -579,6 +587,14 @@
         "title": "Source line numbers",
         "desc": "Show line numbers beside the Markdown source editor"
       },
+      "sourceWrap": {
+        "title": "Wrap source lines",
+        "desc": "Wrap long source lines when they exceed the editor width"
+      },
+      "mobileToolbar": {
+        "title": "Bottom formatting toolbar",
+        "desc": "Show formatting and insert tools below the mobile editor"
+      },
       "outlineEnable": "Default outline enabled",
       "outlineEnableDesc": "Enabling it will make the outline visible by default.",
       "outlinePosition": "Outline position",
@@ -588,7 +604,7 @@
         "right": "Right"
       },
       "showUndoRedo": "Undo/Redo buttons",
-      "showUndoRedoDesc": "Show undo and redo buttons in the editor tab bar.",
+      "showUndoRedoDesc": "Show undo and redo actions in the editor toolbar.",
       "completion": {
         "title": "Auto Completion",
         "model": {
@@ -1023,7 +1039,8 @@
       "title": "Default Model",
       "desc": "Here, you can use different models for different scenes, to improve efficiency and reduce costs.",
       "tooltip": "Use main model",
-      "noModel": "Do not use",
+      "noModel": "Follow main model",
+      "modelUnavailable": "Selected model unavailable",
       "placeholder": "Please select or search for models",
       "options": {
         "primaryModel": {
@@ -1119,6 +1136,7 @@
       "promptTitle": "Prompt Title",
       "desc": "Here, you can add and manage prompts, helping AI better understand your needs.",
       "addPrompt": "Add Prompt",
+      "promptLibrary": "Prompt Library",
       "selectPrompt": "Select Prompt",
       "configPrompt": "Configure Prompt",
       "noContent": "No content",
@@ -1616,6 +1634,8 @@
       "desc": "Here you can create and manage custom organization templates to help AI organize record content according to your needs.",
       "customTemplate": "Custom Template",
       "addTemplate": "Add Custom Template",
+      "emptyTitle": "No templates yet",
+      "emptyDesc": "Create a template to organize records into a consistent structure with AI.",
       "deleteConfirm": "Are you sure to delete this template?",
       "status": "Status",
       "name": "Name",
@@ -1908,7 +1928,7 @@
         "desc": "Set the application's workspace directory where files will be saved",
         "current": "Current Workspace Path",
         "defaultPath": "Default Workspace",
-        "default": "Using default workspace path",
+        "default": "Default workspace",
         "custom": "Using custom workspace path",
         "select": "Select Workspace Directory",
         "reset": "Reset to Default Path",

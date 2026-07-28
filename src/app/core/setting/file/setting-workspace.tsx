@@ -17,7 +17,7 @@ import {
 import { useState } from "react"
 import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
 
-export function SettingWorkspace() {
+export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) {
   const {
     workspacePath,
     setWorkspacePath,
@@ -89,7 +89,7 @@ export function SettingWorkspace() {
 
   return (
     <Field>
-      <FieldTitle>{t('workspace.current')}</FieldTitle>
+      {showTitle ? <FieldTitle>{t('workspace.current')}</FieldTitle> : null}
         <div className="flex flex-col gap-3">
           {/* 当前工作区路径显示和选择 */}
           <ResponsivePopover open={open} onOpenChange={setOpen} mobileTitle={t('workspace.current')}>
@@ -98,6 +98,7 @@ export function SettingWorkspace() {
                 variant="outline"
                 role="combobox"
                 aria-expanded={open}
+                aria-label={t('workspace.current')}
                 className="w-full justify-between p-3 h-auto text-left font-normal"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">

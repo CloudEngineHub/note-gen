@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { useTranslations } from 'next-intl'
@@ -21,11 +21,21 @@ import { cn } from '@/lib/utils'
 import { MobileMeActivityDrawer } from './mobile-me-activity-drawer'
 import { buildActivityDaySummaryText, buildProfileCardData, getBackupMethodStatus, getBackupProviderName, getCurrentActivityStreak, getCurrentWeekActivityCount } from './mobile-me-helpers'
 import { MobileMeProfileCard } from './mobile-me-profile-card'
-import { SettingTab } from './setting-tab'
 import { MobileUpdateSettings } from './mobile-update-settings'
+import { SettingTab } from './setting-tab'
 
 const MOBILE_HEATMAP_WEEKS = 16
 const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
+const MOBILE_ACTIVITY_CACHE_TTL = 30_000
+
+let mobileActivityCache: ActivityCalendarData | null = null
+let mobileActivityCacheTime = 0
+
+function getInitialSelectedDay(data: ActivityCalendarData | null) {
+  if (!data) return undefined
+  return data.days.find((day) => day.day === data.endDate)
+    || [...data.days].reverse().find((day) => day.totalCount > 0)
+}
 
 const embeddedContainerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -51,17 +61,30 @@ const embeddedItemVariants: Variants = {
   },
 }
 
-export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
+export function MobileMePage({
+  embedded = false,
+  animateEntrance = true,
+  refreshOnMount = true,
+}: {
+  embedded?: boolean
+  animateEntrance?: boolean
+  refreshOnMount?: boolean
+}) {
   const tActivity = useTranslations('activity')
   const tMe = useTranslations('mobile.me')
   const reduceMotion = useReducedMotion()
 
-  const [activityData, setActivityData] = useState<ActivityCalendarData | null>(null)
-  const [selectedDay, setSelectedDay] = useState<ActivityDaySummary | undefined>(undefined)
+  const [activityData, setActivityData] = useState<ActivityCalendarData | null>(
+    () => mobileActivityCache
+  )
+  const [selectedDay, setSelectedDay] = useState<ActivityDaySummary | undefined>(
+    () => getInitialSelectedDay(mobileActivityCache)
+  )
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !mobileActivityCache)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const restoredScrollRef = useRef(false)
+  const refreshOnMountRef = useRef(refreshOnMount)
 
   const { primaryBackupMethod } = useSettingStore()
   const {
@@ -81,6 +104,8 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
     setLoading(true)
     try {
       const nextData = await loadActivityCalendarData()
+      mobileActivityCache = nextData
+      mobileActivityCacheTime = Date.now()
       setActivityData(nextData)
       setSelectedDay((currentDay) => {
         if (currentDay) {
@@ -96,10 +121,19 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
   }
 
   useEffect(() => {
+    if (!refreshOnMountRef.current) return
+    if (
+      mobileActivityCache
+      && Date.now() - mobileActivityCacheTime < MOBILE_ACTIVITY_CACHE_TTL
+    ) {
+      return
+    }
     refreshActivity()
   }, [])
 
   useEffect(() => {
+    if (!refreshOnMountRef.current) return
+
     let cancelled = false
 
     async function loadSyncProfile() {
@@ -287,7 +321,7 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
     }
   }, [primaryBackupMethod])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (restoredScrollRef.current) return
     if (!containerRef.current) return
 
@@ -297,13 +331,8 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
       return
     }
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!containerRef.current) return
-        containerRef.current.scrollTop = Number(savedScrollTop)
-        restoredScrollRef.current = true
-      })
-    })
+    containerRef.current.scrollTop = Number(savedScrollTop)
+    restoredScrollRef.current = true
   }, [activityData])
 
   const currentWeekCount = useMemo(() => getCurrentWeekActivityCount(activityData), [activityData])
@@ -375,18 +404,6 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
     return tMe('profile.syncPlatform')
   }, [profile.name, profileProviderType, tMe])
 
-  const profileCardSubtitle = useMemo(() => {
-    if (profileProviderType === 'git' && providerName) {
-      return tMe('profile.gitSubtitle', { provider: providerName })
-    }
-
-    if (profileProviderType === 'storage' && providerName) {
-      return tMe('profile.storageSubtitle', { provider: providerName })
-    }
-
-    return tMe('profile.unconfiguredSubtitle')
-  }, [profileProviderType, providerName, tMe])
-
   function handleSelectDay(day: ActivityDaySummary) {
     setSelectedDay(day)
     setDrawerOpen(true)
@@ -407,7 +424,7 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
       <motion.div
         className="flex flex-1 flex-col gap-4 px-3 py-4"
         variants={embeddedContainerVariants}
-        initial={embedded && !reduceMotion ? "hidden" : false}
+        initial={embedded && animateEntrance && !reduceMotion ? "hidden" : false}
         animate="visible"
       >
         <motion.div variants={embeddedItemVariants}>
@@ -417,7 +434,6 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
         <motion.div variants={embeddedItemVariants}>
           <MobileMeProfileCard
             name={profileCardName}
-            subtitle={profileCardSubtitle}
             avatarUrl={profile.avatarUrl}
             syncStatus={syncStatus}
             providerName={providerName}
@@ -473,12 +489,14 @@ export function MobileMePage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </motion.section>
 
-        <motion.section variants={embeddedItemVariants} className="mobile-dock-surface overflow-hidden rounded-[1.35rem]">
-          <div className="border-b border-border/60 px-4 py-3">
+        <motion.section variants={embeddedItemVariants} className="flex flex-col gap-3 px-1">
+          <div className="px-1">
             <h2 className="text-base font-semibold">{tMe('settings.title')}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">{tMe('settings.description')}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {tMe('settings.description')}
+            </p>
           </div>
-          <SettingTab />
+          <SettingTab restoreSheetOnNavigate={embedded} />
         </motion.section>
       </motion.div>
 

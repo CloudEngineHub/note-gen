@@ -34,6 +34,15 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer'
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/responsive-dialog'
 import { Label } from '@/components/ui/label'
 import { OpenBroswer } from '@/components/open-broswer'
 import { fetchAi } from '@/lib/ai/chat'
@@ -187,32 +196,32 @@ ${newContent}`
             <ItemDescription>{t('prompt.systemPrompt.desc')}</ItemDescription>
           </ItemContent>
           <ItemActions>
-            <Dialog open={systemPromptDialogOpen} onOpenChange={handleSystemPromptDialogChange}>
-              <DialogTrigger asChild>
+            <ResponsiveDialog open={systemPromptDialogOpen} onOpenChange={handleSystemPromptDialogChange}>
+              <ResponsiveDialogTrigger asChild>
                 <Button type="button" variant="outline">
                   <Pencil data-icon="inline-start" />
                   {commonT('edit')}
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                  <DialogTitle>{t('prompt.systemPrompt.title')}</DialogTitle>
-                  <DialogDescription>
+              </ResponsiveDialogTrigger>
+              <ResponsiveDialogContent className="max-h-[92vh] sm:max-w-3xl">
+                <ResponsiveDialogHeader>
+                  <ResponsiveDialogTitle>{t('prompt.systemPrompt.title')}</ResponsiveDialogTitle>
+                  <ResponsiveDialogDescription>
                     {t('prompt.systemPrompt.help')}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex flex-col gap-2">
+                  </ResponsiveDialogDescription>
+                </ResponsiveDialogHeader>
+                <div className="flex min-h-0 flex-col gap-2 overflow-y-auto px-4 sm:px-0">
                   <Label htmlFor="system-prompt">{t('prompt.systemPrompt.label')}</Label>
                   <Textarea
                     id="system-prompt"
                     value={systemPromptDraft}
                     onChange={(e) => setSystemPromptDraft(e.target.value)}
                     placeholder={t('prompt.systemPrompt.placeholder')}
-                    rows={16}
+                    rows={isMobile ? 10 : 16}
                     maxRows={30}
                   />
                 </div>
-                <DialogFooter className="mobile-prompt-dialog-footer gap-2">
+                <ResponsiveDialogFooter className="mobile-prompt-dialog-footer gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -235,9 +244,9 @@ ${newContent}`
                   >
                     {commonT('save')}
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </ResponsiveDialogFooter>
+              </ResponsiveDialogContent>
+            </ResponsiveDialog>
           </ItemActions>
         </Item>
         <div className="flex justify-between items-center">
@@ -249,7 +258,7 @@ ${newContent}`
                   {t('prompt.addPrompt')}
                 </Button>
               </DrawerTrigger>
-              <DrawerContent>
+              <DrawerContent className="max-h-[92vh]">
                 <DrawerHeader>
                   <DrawerTitle>
                     {t('prompt.addPrompt')}
@@ -258,7 +267,7 @@ ${newContent}`
                     {t('prompt.addPromptDesc')}
                   </DrawerDescription>
                 </DrawerHeader>
-                <div className="grid gap-4 px-4">
+                <div className="grid min-h-0 gap-4 overflow-y-auto px-4">
                   <div className="grid gap-2">
                     <Label htmlFor="title">{t('prompt.promptTitle')}</Label>
                     <Input
@@ -358,7 +367,11 @@ ${newContent}`
               </DialogContent>
             </Dialog>
           )}
-          <OpenBroswer title="Awesome Prompts" url="https://github.com/f/awesome-chatgpt-prompts" className='text-sm' />
+          <OpenBroswer
+            title={t('prompt.promptLibrary')}
+            url="https://github.com/f/awesome-chatgpt-prompts"
+            className="text-sm"
+          />
         </div>
         <div className="grid gap-4">
           {promptList.map((prompt) => (
@@ -393,18 +406,18 @@ ${newContent}`
           ))}
         </div>
 
-        <Dialog
+        <ResponsiveDialog
           open={editingId !== null}
           onOpenChange={(open) => {
             if (!open) handleCancelEdit()
           }}
         >
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{commonT('edit')} Prompt</DialogTitle>
-              <DialogDescription>{t('prompt.addPromptDesc')}</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4">
+          <ResponsiveDialogContent className="max-h-[92vh] sm:max-w-2xl">
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>{commonT('edit')} Prompt</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>{t('prompt.addPromptDesc')}</ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
+            <div className="grid min-h-0 gap-4 overflow-y-auto px-4 sm:px-0">
               <div className="grid gap-2">
                 <Label htmlFor="edit-prompt-title">{t('prompt.promptTitle')}</Label>
                 <Input
@@ -426,7 +439,7 @@ ${newContent}`
                 />
               </div>
             </div>
-            <DialogFooter className="mobile-prompt-dialog-footer gap-2">
+            <ResponsiveDialogFooter className="mobile-prompt-dialog-footer gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -445,9 +458,9 @@ ${newContent}`
               >
                 {commonT('save')}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       </div>
     </SettingType>
   )

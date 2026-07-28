@@ -23,9 +23,11 @@ import {
   PieChart,
   Plus,
   Quote,
+  Redo2,
   Sigma,
   Sparkles,
   Table2,
+  Undo2,
   Workflow,
 } from 'lucide-react'
 import { useState, type MouseEvent, type PointerEvent } from 'react'
@@ -55,6 +57,8 @@ type MobileWritingToolbarAction =
   | 'open-ai-custom'
   | 'open-search-replace'
   | 'toggle-outline'
+  | 'undo'
+  | 'redo'
   | 'insert-inline-math'
   | 'insert-block-math'
   | 'insert-mermaid-flowchart'
@@ -68,6 +72,7 @@ type MobileWritingToolbarAction =
 
 interface MobileWritingToolbarProps {
   activeActions?: string[]
+  showUndoRedo?: boolean
   onAction: (action: MobileWritingToolbarAction) => void
 }
 
@@ -144,9 +149,23 @@ const SECONDARY_ITEMS: Record<Exclude<MobileWritingToolbarMenu, 'root'>, Toolbar
   ],
 }
 
-export function MobileWritingToolbar({ activeActions = [], onAction }: MobileWritingToolbarProps) {
+export function MobileWritingToolbar({
+  activeActions = [],
+  showUndoRedo = false,
+  onAction,
+}: MobileWritingToolbarProps) {
   const [activeMenu, setActiveMenu] = useState<MobileWritingToolbarMenu>('root')
-  const items = activeMenu === 'root' ? ROOT_ITEMS : SECONDARY_ITEMS[activeMenu]
+  const items = activeMenu === 'root'
+    ? [
+        ...(showUndoRedo
+          ? [
+              { kind: 'action', action: 'undo', label: '撤销', icon: Undo2 },
+              { kind: 'action', action: 'redo', label: '重做', icon: Redo2 },
+            ] satisfies ToolbarItem[]
+          : []),
+        ...ROOT_ITEMS,
+      ]
+    : SECONDARY_ITEMS[activeMenu]
 
   const preventFocusSteal = (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()

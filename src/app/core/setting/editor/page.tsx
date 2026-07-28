@@ -10,6 +10,7 @@ import { ItemGroup } from '@/components/ui/item';
 import ShowEditorStats from './show-editor-stats';
 import EditorMode from './editor-mode';
 import ShowSourceLineNumbers from './show-source-line-numbers';
+import SourceWrap from './source-wrap';
 import useSettingStore from '@/stores/setting';
 
 export default function EditorSettingPage() {
@@ -20,12 +21,19 @@ export default function EditorSettingPage() {
     <div className="flex flex-col gap-6">
       <DefaultModelsSettings type="editor" />
       <SettingSection title={t('layout.title')} desc={t('layout.desc')}>
-        <LayoutSettings />
+        <ItemGroup>
+          <LayoutSettings />
+        </ItemGroup>
       </SettingSection>
       <SettingSection title={t('display.title')} desc={t('display.desc')}>
         <ItemGroup>
           <EditorMode />
-          {editorViewMode === 'source' ? <ShowSourceLineNumbers /> : null}
+          {editorViewMode === 'source' ? (
+            <>
+              <ShowSourceLineNumbers />
+              <SourceWrap />
+            </>
+          ) : null}
           <Outline />
           <ShowUndoRedo />
           <ShowEditorStats />

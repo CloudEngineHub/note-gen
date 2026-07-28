@@ -23,11 +23,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { SwipeBack } from '@/components/ui/swipe-back'
+import { SwipeBack, type SwipeBackHandle } from '@/components/ui/swipe-back'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
+import { MobileRecordStream } from '@/app/mobile/record/mobile-record-stream'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,6 +118,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const autoSaveTimerRef = useRef<number | null>(null)
+  const swipeBackRef = useRef<SwipeBackHandle>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -274,24 +276,36 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
   if (isLoading || (mark && !draft)) {
     return (
-      <div className="flex h-full items-center justify-center bg-background text-sm text-muted-foreground">
-        {t('record.mark.loading')}
-      </div>
+      <SwipeBack
+        ref={swipeBackRef}
+        onBack={() => void closeDetail()}
+        backdrop={<MobileRecordStream preview />}
+      >
+        <div className="flex h-full items-center justify-center bg-background text-sm text-muted-foreground">
+          {t('record.mark.loading')}
+        </div>
+      </SwipeBack>
     )
   }
 
   if (!mark || !draft) {
     return (
-      <div className="flex h-full flex-col bg-background">
-        <header className="flex h-14 shrink-0 items-center border-b px-2">
-          <Button variant="ghost" size="icon" onClick={() => void closeDetail()} aria-label={t('common.back')}>
-            <ArrowLeft />
-          </Button>
-        </header>
-        <div className="flex flex-1 items-center justify-center px-6 text-sm text-muted-foreground">
-          {t('record.mark.detail.notFound')}
+      <SwipeBack
+        ref={swipeBackRef}
+        onBack={() => void closeDetail()}
+        backdrop={<MobileRecordStream preview />}
+      >
+        <div className="flex h-full flex-col bg-background">
+          <header className="flex h-14 shrink-0 items-center border-b px-2">
+            <Button variant="ghost" size="icon" onClick={() => swipeBackRef.current?.back()} aria-label={t('common.back')}>
+              <ArrowLeft />
+            </Button>
+          </header>
+          <div className="flex flex-1 items-center justify-center px-6 text-sm text-muted-foreground">
+            {t('record.mark.detail.notFound')}
+          </div>
         </div>
-      </div>
+      </SwipeBack>
     )
   }
 
@@ -300,12 +314,14 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
   return (
     <SwipeBack
+      ref={swipeBackRef}
       onBack={() => void closeDetail()}
       enabled={!deleteDialogOpen}
+      backdrop={<MobileRecordStream preview />}
     >
       <div id="mobile-record-detail" className="relative flex h-full min-h-0 w-full flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2">
-        <Button variant="ghost" size="icon" onClick={() => void closeDetail()} aria-label={t('common.back')}>
+        <Button variant="ghost" size="icon" onClick={() => swipeBackRef.current?.back()} aria-label={t('common.back')}>
           <ArrowLeft />
         </Button>
         <div className="flex min-w-0 flex-1 items-center gap-2">

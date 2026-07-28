@@ -5,18 +5,12 @@ import { useTranslations } from 'next-intl'
 import { SettingTab } from '../components/setting-tab'
 
 export default function MobileSettingsIndexPage() {
-  const tSettings = useTranslations('settings')
   const tMe = useTranslations('mobile.me')
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{tSettings('title')}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{tMe('settings.description')}</p>
-      </div>
-      <div className="mobile-dock-surface rounded-[1.35rem] overflow-hidden">
-        <SettingTab />
-      </div>
+    <div className="flex flex-col gap-5">
+      <p className="text-sm text-muted-foreground">{tMe('settings.description')}</p>
+      <SettingTab />
     </div>
   )
 }

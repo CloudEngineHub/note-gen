@@ -35,6 +35,7 @@ import {
 import { S3ImageHosting } from './s3'
 import SMMSImageHosting from './smms'
 import { SettingType } from '../components/setting-base'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -79,7 +80,7 @@ const IMAGE_HOSTING_ICONS: Record<ImageHostingType, LucideIcon> = {
   upyun: UploadCloud,
 }
 
-export default function ImageHostingPage() {
+export default function ImageHostingPage({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations()
   const {
     mainImageHosting,
@@ -146,6 +147,36 @@ export default function ImageHostingPage() {
     }
   }
 
+  function renderUseButton() {
+    const isLocal = section === 'local'
+    const isCurrent = isLocal ? !useImageRepo : isCurrentProvider
+    const disabled = isLocal
+      ? isCurrent || isSaving
+      : !canUseProvider || isCurrent || isSaving
+
+    return (
+      <Button
+        type="button"
+        size="sm"
+        className={mobile ? 'h-11' : undefined}
+        variant={isCurrent ? 'secondary' : 'default'}
+        disabled={disabled}
+        onClick={() => void (isLocal ? handleUseLocalStorage() : handleUseProvider())}
+      >
+        {isSaving ? (
+          <Loader2 data-icon="inline-start" className="animate-spin" />
+        ) : isCurrent ? (
+          <Check data-icon="inline-start" />
+        ) : null}
+        {isCurrent
+          ? t('settings.imageHosting.currentPlatform')
+          : isLocal
+            ? t('settings.imageHosting.useLocalStorage')
+            : t('settings.imageHosting.setCurrentPlatform')}
+      </Button>
+    )
+  }
+
   function renderProviderSettings() {
     switch (provider) {
       case 'github':
@@ -173,6 +204,17 @@ export default function ImageHostingPage() {
     }
   }
 
+  const providerOptions = [
+    {
+      value: 'local',
+      label: t('settings.imageHosting.localProviderTitle'),
+    },
+    ...IMAGE_HOSTING_TYPES.map(itemProvider => ({
+      value: itemProvider,
+      label: getProviderName(itemProvider, t),
+    })),
+  ]
+
   return (
     <SettingType
       id="imageHosting"
@@ -181,7 +223,20 @@ export default function ImageHostingPage() {
       desc={t('settings.imageHosting.desc')}
     >
       <div className="grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <Card size="sm" className="lg:sticky lg:top-2">
+        {mobile ? (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ResponsiveSelect
+                title={t('settings.imageHosting.platformSettings')}
+                value={section}
+                className="h-11"
+                options={providerOptions}
+                onValueChange={value => setSection(value as ImageHostingSection)}
+              />
+            </div>
+            {renderUseButton()}
+          </div>
+        ) : <Card size="sm" className="lg:sticky lg:top-2">
           <CardHeader>
             <CardTitle>{t('settings.imageHosting.platformSettings')}</CardTitle>
           </CardHeader>
@@ -252,7 +307,7 @@ export default function ImageHostingPage() {
               </ItemGroup>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         <div className="flex min-w-0 flex-col gap-4">
           {section === 'local' ? (
@@ -267,20 +322,7 @@ export default function ImageHostingPage() {
                     <CardDescription>{t('settings.imageHosting.localProviderDesc')}</CardDescription>
                   </div>
                 </div>
-                <CardAction>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={!useImageRepo ? 'secondary' : 'default'}
-                    disabled={!useImageRepo || isSaving}
-                    onClick={() => void handleUseLocalStorage()}
-                  >
-                    {!useImageRepo ? <Check data-icon="inline-start" /> : null}
-                    {!useImageRepo
-                      ? t('settings.imageHosting.currentPlatform')
-                      : t('settings.imageHosting.useLocalStorage')}
-                  </Button>
-                </CardAction>
+                {!mobile ? <CardAction>{renderUseButton()}</CardAction> : null}
               </CardHeader>
               <CardContent>
                 <ItemGroup>
@@ -334,22 +376,7 @@ export default function ImageHostingPage() {
                             : 'connection'
                         }
                       />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={isCurrentProvider ? 'secondary' : 'default'}
-                        disabled={!canUseProvider || isCurrentProvider || isSaving}
-                        onClick={() => void handleUseProvider()}
-                      >
-                        {isSaving ? (
-                          <Loader2 data-icon="inline-start" className="animate-spin" />
-                        ) : isCurrentProvider ? (
-                          <Check data-icon="inline-start" />
-                        ) : null}
-                        {isCurrentProvider
-                          ? t('settings.imageHosting.currentPlatform')
-                          : t('settings.imageHosting.setCurrentPlatform')}
-                      </Button>
+                      {!mobile ? renderUseButton() : null}
                     </div>
                   </CardAction>
                 </CardHeader>

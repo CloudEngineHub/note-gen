@@ -544,14 +544,37 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                         <CardDescription className="truncate">{currentConfig.baseURL || t('endpointMissing')}</CardDescription>
                       </div>
                     </div>
-                    <CardAction className="flex gap-2">
-                      <Button variant="outline" size={mobile ? 'icon-sm' : 'sm'} aria-label={t('copyConfig')} onClick={copyConfig}>
-                        <Copy data-icon={mobile ? undefined : 'inline-start'} />{mobile ? null : t('copyConfig')}
-                      </Button>
-                      <Button variant="outline" size="icon-sm" aria-label={t('deleteCustomModel')} onClick={deleteCurrentConfig}>
-                        <Trash2 />
-                      </Button>
-                    </CardAction>
+                    {mobile ? (
+                      <div className="mt-2 grid w-full grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          aria-label={t('copyConfig')}
+                          onClick={copyConfig}
+                        >
+                          <Copy data-icon="inline-start" />
+                          {t('copyConfig')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          aria-label={t('deleteCustomModel')}
+                          onClick={deleteCurrentConfig}
+                        >
+                          <Trash2 data-icon="inline-start" />
+                          {t('deleteCustomModel')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <CardAction className="flex gap-2">
+                        <Button variant="outline" size="sm" aria-label={t('copyConfig')} onClick={copyConfig}>
+                          <Copy data-icon="inline-start" />{t('copyConfig')}
+                        </Button>
+                        <Button variant="outline" size="icon-sm" aria-label={t('deleteCustomModel')} onClick={deleteCurrentConfig}>
+                          <Trash2 />
+                        </Button>
+                      </CardAction>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
@@ -563,9 +586,19 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                 </Card>
 
                 <Tabs orientation="horizontal" value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid h-9 w-full grid-cols-2">
-                    <TabsTrigger className="!justify-center" value="connection"><Settings2 data-icon="inline-start" />{t('connectionTab')}</TabsTrigger>
-                    <TabsTrigger className="!justify-center" value="models"><BotMessageSquare data-icon="inline-start" />{t('modelsTab')}</TabsTrigger>
+                  <TabsList className={mobile ? "grid !h-11 w-full grid-cols-2 items-center !overflow-hidden !p-1" : "grid h-9 w-full grid-cols-2"}>
+                    <TabsTrigger
+                      className={mobile ? "!h-9 !min-h-9 !justify-center !py-0" : "!justify-center"}
+                      value="connection"
+                    >
+                      <Settings2 data-icon="inline-start" />{t('connectionTab')}
+                    </TabsTrigger>
+                    <TabsTrigger
+                      className={mobile ? "!h-9 !min-h-9 !justify-center !py-0" : "!justify-center"}
+                      value="models"
+                    >
+                      <BotMessageSquare data-icon="inline-start" />{t('modelsTab')}
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="connection">
@@ -655,7 +688,11 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                                   <CardContent>
                                     <FieldGroup>
                                       {headerPairs.map((pair, index) => (
-                                        <Field key={pair.id} orientation="horizontal">
+                                        <Field
+                                          key={pair.id}
+                                          orientation={mobile ? 'vertical' : 'horizontal'}
+                                          className={mobile ? 'rounded-lg border p-2' : undefined}
+                                        >
                                           <Input
                                             aria-label={t('headerKey')}
                                             placeholder={t('headerKey')}

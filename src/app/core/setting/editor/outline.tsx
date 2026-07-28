@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 import useSettingStore from '@/stores/setting'
 
 
-export default function Outline() {
+export default function Outline({ showPosition = true }: { showPosition?: boolean }) {
   const t = useTranslations('settings.editor')
   const {
     enableOutline,
@@ -43,7 +43,7 @@ export default function Outline() {
         />
       </ItemActions>
     </Item>
-    <Item
+    {showPosition ? <Item
       variant="outline"
       aria-disabled={!enableOutline}
       className={cn(!enableOutline && 'opacity-60')}
@@ -75,6 +75,6 @@ export default function Outline() {
           </ToggleGroupItem>
         </ToggleGroup>
       </ItemActions>
-    </Item>
+    </Item> : null}
   </>
 }

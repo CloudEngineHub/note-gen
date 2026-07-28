@@ -54,6 +54,18 @@ import {
 } from '@/components/ui/alert-dialog'
 import { SettingSection } from '../components/setting-base'
 
+function redactSensitiveEndpoint(endpoint: string) {
+  return endpoint
+    .replace(
+      /([?&][^=\s]*(?:api[_-]?key|access[_-]?token|token|secret|password)[^=\s]*=)[^&#\s]*/gi,
+      '$1••••••',
+    )
+    .replace(
+      /((?:--?|\/)(?:api[_-]?key|access[_-]?token|token|secret|password)(?:=|\s+))\S+/gi,
+      '$1••••••',
+    )
+}
+
 export function ServerList({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.mcp')
   const { toast } = useToast()
@@ -215,6 +227,7 @@ export function ServerList({ mobile = false }: { mobile?: boolean }) {
               const endpoint = server.type === 'stdio'
                 ? server.command && `${server.command} ${server.args?.join(' ') || ''}`.trim()
                 : server.url
+              const safeEndpoint = endpoint ? redactSensitiveEndpoint(endpoint) : endpoint
 
               if (mobile) {
                 return (
@@ -230,7 +243,7 @@ export function ServerList({ mobile = false }: { mobile?: boolean }) {
                             {server.type === 'stdio' ? t('stdio') : t('http')}
                           </Badge>
                         </ItemTitle>
-                        {endpoint && <ItemDescription className="break-all font-mono">{endpoint}</ItemDescription>}
+                        {safeEndpoint && <ItemDescription className="break-all font-mono">{safeEndpoint}</ItemDescription>}
                       </ItemContent>
                       <Switch
                         className="shrink-0"
@@ -317,7 +330,7 @@ export function ServerList({ mobile = false }: { mobile?: boolean }) {
                         {server.type === 'stdio' ? t('stdio') : t('http')}
                       </Badge>
                     </ItemTitle>
-                    {endpoint && <ItemDescription className="break-all font-mono">{endpoint}</ItemDescription>}
+                    {safeEndpoint && <ItemDescription className="break-all font-mono">{safeEndpoint}</ItemDescription>}
                   </ItemContent>
                   <ItemActions>
                     <Switch

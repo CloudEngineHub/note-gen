@@ -172,10 +172,7 @@ select,
 }
 
 .mobile-setting-screen [data-mobile-setting-section="true"] {
-  border-radius: var(--radius-xl);
-  border: 1px solid hsl(var(--border) / 0.7);
-  background: hsl(var(--card) / 0.45);
-  padding: 0.875rem;
+  padding-block: 0.125rem;
 }
 
 @media (max-width: 639px) {

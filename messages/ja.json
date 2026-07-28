@@ -494,9 +494,17 @@
         "title": "エディター表示",
         "desc": "アウトラインとエディターツールの既定の表示方法を設定します"
       },
+      "reading": {
+        "title": "読みやすさ",
+        "desc": "本文の文字サイズと行間を調整します"
+      },
+      "editing": {
+        "title": "編集方法",
+        "desc": "デフォルトモードとモバイルの編集ツールを設定します"
+      },
       "mode": {
         "title": "デフォルト編集モード",
-        "desc": "デスクトップエディターのデフォルト編集方法を設定します。エディター下部からいつでも切り替えられます",
+        "desc": "エディターのデフォルト編集方法を設定します。エディター下部からいつでも切り替えられます",
         "options": {
           "visual": "WYSIWYG",
           "source": "Markdown ソース"
@@ -516,6 +524,14 @@
         "title": "ソースの行番号",
         "desc": "Markdown ソースモードの左側に行番号を表示します"
       },
+      "sourceWrap": {
+        "title": "ソースを折り返す",
+        "desc": "長い行がエディター幅を超えたときに自動で折り返します"
+      },
+      "mobileToolbar": {
+        "title": "下部書式ツールバー",
+        "desc": "モバイルエディターの下部に書式と挿入ツールを表示します"
+      },
       "outlineEnable": "アウトラインを有効にする",
       "outlineEnableDesc": "アウトラインを有効にすると、アウトラインが表示されます。",
       "outlinePosition": "アウトライン位置",
@@ -525,7 +541,7 @@
         "right": "右側"
       },
       "showUndoRedo": "元に戻す/やり直しボタン",
-      "showUndoRedoDesc": "エディターのタブバーに元に戻すボタンとやり直しボタンを表示します。",
+      "showUndoRedoDesc": "エディターのツールバーに元に戻す操作とやり直し操作を表示します。",
       "completion": {
         "title": "自動補完",
         "model": {
@@ -744,10 +760,11 @@
       "download": "Download"
     },
     "prompt": {
-      "title": "マスク",
-      "promptTitle": "マスク名称",
-      "desc": "ここでマスクを追加・管理し、AIがあなたのニーズをよりよく理解できるようにします。",
-      "addPrompt": "マスクを追加",
+      "title": "プロンプト",
+      "promptTitle": "プロンプト名",
+      "desc": "ここでプロンプトを追加・管理し、AIがニーズをよりよく理解できるようにします。",
+      "addPrompt": "プロンプトを追加",
+      "promptLibrary": "プロンプトライブラリ",
       "selectPrompt": "マスクを選択",
       "configPrompt": "マスクを設定",
       "noContent": "内容がありません",
@@ -861,7 +878,8 @@
       "title": "デフォルトモデル",
       "desc": "ここでは、異なるシーンに応じて異なるモデルを使用し、効率を高めコストを削減できます。",
       "tooltip": "メインモデルを使用",
-      "noModel": "使用しない",
+      "noModel": "メインモデルに従う",
+      "modelUnavailable": "選択したモデルは利用できません",
       "placeholder": "モデルを選択または検索してください",
       "options": {
         "primaryModel": {
@@ -1501,6 +1519,8 @@
       "desc": "ここでは、カスタム整理テンプレートを作成・管理し、AIがあなたのニーズに応じて記録内容を整理するのを支援できます。",
       "customTemplate": "カスタムテンプレート",
       "addTemplate": "テンプレートを追加",
+      "emptyTitle": "整理テンプレートがありません",
+      "emptyDesc": "テンプレートを作成すると、AI が一定の構成で記録を整理できます。",
       "deleteConfirm": "このテンプレートを削除してもよろしいですか？",
       "status": "状態",
       "name": "名称",
@@ -1793,7 +1813,7 @@
         "desc": "アプリケーションのワークスペースディレクトリを設定します。ファイルはこのディレクトリに保存されます。",
         "current": "現在のワークスペースパス",
         "defaultPath": "デフォルトワークスペース",
-        "default": "現在デフォルトのワークスペースパスを使用しています。",
+        "default": "デフォルトワークスペース",
         "custom": "現在カスタムワークスペースパスを使用しています。",
         "select": "ワークスペースディレクトリを選択",
         "reset": "デフォルトパスにリセット",
@@ -2067,15 +2087,15 @@
       }
     },
     "skills": {
-      "title": "Skills",
+      "title": "スキル",
       "desc": "Skills 是可重用的 AI 能力包，让 AI 助手能够根据任务自动应用特定的行为模式。",
       "enable": "启用 Skills 功能",
       "enableDesc": "启用后，AI 可以使用已配置的 Skills",
       "autoMatch": "自动匹配 Skills",
       "autoMatchDesc": "根据用户输入自动选择合适的 Skills",
-      "project": "工作区 Skills",
-      "global": "全局 Skills",
-      "globalPath": "全局 Skills 存储位置",
+      "project": "ワークスペーススキル",
+      "global": "グローバルスキル",
+      "globalPath": "グローバルスキルの保存先",
       "openInFileManager": "在文件管理器中打开",
       "createSkill": "创建 Skill",
       "deleteSkill": "删除 Skill",
@@ -2111,7 +2131,7 @@
       "emptyWorkspace": "工作区中没有 Skills",
       "emptyWorkspaceDesc": "在 skills 文件夹中创建 SKILL.md 文件来添加 Skill",
       "basicSettings": "基础设置",
-      "installedGlobalSkills": "已安装的全局 Skills",
+      "installedGlobalSkills": "インストール済みのグローバルスキル",
       "nameRequired": "请输入 Skill 名称",
       "descriptionRequired": "请输入描述",
       "namePlaceholder": "note-organizer",

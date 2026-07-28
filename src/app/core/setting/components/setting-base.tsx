@@ -28,13 +28,11 @@ export function SettingType(
   if (mobile) {
     return (
       <div id={id} data-setting-page className="flex min-w-0 flex-col gap-6">
-        <header className="flex flex-col gap-1.5">
-          <h1 className="flex w-full items-center gap-2 text-xl font-semibold tracking-tight">
-            {icon && <span className="text-muted-foreground">{icon}</span>}
-            {title}
-          </h1>
-          {desc && <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{desc}</p>}
-        </header>
+        {desc && (
+          <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+            {desc}
+          </p>
+        )}
         <div data-setting-sections className="flex min-w-0 flex-col gap-5">{children}</div>
       </div>
     )

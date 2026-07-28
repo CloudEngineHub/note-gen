@@ -13,14 +13,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from '@/components/ui/item'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { ResponsiveSelect } from '@/components/responsive-select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type {
   RecordCompletionBehavior,
@@ -109,23 +102,17 @@ export function SaveSettings() {
             ))}
           </ToggleGroup>
           {recordSaveTargetMode === 'fixed' ? (
-            <Select
-              value={fixedRecordTagId ? String(fixedRecordTagId) : undefined}
+            <ResponsiveSelect
+              title={t('target.fixedLabel')}
+              value={fixedRecordTagId ? String(fixedRecordTagId) : ''}
               onValueChange={(value) => void setFixedRecordTagId(Number(value))}
-            >
-              <SelectTrigger className="w-full sm:w-52" aria-label={t('target.fixedLabel')}>
-                <SelectValue placeholder={t('target.fixedPlaceholder')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {tags.map((tag) => (
-                    <SelectItem key={tag.id} value={String(tag.id)}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+              className="w-full sm:w-52"
+              placeholder={t('target.fixedPlaceholder')}
+              options={tags.map(tag => ({
+                value: String(tag.id),
+                label: tag.name,
+              }))}
+            />
           ) : null}
         </ItemActions>
       </Item>

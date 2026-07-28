@@ -3,10 +3,12 @@
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Redo2, Undo2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
+import { MobileCanvasPage } from '@/app/mobile/canvas/page'
 import { Button } from '@/components/ui/button'
+import { SwipeBack, type SwipeBackHandle } from '@/components/ui/swipe-back'
 import emitter from '@/lib/emitter'
 import useCanvasStore from '@/stores/canvas'
 
@@ -24,6 +26,7 @@ export default function MobileCanvasEditorPage() {
   const openProject = useCanvasStore(state => state.openProject)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const swipeBackRef = useRef<SwipeBackHandle>(null)
 
   useEffect(() => {
     if (canvasId) void openProject(canvasId)
@@ -76,36 +79,42 @@ export default function MobileCanvasEditorPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-background">
-      <header className="mobile-page-header flex shrink-0 items-center gap-2 border-b px-1">
-        <Button variant="ghost" size="icon" aria-label={t('manager.title')} onClick={() => router.push('/mobile/canvas')}>
-          <ArrowLeft />
-        </Button>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
-          {project?.title || t('loading')}
-        </h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('undo')}
-          disabled={!canUndo}
-          onClick={() => emitter.emit('canvas-undo', { canvasId })}
-        >
-          <Undo2 />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('redo')}
-          disabled={!canRedo}
-          onClick={() => emitter.emit('canvas-redo', { canvasId })}
-        >
-          <Redo2 />
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1">
-        <CanvasEditor canvasId={canvasId} mobile />
+    <SwipeBack
+      ref={swipeBackRef}
+      onBack={() => router.push('/mobile/canvas')}
+      backdrop={<MobileCanvasPage preview />}
+    >
+      <div className="flex h-full min-h-0 w-full flex-col bg-background">
+        <header className="mobile-page-header flex shrink-0 items-center gap-2 border-b px-1">
+          <Button variant="ghost" size="icon" aria-label={t('manager.title')} onClick={() => swipeBackRef.current?.back()}>
+            <ArrowLeft />
+          </Button>
+          <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
+            {project?.title || t('loading')}
+          </h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('undo')}
+            disabled={!canUndo}
+            onClick={() => emitter.emit('canvas-undo', { canvasId })}
+          >
+            <Undo2 />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('redo')}
+            disabled={!canRedo}
+            onClick={() => emitter.emit('canvas-redo', { canvasId })}
+          >
+            <Redo2 />
+          </Button>
+        </header>
+        <div className="min-h-0 flex-1">
+          <CanvasEditor canvasId={canvasId} mobile />
+        </div>
       </div>
-    </div>
+    </SwipeBack>
   )
 }

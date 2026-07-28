@@ -148,6 +148,7 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
         onReady={handleEditorReady}
         onEditorReady={onEditorReady}
         mobileMode
+        applyLayoutPreferences
       />
     </div>
   )

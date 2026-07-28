@@ -1,6 +1,6 @@
 'use client'
 
-import { FileDown, FileUp, Loader2, RefreshCcw, ShieldCheck, UploadCloud } from 'lucide-react'
+import { FileDown, Loader2, RefreshCcw, ShieldCheck, UploadCloud } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
@@ -229,31 +229,32 @@ export default function SyncPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1.5">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <FileUp className="size-6" />
-          {t('settings.sync.title')}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t('settings.sync.desc')}</p>
-      </header>
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        {t('settings.sync.desc')}
+      </p>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">{t('settings.sync.platformSettings')}</h2>
-        <MobileSelectDrawer
-          title={t('settings.sync.selectPlatform')}
-          value={tab}
-          onValueChange={handleTabChange}
-          placeholder={t('settings.sync.selectPlatform')}
-          options={SYNC_PLATFORMS.map(platform => ({
-            value: platform,
-            label: getProviderLabel(platform),
-          }))}
-        />
-        <div className="flex justify-end">
-          <UsePlatformButton
-            platform={tab}
-            disabled={currentSyncState !== SyncStateEnum.success}
-          />
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <MobileSelectDrawer
+              title={t('settings.sync.selectPlatform')}
+              value={tab}
+              onValueChange={handleTabChange}
+              placeholder={t('settings.sync.selectPlatform')}
+              className="h-11"
+              options={SYNC_PLATFORMS.map(platform => ({
+                value: platform,
+                label: getProviderLabel(platform),
+              }))}
+            />
+          </div>
+          <div className="shrink-0 [&>button]:h-11">
+            <UsePlatformButton
+              platform={tab}
+              disabled={currentSyncState !== SyncStateEnum.success}
+            />
+          </div>
         </div>
         {renderSyncContent()}
       </section>

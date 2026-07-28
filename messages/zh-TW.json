@@ -494,9 +494,17 @@
         "title": "編輯器顯示",
         "desc": "設定大綱和編輯器工具的預設顯示方式"
       },
+      "reading": {
+        "title": "閱讀排版",
+        "desc": "調整正文的字號和行距"
+      },
+      "editing": {
+        "title": "編輯方式",
+        "desc": "設定預設編輯模式和行動端寫作工具"
+      },
       "mode": {
         "title": "預設編輯模式",
-        "desc": "設定桌面編輯器預設使用的編輯方式，也可在編輯器底部隨時切換",
+        "desc": "設定編輯器預設使用的編輯方式，也可在編輯器底部隨時切換",
         "options": {
           "visual": "所見即所得",
           "source": "Markdown 原始碼"
@@ -516,6 +524,14 @@
         "title": "原始碼行號",
         "desc": "在 Markdown 原始碼模式左側顯示行號"
       },
+      "sourceWrap": {
+        "title": "原始碼自動換行",
+        "desc": "長行超過編輯器寬度時自動換到下一行"
+      },
+      "mobileToolbar": {
+        "title": "底部格式工具列",
+        "desc": "在行動編輯器底部顯示格式和插入工具"
+      },
       "outlineEnable": "預設啟用大綱",
       "outlineEnableDesc": "啟用後，編輯器將默認顯示大綱。",
       "outlinePosition": "大綱位置",
@@ -525,7 +541,7 @@
         "right": "右側"
       },
       "showUndoRedo": "復原/重做按鈕",
-      "showUndoRedoDesc": "在編輯器標籤列顯示復原和重做按鈕。",
+      "showUndoRedoDesc": "在編輯器工具列顯示復原和重做按鈕。",
       "completion": {
         "title": "快速補全",
         "model": {
@@ -744,10 +760,11 @@
       "download": "下載配置"
     },
     "prompt": {
-      "title": "Prompt",
-      "promptTitle": "Prompt 名稱",
-      "desc": "在這裡，你可以添加和管理 Prompt，幫助 AI 更好地理解你的需求。",
-      "addPrompt": "新增 Prompt",
+      "title": "提示詞",
+      "promptTitle": "提示詞名稱",
+      "desc": "在這裡，你可以新增和管理提示詞，幫助 AI 更好地理解你的需求。",
+      "addPrompt": "新增提示詞",
+      "promptLibrary": "提示詞資源庫",
       "selectPrompt": "選擇 Prompt",
       "configPrompt": "配置 Prompt",
       "noContent": "暫無內容",
@@ -861,7 +878,8 @@
       "title": "默認模型",
       "desc": "在這裡，你可以針對不同的場景使用不同的模型，提高效率降低成本。",
       "tooltip": "使用主要模型",
-      "noModel": "不使用模型",
+      "noModel": "跟隨主要模型",
+      "modelUnavailable": "已選模型不可用",
       "placeholder": "請選擇或搜索模型",
       "mainModel": "主要模型",
       "options": {
@@ -1478,6 +1496,8 @@
       "desc": "在這裡，你可以創建和管理自訂整理模板，幫助 AI 按照你的需求整理記錄內容。",
       "customTemplate": "自訂模板",
       "addTemplate": "新增模板",
+      "emptyTitle": "還沒有整理模板",
+      "emptyDesc": "建立模板後，可以讓 AI 按照固定結構整理記錄。",
       "deleteConfirm": "確認刪除模板嗎?",
       "status": "狀態",
       "name": "名稱",
@@ -1793,7 +1813,7 @@
         "desc": "設置應用程式的工作區目錄，文件將保存在該目錄中。",
         "current": "工作區路徑",
         "defaultPath": "默認工作區",
-        "default": "當前使用默認工作區路徑。",
+        "default": "預設工作區",
         "custom": "當前使用自訂工作區路徑。",
         "select": "選擇工作區目錄",
         "reset": "重設為默認路徑",
@@ -2067,21 +2087,21 @@
       }
     },
     "skills": {
-      "title": "Skills",
-      "desc": "Skills 是可重用的 AI 能力包，让 AI 助手能够根据任务自动应用特定的行为模式。",
+      "title": "技能",
+      "desc": "技能是可重用的 AI 能力包，讓 AI 助手能夠根據任務自動套用特定行為模式。",
       "enable": "启用 Skills 功能",
       "enableDesc": "启用后，AI 可以使用已配置的 Skills",
       "autoMatch": "自动匹配 Skills",
       "autoMatchDesc": "根据用户输入自动选择合适的 Skills",
-      "project": "工作区 Skills",
-      "global": "全局 Skills",
-      "globalPath": "全局 Skills 存储位置",
+      "project": "工作區技能",
+      "global": "全域技能",
+      "globalPath": "全域技能儲存位置",
       "openInFileManager": "在文件管理器中打开",
       "createSkill": "创建 Skill",
       "deleteSkill": "删除 Skill",
       "exportSkill": "导出 Skill",
       "importSkill": "导入 Skill",
-      "installSkill": "安裝 Skill",
+      "installSkill": "安裝技能",
       "installFromFolder": "從資料夾安裝",
       "installFromZip": "從 ZIP 安裝",
       "openSkillsFolder": "開啟目錄",
@@ -2111,7 +2131,7 @@
       "emptyWorkspace": "工作区中没有 Skills",
       "emptyWorkspaceDesc": "在 skills 文件夹中创建 SKILL.md 文件来添加 Skill",
       "basicSettings": "基础设置",
-      "installedGlobalSkills": "已安装的全局 Skills",
+      "installedGlobalSkills": "已安裝的全域技能",
       "nameRequired": "请输入 Skill 名称",
       "descriptionRequired": "请输入描述",
       "namePlaceholder": "note-organizer",

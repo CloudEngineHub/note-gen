@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { convertFileSrc } from '@tauri-apps/api/core'
@@ -66,6 +66,8 @@ const TEMPLATE_ICONS = {
   swot: ShieldQuestion,
 } satisfies Record<CanvasProjectType, typeof FilePlus2>
 
+let mobileCanvasScrollTop = 0
+
 function MobileCanvasThumbnail({ project }: { project: CanvasProject }) {
   const fallback = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(canvasDocumentToSvg(project.document))}`
   const repairThumbnail = useCanvasStore(state => state.repairThumbnail)
@@ -95,7 +97,11 @@ function MobileCanvasThumbnail({ project }: { project: CanvasProject }) {
   )
 }
 
-export default function MobileCanvasPage() {
+interface MobileCanvasPageProps {
+  preview?: boolean
+}
+
+export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}) {
   const router = useRouter()
   const t = useTranslations('canvas')
   const projects = useCanvasStore(state => state.projects)
@@ -112,10 +118,22 @@ export default function MobileCanvasPage() {
   const [templateOpen, setTemplateOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<CanvasProject | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    if (preview) return
     void loadProjects()
-  }, [loadProjects])
+  }, [loadProjects, preview])
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = mobileCanvasScrollTop
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
 
   const visibleProjects = useMemo(() => {
     return [...projects].sort((left, right) => {
@@ -220,7 +238,13 @@ export default function MobileCanvasPage() {
         </div>
       </header>
 
-      <div className="mobile-under-dock-scroll min-h-0 flex-1 overflow-y-auto p-3">
+      <div
+        ref={scrollContainerRef}
+        className="mobile-under-dock-scroll min-h-0 flex-1 overflow-y-auto p-3"
+        onScroll={(event) => {
+          mobileCanvasScrollTop = event.currentTarget.scrollTop
+        }}
+      >
         {loading && visibleProjects.length === 0 ? (
           <div className="grid grid-cols-2 gap-3 min-[700px]:grid-cols-3 min-[980px]:grid-cols-4">
             {Array.from({ length: 6 }, (_, index) => (
@@ -338,3 +362,5 @@ export default function MobileCanvasPage() {
     </div>
   )
 }
+
+export default MobileCanvasPage

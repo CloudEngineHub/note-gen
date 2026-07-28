@@ -48,12 +48,26 @@ export function FooterBar({
           <FileText className="size-3.5 shrink-0" />
           <div className="min-w-0 flex items-center gap-1.5 overflow-hidden">
             <span className="block min-w-0 truncate font-medium text-foreground/90">{fileName}</span>
-            <div className="shrink-0">
-              <WordCount editor={editor} compact />
-            </div>
+            {showEditorStats ? (
+              <div className="shrink-0">
+                <WordCount editor={editor} compact />
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="shrink-0 flex items-center gap-2">
+          {onToggleViewMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              title={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+              aria-label={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+              onClick={onToggleViewMode}
+            >
+              {viewMode === 'source' ? <Eye /> : <Code2 />}
+            </Button>
+          ) : null}
           <HistorySheet editor={editor} />
           <SyncButton />
           <PullButton editor={editor} />

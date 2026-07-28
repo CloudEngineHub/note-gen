@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import {
   ArrowDown,
   CheckCircle2,
+  ChevronDown,
   CircleX,
   Eye,
   EyeOff,
@@ -60,6 +61,7 @@ import {
   type WebSearchSettings,
 } from '@/lib/web-search/settings'
 import type { WebSearchApiProvider } from '../config'
+import { cn } from '@/lib/utils'
 
 const SEARCH_PROVIDERS: Array<{
   id: WebSearchApiProvider
@@ -102,6 +104,8 @@ interface SortableProviderFieldProps {
   visible: boolean
   checkState: CheckState
   disabled: boolean
+  mobile: boolean
+  expanded: boolean
   labels: {
     drag: string
     getApiKey: string
@@ -114,6 +118,7 @@ interface SortableProviderFieldProps {
   onApiKeyChange: (apiKey: string) => void
   onToggleVisibility: () => void
   onCheckConnection: () => void
+  onToggleExpanded: () => void
 }
 
 function SortableProviderField({
@@ -122,10 +127,13 @@ function SortableProviderField({
   visible,
   checkState,
   disabled,
+  mobile,
+  expanded,
   labels,
   onApiKeyChange,
   onToggleVisibility,
   onCheckConnection,
+  onToggleExpanded,
 }: SortableProviderFieldProps) {
   const {
     attributes,
@@ -159,9 +167,9 @@ function SortableProviderField({
       ref={setNodeRef}
       style={style}
       role="listitem"
-      className="relative pl-8"
+      className={cn('relative', !mobile && 'pl-8')}
     >
-      <Button
+      {!mobile ? <Button
         type="button"
         variant="ghost"
         size="icon-sm"
@@ -172,10 +180,24 @@ function SortableProviderField({
         {...listeners}
       >
         <GripVertical />
-      </Button>
+      </Button> : null}
 
       <Field className="rounded-lg border p-3" data-disabled={disabled}>
         <div className="flex min-w-0 items-center gap-2">
+        {mobile ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+            disabled={disabled}
+            aria-label={labels.drag}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical />
+          </Button>
+        ) : null}
         <Avatar size="sm">
           <AvatarFallback>{provider.avatar}</AvatarFallback>
         </Avatar>
@@ -195,10 +217,22 @@ function SortableProviderField({
         >
           {renderCheckIcon()}
         </Button>
+        {mobile ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={provider.name}
+            aria-expanded={expanded}
+            onClick={onToggleExpanded}
+          >
+            <ChevronDown className={cn('transition-transform', expanded && 'rotate-180')} />
+          </Button>
+        ) : null}
         </div>
 
-        <div className="flex min-w-0 gap-2">
-          <InputGroup className="min-w-0 flex-1">
+        {!mobile || expanded ? <div className="flex min-w-0 gap-2">
+          <InputGroup className={cn('min-w-0 flex-1', mobile && 'h-11')}>
             <InputGroupAddon><KeyRound /></InputGroupAddon>
             <InputGroupInput
               id={`web-search-key-${provider.id}`}
@@ -225,19 +259,20 @@ function SortableProviderField({
             type="button"
             url={provider.apiKeyUrl}
             title={labels.getApiKey}
-            className="shrink-0"
+            className={cn('shrink-0', mobile && 'h-11')}
           />
-        </div>
+        </div> : null}
       </Field>
     </div>
   )
 }
 
-export default function WebSearchSettingPage() {
+export default function WebSearchSettingPage({ mobile = false }: { mobile?: boolean }) {
   const t = useTranslations('settings.webSearch')
   const [settings, setSettings] = useState<WebSearchSettings>()
   const [visibleKeys, setVisibleKeys] = useState<Partial<Record<WebSearchApiProvider, boolean>>>({})
   const [checkStates, setCheckStates] = useState<Partial<Record<WebSearchApiProvider, CheckState>>>({})
+  const [expandedProviders, setExpandedProviders] = useState<Set<WebSearchApiProvider>>(new Set())
   const settingsRef = useRef<WebSearchSettings | undefined>(undefined)
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve())
   const saveTimerRef = useRef<number | undefined>(undefined)
@@ -415,7 +450,7 @@ export default function WebSearchSettingPage() {
           </div>
 
           <div className="rounded-xl border border-dashed bg-card">
-            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+            <div className="flex items-start justify-between gap-4 p-4 sm:p-5">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                   <KeyRound className="size-4" />
@@ -454,6 +489,8 @@ export default function WebSearchSettingPage() {
                         visible={visibleKeys[provider.id] === true}
                         checkState={checkStates[provider.id] || 'idle'}
                         disabled={!settings}
+                        mobile={mobile}
+                        expanded={expandedProviders.has(provider.id)}
                         labels={{
                           drag: t('dragProvider', { provider: provider.name }),
                           getApiKey: t('getApiKey'),
@@ -469,6 +506,12 @@ export default function WebSearchSettingPage() {
                           [provider.id]: current[provider.id] !== true,
                         }))}
                         onCheckConnection={() => void handleCheckConnection(provider.id)}
+                        onToggleExpanded={() => setExpandedProviders(current => {
+                          const next = new Set(current)
+                          if (next.has(provider.id)) next.delete(provider.id)
+                          else next.add(provider.id)
+                          return next
+                        })}
                       />
                     ))}
                   </FieldGroup>
