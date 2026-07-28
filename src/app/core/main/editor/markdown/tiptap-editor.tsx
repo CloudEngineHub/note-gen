@@ -3701,6 +3701,62 @@ export function TipTapEditor({
   }, [insertImageAtSelection])
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'development' || !editor) {
+      return
+    }
+
+    const handleVisualAuditSlashCommand = () => {
+      const firstNodeSize = editor.state.doc.childCount > 0
+        ? editor.state.doc.child(0).nodeSize
+        : 1
+      editor
+        .chain()
+        .focus()
+        .insertContentAt(firstNodeSize, { type: 'paragraph' })
+        .setTextSelection(firstNodeSize + 1)
+        .run()
+      editor.commands.triggerSlashCommand()
+    }
+
+    const handleVisualAuditTextSelection = () => {
+      const firstNode = editor.state.doc.childCount > 0
+        ? editor.state.doc.child(0)
+        : null
+      const selectionTo = Math.min(
+        Math.max(firstNode?.content.size ?? 1, 1),
+        8,
+      )
+      editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'ArrowRight',
+        shiftKey: true,
+      }))
+      editor.chain().focus().setTextSelection({ from: 1, to: selectionTo }).run()
+    }
+
+    const handleVisualAuditAiSuggestion = () => {
+      const anchorPosition = Math.min(8, editor.state.doc.content.size)
+      const position = editor.view.coordsAtPos(anchorPosition)
+      emitter.emit('show-ai-suggestion', {
+        originalText: 'NoteGen',
+        suggestedText: 'NoteGen 将记录、整理与写作连接成一个连续工作流。',
+        type: 'polish',
+        position,
+      })
+    }
+
+    document.addEventListener('visual-audit-open-slash-command', handleVisualAuditSlashCommand)
+    document.addEventListener('visual-audit-select-text', handleVisualAuditTextSelection)
+    document.addEventListener('visual-audit-show-ai-suggestion', handleVisualAuditAiSuggestion)
+    return () => {
+      document.removeEventListener('visual-audit-open-slash-command', handleVisualAuditSlashCommand)
+      document.removeEventListener('visual-audit-select-text', handleVisualAuditTextSelection)
+      document.removeEventListener('visual-audit-show-ai-suggestion', handleVisualAuditAiSuggestion)
+    }
+  }, [editor])
+
+  useEffect(() => {
     editorShortcutHandlersRef.current = {
       undo: (targetEditor) => targetEditor.chain().focus().undo().run(),
       redo: (targetEditor) => targetEditor.chain().focus().redo().run(),

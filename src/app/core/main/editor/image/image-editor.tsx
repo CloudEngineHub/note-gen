@@ -59,6 +59,17 @@ export function ImageEditor({ filePath }: ImageEditorProps) {
   const PREVIEW_SCALE_STEP = 0.25
 
   useEffect(() => {
+    const auditState = process.env.NODE_ENV === 'development'
+      ? new URLSearchParams(window.location.search).get('state')
+      : null
+    if (auditState === 'qa-032' || auditState === 'qa-033') {
+      setImageSrc('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMjAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMzIwIDIwMCI+PHJlY3Qgd2lkdGg9IjMyMCIgaGVpZ2h0PSIyMDAiIHJ4PSIyNCIgZmlsbD0iI2Y0ZjRmNSIvPjxyZWN0IHg9IjI4IiB5PSIyOCIgd2lkdGg9IjcyIiBoZWlnaHQ9IjcyIiByeD0iMTgiIGZpbGw9IiMxODE4MWIiLz48cGF0aCBkPSJNNDggNDloMzJ2MzBINDh6TTU2IDQzdjEyTTcyIDQzdjEyIiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjYiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjx0ZXh0IHg9IjI4IiB5PSIxNDUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjM2IiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjMTgxODFiIj5Ob3RlR2VuPC90ZXh0Pjx0ZXh0IHg9IjI4IiB5PSIxNzQiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjNzE3MTdhIj5WaXN1YWwgYXVkaXQgaW1hZ2U8L3RleHQ+PC9zdmc+')
+      setImageWidth(320)
+      setImageHeight(200)
+      setCropMode(auditState === 'qa-033')
+      setLoading(false)
+      return
+    }
     loadImage()
   }, [filePath])
 

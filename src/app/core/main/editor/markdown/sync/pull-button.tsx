@@ -74,6 +74,15 @@ export function PullButton({ editor }: PullButtonProps) {
 
   // Check if sync is configured
   useEffect(() => {
+    if (
+      process.env.NODE_ENV === 'development' &&
+      new URLSearchParams(window.location.search).get('state') === 'qa-031'
+    ) {
+      setIsConfigured(true)
+      setPullStatus('conflict')
+      setShowConflictDialog(true)
+      return
+    }
     isSyncConfigured().then(setIsConfigured)
   }, [])
 

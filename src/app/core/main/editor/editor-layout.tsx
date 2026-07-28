@@ -323,7 +323,11 @@ export function EditorLayout() {
           }
         } else {
           // Check if file exists in fileTree or on disk
-          if (isFileInTree(tab.path) || await checkPathExists(tab.path)) {
+          const isVisualAuditUnknownFile = process.env.NODE_ENV !== 'production'
+            && window.location.pathname.startsWith('/visual-audit/')
+            && getItemType(tab.path) === 'unknown'
+
+          if (isVisualAuditUnknownFile || isFileInTree(tab.path) || await checkPathExists(tab.path)) {
             validTabs.push(tab)
           } else {
             hasInvalid = true
@@ -339,7 +343,7 @@ export function EditorLayout() {
     }
 
     cleanupTabs()
-  }, [fileTree, tabs.length, isFolderInTree, isFileInTree, checkPathExists, isRecordEditorTab, isCanvasEditorTab, setOpenTabs])
+  }, [fileTree, tabs.length, isFolderInTree, isFileInTree, checkPathExists, getItemType, isRecordEditorTab, isCanvasEditorTab, setOpenTabs])
 
   // Initialize and update tabs when active path changes
   useEffect(() => {

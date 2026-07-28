@@ -307,6 +307,12 @@ export function TagManage() {
 
   React.useEffect(() => {
     const fetchData = async() => {
+      if (
+        process.env.NODE_ENV !== 'production'
+        && window.location.pathname.startsWith('/visual-audit/')
+      ) {
+        return
+      }
       await initTagsDb()
       await fetchTags()
       await initTags()
