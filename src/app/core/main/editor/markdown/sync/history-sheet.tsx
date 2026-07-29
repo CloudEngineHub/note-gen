@@ -59,33 +59,6 @@ export function HistorySheet({ editor }: HistorySheetProps) {
     if (!activeFilePath) return
 
     setIsLoading(true)
-    if (
-      process.env.NODE_ENV === 'development' &&
-      new URLSearchParams(window.location.search).get('state') === 'qa-030'
-    ) {
-      setHistory([
-        {
-          sha: '7e4c2a1',
-          fullSha: '7e4c2a1b9d4f',
-          message: '完善 NoteGen 产品规划与视觉检查清单',
-          author: 'NoteGen',
-          date: new Date('2026-07-28T10:24:00+08:00'),
-          url: '#',
-        },
-        {
-          sha: '3bd198f',
-          fullSha: '3bd198f284a0',
-          message: '补充移动端体验与同步说明',
-          author: 'NoteGen',
-          date: new Date('2026-07-27T18:06:00+08:00'),
-          url: '#',
-        },
-      ])
-      setProvider('github')
-      setRepoInfo({ username: 'codexu', repo: 'note-gen' })
-      setIsLoading(false)
-      return
-    }
     try {
       const provider = await getProvider()
       if (!provider) return

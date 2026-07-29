@@ -19,10 +19,6 @@ export function AudioPlayer({ audioPath, compact = false }: AudioPlayerProps) {
   const [duration, setDuration] = useState(0)
   const [audioSrc, setAudioSrc] = useState<string>('')
   const [isReady, setIsReady] = useState(false)
-  const isVisualAuditReadyState = process.env.NODE_ENV !== 'production'
-    && typeof window !== 'undefined'
-    && window.location.pathname.startsWith('/visual-audit/')
-    && new URLSearchParams(window.location.search).get('state') === 'qa-044'
 
   // 加载音频文件
   useEffect(() => {
@@ -102,32 +98,6 @@ export function AudioPlayer({ audioPath, compact = false }: AudioPlayerProps) {
 
   // 如果音频源未加载，显示加载提示
   if (!audioSrc) {
-    if (isVisualAuditReadyState && !compact) {
-      return (
-        <div className="w-full flex items-center gap-1.5 py-1 pl-2 bg-muted/30 rounded">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-3 shrink-0"
-          >
-            <Play className="size-3" />
-          </Button>
-          <span className="text-xs text-muted-foreground shrink-0 w-9 text-right">
-            0:18
-          </span>
-          <Slider
-            value={[18]}
-            max={83}
-            step={0.1}
-            className="flex-1 cursor-pointer"
-          />
-          <span className="text-xs text-muted-foreground shrink-0 w-9">
-            1:23
-          </span>
-        </div>
-      )
-    }
-
     if (compact) {
       return (
         <Button

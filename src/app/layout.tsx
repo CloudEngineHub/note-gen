@@ -42,43 +42,6 @@ export default function RootLayout({
               }
             `}
           </Script>
-          <Script id="visual-audit-tauri-mock" strategy="beforeInteractive">
-            {`
-              if (
-                typeof window !== 'undefined'
-                && window.location.pathname.startsWith('/visual-audit/')
-                && typeof window.__TAURI_INTERNALS__ === 'undefined'
-              ) {
-                const callbacks = new Map();
-                let callbackId = 1;
-                window.__TAURI_INTERNALS__ = {
-                  transformCallback(callback, once) {
-                    const id = callbackId++;
-                    callbacks.set(id, { callback, once });
-                    return id;
-                  },
-                  unregisterCallback(id) {
-                    callbacks.delete(id);
-                  },
-                  convertFileSrc(path) {
-                    return path;
-                  },
-                  async invoke(command) {
-                    if (command === 'plugin:store|load') return 1;
-                    if (command === 'plugin:store|get_store') return null;
-                    if (command === 'plugin:store|get') return [null, false];
-                    if (command === 'plugin:store|has') return false;
-                    if (command === 'plugin:store|keys') return [];
-                    if (command === 'plugin:store|values') return [];
-                    if (command === 'plugin:store|entries') return [];
-                    if (command === 'plugin:store|length') return 0;
-                    if (command.includes('|listen')) return 1;
-                    return null;
-                  },
-                };
-              }
-            `}
-          </Script>
         </head>
         <body suppressHydrationWarning>
           <ConsoleFilter />

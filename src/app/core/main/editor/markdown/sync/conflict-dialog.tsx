@@ -84,29 +84,6 @@ export function ConflictDialog({
 
     const fetchContents = async () => {
       try {
-        if (
-          process.env.NODE_ENV === 'development' &&
-          new URLSearchParams(window.location.search).get('state') === 'qa-031'
-        ) {
-          const local = `# NoteGen 产品规划
-
-## 本次迭代目标
-
-- 完善移动端记录体验
-- 优化 Markdown 编辑与预览
-- 统一桌面端和移动端同步状态`
-          const remote = `# NoteGen 产品规划
-
-## 本次迭代目标
-
-- 完善移动端记录与图片体验
-- 优化 Markdown 编辑与预览
-- 统一多端同步状态与冲突提示`
-          setLocalContent(local)
-          setRemoteContent(remote)
-          setDiff(computeDiff(local, remote))
-          return
-        }
         // 获取远程内容
         const remote = await pullRemoteFile(activeFilePath)
         setRemoteContent(remote)
