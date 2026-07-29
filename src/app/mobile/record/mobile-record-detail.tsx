@@ -5,7 +5,6 @@ import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import {
-  ArrowLeft,
   Copy,
   EllipsisVertical,
   ExternalLink,
@@ -24,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { SwipeBack, type SwipeBackHandle } from '@/components/ui/swipe-back'
+import { MobileBackButton } from '@/components/mobile-back-button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
@@ -296,10 +296,11 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
         backdrop={<MobileRecordStream preview />}
       >
         <div className="flex h-full flex-col bg-background">
-          <header className="flex h-14 shrink-0 items-center border-b px-2">
-            <Button variant="ghost" size="icon" onClick={() => swipeBackRef.current?.back()} aria-label={t('common.back')}>
-              <ArrowLeft />
-            </Button>
+          <header className="mobile-page-header flex shrink-0 items-center border-b px-2">
+            <MobileBackButton
+              label={t('common.back')}
+              onClick={() => swipeBackRef.current?.back()}
+            />
           </header>
           <div className="flex flex-1 items-center justify-center px-6 text-sm text-muted-foreground">
             {t('record.mark.detail.notFound')}
@@ -320,10 +321,11 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
       backdrop={<MobileRecordStream preview />}
     >
       <div id="mobile-record-detail" className="relative flex h-full min-h-0 w-full flex-col bg-background">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2">
-        <Button variant="ghost" size="icon" onClick={() => swipeBackRef.current?.back()} aria-label={t('common.back')}>
-          <ArrowLeft />
-        </Button>
+      <header className="mobile-page-header flex shrink-0 items-center gap-2 border-b bg-background px-2">
+        <MobileBackButton
+          label={t('common.back')}
+          onClick={() => swipeBackRef.current?.back()}
+        />
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Badge variant="outline" className={cn('shrink-0', getMarkTypeListBadgeClasses(mark.type))}>
             {typeLabel}

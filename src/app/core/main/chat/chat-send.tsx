@@ -1138,7 +1138,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 
   return <TooltipButton
     variant={dockStyle ? "ghost" : showStop ? "destructive" : "default"}
-    size="sm"
+    size={dockStyle ? "icon" : "sm"}
     icon={showStop ? <Square /> : <Send />}
     disabled={!showStop && (!primaryModel || !hasInput)}
     tooltipText={showStop
@@ -1148,7 +1148,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         : t('record.chat.input.send')}
     onClick={showStop ? handleStop : handleSubmit}
     buttonClassName={dockStyle ? cn(
-      "rounded-2xl border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
+      "size-8 rounded-full border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
       showStop && "border-destructive/50 bg-destructive/10 text-destructive hover:bg-destructive/10"
     ) : undefined}
   />

@@ -2,13 +2,14 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Redo2, Undo2 } from 'lucide-react'
+import { Redo2, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 
 import { MobileCanvasPage } from '@/app/mobile/canvas/page'
 import { Button } from '@/components/ui/button'
 import { SwipeBack, type SwipeBackHandle } from '@/components/ui/swipe-back'
+import { MobileBackButton } from '@/components/mobile-back-button'
 import emitter from '@/lib/emitter'
 import useCanvasStore from '@/stores/canvas'
 
@@ -85,10 +86,11 @@ export default function MobileCanvasEditorPage() {
       backdrop={<MobileCanvasPage preview />}
     >
       <div className="flex h-full min-h-0 w-full flex-col bg-background">
-        <header className="mobile-page-header flex shrink-0 items-center gap-2 border-b px-1">
-          <Button variant="ghost" size="icon" aria-label={t('manager.title')} onClick={() => swipeBackRef.current?.back()}>
-            <ArrowLeft />
-          </Button>
+        <header className="mobile-page-header flex shrink-0 items-center gap-2 border-b px-2">
+          <MobileBackButton
+            label={t('manager.title')}
+            onClick={() => swipeBackRef.current?.back()}
+          />
           <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
             {project?.title || t('loading')}
           </h1>

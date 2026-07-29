@@ -1,13 +1,12 @@
 'use client'
 
-import { Button } from "@/components/ui/button";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { SwipeBack, type SwipeBackHandle } from "@/components/ui/swipe-back";
 import { SettingLayoutProvider } from "@/app/core/setting/components/setting-base";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { MobileMePage } from "@/app/mobile/setting/components/mobile-me-page";
+import { MobileBackButton } from "@/components/mobile-back-button";
 
 const MOBILE_ME_RESTORE_OPEN_KEY = "mobile-me-restore-open"
 const MOBILE_ME_RESTORE_INSTANT_KEY = "mobile-me-restore-open-instant"
@@ -66,14 +65,10 @@ export default function RootLayout({
     >
       <div className="mobile-setting-screen flex h-full w-full flex-col overflow-y-auto bg-background pt-[calc(3.5rem+env(safe-area-inset-top))]">
         <div className="fixed left-0 right-0 top-[env(safe-area-inset-top)] z-10 flex h-14 items-center border-b border-border/60 bg-background/70 px-2 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-          <Button
-            variant="ghost"
-            size="icon"
+          <MobileBackButton
             onClick={() => swipeBackRef.current?.back()}
-            aria-label={t('back')}
-          >
-            <ArrowLeft />
-          </Button>
+            label={t('back')}
+          />
           <h1 className="min-w-0 flex-1 truncate pr-12 text-center text-base font-semibold">
             {title}
           </h1>
