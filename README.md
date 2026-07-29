@@ -102,6 +102,8 @@ Desktop and Android packages are distributed through the official download page,
 
 Special thanks to our technology partners who make NoteGen better:
 
+This project is tested with BrowserStack.
+
 **[SiliconFlow](https://cloud.siliconflow.cn/i/O2ciJeZw)** - Providing free AI model services, powering NoteGen's intelligent features with high-quality AI capabilities.
 
 <a href="https://cloud.siliconflow.cn/i/O2ciJeZw" target="_blank">
