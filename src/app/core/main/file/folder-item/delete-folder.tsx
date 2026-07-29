@@ -8,12 +8,11 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import { Trash2 } from "lucide-react"
 import { Kbd } from "@/components/ui/kbd"
 import {
-  collectFolderMarkdownPaths,
-  deleteLocalFolderIfExists,
+  clearFolderRemoteState,
   deleteRemoteFolder,
-  deleteVectorDocumentsByPaths,
-  removeFolderFromTree,
+  hasRemoteFolderData,
 } from "./delete-folder-utils";
+import { moveEntryToSystemTrash } from '../system-trash'
 
 interface DeleteFolderProps {
   item: DirTree;
@@ -25,7 +24,8 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
   const {
     fileTree,
     setFileTree,
-    cleanTabsByDeletedFolder
+    cleanTabsByDeletedFolder,
+    loadFileTree,
   } = useArticleStore();
 
   const path = computedParentPath(item);
@@ -42,29 +42,24 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
       
       if (!confirmed) return;
 
-      const markdownPaths = await collectFolderMarkdownPaths(path, item);
-      const localDeleted = await deleteLocalFolderIfExists(path);
-      const remoteResult = await deleteRemoteFolder(item, localDeleted);
-      if (remoteResult.failedPaths.length > 0) {
-        throw new Error(`Delete remote folder failed: ${remoteResult.failedPaths.join(', ')}`);
-      }
+      const trashed = await moveEntryToSystemTrash(path)
+      const removedVectorEntries = new Map(
+        Array.from(useArticleStore.getState().vectorIndexedFiles.entries())
+          .filter(([vectorPath]) => vectorPath === path || vectorPath.startsWith(`${path}/`))
+      )
 
       // 清理已被删除的文件夹对应的 tabs（包括自动选择其他 tab）
       await cleanTabsByDeletedFolder(path)
-
-      // 从文件树中移除该文件夹
-      const cacheTree = cloneDeep(fileTree);
-      removeFolderFromTree(cacheTree, path);
-      setFileTree(cacheTree);
-
-      // 删除向量数据库中该文件夹下所有文件的记录
-      try {
-        await deleteVectorDocumentsByPaths(markdownPaths, path);
-      } catch (error) {
-        console.error('删除文件夹向量数据失败:', error)
+      if (removedVectorEntries.size > 0) {
+        const nextVectorIndexedFiles = new Map(useArticleStore.getState().vectorIndexedFiles)
+        removedVectorEntries.forEach((_, vectorPath) => nextVectorIndexedFiles.delete(vectorPath))
+        useArticleStore.setState({ vectorIndexedFiles: nextVectorIndexedFiles })
       }
+      await loadFileTree({ skipRemoteSync: true })
 
-      toast({ title: t('context.deleteSuccess') });
+      toast({
+        title: t('context.movedToTrash', { count: trashed ? 1 : 0 }),
+      });
     } catch (error) {
       console.error('Delete folder failed:', error);
       toast({ 
@@ -74,20 +69,56 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
     }
   }
 
+  async function handleDeleteRemoteFolder(event: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    event.stopPropagation()
+    const confirmed = await ask(t('context.confirmDeleteRemoteFolder', { name: item.name }), {
+      title: item.name,
+      kind: 'warning',
+    })
+    if (!confirmed) return
+
+    try {
+      const result = await deleteRemoteFolder(item, false)
+      if (result.failedPaths.length > 0) {
+        throw new Error(result.failedPaths.join(', '))
+      }
+      const cacheTree = cloneDeep(fileTree)
+      clearFolderRemoteState(cacheTree, path)
+      setFileTree(cacheTree)
+      toast({ title: t('context.deleteRemoteSuccess') })
+    } catch (error) {
+      console.error('Delete remote folder failed:', error)
+      toast({ title: t('context.deleteFailed'), variant: 'destructive' })
+    }
+  }
+
   return (
-    <ContextMenuItem
-      inset
-      className="text-red-900"
-      onClick={handleDeleteFolder}
-      menuType="file"
-    >
-      <Trash2 className="mr-2 h-4 w-4" />
-      {t('context.delete')}
-      {shortcut && (
-        <ContextMenuShortcut menuType="file">
-          <Kbd>{shortcut}</Kbd>
-        </ContextMenuShortcut>
-      )}
-    </ContextMenuItem>
+    <>
+      <ContextMenuItem
+        inset
+        disabled={!item.isLocale}
+        className="text-destructive"
+        onClick={handleDeleteFolder}
+        menuType="file"
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        {t('context.deleteLocalFolder')}
+        {shortcut && (
+          <ContextMenuShortcut menuType="file">
+            <Kbd>{shortcut}</Kbd>
+          </ContextMenuShortcut>
+        )}
+      </ContextMenuItem>
+      <ContextMenuItem
+        inset
+        disabled={!hasRemoteFolderData(item)}
+        className="text-destructive"
+        onClick={handleDeleteRemoteFolder}
+        menuType="file"
+      >
+        <Trash2 className="mr-2 h-4 w-4" />
+        {t('context.deleteRemoteFolder')}
+      </ContextMenuItem>
+    </>
   );
 }

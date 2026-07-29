@@ -10,6 +10,7 @@ import { platform } from "@tauri-apps/plugin-os"
 import { isEditableKeyboardTarget } from "@/lib/is-editable-keyboard-target"
 import { flattenFileTree, getFileSelectionEntries, toClipboardItems } from "./file-selection"
 import { useShallow } from 'zustand/react/shallow'
+import { useWorkspaceFileWatcher } from './use-workspace-file-watcher'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -249,6 +250,7 @@ function useFileManagerShortcuts() {
 }
 
 export function FileSidebar() {
+  useWorkspaceFileWatcher()
   const {
     initCollapsibleList,
     initSortSettings,
@@ -276,7 +278,7 @@ export function FileSidebar() {
     <div
       ref={sidebarRef}
       id="article-sidebar"
-      className="w-full h-full flex flex-col outline-none"
+      className="flex h-full w-full flex-col bg-background text-foreground outline-none"
       tabIndex={-1}
     >
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">

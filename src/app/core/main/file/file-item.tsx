@@ -2,8 +2,8 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import useArticleStore, { DirTree } from "@/stores/article";
-import { BaseDirectory, exists, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
-import { Copy, Database, Download, File, FileCode, FileDown, FileJson, FileText, FileUp, FolderOpen, ImageIcon, LoaderCircle, RefreshCwOff, Trash2 } from "lucide-react"
+import { BaseDirectory, exists, rename, writeTextFile } from "@tauri-apps/plugin-fs";
+import { Copy, Database, Download, File, FileCode, FileJson, FileText, FileUp, FolderOpen, ImageIcon, LoaderCircle, RefreshCwOff, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ask } from '@tauri-apps/plugin-dialog';
 import { platform } from '@tauri-apps/plugin-os';
@@ -33,12 +33,17 @@ import { isSkillsFolder } from "@/lib/skills/utils";
 import { exportMarkdownFile, type MarkdownExportFormat } from "../editor/markdown/markdown-export";
 import { setFileManagerDragData } from "./file-dnd";
 import { debugSyncPath } from "@/lib/sync/remote-file";
-import { cn } from "@/lib/utils";
 import { BatchSelectionContextMenu } from "./batch-selection-context-menu";
-import type { FileSelectionEntry } from "./file-selection";
+import { getTopLevelSelectionEntries, type FileSelectionEntry } from "./file-selection";
 import { pasteIntoFolder } from "./folder-item/paste-into-folder";
 import { downloadRemoteLibraryFile, uploadLocalLibraryFile } from "@/lib/sync/remote-library";
 import { useShallow } from 'zustand/react/shallow';
+import { FileTreeRow, type FileTreeItemProps } from "./file-tree-row";
+import { Badge } from '@/components/ui/badge'
+import { getFileTreeSyncStatus, getSyncConfiguration, validateFileTreeName, type FileTreeSyncStatus } from "./file-tree-action-policy";
+import { useSettingsDialogStore } from "@/stores/settings-dialog";
+import { FileTreeDecorations } from "./file-tree-decorations";
+import { moveEntryToSystemTrash } from './system-trash'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -79,14 +84,21 @@ export function FileItem({
   focusSidebar,
   selectedPathSet,
   selectionEntries,
+  treeItemProps,
+  level = 0,
+  syncStatus: providedSyncStatus,
 }: {
   item: DirTree
   focusSidebar?: () => void
   selectedPathSet: Set<string>
   selectionEntries: FileSelectionEntry[]
+  treeItemProps?: FileTreeItemProps
+  level?: number
+  syncStatus?: FileTreeSyncStatus
 }) {
   const [isEditing, setIsEditing] = useState(item.isEditing)
   const [name, setName] = useState(item.name)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const [, setIsComposing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const {
@@ -101,11 +113,12 @@ export function FileItem({
     checkFileVectorIndexed,
     cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder,
-    selectedFilePaths,
     setSelectedFilePaths,
-    clearSelectedFilePaths,
     setEntryLoading,
+    setEntrySyncError,
     markFileLocal,
+    reconcileLocalFile,
+    clearFileRemoteState,
   } = useArticleStore(useShallow((state) => ({
     activeFilePath: state.activeFilePath,
     setActiveFilePath: state.setActiveFilePath,
@@ -118,13 +131,13 @@ export function FileItem({
     checkFileVectorIndexed: state.checkFileVectorIndexed,
     cleanTabsByDeletedFile: state.cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder: state.cleanTabsByDeletedFolder,
-    selectedFilePaths: state.selectedFilePaths,
     setSelectedFilePaths: state.setSelectedFilePaths,
-    clearSelectedFilePaths: state.clearSelectedFilePaths,
     setEntryLoading: state.setEntryLoading,
+    setEntrySyncError: state.setEntrySyncError,
     markFileLocal: state.markFileLocal,
+    reconcileLocalFile: state.reconcileLocalFile,
+    clearFileRemoteState: state.clearFileRemoteState,
   })))
-  const setArticleState = useArticleStore.setState
   const { setClipboardItem, clipboardItem, clipboardItems, clipboardOperation } = useClipboardStore()
   const { fileManagerTextSize } = useSettingStore()
   const t = useTranslations('article.file')
@@ -159,6 +172,8 @@ export function FileItem({
   }
 
   const iconSize = getIconSize(fileManagerTextSize)
+  const syncStatus = providedSyncStatus ?? getFileTreeSyncStatus(item)
+  const syncStatusTitle = item.syncError ?? t(`syncStatus.${syncStatus}`)
 
   // 检查文件是否被剪切
   const isCut = clipboardOperation === 'cut' && clipboardItems.some(entry => entry.path === path)
@@ -176,14 +191,37 @@ export function FileItem({
     const status = item.vectorCalcStatus
 
     if (status === 'calculating') {
-      return <LoaderCircle className={`${iconSize} mr-2 shrink-0 animate-spin`} />
+      return (
+        <span title={t('context.knowledgeBase')} aria-label={t('context.knowledgeBase')}>
+          <LoaderCircle className={`${iconSize} shrink-0 animate-spin text-muted-foreground`} />
+        </span>
+      )
     } else if (status === 'completed' || hasVector) {
-      return <Database className={`${iconSize} mr-2 shrink-0 text-muted-foreground opacity-60`} />
+      return (
+        <span title={t('context.knowledgeBase')} aria-label={t('context.knowledgeBase')}>
+          <Database className={`${iconSize} shrink-0 text-muted-foreground opacity-60`} />
+        </span>
+      )
     }
     return null
   }
 
-  const isRoot = path.split('/').length === 1
+  const renderFileTypeIcon = () => {
+    if (item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i)) {
+      return <ImageIcon className={`${iconSize} shrink-0`} />
+    }
+    if (item.name.match(/\.(md|markdown|txt)$/i)) {
+      return <FileText className={`${iconSize} shrink-0`} />
+    }
+    if (item.name.match(/\.(json|yaml|yml|toml)$/i)) {
+      return <FileJson className={`${iconSize} shrink-0`} />
+    }
+    if (item.name.match(/\.(py|js|ts|jsx|tsx|css|scss|less|html|xml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro)$/i)) {
+      return <FileCode className={`${iconSize} shrink-0`} />
+    }
+    return <File className={`${iconSize} shrink-0`} />
+  }
+
   const folderPath = path.includes('/') ? path.split('/').slice(0, -1).join('/') : ''
   // 不需要 cloneDeep，因为 getCurrentFolder 只读取数据不修改
   const currentFolder = getCurrentFolder(folderPath, fileTree)
@@ -191,6 +229,7 @@ export function FileItem({
   // 优化的输入处理，支持输入法
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value)
+    setRenameError(null)
   }, [])
 
   // 输入法合成开始
@@ -242,19 +281,11 @@ export function FileItem({
   }
 
   function handleFileClick(e: React.MouseEvent<HTMLDivElement, MouseEvent>) {
-    if (e.metaKey || e.ctrlKey) {
-      e.preventDefault()
-      e.stopPropagation()
-      focusSidebar?.()
-      setSelectedFilePaths(
-        isSelected
-          ? selectedFilePaths.filter(selectedPath => selectedPath !== path)
-          : [...selectedFilePaths, path]
-      )
+    focusSidebar?.()
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
       return
     }
 
-    clearSelectedFilePaths()
     void handleSelectFile()
   }
 
@@ -275,68 +306,20 @@ export function FileItem({
     // 如果用户确认删除，则继续执行
     if (answer) {
       try {
-        // 获取工作区路径信息
-        const { getFilePathOptions, getWorkspacePath } = await import('@/lib/workspace')
-        const workspace = await getWorkspacePath()
-
         // 使用当前路径，而不是重新计算的路径
         const currentPath = computedParentPath(item)
+        const trashed = await moveEntryToSystemTrash(currentPath)
 
-        // 根据工作区类型正确删除文件
-        const pathOptions = await getFilePathOptions(currentPath)
-
-        if (workspace.isCustom) {
-          // 自定义工作区
-          await remove(pathOptions.path)
-        } else {
-          // 默认工作区
-          await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
-        }
-
-        // 更新文件树
-        if (currentFolder) {
-          const index = currentFolder.children?.findIndex(file => file.name === item.name)
-          if (index !== undefined && index !== -1 && currentFolder.children) {
-            const current = currentFolder.children[index]
-            if (current.sha) {
-              // 有云端版本：只标记为非本地文件，保留云端文件
-              current.isLocale = false
-            } else {
-              // 纯本地文件：直接从文件树中移除
-              currentFolder.children.splice(index, 1)
-            }
-          }
-        } else {
-          // 根目录文件：需要克隆 fileTree 来更新
-          const cacheTree = cloneDeep(fileTree)
-          const index = cacheTree.findIndex(file => file.name === item.name)
-          if (index !== undefined && index !== -1) {
-            const current = cacheTree[index]
-            if (current.sha) {
-              // 有云端版本：只标记为非本地文件，保留云端文件
-              current.isLocale = false
-            } else {
-              // 纯本地文件：直接从文件树中移除
-              cacheTree.splice(index, 1)
-            }
-          }
-          setFileTree(cacheTree)
-        }
-
-        // 删除向量数据库中的记录
-        try {
-          const { deleteVectorDocumentsByFilename } = await import('@/db/vector')
-          await deleteVectorDocumentsByFilename(path)
-          // 从向量索引映射中移除
-          const newMap = new Map(vectorIndexedFiles)
-          newMap.delete(path)
-          setArticleState({ vectorIndexedFiles: newMap })
-        } catch (error) {
-          console.error(`删除文件 ${item.name} 的向量数据失败:`, error)
-        }
-
-        // 清理已被删除的文件对应的 tabs（包括自动选择其他 tab）
+        reconcileLocalFile(currentPath, false)
         await cleanTabsByDeletedFile(currentPath)
+        if (vectorIndexedFiles.has(currentPath)) {
+          const nextVectorIndexedFiles = new Map(useArticleStore.getState().vectorIndexedFiles)
+          nextVectorIndexedFiles.delete(currentPath)
+          useArticleStore.setState({ vectorIndexedFiles: nextVectorIndexedFiles })
+        }
+        toast({
+          title: t('context.movedToTrash', { count: trashed ? 1 : 0 }),
+        })
       } catch (error) {
         console.error('Delete file failed:', error)
         toast({
@@ -356,24 +339,7 @@ export function FileItem({
     if (answer) {
       const currentPath = computedParentPath(item)
 
-      // 设置 loading 状态
-      const cacheTree = cloneDeep(fileTree)
-      const setLoadingStatus = (items: typeof cacheTree): boolean => {
-        for (const entry of items) {
-          const entryPath = computedParentPath(entry)
-          if (entryPath === currentPath && entry.isFile) {
-            entry.loading = true
-            return true
-          }
-          if (entry.children && setLoadingStatus(entry.children)) {
-            return true
-          }
-        }
-        return false
-      }
-      if (setLoadingStatus(cacheTree)) {
-        setFileTree(cacheTree)
-      }
+      setEntryLoading(currentPath, true)
 
       try {
         // 获取当前主要备份方式
@@ -424,80 +390,18 @@ export function FileItem({
         }
 
         if (success) {
-          // 只更新当前文件的状态，不刷新整个文件树
-          const cacheTree = cloneDeep(fileTree)
-
-          // 递归查找并更新/删除文件
-          const updateOrRemoveFile = (items: typeof cacheTree): boolean => {
-            for (let i = 0; i < items.length; i++) {
-              const entry = items[i]
-              const entryPath = computedParentPath(entry)
-              if (entryPath === currentPath && entry.isFile) {
-                if (entry.isLocale) {
-                  // 本地存在：只清除远程 SHA
-                  entry.sha = undefined
-                  entry.loading = undefined
-                } else {
-                  // 本地不存在：从列表中移除
-                  items.splice(i, 1)
-                }
-                return true
-              }
-              if (entry.children && updateOrRemoveFile(entry.children)) {
-                return true
-              }
-            }
-            return false
-          }
-
-          if (updateOrRemoveFile(cacheTree)) {
-            setFileTree(cacheTree)
-          }
+          clearFileRemoteState(currentPath)
 
           toast({
             title: t('context.delete'),
             description: t('context.deleteSyncFileSuccess'),
           });
         } else {
-          // 删除失败，清除 loading 状态
-          const cacheTree = cloneDeep(fileTree)
-          const clearLoadingStatus = (items: typeof cacheTree): boolean => {
-            for (const entry of items) {
-              const entryPath = computedParentPath(entry)
-              if (entryPath === currentPath && entry.isFile) {
-                entry.loading = undefined
-                return true
-              }
-              if (entry.children && clearLoadingStatus(entry.children)) {
-                return true
-              }
-            }
-            return false
-          }
-          if (clearLoadingStatus(cacheTree)) {
-            setFileTree(cacheTree)
-          }
+          setEntryLoading(currentPath, false)
           throw new Error('删除操作返回失败')
         }
       } catch (error) {
-        // 删除失败，清除 loading 状态
-        const cacheTree = cloneDeep(fileTree)
-        const clearLoadingStatus = (items: typeof cacheTree): boolean => {
-          for (const entry of items) {
-            const entryPath = computedParentPath(entry)
-            if (entryPath === currentPath && entry.isFile) {
-              entry.loading = undefined
-              return true
-            }
-            if (entry.children && clearLoadingStatus(entry.children)) {
-              return true
-            }
-          }
-          return false
-        }
-        if (clearLoadingStatus(cacheTree)) {
-          setFileTree(cacheTree)
-        }
+        setEntryLoading(currentPath, false)
         console.error('[handleDeleteSyncFile] 删除远程文件失败:', error);
         toast({
           title: t('context.delete'),
@@ -512,6 +416,7 @@ export function FileItem({
     // 延迟执行，确保上下文菜单完全关闭
     setTimeout(() => {
       setIsEditing(true)
+      setRenameError(null)
       setTimeout(() => {
         const input = inputRef.current
         if (input) {
@@ -549,6 +454,11 @@ export function FileItem({
     }
   
     if (finalName && finalName.trim() !== '' && finalName !== originalName) {
+      if (validateFileTreeName(finalName)) {
+        setRenameError(t('error.invalidName'))
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
       const renamePlan = buildFileRenamePlan({
         originalName,
         currentPath: path,
@@ -576,23 +486,35 @@ export function FileItem({
           nextTree[fileIndex].isEditing = false
         }
       }
-      setFileTree(nextTree)
-      
       // 确定是重命名现有文件还是创建新文件
       if (operation === 'rename') {
         // 重命名现有文件
         // 获取源路径和目标路径
         const oldPathOptions = await getFilePathOptions(path)
         const newPathOptions = await getFilePathOptions(targetRelativePath)
+        const targetExists = workspace.isCustom
+          ? await exists(newPathOptions.path)
+          : await exists(newPathOptions.path, { baseDir: newPathOptions.baseDir })
+        if (targetExists) {
+          setRenameError(t('error.fileExists'))
+          setTimeout(() => inputRef.current?.focus(), 0)
+          return
+        }
         
         // 根据工作区类型执行重命名操作
-        if (workspace.isCustom) {
-          await rename(oldPathOptions.path, newPathOptions.path)
-        } else {
-          await rename(oldPathOptions.path, newPathOptions.path, { 
-            newPathBaseDir: BaseDirectory.AppData, 
-            oldPathBaseDir: BaseDirectory.AppData 
-          })
+        try {
+          if (workspace.isCustom) {
+            await rename(oldPathOptions.path, newPathOptions.path)
+          } else {
+            await rename(oldPathOptions.path, newPathOptions.path, {
+              newPathBaseDir: BaseDirectory.AppData,
+              oldPathBaseDir: BaseDirectory.AppData
+            })
+          }
+        } catch (error) {
+          setRenameError(error instanceof Error ? error.message : String(error))
+          setTimeout(() => inputRef.current?.focus(), 0)
+          return
         }
         const { renameVectorDocumentsByFilename } = await import('@/db/vector')
         await renameVectorDocumentsByFilename(path, targetRelativePath)
@@ -609,8 +531,8 @@ export function FileItem({
         }
         
         if (isExists) {
-          toast({ title: '文件名已存在' })
-          setTimeout(() => inputRef.current?.focus(), 300);
+          setRenameError(t('error.fileExists'))
+          setTimeout(() => inputRef.current?.focus(), 0)
           return
         } else {
           // 创建新文件
@@ -621,6 +543,7 @@ export function FileItem({
           }
         }
       }
+      setFileTree(nextTree)
       
       // 构建新文件的完整路径用于激活文件
       let newPath = targetRelativePath
@@ -694,7 +617,10 @@ export function FileItem({
   }
 
   function handleDragStart(ev: React.DragEvent<HTMLElement>) {
-    setFileManagerDragData(ev.dataTransfer, path)
+    const selectedPaths = selectedPathSet.has(path)
+      ? getTopLevelSelectionEntries(selectionEntries).map(entry => entry.path)
+      : [path]
+    setFileManagerDragData(ev.dataTransfer, selectedPaths)
   }
 
   async function handleCopyFile() {
@@ -762,9 +688,16 @@ export function FileItem({
 
   async function handleUploadFile() {
     if (isUploading || !item.isLocale || item.name === '') return
+    const sync = await getSyncConfiguration()
+    if (!sync.configured) {
+      toast({ title: t('context.syncNotConfigured'), description: t('context.configureSync') })
+      useSettingsDialogStore.getState().openSettings('sync')
+      return
+    }
 
     setIsUploading(true)
     setEntryLoading(path, true)
+    setEntrySyncError(path)
     const progressToast = toast({
       title: t('context.uploadFileProgress'),
       description: item.name,
@@ -779,6 +712,7 @@ export function FileItem({
         duration: 3000,
       })
     } catch (error) {
+      setEntrySyncError(path, error instanceof Error ? error.message : String(error))
       progressToast.update({
         title: t('context.uploadFileError'),
         description: error instanceof Error ? error.message : String(error),
@@ -875,36 +809,35 @@ export function FileItem({
   const modKey = currentPlatform === 'macos' ? '⌘' : 'Ctrl'
   const deleteKey = currentPlatform === 'macos' ? '⌫' : 'Del'
   const renameKey = currentPlatform === 'macos' ? '↩' : 'F2'
-
   return (
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div
-            data-file-manager-item-path={path}
-            data-file-manager-item-kind="file"
-            className={cn(
-              "file-manange-item min-w-0 overflow-hidden",
-              path === activeFilePath && "active",
-              isSelected && "file-selected",
-              !isRoot && "translate-x-5 w-[calc(100%-20px)]!"
-            )}
-            onClick={handleFileClick}
+          <FileTreeRow
+            path={path}
+            kind="file"
+            level={level}
+            active={path === activeFilePath}
+            selected={isSelected}
+            treeItemProps={treeItemProps}
+            onActivate={handleFileClick}
             onContextMenu={handleFileContextMenu}
           >
             {
               isEditing ? 
               <div className="flex min-w-0 w-full items-center gap-1 select-none">
-                <span className={item.parent ? 'size-0' : `${iconSize} ml-1`} />
                 <File className={`${iconSize} shrink-0`} />
                 <Input
                   ref={inputRef}
-                  className={`h-5 min-w-0 flex-1 rounded-sm text-${fileManagerTextSize} px-1 font-normal mr-1`}
+                  className={`h-5 min-w-0 flex-1 rounded-sm text-${fileManagerTextSize} px-1 font-normal mr-1 ${renameError ? 'border-destructive focus-visible:ring-destructive/30' : ''}`}
                   value={name}
+                  aria-invalid={Boolean(renameError)}
+                  title={renameError ?? undefined}
                   onBlur={handleRename}
                   onChange={handleInputChange}
                   onCompositionStart={handleCompositionStart}
                   onCompositionEnd={handleCompositionEnd}
+                  onClick={(event) => event.stopPropagation()}
                   onKeyDown={(e) => {
                     // 阻止删除快捷键冒泡到全局快捷键处理器
                     if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -917,6 +850,11 @@ export function FileItem({
                     }
                   }}
                 />
+                {renameError ? (
+                  <Badge variant="destructive" className="mr-1 max-w-28 shrink-0 truncate">
+                    {renameError}
+                  </Badge>
+                ) : null}
               </div> :
               item.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) ?
               <span
@@ -928,15 +866,15 @@ export function FileItem({
                   onDragStart={handleDragStart}
                   className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-1 overflow-hidden"
                 >
-                  <span className={item.parent ? 'size-0' : `${iconSize} ml-1`}></span>
-                  <div className="relative flex shrink-0 items-center">
-                    {item.loading
-                      ? <LoaderCircle className={`${iconSize} shrink-0 animate-spin`} />
-                      : <ImageIcon className={`${iconSize} shrink-0`} />}
-                  </div>
+                  <div className="relative flex shrink-0 items-center">{renderFileTypeIcon()}</div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{item.name}</span>
-                  {renderVectorIcon()}
                 </div>
+                <FileTreeDecorations
+                  iconSize={iconSize}
+                  knowledge={renderVectorIcon()}
+                  syncStatus={syncStatus}
+                  syncTitle={syncStatusTitle}
+                />
                 {isMobile && (
                   <MobileActionMenu className="ml-1">
                     <MobileMenuItem onClick={handleShowFileManager}>
@@ -978,19 +916,15 @@ export function FileItem({
                   onDragStart={handleDragStart}
                   className="relative flex min-w-0 flex-1 cursor-default select-none items-center gap-1 overflow-hidden"
                 >
-                  <span className={item.parent ? 'size-0' : `${iconSize} ml-1`}></span>
-                  <div className="relative flex shrink-0 items-center">
-                    { item.loading ? (
-                      <LoaderCircle className={`${iconSize} shrink-0 animate-spin`} />
-                    ) : item.isLocale ? (
-                      item.sha ? <FileUp className={`${iconSize} shrink-0`} /> : <File className={`${iconSize} shrink-0`} />
-                    ) : (
-                      <FileDown className={`${iconSize} shrink-0`} />
-                    )}
-                  </div>
+                  <div className="relative flex shrink-0 items-center">{renderFileTypeIcon()}</div>
                   <span className={`text-${fileManagerTextSize} min-w-0 flex-1 truncate`}>{item.name}</span>
-                  {renderVectorIcon()}
                 </div>
+                <FileTreeDecorations
+                  iconSize={iconSize}
+                  knowledge={renderVectorIcon()}
+                  syncStatus={syncStatus}
+                  syncTitle={syncStatusTitle}
+                />
                 {isMobile && (
                   <MobileActionMenu className="ml-1">
                     <MobileMenuItem onClick={handleShowFileManager}>
@@ -1024,7 +958,7 @@ export function FileItem({
                 )}
               </span>
             }
-          </div>
+          </FileTreeRow>
         </ContextMenuTrigger>
         <ContextMenuContent>
           {useSelectionMenu ? (

@@ -1843,6 +1843,8 @@
         "select": "Selecionar Diretório do Workspace",
         "reset": "Redefinir para Caminho Padrão",
         "history": "Caminhos Históricos",
+        "removeHistory": "Remover do histórico",
+        "switchFailed": "Falha ao trocar o workspace. O workspace anterior foi restaurado.",
         "selectFromHistory": "Selecionar workspace do histórico",
         "clearHistory": "Limpar Histórico",
         "actions": "Ações",
@@ -3285,6 +3287,24 @@
         "title": "Nenhuma nota ainda",
         "description": "Crie uma nova nota,\nou importe notas do seu dispositivo."
       },
+      "treeLabel": "Arquivos do espaço de trabalho",
+      "expandFolder": "Expandir pasta",
+      "collapseFolder": "Recolher pasta",
+      "search": {
+        "label": "Pesquisar arquivos",
+        "placeholder": "Pesquisar arquivos...",
+        "clear": "Limpar pesquisa",
+        "resultCount": "{count} itens",
+        "searchingLocal": "Pesquisando arquivos locais…",
+        "localNotFoundSearchingRemote": "Nenhum resultado local. Pesquisando arquivos remotos…",
+        "localFoundSearchingRemote": "{count} resultados locais encontrados. Pesquisando arquivos remotos…",
+        "emptyTitle": "Nenhum arquivo encontrado",
+        "emptyDescription": "Tente outra palavra-chave.",
+        "localNotFoundRemoteUnavailable": "Nenhum resultado local. A sincronização remota não está configurada.",
+        "remoteError": "Falha na pesquisa remota",
+        "retry": "Tentar novamente",
+        "folderProgress": "Pastas {loaded}/{total}"
+      },
       "toolbar": {
         "accessRepo": "Acessar Repositório",
         "loadingSync": "Carregando informações de sincronização",
@@ -3352,6 +3372,14 @@
         "pullingRemote": "Buscando conteúdo mais recente do servidor remoto...",
         "pullComplete": "Pull Concluído"
       },
+      "syncStatus": {
+        "loading": "Sincronizando",
+        "error": "A última sincronização falhou",
+        "dirty": "Alterações locais não sincronizadas",
+        "synced": "Disponível local e remotamente",
+        "local-only": "Somente local",
+        "remote-only": "Somente remoto"
+      },
       "mobile": {
         "cancel": "Cancelar",
         "create": "Criar",
@@ -3380,12 +3408,26 @@
         "rename": "Renomear",
         "deleteSyncFile": "Excluir Arquivo Sincronizado",
         "deleteLocalFile": "Excluir Arquivo Local",
+        "deleteLocalFolder": "Excluir Pasta Local",
+        "deleteRemoteFolder": "Excluir Pasta Remota",
         "delete": "Excluir",
         "confirmDelete": "Tem certeza de que deseja excluir a pasta \"{name}\"? Isso excluirá a pasta e todo o seu conteúdo.",
+        "confirmDeleteRemoteFolder": "Excluir a pasta remota “{name}” e todo o conteúdo remoto? O conteúdo local será mantido.",
         "deleteSuccess": "Excluído com sucesso",
+        "deleteRemoteSuccess": "Pasta remota excluída",
+        "movedToTrash": "{count} itens movidos para a lixeira do sistema",
         "deleteFailed": "Falha ao excluir",
         "moveFailed": "Falha ao mover",
+        "moveComplete": "Movimentação concluída",
+        "moveResult": "{moved} movidos, {failed} com falha",
+        "moveFailure": {
+          "conflict": "Já existe um item com o mesmo nome no destino. Nada foi movido.",
+          "invalid-target": "Uma pasta não pode ser movida para si mesma ou para uma subpasta.",
+          "move-failed": "A movimentação falhou e as alterações anteriores foram revertidas.",
+          "rollback-failed": "A movimentação falhou e alguns itens não puderam ser revertidos automaticamente."
+        },
         "invalidMoveTarget": "Não é possível mover para si mesmo ou uma subpasta",
+        "dropTarget": "Mover {count} itens para {name}",
         "newFile": "Novo Arquivo",
         "newFolder": "Nova Pasta",
         "duplicate": "Duplicar",
@@ -3398,6 +3440,9 @@
         "uploadFolderSuccess": "Envio da pasta concluído",
         "uploadFolderResult": "Enviados {uploaded}, falhas {failed}",
         "uploadFolderError": "Falha ao enviar pasta",
+        "configureSync": "Abrir configurações de sincronização",
+        "syncNotConfigured": "A sincronização não está configurada",
+        "syncConfigured": "A sincronização com {platform} está configurada",
         "syncFolder": "Baixar pasta",
         "syncFolderDesc": "Baixar todos os arquivos da pasta remota",
         "syncFolderSuccess": "Download da pasta concluído",
@@ -3456,7 +3501,8 @@
         "assets": "Ativos"
       },
       "error": {
-        "fileExists": "O nome do arquivo já existe"
+        "fileExists": "Esse nome já existe",
+        "invalidName": "O nome não pode conter barras, barras invertidas ou caracteres de controle"
       },
       "clipboard": {
         "copied": "Copiado para a área de transferência",

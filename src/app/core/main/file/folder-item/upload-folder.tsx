@@ -7,18 +7,27 @@ import { uploadLocalLibraryFolder } from '@/lib/sync/remote-library'
 import useArticleStore, { DirTree } from '@/stores/article'
 import { MobileMenuItem } from '../mobile-action-menu'
 import { computedParentPath } from '@/lib/path'
+import { getSyncConfiguration } from '../file-tree-action-policy'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 export function UploadFolder({ item, mobile = false }: { item: DirTree; mobile?: boolean }) {
   const t = useTranslations('article.file.context')
   const [isUploading, setIsUploading] = useState(false)
-  const { loadFileTree, loadRemoteSyncFiles, markFileRemote, setEntryLoading } = useArticleStore()
+  const { loadFileTree, loadRemoteSyncFiles, markFileRemote, setEntryLoading, setEntrySyncError } = useArticleStore()
 
   async function handleUploadFolder() {
     if (isUploading || !item.isLocale || !item.isDirectory) return
+    const sync = await getSyncConfiguration()
+    if (!sync.configured) {
+      toast({ title: t('syncNotConfigured'), description: t('configureSync') })
+      useSettingsDialogStore.getState().openSettings('sync')
+      return
+    }
 
     const folderPath = computedParentPath(item)
     setIsUploading(true)
     setEntryLoading(folderPath, true)
+    setEntrySyncError(folderPath)
     const progressToast = toast({
       title: t('uploadFolderProgress'),
       description: item.name,
@@ -49,6 +58,7 @@ export function UploadFolder({ item, mobile = false }: { item: DirTree; mobile?:
         duration: 5000,
       })
     } catch (error) {
+      setEntrySyncError(folderPath, error instanceof Error ? error.message : String(error))
       progressToast.update({
         title: t('uploadFolderError'),
         description: error instanceof Error ? error.message : String(error),

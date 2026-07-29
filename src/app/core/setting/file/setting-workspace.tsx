@@ -25,7 +25,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
     removeWorkspaceHistory,
     clearWorkspaceHistory
   } = useSettingStore()
-  const {clearCollapsibleList, loadFileTree, setActiveFilePath, setCurrentArticle} = useArticleStore()
+  const {loadWorkspaceCollapsibleList, loadFileTree, setActiveFilePath, setCurrentArticle} = useArticleStore()
   const { refreshSkills } = useSkillsStore()
   const t = useTranslations('settings.file')
   const [open, setOpen] = useState(false)
@@ -52,10 +52,11 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
   async function switchWorkspace(path: string) {
     try {
       await setWorkspacePath(path)
-      await clearCollapsibleList()
       setActiveFilePath('')
       setCurrentArticle('')
+      const lastActivePath = await loadWorkspaceCollapsibleList()
       await loadFileTree()
+      if (lastActivePath) await setActiveFilePath(lastActivePath)
       await refreshSkills()
     } catch (error) {
       console.error('切换工作区失败:', error)
@@ -77,10 +78,11 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
         await mkdir('article', { baseDir: BaseDirectory.AppData })
       }
       await setWorkspacePath('')
-      await clearCollapsibleList()
       setActiveFilePath('')
       setCurrentArticle('')
+      const lastActivePath = await loadWorkspaceCollapsibleList()
       await loadFileTree()
+      if (lastActivePath) await setActiveFilePath(lastActivePath)
       await refreshSkills()
     } catch (error) {
       console.error('重置工作区失败:', error)

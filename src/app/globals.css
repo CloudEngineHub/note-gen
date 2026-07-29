@@ -421,62 +421,76 @@ html, body {
   }
 }
 
-.file-manange-item {
+.file-manager-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0;
+  gap: 0.375rem;
+  height: 1.75rem;
+  padding-right: 0.5rem;
+  border-radius: calc(var(--radius) - 0.1875rem);
   font-size: 0.875rem;
-  cursor: pointer;
+  cursor: default;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  color: hsl(var(--sidebar-foreground));
+  outline: none;
+  transition: background-color 100ms ease, color 100ms ease, box-shadow 100ms ease;
 }
 
-.file-manange-item:not(.active):not(.file-selected):not(.file-on-drop):hover {
-  background-color: hsl(var(--third) / 0.55);
+.file-manager-item:not(.active):not(.file-selected):not(.file-on-drop):hover {
+  background-color: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
 }
 
-.dark .file-manange-item:not(.active):not(.file-selected):not(.file-on-drop):hover {
-  background-color: hsl(var(--muted) / 0.65);
+.file-manager-item:focus-visible {
+  box-shadow: inset 0 0 0 1px hsl(var(--sidebar-ring) / 0.65);
 }
 
-.file-manange-item.active {
-  background-color: hsl(var(--third));
-  color: hsl(var(--third-foreground));
-  font-weight: 700;
+.file-manager-item.active {
+  background-color: hsl(var(--sidebar-accent));
+  color: hsl(var(--sidebar-accent-foreground));
+  font-weight: 500;
 }
 
-.dark .file-manange-item.active {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+.file-manager-item.active::before {
+  position: absolute;
+  inset-block: 0.375rem;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 9999px;
+  background: hsl(var(--sidebar-primary));
+  content: "";
 }
 
-.file-manange-item.active .bg-primary-foreground {
-  background-color: hsl(var(--third));
+.file-manager-item.active.file-selected {
+  background-color: hsl(var(--sidebar-accent));
 }
 
-.dark .file-manange-item.active .bg-primary-foreground {
-  background-color: hsl(var(--secondary-foreground));
+.file-manager-item.file-selected {
+  background-color: hsl(var(--sidebar-primary) / 0.09);
+  color: hsl(var(--sidebar-foreground));
 }
 
-.file-manange-item.file-selected {
-  background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--foreground));
-  box-shadow: inset 2px 0 0 hsl(var(--primary));
-}
-
-.dark .file-manange-item.file-selected {
-  background-color: hsl(var(--primary) / 0.18);
-  color: hsl(var(--foreground));
-  box-shadow: inset 2px 0 0 hsl(var(--primary));
-}
-
-.file-manange-item.file-on-drop {
-  background-color: hsl(var(--primary) / 0.12);
-  outline: 1px dashed hsl(var(--primary) / 0.7);
+.file-manager-item.file-on-drop {
+  background-color: hsl(var(--sidebar-primary) / 0.1);
+  outline: 1px dashed hsl(var(--sidebar-ring) / 0.7);
   outline-offset: -2px;
+}
+
+.file-manager-item [data-file-manager-drag-handle] > svg,
+.file-manager-item [data-file-manager-drag-handle] > div > svg {
+  color: hsl(var(--muted-foreground));
+  stroke-width: 1.75;
+}
+
+.file-manager-item.active [data-file-manager-drag-handle] > svg,
+.file-manager-item.active [data-file-manager-drag-handle] > div > svg,
+.file-manager-item:hover [data-file-manager-drag-handle] > svg,
+.file-manager-item:hover [data-file-manager-drag-handle] > div > svg {
+  color: currentColor;
 }
 
 :not(table)::-webkit-scrollbar {

@@ -1818,6 +1818,8 @@
         "select": "選擇工作區目錄",
         "reset": "重設為默認路徑",
         "history": "歷史路徑",
+        "removeHistory": "移除歷史記錄",
+        "switchFailed": "切換工作區失敗，已恢復原工作區",
         "selectFromHistory": "從歷史記錄中選擇工作區",
         "clearHistory": "清空歷史記錄",
         "actions": "操作",
@@ -3292,6 +3294,24 @@
         "title": "還沒有筆記",
         "description": "建立一篇新的筆記，\n或從本機匯入已有筆記。"
       },
+      "treeLabel": "工作區檔案",
+      "expandFolder": "展開資料夾",
+      "collapseFolder": "摺疊資料夾",
+      "search": {
+        "label": "搜尋檔案",
+        "placeholder": "搜尋檔案...",
+        "clear": "清除搜尋",
+        "resultCount": "{count} 項",
+        "searchingLocal": "正在搜尋本機檔案…",
+        "localNotFoundSearchingRemote": "本機未找到，正在搜尋遠端檔案…",
+        "localFoundSearchingRemote": "已找到 {count} 個本機結果，正在搜尋遠端檔案…",
+        "emptyTitle": "沒有符合的檔案",
+        "emptyDescription": "請嘗試其他關鍵字。",
+        "localNotFoundRemoteUnavailable": "本機未找到符合的檔案，遠端同步尚未設定。",
+        "remoteError": "遠端搜尋失敗",
+        "retry": "重試",
+        "folderProgress": "文件夾 {loaded}/{total}"
+      },
       "toolbar": {
         "accessRepo": "訪問倉庫",
         "loadingSync": "正在載入同步資訊",
@@ -3359,6 +3379,14 @@
         "pullingRemote": "正在從遠端伺服器取得最新內容...",
         "pullComplete": "拉取完成"
       },
+      "syncStatus": {
+        "loading": "正在同步",
+        "error": "上次同步失敗",
+        "dirty": "本機有未同步修改",
+        "synced": "本機與遠端均存在",
+        "local-only": "僅本機",
+        "remote-only": "僅遠端"
+      },
       "mobile": {
         "cancel": "取消",
         "create": "創建",
@@ -3387,12 +3415,26 @@
         "rename": "重命名",
         "deleteSyncFile": "刪除同步文件",
         "deleteLocalFile": "刪除本地文件",
+        "deleteLocalFolder": "刪除本機文件夾",
+        "deleteRemoteFolder": "刪除遠程文件夾",
         "delete": "刪除",
         "confirmDelete": "確定要刪除文件夾 \"{name}\" 嗎？此操作將刪除文件夾及其所有內容。",
+        "confirmDeleteRemoteFolder": "確定要刪除遠程文件夾「{name}」及其所有遠程內容嗎？本機內容會保留。",
         "deleteSuccess": "刪除成功",
+        "deleteRemoteSuccess": "遠程文件夾已刪除",
+        "movedToTrash": "已將 {count} 項移到系統垃圾桶",
         "deleteFailed": "刪除失敗",
         "moveFailed": "移動失敗",
+        "moveComplete": "移動完成",
+        "moveResult": "成功 {moved} 項，失敗 {failed} 項",
+        "moveFailure": {
+          "conflict": "目標位置已有同名項目，未移動任何內容",
+          "invalid-target": "不能移動到自身或子目錄",
+          "move-failed": "移動失敗，已回復先前操作",
+          "rollback-failed": "移動失敗，且部分項目無法自動回復"
+        },
         "invalidMoveTarget": "不能移動到自身或子目錄",
+        "dropTarget": "移動 {count} 項到 {name}",
         "newFile": "新建文件",
         "newFolder": "新建文件夾",
         "duplicate": "建立副本",
@@ -3405,6 +3447,9 @@
         "uploadFolderSuccess": "文件夾上傳完成",
         "uploadFolderResult": "上傳 {uploaded} 個，失敗 {failed} 個",
         "uploadFolderError": "文件夾上傳失敗",
+        "configureSync": "前往同步設定",
+        "syncNotConfigured": "同步尚未設定",
+        "syncConfigured": "{platform} 同步已設定",
         "syncFolder": "下載文件夾",
         "syncFolderDesc": "下載目前遠端文件夾下的全部文件",
         "syncFolderSuccess": "文件夾下載完成",
@@ -3463,7 +3508,8 @@
         "assets": "靜態資源"
       },
       "error": {
-        "fileExists": "檔案名已存在"
+        "fileExists": "名稱已存在",
+        "invalidName": "名稱不能包含斜線、反斜線或控制字元"
       },
       "clipboard": {
         "copied": "已複製到剪貼簿",

@@ -1,6 +1,7 @@
 'use client'
 import React, { useEffect, useState, useMemo, useRef } from "react"
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
+import type { ItemInstance } from '@headless-tree/core'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,25 +10,19 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/enhanced-context-menu"
 import useArticleStore, { DirTree } from "@/stores/article"
-import { remove, writeTextFile, writeFile } from "@tauri-apps/plugin-fs"
+import { writeTextFile, writeFile } from "@tauri-apps/plugin-fs"
+import { Store } from '@tauri-apps/plugin-store'
 import { FileItem } from './file-item'
 import { FolderItem } from "./folder-item"
-import { computedParentPath } from "@/lib/path"
 import { writeDroppedFileToRoot } from "./root-drop"
 import { cn } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import { useTranslations } from "next-intl"
 import useClipboardStore from "@/stores/clipboard"
 import { cloneDeep } from "lodash-es"
-import { Files, FilePlus, FileSymlink, FolderPlus, Upload } from "lucide-react"
+import { Files, FilePlus, FileSymlink, FolderPlus, Search, Upload, X } from "lucide-react"
 import { pasteIntoFolder } from "./folder-item/paste-into-folder"
-import {
-  collectFolderMarkdownPaths,
-  deleteLocalFolderIfExists,
-  deleteRemoteFolder,
-  deleteVectorDocumentsByPaths,
-  removeFolderFromTree,
-} from "./folder-item/delete-folder-utils"
+import { moveEntriesToSystemTrash } from './system-trash'
 import {
   flattenFileTree,
   getFileSelectionEntries,
@@ -38,11 +33,12 @@ import {
   type SelectionBox,
 } from "./file-selection"
 import {
-  getFileManagerDragPath,
+  clearFileManagerDragData,
+  getFileManagerDragPaths,
   getPathAfterMove,
   hasExternalFilesDragData,
   hasFileManagerDragData,
-  moveFileManagerEntry,
+  moveFileManagerEntries,
 } from "./file-dnd"
 import {
   Empty,
@@ -53,9 +49,29 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useMarkdownImport } from './use-markdown-import'
 import { useShallow } from 'zustand/react/shallow'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group'
+import {
+  buildFileTreeSearchIndex,
+  filterFileTreeByPathSet,
+  getFileTreeSearchMatches,
+  searchFileTreeIndex,
+  type FileTreeNode,
+} from './file-tree-model'
+import { useFileTree } from './use-file-tree'
+import { useSyncAvailability } from './use-sync-availability'
+import useSettingStore from '@/stores/setting'
+import { buildFileTreeSyncStatusMap } from './file-tree-action-policy'
+
+type SearchPhase = 'idle' | 'local' | 'remote' | 'complete'
 
 // 递归过滤文件树，移除云端文件（如果 showCloudFiles 为 false）
 function filterFileTree(tree: DirTree[], showCloud: boolean): DirTree[] {
@@ -69,55 +85,17 @@ function filterFileTree(tree: DirTree[], showCloud: boolean): DirTree[] {
     }))
 }
 
-function Tree({
-  item,
-  focusSidebar,
-  selectedPathSet,
-  selectionEntries,
-}: {
-  item: DirTree
-  focusSidebar: () => void
-  selectedPathSet: Set<string>
-  selectionEntries: FileSelectionEntry[]
-}) {
-  const collapsibleList = useArticleStore((state) => state.collapsibleList)
-  const path = computedParentPath(item)
-
-  return (
-    item.isFile ?
-    <FileItem
-      item={item}
-      focusSidebar={focusSidebar}
-      selectedPathSet={selectedPathSet}
-      selectionEntries={selectionEntries}
-    /> :
-    <li className="min-w-0">
-      <Collapsible
-        className="group/collapsible"
-        open={collapsibleList.includes(path)}
-      >
-        <FolderItem
-          item={item}
-          focusSidebar={focusSidebar}
-          selectedPathSet={selectedPathSet}
-          selectionEntries={selectionEntries}
-        />
-        <CollapsibleContent className="min-w-0 pl-1">
-          <ul className="min-w-0 pl-2">
-            {item.children?.map((subItem) => (
-              <Tree
-                key={`${subItem.name}-${subItem.parent?.name}-${subItem.sha || ''}-${subItem.isLocale}`}
-                item={subItem}
-                focusSidebar={focusSidebar}
-                selectedPathSet={selectedPathSet}
-                selectionEntries={selectionEntries}
-              />
-            ))}
-          </ul>
-        </CollapsibleContent>
-      </Collapsible>
-    </li>
-  )
+// 搜索结果按“本地优先、远程补充”展示。同一来源内保持文件树原有顺序，
+// 避免远程结果到达后让已经展示的本地结果相互跳动。
+function prioritizeLocalSearchResults(tree: DirTree[]): DirTree[] {
+  return tree
+    .map(item => ({
+      ...item,
+      children: item.children
+        ? prioritizeLocalSearchResults(item.children)
+        : undefined,
+    }))
+    .sort((left, right) => Number(right.isLocale) - Number(left.isLocale))
 }
 
 function getSelectionBox(startX: number, startY: number, currentX: number, currentY: number): SelectionBox {
@@ -132,44 +110,39 @@ function getSelectionBox(startX: number, startY: number, currentX: number, curre
   }
 }
 
-function removeFileFromTree(tree: DirTree[], filePath: string) {
-  const parentPath = filePath.split('/').slice(0, -1).join('/')
-  const fileName = filePath.split('/').pop() || filePath
-  const siblings = parentPath
-    ? flattenFileTree(tree).find(entry => entry.path === parentPath)?.item.children
-    : tree
-
-  if (!siblings) {
-    return false
-  }
-
-  const index = siblings.findIndex(entry => entry.name === fileName && entry.isFile)
-  if (index === -1) {
-    return false
-  }
-
-  const current = siblings[index]
-  if (current.sha) {
-    current.isLocale = false
-    current.loading = undefined
-  } else {
-    siblings.splice(index, 1)
-  }
-
-  return true
-}
-
 export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   const [isDragging, setIsDragging] = useState(false)
+  const [dragItemCount, setDragItemCount] = useState(0)
+  const [filterQuery, setFilterQuery] = useState('')
+  const [isSearchLoading, setIsSearchLoading] = useState(false)
+  const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle')
+  const [localSearchMatchCount, setLocalSearchMatchCount] = useState(0)
+  const [remoteSearchUnavailable, setRemoteSearchUnavailable] = useState(false)
+  const [remoteSearchError, setRemoteSearchError] = useState(false)
+  const [searchRetryNonce, setSearchRetryNonce] = useState(0)
+  const [searchProgress, setSearchProgress] = useState({ loaded: 0, total: 0 })
+  const [treeScrollMargin, setTreeScrollMargin] = useState(44)
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null)
   const dragDepthRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const treeContainerRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null)
   const selectingRef = useRef(false)
   const pointerIdRef = useRef<number | null>(null)
   const suppressNextClickRef = useRef(false)
+  const searchLoadGenerationRef = useRef(0)
+  const remoteSearchRootLoadedRef = useRef(false)
+  const remoteSearchLoadedPathsRef = useRef(new Set<string>())
+  const scrollSaveTimerRef = useRef<number | null>(null)
+  const workspacePath = useSettingStore(state => state.workspacePath)
   const t = useTranslations('article.file')
   const tRecordToolbar = useTranslations('record.mark.toolbar')
+  const {
+    configurationRevision: syncConfigurationRevision,
+    refresh: refreshSyncAvailability,
+  } = useSyncAvailability()
   const {
     activeFilePath,
     fileTree,
@@ -188,6 +161,10 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     cleanTabsByDeletedFolder,
     fileTreeLoading,
     fileTreeInitialized,
+    collapsibleList,
+    setCollapsibleList,
+    loadCollapsibleFiles,
+    loadFolderRemoteFiles,
   } = useArticleStore(useShallow((state) => ({
     activeFilePath: state.activeFilePath,
     fileTree: state.fileTree,
@@ -206,9 +183,12 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     cleanTabsByDeletedFolder: state.cleanTabsByDeletedFolder,
     fileTreeLoading: state.fileTreeLoading,
     fileTreeInitialized: state.fileTreeInitialized,
+    collapsibleList: state.collapsibleList,
+    setCollapsibleList: state.setCollapsibleList,
+    loadCollapsibleFiles: state.loadCollapsibleFiles,
+    loadFolderRemoteFiles: state.loadFolderRemoteFiles,
   })))
   const { isImporting, importMarkdown } = useMarkdownImport()
-  const setArticleState = useArticleStore.setState
   const { clipboardItem, clipboardItems, clipboardOperation, setClipboardItem } = useClipboardStore()
 
   const selectedEntries = useMemo(
@@ -223,6 +203,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   function resetRootDropState() {
     dragDepthRef.current = 0
     setIsDragging(false)
+    setDragItemCount(0)
   }
 
   function isRootBlankDropTarget(target: EventTarget | null) {
@@ -292,28 +273,26 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     })
 
     const selectedPaths: string[] = []
-    const itemElements = container.querySelectorAll<HTMLElement>('[data-file-manager-item-path]')
+    const treeContainer = treeContainerRef.current
+    if (!treeContainer) return
     const clientHitBox = {
       left: clientBox.left,
       right: clientBox.left + clientBox.width,
       top: clientBox.top,
       bottom: clientBox.top + clientBox.height,
     }
-    const listHitBox = {
-      ...clientHitBox,
-      left: containerRect.left,
-      right: containerRect.right,
-    }
-    itemElements.forEach(element => {
-      const itemPath = element.dataset.fileManagerItemPath
-      if (!itemPath) {
-        return
+    const treeRect = treeContainer.getBoundingClientRect()
+    treeItems.forEach((treeItem, index) => {
+      const node = treeItem.getItemData()
+      if (!node.item) return
+      const rowTop = treeRect.top + index * 28
+      const rowRect = {
+        left: containerRect.left,
+        right: containerRect.right,
+        top: rowTop,
+        bottom: rowTop + 28,
       }
-
-      const rect = element.getBoundingClientRect()
-      if (rectsIntersect(listHitBox, rect)) {
-        selectedPaths.push(itemPath)
-      }
+      if (rectsIntersect(clientHitBox, rowRect)) selectedPaths.push(node.path)
     })
     setSelectedFilePaths(selectedPaths)
   }
@@ -343,6 +322,13 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
 
     selectingRef.current = true
     e.preventDefault()
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    const edgeSize = 36
+    if (e.clientY < containerRect.top + edgeSize) {
+      e.currentTarget.scrollBy({ top: -14 })
+    } else if (e.clientY > containerRect.bottom - edgeSize) {
+      e.currentTarget.scrollBy({ top: 14 })
+    }
     updateSelectionFromPointer(e.clientX, e.clientY)
   }
 
@@ -373,52 +359,32 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     e.stopPropagation()
   }
 
-  async function deleteLocalFile(entry: FileSelectionEntry, tree: DirTree[]) {
-    const { getFilePathOptions, getWorkspacePath } = await import('@/lib/workspace')
-    const workspace = await getWorkspacePath()
-    const pathOptions = await getFilePathOptions(entry.path)
-
-    if (workspace.isCustom) {
-      await remove(pathOptions.path)
-    } else {
-      await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
+  function handleFileManagerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      event.preventDefault()
+      event.stopPropagation()
+      searchInputRef.current?.focus()
+      searchInputRef.current?.select()
+      return
     }
 
-    removeFileFromTree(tree, entry.path)
-
-    try {
-      const { deleteVectorDocumentsByFilename } = await import('@/db/vector')
-      await deleteVectorDocumentsByFilename(entry.path)
-      const nextVectorIndexedFiles = new Map(useArticleStore.getState().vectorIndexedFiles)
-      nextVectorIndexedFiles.delete(entry.path)
-      setArticleState({ vectorIndexedFiles: nextVectorIndexedFiles })
-    } catch (error) {
-      console.error(`删除文件 ${entry.path} 的向量数据失败:`, error)
+    if (event.key === 'Escape' && filterQuery) {
+      event.preventDefault()
+      event.stopPropagation()
+      setFilterQuery('')
+      focusSidebar()
     }
-
-    await cleanTabsByDeletedFile(entry.path)
   }
 
-  async function deleteFolder(entry: FileSelectionEntry, tree: DirTree[]) {
-    const markdownPaths = await collectFolderMarkdownPaths(entry.path, entry.item)
-    const localDeleted = await deleteLocalFolderIfExists(entry.path)
-    const remoteResult = await deleteRemoteFolder(entry.item, localDeleted)
-    if (remoteResult.failedPaths.length > 0) {
-      throw new Error(`Delete remote folder failed: ${remoteResult.failedPaths.join(', ')}`)
+  async function cleanDeletedLocalEntryTabs(entry: FileSelectionEntry) {
+    if (entry.isDirectory) {
+      await cleanTabsByDeletedFolder(entry.path)
+      if (activeFilePath === entry.path || activeFilePath.startsWith(`${entry.path}/`)) {
+        setActiveFilePath('')
+      }
+      return
     }
-
-    await cleanTabsByDeletedFolder(entry.path)
-    removeFolderFromTree(tree, entry.path)
-
-    try {
-      await deleteVectorDocumentsByPaths(markdownPaths, entry.path)
-    } catch (error) {
-      console.error('删除文件夹向量数据失败:', error)
-    }
-
-    if (activeFilePath === entry.path || activeFilePath.startsWith(`${entry.path}/`)) {
-      setActiveFilePath('')
-    }
+    await cleanTabsByDeletedFile(entry.path)
   }
 
   async function handleDeleteSelectedEntries() {
@@ -437,19 +403,25 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       return
     }
 
-    const nextTree = cloneDeep(fileTree)
     try {
+      const trashedCount = await moveEntriesToSystemTrash(entries.map(entry => entry.path))
       for (const entry of entries) {
-        if (entry.isDirectory) {
-          await deleteFolder(entry, nextTree)
-        } else {
-          await deleteLocalFile(entry, nextTree)
-        }
+        await cleanDeletedLocalEntryTabs(entry)
       }
 
-      setFileTree(nextTree)
+      const nextVectorIndexedFiles = new Map(useArticleStore.getState().vectorIndexedFiles)
+      for (const path of nextVectorIndexedFiles.keys()) {
+        if (entries.some(entry => path === entry.path || path.startsWith(`${entry.path}/`))) {
+          nextVectorIndexedFiles.delete(path)
+        }
+      }
+      useArticleStore.setState({ vectorIndexedFiles: nextVectorIndexedFiles })
+
+      await loadFileTree({ skipRemoteSync: true })
       clearSelectedFilePaths()
-      toast({ title: t('context.deleteSuccess') })
+      toast({
+        title: t('context.movedToTrash', { count: trashedCount }),
+      })
     } catch (error) {
       console.error('Delete selected entries failed:', error)
       toast({
@@ -460,39 +432,48 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     }
   }
 
-  async function moveEntryToRoot(sourcePath: string) {
-    const result = await moveFileManagerEntry(sourcePath, '')
-
-    if (!result.moved) {
-      if (result.reason === 'invalid-target') {
-        toast({
-          title: t('context.invalidMoveTarget'),
-          variant: 'destructive',
-        })
+  async function moveEntriesToRoot(sourcePaths: string[]) {
+    const batchResult = await moveFileManagerEntries(sourcePaths, '')
+    if (batchResult.failed.length > 0) {
+      if (batchResult.failed.some(failure => failure.reason === 'rollback-failed')) {
+        await loadFileTree({ skipRemoteSync: true })
       }
+      toast({
+        title: t('context.moveFailed'),
+        description: t(`context.moveFailure.${batchResult.failed[0].reason}`),
+        variant: 'destructive',
+      })
       return
     }
 
-    const movedInTree = moveLocalEntry(result.sourcePath, result.targetPath)
-    if (!movedInTree) {
-      await loadFileTree()
+    let nextActiveFilePath = activeFilePath
+    let requiresReload = false
+    for (const result of batchResult.moved) {
+      requiresReload = !moveLocalEntry(result.sourcePath, result.targetPath) || requiresReload
+      nextActiveFilePath = getPathAfterMove(nextActiveFilePath, result.sourcePath, result.targetPath)
+      await syncOpenTabsForPathChange(result.sourcePath, result.targetPath)
     }
-
-    const nextActiveFilePath = getPathAfterMove(activeFilePath, result.sourcePath, result.targetPath)
-    if (nextActiveFilePath !== activeFilePath) {
-      setActiveFilePath(nextActiveFilePath)
+    if (requiresReload) await loadFileTree({ skipRemoteSync: true })
+    if (nextActiveFilePath !== activeFilePath) setActiveFilePath(nextActiveFilePath)
+    setSelectedFilePaths(batchResult.moved.map(result => result.targetPath))
+    if (batchResult.moved.length > 1) {
+      toast({
+        title: t('context.moveComplete'),
+        description: t('context.moveResult', {
+          moved: batchResult.moved.length,
+          failed: 0,
+        }),
+      })
     }
-
-    await syncOpenTabsForPathChange(result.sourcePath, result.targetPath)
   }
 
   async function handleDrop (e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault()
     e.stopPropagation()
     const isFileManagerDrag = hasFileManagerDragData(e.dataTransfer)
-    const renamePath = isFileManagerDrag
-      ? getFileManagerDragPath(e.dataTransfer)
-      : ''
+    const renamePaths = isFileManagerDrag
+      ? getFileManagerDragPaths(e.dataTransfer)
+      : []
 
     if (isFileManagerDrag && !isRootBlankDropTarget(e.target)) {
       resetRootDropState()
@@ -500,8 +481,8 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     }
 
     try {
-      if (renamePath) {
-        await moveEntryToRoot(renamePath)
+      if (renamePaths.length > 0) {
+        await moveEntriesToRoot(renamePaths)
       } else {
         const files = e.dataTransfer.files
         for (let i = 0; i < files.length; i += 1) {
@@ -555,7 +536,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     } catch (error) {
       console.error('File manager drop failed:', error)
       toast({
-        title: renamePath ? t('context.moveFailed') : t('toolbar.importError'),
+        title: renamePaths.length > 0 ? t('context.moveFailed') : t('toolbar.importError'),
         variant: 'destructive',
       })
     } finally {
@@ -573,6 +554,9 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
 
     e.preventDefault()
     dragDepthRef.current += 1
+    setDragItemCount(hasExternalFilesDragData(e.dataTransfer)
+      ? e.dataTransfer.files.length
+      : getFileManagerDragPaths(e.dataTransfer).length)
     setIsDragging(true)
   }
 
@@ -587,6 +571,19 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
 
     e.preventDefault()
     e.dataTransfer.dropEffect = hasExternalFilesDragData(e.dataTransfer) ? 'copy' : 'move'
+    setDragItemCount(hasExternalFilesDragData(e.dataTransfer)
+      ? e.dataTransfer.files.length
+      : getFileManagerDragPaths(e.dataTransfer).length)
+    const container = containerRef.current
+    if (container) {
+      const bounds = container.getBoundingClientRect()
+      const edgeSize = 40
+      if (e.clientY < bounds.top + edgeSize) {
+        container.scrollTop -= 14
+      } else if (e.clientY > bounds.bottom - edgeSize) {
+        container.scrollTop += 14
+      }
+    }
     setIsDragging(true)
   }
 
@@ -610,7 +607,9 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   useEffect(() => {
     function handleGlobalDragFinish() {
       dragDepthRef.current = 0
+      clearFileManagerDragData()
       setIsDragging(false)
+      setDragItemCount(0)
     }
 
     window.addEventListener('drop', handleGlobalDragFinish)
@@ -629,6 +628,189 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   }, [fileTreeInitialized, fileTreeLoading, loadFileTree])
 
   useEffect(() => {
+    let disposed = false
+    const key = `fileTreeScrollTop:${workspacePath || '__default__'}`
+    remoteSearchRootLoadedRef.current = false
+    remoteSearchLoadedPathsRef.current.clear()
+
+    void Store.load('store.json').then(async store => {
+      const scrollTop = await store.get<number>(key) ?? 0
+      if (!disposed && containerRef.current) {
+        containerRef.current.scrollTop = scrollTop
+      }
+    })
+
+    return () => {
+      disposed = true
+      if (scrollSaveTimerRef.current !== null) {
+        window.clearTimeout(scrollSaveTimerRef.current)
+        scrollSaveTimerRef.current = null
+      }
+    }
+  }, [workspacePath])
+
+  useEffect(() => {
+    const toolbar = toolbarRef.current
+    if (!toolbar) return
+    const updateMargin = () => setTreeScrollMargin(toolbar.offsetHeight)
+    updateMargin()
+    const observer = new ResizeObserver(updateMargin)
+    observer.observe(toolbar)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    remoteSearchRootLoadedRef.current = false
+    remoteSearchLoadedPathsRef.current.clear()
+  }, [syncConfigurationRevision])
+
+  useEffect(() => {
+    setFilterQuery('')
+    setSelectionBox(null)
+    clearSelectedFilePaths()
+    clearFileManagerDragData()
+    resetRootDropState()
+  }, [workspacePath])
+
+  function handleScroll() {
+    if (scrollSaveTimerRef.current !== null) {
+      window.clearTimeout(scrollSaveTimerRef.current)
+    }
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      const scrollTop = containerRef.current?.scrollTop ?? 0
+      const key = `fileTreeScrollTop:${workspacePath || '__default__'}`
+      void Store.load('store.json').then(async store => {
+        await store.set(key, scrollTop)
+        await store.save()
+      })
+    }, 200)
+  }
+
+  useEffect(() => {
+    const query = filterQuery.trim()
+    const generation = ++searchLoadGenerationRef.current
+
+    if (!query) {
+      setIsSearchLoading(false)
+      setSearchPhase('idle')
+      setLocalSearchMatchCount(0)
+      setRemoteSearchUnavailable(false)
+      setRemoteSearchError(false)
+      setSearchProgress({ loaded: 0, total: 0 })
+      return
+    }
+
+    setIsSearchLoading(true)
+    setSearchPhase('local')
+    setLocalSearchMatchCount(0)
+    setRemoteSearchUnavailable(false)
+    setRemoteSearchError(false)
+    const timer = window.setTimeout(async () => {
+      const locallyLoadedPaths = new Set<string>()
+
+      // 第一阶段只读取本地目录。fileTree 会在每个批次完成后立即更新，
+      // 因此用户无需等待远程请求即可看到本地匹配结果。
+      while (generation === searchLoadGenerationRef.current) {
+        const folderPaths = flattenFileTree(useArticleStore.getState().fileTree)
+          .filter(entry => entry.isDirectory && !locallyLoadedPaths.has(entry.path))
+          .map(entry => entry.path)
+
+        if (folderPaths.length === 0) {
+          break
+        }
+
+        setSearchProgress({
+          loaded: locallyLoadedPaths.size,
+          total: locallyLoadedPaths.size + folderPaths.length,
+        })
+        for (let index = 0; index < folderPaths.length; index += 4) {
+          if (generation !== searchLoadGenerationRef.current) return
+          const batch = folderPaths.slice(index, index + 4)
+          batch.forEach(path => locallyLoadedPaths.add(path))
+          await Promise.all(batch.map(path => (
+            useArticleStore.getState().loadCollapsibleFiles(path, { skipRemoteSync: true })
+          )))
+          setSearchProgress(current => ({ ...current, loaded: locallyLoadedPaths.size }))
+        }
+      }
+
+      if (generation !== searchLoadGenerationRef.current) return
+
+      const localTree = filterFileTree(useArticleStore.getState().fileTree, false)
+      const localIndex = buildFileTreeSearchIndex(localTree)
+      const localMatchCount = getFileTreeSearchMatches(localIndex, query).size
+      setLocalSearchMatchCount(localMatchCount)
+
+      let canSearchRemote = false
+      if (showCloudFiles) {
+        try {
+          canSearchRemote = (await refreshSyncAvailability()).configured
+        } catch {
+          canSearchRemote = false
+        }
+      }
+
+      if (generation !== searchLoadGenerationRef.current) return
+
+      setRemoteSearchUnavailable(showCloudFiles && !canSearchRemote)
+
+      if (canSearchRemote) {
+        setSearchPhase('remote')
+        try {
+
+        // 先更新远程根目录，保证此前尚未出现在本地树中的远程文件夹
+        // 也能进入后续搜索。
+        if (!remoteSearchRootLoadedRef.current) {
+          await useArticleStore.getState().loadRemoteSyncFiles()
+          remoteSearchRootLoadedRef.current = true
+        }
+
+        // 第二阶段再逐层加载远程目录。每批远程结果合并进 fileTree 后会
+        // 自动参与当前搜索，新发现的远程文件夹也会在下一轮继续加载。
+        const remotelyLoadedPaths = remoteSearchLoadedPathsRef.current
+        while (generation === searchLoadGenerationRef.current) {
+          const folderPaths = flattenFileTree(useArticleStore.getState().fileTree)
+            .filter(entry => entry.isDirectory && !remotelyLoadedPaths.has(entry.path))
+            .map(entry => entry.path)
+
+          if (folderPaths.length === 0) {
+            break
+          }
+
+          setSearchProgress({
+            loaded: remotelyLoadedPaths.size,
+            total: remotelyLoadedPaths.size + folderPaths.length,
+          })
+          for (let index = 0; index < folderPaths.length; index += 4) {
+            if (generation !== searchLoadGenerationRef.current) return
+            const batch = folderPaths.slice(index, index + 4)
+            batch.forEach(path => remotelyLoadedPaths.add(path))
+            await Promise.all(batch.map(path => loadFolderRemoteFiles(path)))
+            setSearchProgress(current => ({ ...current, loaded: remotelyLoadedPaths.size }))
+          }
+        }
+        } catch {
+          if (generation === searchLoadGenerationRef.current) {
+            setRemoteSearchError(true)
+          }
+        }
+      }
+
+      if (generation === searchLoadGenerationRef.current) {
+        setSearchPhase('complete')
+        setIsSearchLoading(false)
+      }
+    }, 180)
+
+    return () => {
+      window.clearTimeout(timer)
+      if (searchLoadGenerationRef.current === generation) {
+        searchLoadGenerationRef.current += 1
+      }
+    }
+  }, [filterQuery, loadFolderRemoteFiles, refreshSyncAvailability, searchRetryNonce, showCloudFiles])
+
+  useEffect(() => {
     function handleDeleteSelection() {
       void handleDeleteSelectedEntries()
     }
@@ -644,7 +826,57 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     () => filterFileTree(fileTree, showCloudFiles),
     [fileTree, showCloudFiles]
   )
+  const syncStatusByPath = useMemo(
+    () => buildFileTreeSyncStatusMap(fileTree),
+    [fileTree]
+  )
+  const searchIndex = useMemo(
+    () => buildFileTreeSearchIndex(filteredFileTree),
+    [filteredFileTree]
+  )
+  const visibleFileTree = useMemo(
+    () => filterQuery.trim()
+      ? prioritizeLocalSearchResults(
+          filterFileTreeByPathSet(filteredFileTree, searchFileTreeIndex(searchIndex, filterQuery))
+        )
+      : filteredFileTree,
+    [filteredFileTree, filterQuery, searchIndex]
+  )
   const showEmptyState = fileTreeInitialized && filteredFileTree.length === 0
+  const { model: treeModel, tree } = useFileTree({
+    items: visibleFileTree,
+    expandedPaths: collapsibleList,
+    selectedPaths: selectedFilePaths,
+    filterActive: Boolean(filterQuery.trim()),
+    setExpandedPath: setCollapsibleList,
+    loadExpandedFolder: loadCollapsibleFiles,
+    setSelectedPaths: setSelectedFilePaths,
+  })
+  const showNoResults = Boolean(filterQuery.trim())
+    && !isSearchLoading
+    && treeModel.rootChildren.length === 0
+  const treeItems = tree.getItems()
+  const rowVirtualizer = useVirtualizer({
+    count: treeItems.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 28,
+    getItemKey: index => treeItems[index]?.getId() ?? index,
+    overscan: 12,
+    scrollMargin: treeScrollMargin,
+  })
+  const visibleResultCount = useMemo(
+    () => filterQuery.trim()
+      ? getFileTreeSearchMatches(searchIndex, filterQuery).size
+      : flattenFileTree(visibleFileTree).filter(entry => entry.name !== '').length,
+    [filterQuery, searchIndex, visibleFileTree]
+  )
+  const searchStatusLabel = searchPhase === 'local'
+    ? t('search.searchingLocal')
+    : searchPhase === 'remote'
+      ? localSearchMatchCount === 0
+        ? t('search.localNotFoundSearchingRemote')
+        : t('search.localFoundSearchingRemote', { count: localSearchMatchCount })
+      : ''
 
   useEffect(() => {
     const availablePaths = new Set(flattenFileTree(filteredFileTree).map(entry => entry.path))
@@ -658,8 +890,8 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     <div
       ref={containerRef}
       className={cn(
-        "relative h-full min-h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto transition-colors",
-        isDragging && "bg-primary/5 outline-2 outline-dashed -outline-offset-4 outline-primary/60"
+        "relative h-full min-h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors",
+        isDragging && "bg-accent/60 outline-2 outline-dashed -outline-offset-4 outline-ring/60"
       )}
       onDrop={(e) => handleDrop(e)}
       onDragEnter={(e) => handleDragEnter(e)}
@@ -670,24 +902,169 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       onPointerUp={resetPointerSelection}
       onPointerCancel={resetPointerSelection}
       onClickCapture={handleClickCapture}
+      onKeyDown={handleFileManagerKeyDown}
+      onScroll={handleScroll}
     >
-      {selectedFilePaths.length > 1 && (
-        <div className="pointer-events-none sticky top-2 left-2 z-10 ml-2 w-fit rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-sm">
-          {tRecordToolbar('selectedCount', { count: selectedFilePaths.length })}
-        </div>
-      )}
       <div className="flex h-full min-h-full min-w-0 flex-col p-0">
-        <ul className="min-w-0 shrink-0">
-          {filteredFileTree.map((item) => (
-            <Tree
-              key={`${item.name}-${item.parent?.name || ''}-${item.sha || ''}-${item.isLocale}`}
-              item={item}
-              focusSidebar={focusSidebar}
-              selectedPathSet={selectedPathSet}
-              selectionEntries={selectedEntries}
-            />
-          ))}
-        </ul>
+        {isDragging && dragItemCount > 0 ? (
+          <Badge variant="outline" className="pointer-events-none absolute right-2 top-12">
+            {t('context.dropTarget', { name: t('mobile.root'), count: dragItemCount })}
+          </Badge>
+        ) : null}
+        <div ref={toolbarRef} className="sticky top-0 z-10 bg-background/95 px-2 py-2 backdrop-blur-sm">
+          <div className="flex min-w-0 items-center gap-1.5">
+              <InputGroup
+                focusRing="subtle"
+                className="h-7 min-w-0 flex-1 rounded-md border-sidebar-border/80 bg-background/55 shadow-none transition-colors focus-within:bg-background"
+              >
+                <InputGroupAddon className="text-muted-foreground/80">
+                  {isSearchLoading
+                    ? <Spinner className="size-3.5" />
+                    : <Search className="size-3.5" />}
+                </InputGroupAddon>
+                <InputGroupInput
+                  ref={searchInputRef}
+                  className="text-xs"
+                  value={filterQuery}
+                  onChange={event => setFilterQuery(event.target.value)}
+                  placeholder={t('search.placeholder')}
+                  aria-label={t('search.label')}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape' && filterQuery) {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      setFilterQuery('')
+                    }
+                  }}
+                />
+                {filterQuery && (
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      size="icon-xs"
+                      aria-label={t('search.clear')}
+                      title={t('search.clear')}
+                      onClick={() => setFilterQuery('')}
+                    >
+                      <X className="size-3" />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                )}
+              </InputGroup>
+              {selectedFilePaths.length > 1 && (
+                <Badge variant="secondary" className="pointer-events-none shrink-0 tabular-nums">
+                  {tRecordToolbar('selectedCount', { count: selectedFilePaths.length })}
+                </Badge>
+              )}
+              {isSearchLoading && searchProgress.total > 0 && (
+                <Badge variant="outline" className="pointer-events-none shrink-0 tabular-nums">
+                  {t('search.folderProgress', {
+                    loaded: Math.min(searchProgress.loaded, searchProgress.total),
+                    total: searchProgress.total,
+                  })}
+                </Badge>
+              )}
+              {!isSearchLoading && filterQuery.trim() && (
+                <Badge variant="outline" className="pointer-events-none shrink-0 tabular-nums">
+                  {t('search.resultCount', { count: visibleResultCount })}
+                </Badge>
+              )}
+          </div>
+          {searchStatusLabel && (
+              <Badge
+                variant="secondary"
+                className="pointer-events-none mt-1.5 max-w-full justify-start"
+                role="status"
+                aria-live="polite"
+              >
+                <span className="truncate">{searchStatusLabel}</span>
+              </Badge>
+          )}
+          {remoteSearchError && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <Badge variant="destructive" role="status">
+                  {t('search.remoteError')}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    remoteSearchRootLoadedRef.current = false
+                    remoteSearchLoadedPathsRef.current.clear()
+                    setSearchRetryNonce(value => value + 1)
+                  }}
+                >
+                  {t('search.retry')}
+                </Button>
+              </div>
+          )}
+        </div>
+        <div
+          {...tree.getContainerProps(t('treeLabel'))}
+          ref={treeContainerRef}
+          className="relative min-w-0 shrink-0 px-1.5 outline-none"
+          style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+        >
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const treeItem = treeItems[virtualRow.index] as ItemInstance<FileTreeNode>
+            const node = treeItem.getItemData()
+            if (!node.item) return null
+
+            const treeItemProps = treeItem.getProps() as React.HTMLAttributes<HTMLDivElement> & React.RefAttributes<HTMLDivElement>
+            const level = Math.max(0, treeItem.getItemMeta().level)
+
+            return node.isFolder ? (
+              <div
+                key={node.id}
+                className="absolute left-0 top-0 w-full"
+                style={{ transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)` }}
+              >
+                <FolderItem
+                  item={node.item}
+                  focusSidebar={focusSidebar}
+                  selectedPathSet={selectedPathSet}
+                  selectionEntries={selectedEntries}
+                  treeItemProps={treeItemProps}
+                  level={level}
+                  expanded={treeItem.isExpanded()}
+                  expandable={!node.childrenLoaded || node.children.length > 0 || !node.item.isLocale}
+                  expansionLocked={Boolean(filterQuery.trim())}
+                  syncStatus={syncStatusByPath.get(node.path)}
+                />
+              </div>
+            ) : (
+              <div
+                key={node.id}
+                className="absolute left-0 top-0 w-full"
+                style={{ transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)` }}
+              >
+                <FileItem
+                  item={node.item}
+                  focusSidebar={focusSidebar}
+                  selectedPathSet={selectedPathSet}
+                  selectionEntries={selectedEntries}
+                  treeItemProps={treeItemProps}
+                  level={level}
+                  syncStatus={syncStatusByPath.get(node.path)}
+                />
+              </div>
+            )
+          })}
+        </div>
+        {showNoResults && (
+          <Empty className="min-h-44 justify-start pt-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Search />
+              </EmptyMedia>
+              <EmptyTitle>{t('search.emptyTitle')}</EmptyTitle>
+              <EmptyDescription className="text-xs">
+                {t(remoteSearchUnavailable
+                  ? 'search.localNotFoundRemoteUnavailable'
+                  : 'search.emptyDescription')}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <div
@@ -696,7 +1073,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
               className={cn(
                 "min-h-24 flex-1 transition-colors",
                 showEmptyState && "flex",
-                isDragging && "bg-primary/5"
+                isDragging && "bg-accent/50"
               )}
               onClick={clearSelectedFilePaths}
               onContextMenu={(e) => {

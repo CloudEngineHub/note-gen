@@ -7,16 +7,24 @@ import useArticleStore, { DirTree } from "@/stores/article";
 import { computedParentPath } from "@/lib/path";
 import { pullRemoteLibraryFolder } from "@/lib/sync/remote-library";
 import { MobileMenuItem } from "../mobile-action-menu";
+import { getSyncConfiguration } from "../file-tree-action-policy";
+import { useSettingsDialogStore } from "@/stores/settings-dialog";
 
 export default function DownloadFolder({ item, mobile = false }: { item: DirTree; mobile?: boolean }) {
   const t = useTranslations('article.file')
   const [isSyncing, setIsSyncing] = useState(false)
 
-  const { loadFileTree, setEntryLoading } = useArticleStore()
+  const { loadFileTree, setEntryLoading, setEntrySyncError } = useArticleStore()
 
   // 下载远程文件夹下的全部文件类型
   async function handleSyncFolder() {
     if (isSyncing) return
+    const sync = await getSyncConfiguration()
+    if (!sync.configured) {
+      toast({ title: t('context.syncNotConfigured'), description: t('context.configureSync') })
+      useSettingsDialogStore.getState().openSettings('sync')
+      return
+    }
 
     // 检查是否真的是目录（防止误将文件当作目录处理）
     if (!item.isDirectory) {
@@ -29,8 +37,10 @@ export default function DownloadFolder({ item, mobile = false }: { item: DirTree
     }
 
     const folderPath = computedParentPath(item)
+    let syncError: string | undefined
     setIsSyncing(true);
     setEntryLoading(folderPath, true)
+    setEntrySyncError(folderPath)
     const progressToast = toast({
       title: t('context.syncFolderProgress'),
       description: item.name,
@@ -57,6 +67,7 @@ export default function DownloadFolder({ item, mobile = false }: { item: DirTree
         duration: 5000,
       })
     } catch (error) {
+      syncError = error instanceof Error ? error.message : String(error)
       progressToast.update({
         title: t('context.syncFolderError'),
         description: String(error),
@@ -67,6 +78,7 @@ export default function DownloadFolder({ item, mobile = false }: { item: DirTree
       // 刷新文件树以更新本地状态
       try {
         await loadFileTree()
+        if (syncError) setEntrySyncError(folderPath, syncError)
       } finally {
         setEntryLoading(folderPath, false)
         setIsSyncing(false)

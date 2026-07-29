@@ -10,7 +10,7 @@ import { getWorkspaceDisplayName } from "@/lib/workspace-name"
 
 export function WorkspaceSelector() {
   const { workspacePath, workspaceHistory, setWorkspacePath } = useSettingStore()
-  const { clearCollapsibleList, loadFileTree, setActiveFilePath, setCurrentArticle } = useArticleStore()
+  const { loadWorkspaceCollapsibleList, loadFileTree, setActiveFilePath, setCurrentArticle } = useArticleStore()
   const t = useTranslations('settings.file')
 
   // 当前工作区名称
@@ -26,10 +26,11 @@ export function WorkspaceSelector() {
     
     try {
       await setWorkspacePath(targetPath)
-      await clearCollapsibleList()
       setActiveFilePath('')
       setCurrentArticle('')
+      const lastActivePath = await loadWorkspaceCollapsibleList()
       await loadFileTree()
+      if (lastActivePath) await setActiveFilePath(lastActivePath)
     } catch (error) {
       console.error('切换工作区失败:', error)
     }

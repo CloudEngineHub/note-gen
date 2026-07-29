@@ -46,17 +46,30 @@ export function UnsupportedFile({ filePath }: UnsupportedFileProps) {
 
   // 获取文件元信息
   useEffect(() => {
-    const fetchMetadata = async () => {
-      try {
-        const { stat } = await import('@tauri-apps/plugin-fs')
-        const pathOptions = await getFilePathOptions(filePath)
+    let cancelled = false
 
-        let fileStat
-        if (pathOptions.baseDir) {
-          fileStat = await stat(pathOptions.path, { baseDir: pathOptions.baseDir })
-        } else {
-          fileStat = await stat(pathOptions.path)
+    const fetchMetadata = async () => {
+      setLoading(true)
+      setMetadata(null)
+
+      try {
+        const { exists, stat } = await import('@tauri-apps/plugin-fs')
+        const pathOptions = await getFilePathOptions(filePath)
+        const fileExists = pathOptions.baseDir
+          ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+          : await exists(pathOptions.path)
+
+        // 同步列表中可能暂时存在尚未下载的远程路径。它不是本地文件，
+        // 因此没有可读取的元数据，也不应作为错误上报。
+        if (!fileExists || cancelled) {
+          return
         }
+
+        const fileStat = pathOptions.baseDir
+          ? await stat(pathOptions.path, { baseDir: pathOptions.baseDir })
+          : await stat(pathOptions.path)
+
+        if (cancelled) return
 
         setMetadata({
           size: fileStat.size,
@@ -64,13 +77,25 @@ export function UnsupportedFile({ filePath }: UnsupportedFileProps) {
           createdAt: fileStat.birthtime?.getTime() || null
         })
       } catch (error) {
-        console.error('Failed to get file metadata:', error)
+        const message = error instanceof Error ? error.message : String(error)
+        const isMissingPath = message.includes('No such file or directory')
+          || message.toLowerCase().includes('not found')
+
+        if (!cancelled && !isMissingPath) {
+          console.error('Failed to get file metadata:', error)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
-    fetchMetadata()
+    void fetchMetadata()
+
+    return () => {
+      cancelled = true
+    }
   }, [filePath])
 
   // 格式化文件大小

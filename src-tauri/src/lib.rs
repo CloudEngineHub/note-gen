@@ -16,6 +16,7 @@ mod remote_skills;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod skill_runtime;
 mod skills;
+mod system_trash;
 
 use ai::{
     ai_binary_request, ai_chat_completion_stream, ai_json_request, ai_multipart_request,
@@ -111,6 +112,7 @@ pub fn run() {
             run_ocr_provider,
             printing::print_webview,
             mobile_system_bars::set_mobile_system_bars,
+            system_trash::move_paths_to_trash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

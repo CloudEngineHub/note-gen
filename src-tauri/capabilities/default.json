@@ -44,6 +44,8 @@
       ]
     },
     "fs:allow-exists",
+    "fs:allow-watch",
+    "fs:allow-unwatch",
     {
       "identifier": "fs:allow-mkdir",
       "allow": [

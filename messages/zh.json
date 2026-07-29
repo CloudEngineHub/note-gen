@@ -1953,6 +1953,8 @@
         "select": "选择工作区目录",
         "reset": "重置为默认路径",
         "history": "历史路径",
+        "removeHistory": "移除历史记录",
+        "switchFailed": "切换工作区失败，已恢复原工作区",
         "selectFromHistory": "从历史记录中选择工作区",
         "clearHistory": "清空历史记录",
         "actions": "操作",
@@ -3425,6 +3427,24 @@
         "title": "还没有笔记",
         "description": "创建一篇新的笔记，\n或从本地导入已有笔记。"
       },
+      "treeLabel": "工作区文件",
+      "expandFolder": "展开文件夹",
+      "collapseFolder": "折叠文件夹",
+      "search": {
+        "label": "搜索文件",
+        "placeholder": "搜索文件...",
+        "clear": "清除搜索",
+        "resultCount": "{count} 项",
+        "searchingLocal": "正在搜索本地文件…",
+        "localNotFoundSearchingRemote": "本地未找到，正在搜索远程文件…",
+        "localFoundSearchingRemote": "已找到 {count} 个本地结果，正在搜索远程文件…",
+        "emptyTitle": "没有匹配的文件",
+        "emptyDescription": "换一个关键词试试。",
+        "localNotFoundRemoteUnavailable": "本地未找到匹配文件，远程同步尚未配置。",
+        "remoteError": "远程搜索失败",
+        "retry": "重试",
+        "folderProgress": "目录 {loaded}/{total}"
+      },
       "toolbar": {
         "accessRepo": "访问仓库",
         "loadingSync": "正在加载同步信息",
@@ -3492,6 +3512,14 @@
         "pullingRemote": "正在从远程服务器获取最新内容...",
         "pullComplete": "拉取完成"
       },
+      "syncStatus": {
+        "loading": "正在同步",
+        "error": "上次同步失败",
+        "dirty": "本地有未同步修改",
+        "synced": "本地与远端均存在",
+        "local-only": "仅本地",
+        "remote-only": "仅远端"
+      },
       "context": {
         "viewDirectory": "查看目录",
         "cut": "剪切",
@@ -3500,12 +3528,26 @@
         "rename": "重命名",
         "deleteSyncFile": "删除同步文件",
         "deleteLocalFile": "删除本地文件",
+        "deleteLocalFolder": "删除本地文件夹",
+        "deleteRemoteFolder": "删除远程文件夹",
         "delete": "删除",
         "confirmDelete": "确定要删除文件夹 \"{name}\" 吗？此操作将删除文件夹及其所有内容。",
+        "confirmDeleteRemoteFolder": "确定要删除远程文件夹“{name}”及其所有远程内容吗？本地内容会保留。",
         "deleteSuccess": "删除成功",
+        "deleteRemoteSuccess": "远程文件夹已删除",
+        "movedToTrash": "已将 {count} 项移到系统废纸篓",
         "deleteFailed": "删除失败",
         "moveFailed": "移动失败",
+        "moveComplete": "移动完成",
+        "moveResult": "成功 {moved} 项，失败 {failed} 项",
+        "moveFailure": {
+          "conflict": "目标位置存在同名项目，未移动任何内容",
+          "invalid-target": "不能移动到自身或子目录",
+          "move-failed": "移动失败，已回滚先前操作",
+          "rollback-failed": "移动失败，且部分项目无法自动回滚"
+        },
         "invalidMoveTarget": "不能移动到自身或子目录",
+        "dropTarget": "移动 {count} 项到 {name}",
         "newFile": "新建文件",
         "newFolder": "新建文件夹",
         "duplicate": "创建副本",
@@ -3518,6 +3560,9 @@
         "uploadFolderSuccess": "文件夹上传完成",
         "uploadFolderResult": "上传 {uploaded} 个，失败 {failed} 个",
         "uploadFolderError": "文件夹上传失败",
+        "configureSync": "前往同步设置",
+        "syncNotConfigured": "同步尚未配置",
+        "syncConfigured": "{platform} 同步已配置",
         "syncFolder": "下载文件夹",
         "syncFolderDesc": "下载当前远程文件夹下的全部文件",
         "syncFolderSuccess": "文件夹下载完成",
@@ -3576,7 +3621,8 @@
         "assets": "静态资源"
       },
       "error": {
-        "fileExists": "文件名已存在"
+        "fileExists": "名称已存在",
+        "invalidName": "名称不能包含斜杠、反斜杠或控制字符"
       },
       "clipboard": {
         "copied": "已复制到剪贴板",

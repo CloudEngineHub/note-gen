@@ -1933,6 +1933,8 @@
         "select": "Select Workspace Directory",
         "reset": "Reset to Default Path",
         "history": "History Paths",
+        "removeHistory": "Remove from history",
+        "switchFailed": "Failed to switch workspace. The previous workspace was restored.",
         "selectFromHistory": "Select workspace from history",
         "clearHistory": "Clear History",
         "actions": "Actions",
@@ -3405,6 +3407,24 @@
         "title": "No notes yet",
         "description": "Create a new note,\nor import notes from your device."
       },
+      "treeLabel": "Workspace files",
+      "expandFolder": "Expand folder",
+      "collapseFolder": "Collapse folder",
+      "search": {
+        "label": "Search files",
+        "placeholder": "Search files...",
+        "clear": "Clear search",
+        "resultCount": "{count} items",
+        "searchingLocal": "Searching local files…",
+        "localNotFoundSearchingRemote": "No local matches. Searching remote files…",
+        "localFoundSearchingRemote": "Found {count} local matches. Searching remote files…",
+        "emptyTitle": "No matching files",
+        "emptyDescription": "Try a different keyword.",
+        "localNotFoundRemoteUnavailable": "No local matches. Remote sync is not configured.",
+        "remoteError": "Remote search failed",
+        "retry": "Retry",
+        "folderProgress": "Folders {loaded}/{total}"
+      },
       "toolbar": {
         "accessRepo": "Access Repository",
         "loadingSync": "Loading sync info",
@@ -3472,6 +3492,14 @@
         "pullingRemote": "Fetching latest content from remote server...",
         "pullComplete": "Pull Complete"
       },
+      "syncStatus": {
+        "loading": "Syncing",
+        "error": "Last sync failed",
+        "dirty": "Local changes not synced",
+        "synced": "Available locally and remotely",
+        "local-only": "Local only",
+        "remote-only": "Remote only"
+      },
       "context": {
         "viewDirectory": "View Directory",
         "cut": "Cut",
@@ -3480,12 +3508,26 @@
         "rename": "Rename",
         "deleteSyncFile": "Delete Sync File",
         "deleteLocalFile": "Delete Local File",
+        "deleteLocalFolder": "Delete Local Folder",
+        "deleteRemoteFolder": "Delete Remote Folder",
         "delete": "Delete",
         "confirmDelete": "Are you sure you want to delete the folder \"{name}\"? This will delete the folder and all its contents.",
+        "confirmDeleteRemoteFolder": "Delete remote folder “{name}” and all of its remote contents? Local contents will be kept.",
         "deleteSuccess": "Deleted successfully",
+        "deleteRemoteSuccess": "Remote folder deleted",
+        "movedToTrash": "Moved {count} items to the system trash",
         "deleteFailed": "Delete failed",
         "moveFailed": "Move failed",
+        "moveComplete": "Move complete",
+        "moveResult": "{moved} moved, {failed} failed",
+        "moveFailure": {
+          "conflict": "An item with the same name exists at the destination. Nothing was moved.",
+          "invalid-target": "A folder cannot be moved into itself or one of its descendants.",
+          "move-failed": "The move failed and earlier changes were rolled back.",
+          "rollback-failed": "The move failed and some items could not be rolled back automatically."
+        },
         "invalidMoveTarget": "Cannot move into itself or a subfolder",
+        "dropTarget": "Move {count} items to {name}",
         "newFile": "New File",
         "newFolder": "New Folder",
         "duplicate": "Duplicate",
@@ -3498,6 +3540,9 @@
         "uploadFolderSuccess": "Folder upload complete",
         "uploadFolderResult": "Uploaded {uploaded}, failed {failed}",
         "uploadFolderError": "Folder upload failed",
+        "configureSync": "Open sync settings",
+        "syncNotConfigured": "Sync is not configured",
+        "syncConfigured": "{platform} sync is configured",
         "syncFolder": "Download Folder",
         "syncFolderDesc": "Download all files in the remote folder",
         "syncFolderSuccess": "Folder download complete",
@@ -3556,7 +3601,8 @@
         "assets": "Assets"
       },
       "error": {
-        "fileExists": "File name already exists"
+        "fileExists": "That name already exists",
+        "invalidName": "Names cannot contain slashes, backslashes, or control characters"
       },
       "clipboard": {
         "copied": "Copied to clipboard",

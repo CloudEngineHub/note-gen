@@ -233,12 +233,15 @@ export async function pullRemoteLibraryFolder(
   const normalizedFolderPath = folderPath.replace(/^\/+|\/+$/g, '')
   const files = (await listRemoteLibraryFiles({ includeStaticAssets: true }))
     .filter(file => file.path.startsWith(`${normalizedFolderPath}/`))
-  return await pullRemoteLibraryFiles(files, onProgress)
+  // “下载文件夹”是用户明确发起的远端覆盖操作。已有本地文件也要
+  // 重新下载，否则界面显示完成却无法取得远端更新。
+  return await pullRemoteLibraryFiles(files, onProgress, { overwriteExisting: true })
 }
 
 async function pullRemoteLibraryFiles(
   files: RemoteLibraryFile[],
-  onProgress?: (progress: PullAllProgress) => void
+  onProgress?: (progress: PullAllProgress) => void,
+  options: { overwriteExisting?: boolean } = {}
 ): Promise<PullAllResult> {
   const result: PullAllResult = { total: files.length, downloaded: 0, skipped: 0, failed: [] }
 
@@ -247,7 +250,7 @@ async function pullRemoteLibraryFiles(
     onProgress?.({ phase: 'downloading', current: index + 1, total: files.length, path: file.path })
 
     try {
-      if (await isLocalLibraryFile(file.path)) {
+      if (!options.overwriteExisting && await isLocalLibraryFile(file.path)) {
         result.skipped += 1
         continue
       }

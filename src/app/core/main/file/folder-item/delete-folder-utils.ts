@@ -196,6 +196,33 @@ export function removeFolderFromTree(tree: DirTree[], folderPath: string) {
   }
 }
 
+export function clearFolderRemoteState(tree: DirTree[], folderPath: string) {
+  const currentFolder = getCurrentFolder(folderPath, tree)
+  if (!currentFolder) return
+
+  function clearNode(node: DirTree): DirTree | null {
+    if (!node.isLocale) return null
+
+    node.sha = undefined
+    node.loading = undefined
+    node.syncDirty = false
+    node.syncError = undefined
+    if (node.children) {
+      node.children = node.children
+        .map(clearNode)
+        .filter((child): child is DirTree => child !== null)
+      node.children.forEach(child => {
+        child.parent = node
+      })
+    }
+    return node
+  }
+
+  if (!clearNode(currentFolder)) {
+    removeFolderFromTree(tree, folderPath)
+  }
+}
+
 async function getGitRemoteEntries(platform: GitSyncPlatform, path: string, repo: string): Promise<unknown> {
   switch (platform) {
     case "github":

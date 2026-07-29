@@ -20,6 +20,7 @@ mod remote_skills;
 mod screenshot;
 mod skill_runtime;
 mod skills;
+mod system_trash;
 mod tray;
 mod window;
 
@@ -127,6 +128,7 @@ fn main() {
             run_ocr_provider,
             printing::print_webview,
             file_open::drain_pending_open_files,
+            system_trash::move_paths_to_trash,
         ])
         // 应用设置 - 在所有插件和命令注册后
         .setup(app_setup::setup_app)
