@@ -217,10 +217,17 @@ export interface CanvasCustomComponent {
 export interface CanvasSelectionContext {
   canvasId: string
   canvasTitle: string
+  scope: 'canvas' | 'selection'
   nodes: Array<{
     id: string
     type: CanvasNodeType
     label: string
+    description?: string
+    filePath?: string
+    recordId?: number
+    url?: string
+    checked?: boolean
+    chart?: CanvasChartSpec
   }>
   edges: Array<{
     id: string

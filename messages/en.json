@@ -3009,6 +3009,34 @@
           "noFiles": "No files found",
           "loading": "Loading..."
         },
+        "composerMenu": {
+          "loading": "Loading...",
+          "empty": "No matching results",
+          "commands": {
+            "title": "Quick commands",
+            "placeholder": "Search commands...",
+            "summarize": { "label": "Summarize", "description": "Extract key points and conclusions", "prompt": "Summarize the following content and extract the key points and conclusions:" },
+            "organize": { "label": "Organize as note", "description": "Create structured Markdown", "prompt": "Organize the following content into a clear, structured Markdown note:" },
+            "rewrite": { "label": "Polish", "description": "Improve wording without changing meaning", "prompt": "Polish the following content while preserving its meaning:" },
+            "translate": { "label": "Translate", "description": "Translate into a chosen language", "prompt": "Translate the following content into:" },
+            "searchNotes": { "label": "Search notes", "description": "Find related content in your knowledge base", "prompt": "Search my note knowledge base and answer:" },
+            "createNote": { "label": "Create note", "description": "Create a structured Markdown note", "prompt": "Create a new Markdown note based on these requirements:" }
+          },
+          "skills": {
+            "title": "Skills",
+            "scope": { "global": "Global", "project": "Workspace" }
+          },
+          "resources": {
+            "title": "Link context",
+            "placeholder": "Search files, records, or canvases...",
+            "files": "Files",
+            "records": "Records",
+            "canvases": "Canvases",
+            "untitledRecord": "Untitled record",
+            "recordFallback": "Record content",
+            "canvasSummary": "{nodes} nodes, {edges} edges"
+          }
+        },
         "clearChat": "Clear chat",
         "clearContext": {
           "tooltip": "Clear context"
@@ -3137,7 +3165,7 @@
     "arrange": { "title": "Align and group", "description": "Arrange the selected nodes.", "alignHorizontal": "Align horizontal centers", "alignVertical": "Align vertical centers", "distributeHorizontal": "Distribute horizontally", "distributeVertical": "Distribute vertically", "group": "Create group" },
     "group": { "defaultLabel": "Group" },
     "edge": { "title": "Connection style", "description": "Adjust the selected connection path and label.", "orthogonal": "Orthogonal", "straight": "Straight", "curve": "Curve", "editLabel": "Edit label", "labelPrompt": "Enter connection label", "labelDescription": "The label appears at the center of the edge. Leave it empty to remove it.", "saveLabel": "Save label" },
-    "selection": { "tools": "Node tools", "style": "Node style", "color": "Accent", "customColor": "Custom color", "border": "Border", "solid": "Solid", "dashed": "Dashed", "dotted": "Dotted", "borderWidth": "Border width", "fill": "Background", "transparent": "Transparent", "customFill": "Custom fill", "lock": "Lock nodes", "unlock": "Unlock nodes", "copyStyle": "Copy style", "pasteStyle": "Paste style", "styleCopied": "Node style copied", "stylePasted": "Node style applied", "imagePasted": "Image pasted onto canvas", "imagePasteError": "Could not paste image", "chatContext": "Canvas selection: {nodes} nodes, {edges} edges", "removeChatContext": "Remove canvas selection" },
+    "selection": { "tools": "Node tools", "style": "Node style", "color": "Accent", "customColor": "Custom color", "border": "Border", "solid": "Solid", "dashed": "Dashed", "dotted": "Dotted", "borderWidth": "Border width", "fill": "Background", "transparent": "Transparent", "customFill": "Custom fill", "lock": "Lock nodes", "unlock": "Unlock nodes", "copyStyle": "Copy style", "pasteStyle": "Paste style", "styleCopied": "Node style copied", "stylePasted": "Node style applied", "imagePasted": "Image pasted onto canvas", "imagePasteError": "Could not paste image", "chatContext": "Canvas selection: {nodes} nodes, {edges} edges", "chatContextNodes": "{nodes} nodes", "chatContextNodesAndRelations": "{nodes} nodes · {relations} relations", "removeChatContext": "Remove canvas selection" },
     "layer": { "front": "Bring to front", "forward": "Bring forward", "backward": "Send backward", "back": "Send to back" },
     "noteNode": { "title": "Add note reference", "description": "Choose a note from the file manager. Double-click the node to open its source file.", "search": "Search notes...", "empty": "No notes found", "group": "Workspace notes", "added": "Added note “{name}”" },
     "footer": {

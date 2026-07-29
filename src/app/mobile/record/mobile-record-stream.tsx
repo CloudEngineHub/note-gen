@@ -509,7 +509,7 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mobile-page-header sticky top-0 z-10 flex items-center justify-between gap-2 border-b bg-background px-3">
+      <header className="mobile-page-header sticky top-0 z-10 flex items-center justify-between gap-2 border-b bg-background px-2">
         {trashState ? (
           <div className="px-2 text-sm font-medium">{t('record.trash.title')}</div>
         ) : multiMode ? (
@@ -547,17 +547,17 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
           </Drawer>
         )}
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center">
           {trashState ? (
             <>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={handleRestoreAll} disabled={marks.length === 0} title={t('record.trash.restoreAll')}>
-                <RotateCcw className="size-4" />
+              <Button variant="ghost" size="icon" onClick={handleRestoreAll} disabled={marks.length === 0} title={t('record.trash.restoreAll')}>
+                <RotateCcw />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={handleClearTrash} disabled={marks.length === 0} title={t('record.trash.empty')}>
-                <Trash2 className="size-4" />
+              <Button variant="ghost" size="icon" onClick={handleClearTrash} disabled={marks.length === 0} title={t('record.trash.empty')}>
+                <Trash2 />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => void setTrashState(false, { deferFetch: true })} title={t('common.close')}>
-                <XCircle className="size-4" />
+              <Button variant="ghost" size="icon" onClick={() => void setTrashState(false, { deferFetch: true })} title={t('common.close')}>
+                <XCircle />
               </Button>
             </>
           ) : multiMode ? (
@@ -565,11 +565,10 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11"
                 onClick={() => setSelectedIds(isAllSelected ? new Set() : new Set(filteredRecords.map((item: Mark) => item.id)))}
                 title={t('record.mark.toolbar.selectAll')}
               >
-                <ListChecks className="size-4" />
+                <ListChecks />
               </Button>
               <MobileActionDrawer
                 title={t('record.mark.toolbar.moveTag')}
@@ -577,11 +576,10 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
                     disabled={selectedCount === 0 || !canMoveBetweenTags}
                     title={t('record.mark.toolbar.moveTag')}
                   >
-                    <MoveRight className="size-4" />
+                    <MoveRight />
                   </Button>
                 }
                 items={tags.map(tag => ({
@@ -590,31 +588,31 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
                   onSelect: () => handleMoveSelected(tag.id),
                 }))}
               />
-              <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" disabled={selectedCount === 0} onClick={handleDeleteSelected} title={t('record.mark.toolbar.delete')}>
-                <Trash2 className="size-4" />
+              <Button variant="ghost" size="icon" className="text-destructive" disabled={selectedCount === 0} onClick={handleDeleteSelected} title={t('record.mark.toolbar.delete')}>
+                <Trash2 />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setMultiMode(false)} title={t('record.mark.toolbar.exitMultiSelect')}>
-                <XCircle className="size-4" />
+              <Button variant="ghost" size="icon" onClick={() => setMultiMode(false)} title={t('record.mark.toolbar.exitMultiSelect')}>
+                <XCircle />
               </Button>
             </>
           ) : (
             <>
-              <Button variant="ghost" size="icon" className="relative h-11 w-11" title={t('record.mark.toolbar.filter.title')} onClick={() => setTypeFilterOpen(true)}>
-                <Filter className="size-4" />
+              <Button variant="ghost" size="icon" className="relative" title={t('record.mark.toolbar.filter.title')} onClick={() => setTypeFilterOpen(true)}>
+                <Filter />
                 {isFilterActive ? (
                   <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
                 ) : null}
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setMultiMode(true)} title={t('record.mark.toolbar.multiSelect')}>
-                <CheckSquare className="size-4" />
+              <Button variant="ghost" size="icon" onClick={() => setMultiMode(true)} title={t('record.mark.toolbar.multiSelect')}>
+                <CheckSquare />
               </Button>
-              <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => void setTrashState(true, { deferFetch: true })} title={t('record.mark.toolbar.trash')}>
-                <Trash2 className="size-4" />
+              <Button variant="ghost" size="icon" onClick={() => void setTrashState(true, { deferFetch: true })} title={t('record.mark.toolbar.trash')}>
+                <Trash2 />
               </Button>
             </>
           )}
         </div>
-      </div>
+      </header>
 
       <RecordSyncStatusBanner settingsHref="/mobile/setting/pages/sync" compact />
 

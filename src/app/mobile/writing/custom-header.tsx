@@ -1006,48 +1006,44 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   }, [])
 
   return (
-    <div className="mobile-page-header w-full flex items-center justify-between gap-3 border-b bg-background px-3 text-sm">
-      <div className="flex items-center gap-1 shrink-0">
+    <header className="mobile-page-header flex w-full items-center justify-between gap-2 border-b bg-background px-2 text-sm">
+      <div className="flex shrink-0 items-center">
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 rounded-full"
           onClick={handleUndo}
           disabled={!canUndo}
           aria-label={tEditorCommands('undo.title')}
         >
-          <Undo2 className="size-4" />
+          <Undo2 />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 rounded-full"
           onClick={handleRedo}
           disabled={!canRedo}
           aria-label={tEditorCommands('redo.title')}
         >
-          <Redo2 className="size-4" />
+          <Redo2 />
         </Button>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex shrink-0 items-center">
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 rounded-full"
           onClick={handleSearchReplace}
           aria-label={tEditor('search.placeholder')}
         >
-          <SearchCode className="size-4" />
+          <SearchCode />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 rounded-full"
           onClick={handleToggleOutline}
           aria-label={tOutline('open')}
         >
-          <List className="size-4" />
+          <List />
         </Button>
 
         <Drawer
@@ -1057,8 +1053,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           dismissible={!dragEntry}
         >
           <DrawerTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-9 rounded-full">
-              <Folder className="size-4" />
+            <Button variant="ghost" size="icon">
+              <Folder />
               <span className="sr-only">{tMobile('openFiles')}</span>
             </Button>
           </DrawerTrigger>
@@ -1336,6 +1332,6 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           }
         }}
       />
-    </div>
+    </header>
   )
 }

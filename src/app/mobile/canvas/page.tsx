@@ -169,15 +169,15 @@ export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-background">
-      <header className="mobile-page-header flex shrink-0 items-center justify-between gap-3 border-b px-3">
+      <header className="mobile-page-header flex w-full shrink-0 items-center gap-2 border-b bg-background px-2">
         <div className="min-w-0">
           <h1 className="truncate text-base font-semibold">{t('manager.title')}</h1>
         </div>
-        <div className="flex shrink-0 items-center">
+        <div className="ml-auto flex shrink-0 items-center">
           <Drawer open={templateOpen} onOpenChange={setTemplateOpen}>
             <DrawerTrigger asChild>
               <Button variant="ghost" size="icon" aria-label={t('new')}>
-                <FilePlus2 />
+                <FilePlus2 className="!size-5" />
               </Button>
             </DrawerTrigger>
             <DrawerContent>
@@ -208,7 +208,7 @@ export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}
             title={t('more')}
             trigger={
               <Button variant="ghost" size="icon" aria-label={t('more')}>
-                <EllipsisVertical />
+                <EllipsisVertical className="!size-5" />
               </Button>
             }
             items={[

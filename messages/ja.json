@@ -2807,6 +2807,34 @@
           "noFiles": "ファイルが見つかりません",
           "loading": "読み込み中..."
         },
+        "composerMenu": {
+          "loading": "読み込み中...",
+          "empty": "一致する結果がありません",
+          "commands": {
+            "title": "クイックコマンド",
+            "placeholder": "コマンドを検索...",
+            "summarize": { "label": "要約", "description": "要点と結論を抽出", "prompt": "次の内容を要約し、要点と結論を抽出してください：" },
+            "organize": { "label": "ノートに整理", "description": "構造化された Markdown に整理", "prompt": "次の内容を明確で構造化された Markdown ノートに整理してください：" },
+            "rewrite": { "label": "推敲", "description": "意味を保ちながら表現を改善", "prompt": "意味を保ちながら、次の内容を推敲してください：" },
+            "translate": { "label": "翻訳", "description": "指定した言語に翻訳", "prompt": "次の内容を以下の言語に翻訳してください：" },
+            "searchNotes": { "label": "ノートを検索", "description": "ナレッジベースから関連情報を検索", "prompt": "ノートのナレッジベースを検索して回答してください：" },
+            "createNote": { "label": "ノートを作成", "description": "構造化された Markdown ノートを新規作成", "prompt": "次の要件に基づいて新しい Markdown ノートを作成してください：" }
+          },
+          "skills": {
+            "title": "Skills",
+            "scope": { "global": "グローバル", "project": "ワークスペース" }
+          },
+          "resources": {
+            "title": "コンテキストをリンク",
+            "placeholder": "ファイル、記録、キャンバスを検索...",
+            "files": "ファイル",
+            "records": "記録",
+            "canvases": "キャンバス",
+            "untitledRecord": "無題の記録",
+            "recordFallback": "記録内容",
+            "canvasSummary": "{nodes} ノード、{edges} エッジ"
+          }
+        },
         "stopped": "对话已终止",
         "newChat": "新しいチャット",
         "temporaryChat": "一時チャット"
@@ -3011,7 +3039,7 @@
     "arrange": { "title": "整列とグループ", "description": "選択したノードを整理します。", "alignHorizontal": "水平中央揃え", "alignVertical": "垂直中央揃え", "distributeHorizontal": "水平方向に均等配置", "distributeVertical": "垂直方向に均等配置", "group": "グループを作成" },
     "group": { "defaultLabel": "グループ" },
     "edge": { "title": "接続スタイル", "description": "選択した接続の経路とラベルを調整します。", "orthogonal": "折れ線", "straight": "直線", "curve": "曲線", "editLabel": "ラベルを編集", "labelPrompt": "接続ラベルを入力", "labelDescription": "ラベルは接続の中央に表示されます。空欄で削除できます。", "saveLabel": "ラベルを保存" },
-    "selection": { "tools": "ノードツール", "style": "ノードスタイル", "color": "アクセント", "customColor": "カスタムカラー", "border": "枠線", "solid": "実線", "dashed": "破線", "dotted": "点線", "borderWidth": "枠線の太さ", "fill": "背景", "transparent": "透明", "customFill": "カスタム背景色", "lock": "ノードをロック", "unlock": "ノードのロックを解除", "copyStyle": "スタイルをコピー", "pasteStyle": "スタイルを貼り付け", "styleCopied": "ノードスタイルをコピーしました", "stylePasted": "ノードスタイルを適用しました", "imagePasted": "画像をキャンバスに貼り付けました", "imagePasteError": "画像を貼り付けられませんでした", "chatContext": "キャンバス選択：ノード {nodes} 件、接続線 {edges} 件", "removeChatContext": "キャンバス選択を解除" },
+    "selection": { "tools": "ノードツール", "style": "ノードスタイル", "color": "アクセント", "customColor": "カスタムカラー", "border": "枠線", "solid": "実線", "dashed": "破線", "dotted": "点線", "borderWidth": "枠線の太さ", "fill": "背景", "transparent": "透明", "customFill": "カスタム背景色", "lock": "ノードをロック", "unlock": "ノードのロックを解除", "copyStyle": "スタイルをコピー", "pasteStyle": "スタイルを貼り付け", "styleCopied": "ノードスタイルをコピーしました", "stylePasted": "ノードスタイルを適用しました", "imagePasted": "画像をキャンバスに貼り付けました", "imagePasteError": "画像を貼り付けられませんでした", "chatContext": "キャンバス選択：ノード {nodes} 件、接続線 {edges} 件", "chatContextNodes": "{nodes} 個のノード", "chatContextNodesAndRelations": "{nodes} 個のノード · {relations} 件の関係", "removeChatContext": "キャンバス選択を解除" },
     "layer": { "front": "最前面へ", "forward": "前面へ移動", "backward": "背面へ移動", "back": "最背面へ" },
     "noteNode": { "title": "ノート参照を追加", "description": "ファイルマネージャーからノートを選択します。ノードをダブルクリックすると元ファイルを開けます。", "search": "ノートを検索...", "empty": "ノートが見つかりません", "group": "ワークスペースのノート", "added": "ノート「{name}」を追加しました" },
     "footer": {

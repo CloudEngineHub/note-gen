@@ -48,6 +48,7 @@ export interface AgentHandlerConfig {
   }
   attachments?: RuntimeChatAttachment[]
   imageAttachments?: AgentImageAttachment[]
+  selectedSkills?: string[]
 }
 
 export class AgentHandler {
@@ -80,6 +81,7 @@ export class AgentHandler {
       isRunning: true,
       isThinking: false,
       status: 'preparing_context',
+      selectedSkills: this.config.selectedSkills,
       currentStepStartTime: Date.now(),
     })
 
@@ -126,6 +128,7 @@ export class AgentHandler {
         currentEditorState,
         currentQuote: this.config.currentQuote,
         availableSkills: skillsInfo,
+        selectedSkills: this.config.selectedSkills,
         selectedMcpServerIds,
         attachments: this.config.attachments,
         imageAttachments: this.config.imageAttachments,
@@ -301,14 +304,15 @@ export class AgentHandler {
       description: BUILTIN_SKILL_CREATOR.description,
     }
 
-    if (!skillsStore.autoMatch) {
-      return [creator]
-    }
-
     try {
       await skillsStore.initSkills()
       const enabledSkills = await skillManager.getEnabledSkills()
-      return [creator, ...enabledSkills
+      const selectedSkillIds = new Set(this.config.selectedSkills || [])
+      const visibleSkills = skillsStore.autoMatch
+        ? enabledSkills
+        : enabledSkills.filter(skill => selectedSkillIds.has(skill.metadata.id))
+
+      return [creator, ...visibleSkills
         .filter((skill) => skill.metadata.id !== BUILTIN_SKILL_CREATOR.id)
         .map((skill) => ({
           id: skill.metadata.id,

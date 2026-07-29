@@ -2804,6 +2804,34 @@
           "noFiles": "未找到文件",
           "loading": "載入中..."
         },
+        "composerMenu": {
+          "loading": "正在載入...",
+          "empty": "沒有符合結果",
+          "commands": {
+            "title": "快捷指令",
+            "placeholder": "搜尋指令...",
+            "summarize": { "label": "總結", "description": "提煉重點和結論", "prompt": "請總結以下內容，提煉重點和結論：" },
+            "organize": { "label": "整理成筆記", "description": "整理為結構清晰的 Markdown", "prompt": "請將以下內容整理成結構清晰的 Markdown 筆記：" },
+            "rewrite": { "label": "潤飾", "description": "保持原意並改善表達", "prompt": "請潤飾以下內容，保持原意並改善表達：" },
+            "translate": { "label": "翻譯", "description": "翻譯為指定語言", "prompt": "請將以下內容翻譯為：" },
+            "searchNotes": { "label": "搜尋筆記", "description": "在知識庫中尋找相關內容", "prompt": "請在我的筆記知識庫中搜尋並回答：" },
+            "createNote": { "label": "建立筆記", "description": "新增一篇結構清晰的 Markdown 筆記", "prompt": "請根據以下要求建立一篇新的 Markdown 筆記：" }
+          },
+          "skills": {
+            "title": "Skills",
+            "scope": { "global": "全域", "project": "工作區" }
+          },
+          "resources": {
+            "title": "關聯上下文",
+            "placeholder": "搜尋文件、記錄或畫布...",
+            "files": "文件",
+            "records": "記錄",
+            "canvases": "畫布",
+            "untitledRecord": "未命名記錄",
+            "recordFallback": "記錄內容",
+            "canvasSummary": "{nodes} 個節點，{edges} 條連線"
+          }
+        },
         "stopped": "对话已终止",
         "mcp": {
           "tooltip": "MCP 服务器"
@@ -3024,7 +3052,7 @@
     "arrange": { "title": "對齊與群組", "description": "整理目前選取的節點。", "alignHorizontal": "水平置中對齊", "alignVertical": "垂直置中對齊", "distributeHorizontal": "水平平均分布", "distributeVertical": "垂直平均分布", "group": "建立群組" },
     "group": { "defaultLabel": "群組" },
     "edge": { "title": "連線樣式", "description": "調整選取連線的路徑和文字。", "orthogonal": "折線", "straight": "直線", "curve": "曲線", "editLabel": "編輯連線文字", "labelPrompt": "輸入連線文字", "labelDescription": "文字會顯示在線段中間，留空即可移除。", "saveLabel": "儲存文字" },
-    "selection": { "tools": "節點工具", "style": "節點樣式", "color": "強調色", "customColor": "自訂顏色", "border": "邊框", "solid": "實線", "dashed": "虛線", "dotted": "點線", "borderWidth": "邊框粗細", "fill": "背景填色", "transparent": "透明", "customFill": "自訂填色", "lock": "鎖定節點", "unlock": "解鎖節點", "copyStyle": "複製樣式", "pasteStyle": "貼上樣式", "styleCopied": "節點樣式已複製", "stylePasted": "節點樣式已套用", "imagePasted": "圖片已貼到畫布", "imagePasteError": "貼上圖片失敗", "chatContext": "已關聯畫布元素：{nodes} 個節點，{edges} 條連線", "removeChatContext": "取消關聯畫布元素" },
+    "selection": { "tools": "節點工具", "style": "節點樣式", "color": "強調色", "customColor": "自訂顏色", "border": "邊框", "solid": "實線", "dashed": "虛線", "dotted": "點線", "borderWidth": "邊框粗細", "fill": "背景填色", "transparent": "透明", "customFill": "自訂填色", "lock": "鎖定節點", "unlock": "解鎖節點", "copyStyle": "複製樣式", "pasteStyle": "貼上樣式", "styleCopied": "節點樣式已複製", "stylePasted": "節點樣式已套用", "imagePasted": "圖片已貼到畫布", "imagePasteError": "貼上圖片失敗", "chatContext": "已關聯畫布元素：{nodes} 個節點，{edges} 條連線", "chatContextNodes": "{nodes} 個節點", "chatContextNodesAndRelations": "{nodes} 個節點 · {relations} 條關係", "removeChatContext": "取消關聯畫布元素" },
     "layer": { "front": "置於頂層", "forward": "上移一層", "backward": "下移一層", "back": "置於底層" },
     "noteNode": { "title": "新增筆記引用", "description": "從檔案管理器選擇一篇筆記，雙擊節點可以開啟原始檔案。", "search": "搜尋筆記...", "empty": "找不到筆記", "group": "工作區筆記", "added": "已新增筆記「{name}」" },
     "footer": {

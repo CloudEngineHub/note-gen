@@ -3,8 +3,6 @@ import * as React from "react"
 import { useEffect, useRef, useState, useCallback } from "react"
 import useSettingStore from "@/stores/setting"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import useChatStore from "@/stores/chat"
 import useArticleStore from "@/stores/article"
 import useCanvasStore from "@/stores/canvas"
@@ -12,15 +10,13 @@ import { useTranslations } from 'next-intl'
 import { useLocalStorage } from 'react-use';
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { ChatSend } from "./chat-send"
-import { LinkedFileDisplay } from "./file-link"
 import { isLinkedFolder, LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
 import emitter from "@/lib/emitter"
 import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
 import { useIsMobile } from '@/hooks/use-mobile'
 import { ImageAttachments, ImageAttachment } from "./image-attachments"
-import { ImageIcon, MousePointer2, X } from "lucide-react"
+import { ImageIcon } from "lucide-react"
 import { isMobileDevice } from '@/lib/check'
-import { QuoteDisplay } from "./quote-display"
 import type { PendingQuote } from "@/stores/chat"
 import { AgentApprovalPanel } from "./agent-approval-panel"
 import { cancelPendingAgentAction, confirmPendingAgentAction } from "./agent-approval-actions"
@@ -40,6 +36,23 @@ import {
   createFolderAttachment,
   type RuntimeChatAttachment,
 } from '@/lib/chat-attachments'
+import {
+  ChatComposerMenu,
+  type ChatComposerMenuHandle,
+  type ComposerMenuMode,
+} from './chat-composer-menu'
+import {
+  ChatContextStrip,
+  getMentionedContextKey,
+  type MentionedContext,
+  type MentionedRecord,
+} from './chat-context-strip'
+import { getMarkListItemContent } from '@/app/core/main/mark/mark-list-item-content'
+import { getRecordIdFromTabPath } from '@/app/core/main/mark/mark-record-tab'
+import { getCanvasIdFromTabPath } from '@/app/core/main/canvas/canvas-tab'
+import { getMarkById, type Mark } from '@/db/marks'
+import type { CanvasProject, CanvasSelectionContext } from '@/types/canvas'
+import type { SkillMetadata } from '@/lib/skills/types'
 
 const MAX_IMAGE_ATTACHMENTS = 6
 const MAX_IMAGE_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
@@ -109,7 +122,16 @@ export const ChatInput = React.memo(function ChatInput() {
     agentState,
     isTemporaryConversation,
   } = useChatStore()
-  const { activeFilePath, currentArticle } = useArticleStore()
+  const {
+    activeFilePath,
+    activeTabId,
+    currentArticle,
+    openTabs,
+  } = useArticleStore()
+  const activeTabPath = React.useMemo(
+    () => openTabs.find(tab => tab.id === activeTabId)?.path || activeFilePath,
+    [activeFilePath, activeTabId, openTabs]
+  )
   const canvasSelectionContext = useCanvasStore(state => state.selectionContext)
   const setCanvasSelectionContext = useCanvasStore(state => state.setSelectionContext)
   const [isComposing, setIsComposing] = useState(false)
@@ -124,7 +146,16 @@ export const ChatInput = React.memo(function ChatInput() {
   const [fileAttachments, setFileAttachments] = useState<RuntimeChatAttachment[]>([])
   const [contextUsageLinkedContent, setContextUsageLinkedContent] = useState('')
   const [isImageDragOver, setIsImageDragOver] = useState(false)
+  const [composerMenu, setComposerMenu] = useState<{
+    mode: ComposerMenuMode
+    start: number
+    query: string
+  } | null>(null)
+  const [selectedSkills, setSelectedSkills] = useState<SkillMetadata[]>([])
+  const [activeTabContext, setActiveTabContext] = useState<MentionedContext | null>(null)
+  const [mentionedContexts, setMentionedContexts] = useState<MentionedContext[]>([])
   const chatSendRef = useRef<{ sendChat: () => void } | null>(null)
+  const composerMenuRef = useRef<ChatComposerMenuHandle>(null)
   const isMobile = useIsMobile()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -134,6 +165,45 @@ export const ChatInput = React.memo(function ChatInput() {
   const onboardingTypingTimerRefs = useRef<number[]>([])
   const maxImageSizeLabel = formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE_BYTES)
   const activeQuote = pendingQuote || editorSelectionQuote
+  const visibleActiveTabContext = React.useMemo(() => {
+    if (activeTabContext?.kind === 'record') {
+      return activeQuote?.articlePath === activeTabContext.record.articlePath
+        ? null
+        : activeTabContext
+    }
+    return activeTabContext
+  }, [activeQuote?.articlePath, activeTabContext])
+  const visibleMentionedContexts = React.useMemo(
+    () => mentionedContexts.filter(context => {
+      if (
+        visibleActiveTabContext
+        && getMentionedContextKey(visibleActiveTabContext) === getMentionedContextKey(context)
+      ) {
+        return false
+      }
+      if (context.kind === 'file') {
+        return !(
+          linkedResource
+          && !isLinkedFolder(linkedResource)
+          && (
+            linkedResource.path === context.file.path
+            || linkedResource.relativePath === context.file.relativePath
+          )
+        )
+      }
+      if (context.kind === 'record') {
+        return activeQuote?.articlePath !== context.record.articlePath
+      }
+      return canvasSelectionContext?.canvasId !== context.canvas.canvasId
+    }),
+    [
+      activeQuote?.articlePath,
+      canvasSelectionContext?.canvasId,
+      linkedResource,
+      mentionedContexts,
+      visibleActiveTabContext,
+    ]
+  )
   const contextUsageLinkedResourceIsActiveFile = Boolean(
     linkedResource
     && !isLinkedFolder(linkedResource)
@@ -174,6 +244,22 @@ export const ChatInput = React.memo(function ChatInput() {
     activeQuote?.fullContent,
     contextUsageAgentRuntime,
     canvasSelectionContext ? JSON.stringify(canvasSelectionContext) : '',
+    visibleActiveTabContext
+      ? visibleActiveTabContext.kind === 'record'
+        ? visibleActiveTabContext.record.fullContent
+        : visibleActiveTabContext.kind === 'canvas'
+          ? JSON.stringify(visibleActiveTabContext.canvas)
+          : `${visibleActiveTabContext.file.name}\n${visibleActiveTabContext.file.relativePath}`
+      : '',
+    ...visibleMentionedContexts.map(context => {
+      if (context.kind === 'file') {
+        return `${context.file.name}\n${context.file.relativePath}`
+      }
+      if (context.kind === 'record') {
+        return context.record.fullContent
+      }
+      return JSON.stringify(context.canvas)
+    }),
     ...fileAttachments.map(attachment => attachment.preview || ''),
   ].filter(Boolean).join('\n\n'), [
     activeQuote?.fullContent,
@@ -186,6 +272,8 @@ export const ChatInput = React.memo(function ChatInput() {
     linkedResource,
     contextUsageLinkedResourceIsActiveFile,
     linkedResourcePreview,
+    visibleMentionedContexts,
+    visibleActiveTabContext,
   ])
 
   useEffect(() => {
@@ -238,6 +326,108 @@ export const ChatInput = React.memo(function ChatInput() {
       textarea.style.height = `${newHeight}px`
     })
   }, [])
+
+  function handleComposerTextChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
+    const nextText = event.target.value
+    const cursor = event.target.selectionStart ?? nextText.length
+    const trigger = nextText[cursor - 1]
+    const previousCharacter = nextText[cursor - 2]
+    const isTriggerBoundary = cursor === 1 || /\s/.test(previousCharacter || '')
+
+    if ((trigger === '/' || trigger === '@') && isTriggerBoundary) {
+      applyTypedText(nextText)
+      setComposerMenu({
+        mode: trigger === '/' ? 'command' : 'resource',
+        start: cursor - 1,
+        query: '',
+      })
+      return
+    }
+
+    if (composerMenu) {
+      const menuTrigger = composerMenu.mode === 'command' ? '/' : '@'
+      const triggerStillExists = nextText[composerMenu.start] === menuTrigger
+      if (!triggerStillExists || cursor <= composerMenu.start) {
+        setComposerMenu(null)
+      } else {
+        setComposerMenu({
+          ...composerMenu,
+          query: nextText.slice(composerMenu.start + 1, cursor),
+        })
+      }
+    }
+
+    setText(nextText)
+    const textarea = event.target
+    textarea.style.height = 'auto'
+    const newHeight = Math.min(textarea.scrollHeight, 240)
+    textarea.style.height = `${newHeight}px`
+  }
+
+  function closeComposerMenu() {
+    setComposerMenu(null)
+    window.requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
+  function replaceComposerMenuToken(replacement = '') {
+    if (!composerMenu) return
+
+    const tokenEnd = composerMenu.start + composerMenu.query.length + 1
+    const nextText = `${text.slice(0, composerMenu.start)}${replacement}${text.slice(tokenEnd)}`
+    const nextCursor = composerMenu.start + replacement.length
+    applyTypedText(nextText)
+    setComposerMenu(null)
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      textareaRef.current?.setSelectionRange(nextCursor, nextCursor)
+    })
+  }
+
+  function createRecordQuote(mark: Mark): MentionedRecord {
+    const display = getMarkListItemContent(mark)
+    const fullContent = [mark.content, mark.desc, mark.url]
+      .map(value => value?.trim())
+      .filter(Boolean)
+      .join('\n\n')
+    const fileName = display.title || t('record.chat.input.composerMenu.resources.untitledRecord')
+
+    return {
+      quote: display.preview || fullContent,
+      fullContent,
+      fileName,
+      startLine: -1,
+      endLine: -1,
+      from: -1,
+      to: -1,
+      articlePath: `record:${mark.id}`,
+      markType: mark.type,
+    }
+  }
+
+  function createCanvasContext(project: CanvasProject): CanvasSelectionContext {
+    return {
+      canvasId: project.id,
+      canvasTitle: project.title,
+      scope: 'canvas',
+      nodes: project.document.nodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        label: String(node.data.label || node.data.description || node.type),
+        description: node.data.description,
+        filePath: node.data.filePath,
+        recordId: node.data.recordId,
+        url: node.data.url,
+        checked: node.data.checked,
+        chart: node.data.chart,
+      })),
+      edges: project.document.edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+      })),
+    }
+  }
 
   // 添加输入到历史记录
   function addToHistory(input: string) {
@@ -730,9 +920,12 @@ export const ChatInput = React.memo(function ChatInput() {
     }
     addToHistory(text)
     setText('')
+    setComposerMenu(null)
     setHistoryIndex(-1)
     setAttachedImages([])
     setFileAttachments([])
+    setSelectedSkills([])
+    setMentionedContexts([])
     clearPendingQuote()
     if (isMobileDevice_) {
       clearEditorSelectionQuote()
@@ -891,8 +1084,46 @@ ${previewLines.join('\n')}
 
   // 自动关联当前打开的 markdown 文件或文件夹
   useEffect(() => {
+    let cancelled = false
+
     async function linkCurrentResource() {
-      if (!activeFilePath) {
+      if (!activeTabPath) {
+        setActiveTabContext(null)
+        setLinkedResource(null)
+        setChatLinkedResource(null)
+        setLinkedResourcePreview(null)
+        return
+      }
+
+      const recordId = getRecordIdFromTabPath(activeTabPath)
+      if (recordId !== null) {
+        const mark = await getMarkById(recordId)
+        if (cancelled) return
+        setActiveTabContext(mark && mark.deleted === 0
+          ? { kind: 'record', record: createRecordQuote(mark) }
+          : null)
+        setLinkedResource(null)
+        setChatLinkedResource(null)
+        setLinkedResourcePreview(null)
+        return
+      }
+
+      const canvasId = getCanvasIdFromTabPath(activeTabPath)
+      if (canvasId !== null) {
+        const canvasStore = useCanvasStore.getState()
+        const project = canvasStore.projects.find(item => item.id === canvasId)
+          || await canvasStore.openProject(canvasId)
+        if (cancelled) return
+        const latestDocument = useCanvasStore.getState().documents[canvasId]
+        setActiveTabContext(project
+          ? {
+              kind: 'canvas',
+              canvas: createCanvasContext({
+                ...project,
+                document: latestDocument || project.document,
+              }),
+            }
+          : null)
         setLinkedResource(null)
         setChatLinkedResource(null)
         setLinkedResourcePreview(null)
@@ -900,48 +1131,53 @@ ${previewLines.join('\n')}
       }
 
       const workspace = await getWorkspacePath()
+      if (cancelled) return
 
       // 检查是否是支持的文件类型（包括 markdown、代码文件等）
-      if (activeFilePath.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template)$/i)) {
+      if (activeTabPath.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template)$/i)) {
         // 文件关联逻辑
-        const fileName = activeFilePath.split('/').pop() || activeFilePath
+        const fileName = activeTabPath.split('/').pop() || activeTabPath
 
         // 构建完整路径
         let fullPath: string
         if (workspace.isCustom) {
-          const pathParts = activeFilePath.split('/')
+          const pathParts = activeTabPath.split('/')
           fullPath = workspace.path + '/' + pathParts.join('/')
         } else {
-          fullPath = activeFilePath
+          fullPath = activeTabPath
         }
 
         const resource = {
           name: fileName,
           path: fullPath,
-          relativePath: activeFilePath
+          relativePath: activeTabPath
         }
+        setActiveTabContext(null)
         setLinkedResource(resource)
         setChatLinkedResource(resource)
+        setLinkedResourcePreview(null)
 
         // 生成并设置文件预览
-        const preview = await generateFilePreview(fullPath, workspace.isCustom, activeFilePath === resource.relativePath)
+        const preview = await generateFilePreview(fullPath, workspace.isCustom, activeTabPath === resource.relativePath)
+        if (cancelled) return
         setLinkedResourcePreview(preview)
-      } else if (!activeFilePath.includes('.')) {
+      } else if (!activeTabPath.includes('.')) {
         // 文件夹关联逻辑 - 只有当路径不包含 . 时才可能是文件夹
-        const folderName = activeFilePath.split('/').pop() || activeFilePath
+        const folderName = activeTabPath.split('/').pop() || activeTabPath
 
         // 构建完整路径
         let fullPath: string
         if (workspace.isCustom) {
-          const pathParts = activeFilePath.split('/')
+          const pathParts = activeTabPath.split('/')
           fullPath = workspace.path + '/' + pathParts.join('/')
         } else {
-          fullPath = activeFilePath
+          fullPath = activeTabPath
         }
 
         // 计算文件夹中的文件数量和索引状态
         const { collectMarkdownFiles } = await import('@/lib/files')
-        const files = await collectMarkdownFiles(activeFilePath)
+        const files = await collectMarkdownFiles(activeTabPath)
+        if (cancelled) return
         const { vectorIndexedFiles } = useArticleStore.getState()
         const indexedCount = files.filter(f =>
           vectorIndexedFiles.has(f.path)
@@ -952,36 +1188,42 @@ ${previewLines.join('\n')}
           const resource = {
             name: folderName,
             path: fullPath,
-            relativePath: activeFilePath,
+            relativePath: activeTabPath,
             fileCount: files.length,
             indexedCount: indexedCount
           }
+          setActiveTabContext(null)
           setLinkedResource(resource)
           setChatLinkedResource(resource)
           // 文件夹不生成行号预览
           setLinkedResourcePreview(null)
         } else {
           // 没有索引文件，清除关联
+          setActiveTabContext(null)
           setLinkedResource(null)
           setChatLinkedResource(null)
           setLinkedResourcePreview(null)
         }
       } else {
         // 不支持的文件类型（如 .docx, .pdf 等），不进行关联
+        setActiveTabContext(null)
         setLinkedResource(null)
         setChatLinkedResource(null)
         setLinkedResourcePreview(null)
       }
     }
 
-    linkCurrentResource()
-  }, [activeFilePath])
+    void linkCurrentResource()
+    return () => {
+      cancelled = true
+    }
+  }, [activeTabPath])
 
   return (
     <footer
       id="onboarding-target-chat-input"
       className={cn(
-        "flex w-full flex-col items-center justify-between",
+        "relative flex w-full flex-col items-center justify-between",
         isMobile ? "px-2 pb-1 pt-0" : "p-1"
       )}
     >
@@ -1000,11 +1242,6 @@ ${previewLines.join('\n')}
         pendingConfirmation={agentState.pendingConfirmation}
         onConfirm={confirmPendingAgentAction}
         onCancel={cancelPendingAgentAction}
-      />
-      <LinkedFileDisplay
-        linkedResource={linkedResource}
-        onFileRemove={removeLinkedFile}
-        mobileDockStyle={isMobile}
       />
       <div
         className={cn(
@@ -1048,32 +1285,26 @@ ${previewLines.join('\n')}
             </div>
           </div>
         )}
-        {activeQuote && (
-          <QuoteDisplay quoteData={activeQuote} onRemove={removeQuote} />
-        )}
-        {canvasSelectionContext && (
-          <div className="flex px-1 pt-1">
-            <Badge variant="secondary" className="min-w-0 max-w-full gap-1.5 font-normal">
-              <MousePointer2 data-icon="inline-start" />
-              <span className="truncate">
-                {t('canvas.selection.chatContext', {
-                  nodes: canvasSelectionContext.nodes.length,
-                  edges: canvasSelectionContext.edges.length,
-                })}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="-mr-1"
-                aria-label={t('canvas.selection.removeChatContext')}
-                onClick={() => setCanvasSelectionContext(null)}
-              >
-                <X data-icon="inline-start" />
-              </Button>
-            </Badge>
-          </div>
-        )}
+        <ChatContextStrip
+          linkedResource={linkedResource}
+          activeTabContext={visibleActiveTabContext}
+          quoteData={activeQuote}
+          canvasContext={canvasSelectionContext}
+          selectedSkills={selectedSkills}
+          mentionedContexts={visibleMentionedContexts}
+          onRemoveLinkedResource={removeLinkedFile}
+          onRemoveActiveTabContext={() => setActiveTabContext(null)}
+          onRemoveQuote={removeQuote}
+          onRemoveCanvas={() => setCanvasSelectionContext(null)}
+          onRemoveSkill={skillId => {
+            setSelectedSkills(current => current.filter(skill => skill.id !== skillId))
+          }}
+          onRemoveMentionedContext={key => {
+            setMentionedContexts(current =>
+              current.filter(context => getMentionedContextKey(context) !== key)
+            )
+          }}
+        />
         <ImageAttachments images={attachedImages} onRemove={removeImage} />
         <PendingFileAttachments attachments={fileAttachments} onRemove={removeFileAttachment} />
         <div className="relative w-full flex items-start">
@@ -1088,19 +1319,36 @@ ${previewLines.join('\n')}
             rows={1}
             disabled={!primaryModel}
             value={text}
-            onChange={(e) => {
-              setText(e.target.value)
-              const textarea = e.target
-              textarea.style.height = 'auto'
-              const newHeight = Math.min(textarea.scrollHeight, 240)
-              textarea.style.height = `${newHeight}px`
-            }}
+            onChange={handleComposerTextChange}
             placeholder={loading ? steeringPlaceholder : defaultPlaceholder}
             onKeyDown={(e) => {
               const textarea = e.target as HTMLTextAreaElement
               const cursorPosition = textarea.selectionStart
               const isAtStart = cursorPosition === 0
               const isAtEnd = cursorPosition === text.length
+
+              if (composerMenu && !isComposing) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault()
+                  composerMenuRef.current?.moveSelection(1)
+                  return
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault()
+                  composerMenuRef.current?.moveSelection(-1)
+                  return
+                }
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  composerMenuRef.current?.selectCurrent()
+                  return
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault()
+                  closeComposerMenu()
+                  return
+                }
+              }
 
               if (e.key === "Enter" && !isComposing && !e.shiftKey && e.keyCode === 13) {
                 e.preventDefault()
@@ -1131,6 +1379,13 @@ ${previewLines.join('\n')}
             onCompositionEnd={() => setTimeout(() => {
               setIsComposing(false)
             }, 0)}
+            onBlur={() => {
+              window.requestAnimationFrame(() => {
+                if (document.activeElement !== textareaRef.current) {
+                  setComposerMenu(null)
+                }
+              })
+            }}
             onPaste={handlePaste}
           />
         </div>
@@ -1167,6 +1422,25 @@ ${previewLines.join('\n')}
               fileAttachments={fileAttachments}
               quoteData={activeQuote}
               canvasSelectionContext={canvasSelectionContext}
+              selectedSkillIds={selectedSkills.map(skill => skill.id)}
+              mentionedFiles={[
+                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleMentionedContexts,
+              ].flatMap(context =>
+                context.kind === 'file' ? [context.file] : []
+              )}
+              mentionedRecords={[
+                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleMentionedContexts,
+              ].flatMap(context =>
+                context.kind === 'record' ? [context.record] : []
+              )}
+              mentionedCanvases={[
+                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleMentionedContexts,
+              ].flatMap(context =>
+                context.kind === 'canvas' ? [context.canvas] : []
+              )}
               dockStyle={isMobile}
               ref={chatSendRef}
             />
@@ -1174,6 +1448,64 @@ ${previewLines.join('\n')}
         </div>
 
       </div>
+      <ChatComposerMenu
+        ref={composerMenuRef}
+        mode={composerMenu?.mode ?? null}
+        query={composerMenu?.query ?? ''}
+        onClose={closeComposerMenu}
+        onCommandSelect={prompt => replaceComposerMenuToken(prompt)}
+        onFileSelect={file => {
+          const duplicatesLinkedFile = Boolean(
+            linkedResource
+            && !isLinkedFolder(linkedResource)
+            && linkedResource.path === file.path
+          )
+          if (!duplicatesLinkedFile) {
+            const context: MentionedContext = { kind: 'file', file }
+            const key = getMentionedContextKey(context)
+            setMentionedContexts(current =>
+              current.some(selected => getMentionedContextKey(selected) === key)
+                ? current
+                : [...current, context]
+            )
+          }
+          replaceComposerMenuToken()
+        }}
+        onRecordSelect={mark => {
+          const record = createRecordQuote(mark)
+          if (activeQuote?.articlePath !== record.articlePath) {
+            const context: MentionedContext = { kind: 'record', record }
+            const key = getMentionedContextKey(context)
+            setMentionedContexts(current =>
+              current.some(selected => getMentionedContextKey(selected) === key)
+                ? current
+                : [...current, context]
+            )
+          }
+          replaceComposerMenuToken()
+        }}
+        onCanvasSelect={project => {
+          const canvas = createCanvasContext(project)
+          if (canvasSelectionContext?.canvasId !== canvas.canvasId) {
+            const context: MentionedContext = { kind: 'canvas', canvas }
+            const key = getMentionedContextKey(context)
+            setMentionedContexts(current =>
+              current.some(selected => getMentionedContextKey(selected) === key)
+                ? current
+                : [...current, context]
+            )
+          }
+          replaceComposerMenuToken()
+        }}
+        onSkillSelect={skill => {
+          setSelectedSkills(current =>
+            current.some(selected => selected.id === skill.id)
+              ? current
+              : [...current, skill]
+          )
+          replaceComposerMenuToken()
+        }}
+      />
     </footer>
   )
 })

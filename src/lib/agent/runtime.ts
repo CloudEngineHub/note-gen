@@ -683,6 +683,7 @@ export class AgentRuntime {
       userInput: input.userInput,
       currentQuote: input.currentQuote,
       availableSkills: input.availableSkills,
+      selectedSkills: input.selectedSkills,
       selectedMcpServerIds: input.selectedMcpServerIds,
       attachments: input.attachments,
       imageAttachments: input.imageAttachments,
@@ -715,6 +716,7 @@ export class AgentRuntime {
       hasQuote: Boolean(input.currentQuote),
       hasEditorState: Boolean(input.currentEditorState),
       availableSkillCount: input.availableSkills?.length || 0,
+      selectedSkills: input.selectedSkills || [],
       directMcpToolCount: mcpToolCatalog.directTools.length,
       deferredMcpToolCount: mcpToolCatalog.deferredEntries.length,
       mcpSchemaTokens: mcpToolCatalog.schemaTokens,
@@ -978,6 +980,30 @@ export class AgentRuntime {
       context.userInput = latest.text
       context.currentQuote = latest.currentQuote
       context.attachments = latest.attachments ?? context.attachments
+      const steeredSkillIds = payloads.flatMap(payload => payload.selectedSkills || [])
+      if (steeredSkillIds.length > 0) {
+        context.selectedSkills = [
+          ...new Set([...(context.selectedSkills || []), ...steeredSkillIds]),
+        ]
+        const availableSkillIds = new Set(
+          (context.availableSkills || []).map(skill => skill.id)
+        )
+        for (const skillId of steeredSkillIds) {
+          if (availableSkillIds.has(skillId)) continue
+          const skill = skillManager.getSkill(skillId)
+          if (!skill || skill.metadata.enabled === false) continue
+          context.availableSkills = [
+            ...(context.availableSkills || []),
+            {
+              id: skill.metadata.id,
+              name: skill.metadata.name,
+              description: skill.metadata.description,
+              scope: skill.metadata.scope,
+            },
+          ]
+          availableSkillIds.add(skillId)
+        }
+      }
       if (latest.imageAttachments?.length) {
         context.imageAttachments = [
           ...(context.imageAttachments ?? []),

@@ -6,7 +6,7 @@ import useTagStore from "@/stores/tag"
 import { TooltipButton } from "@/components/tooltip-button"
 import { useImperativeHandle, forwardRef, useRef } from "react"
 import { useTranslations } from "next-intl"
-import { LinkedResource, isLinkedFolder } from "@/lib/files"
+import { LinkedResource, isLinkedFolder, type MarkdownFile } from "@/lib/files"
 import { readTextFile } from "@tauri-apps/plugin-fs"
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { AgentHandler } from "@/lib/agent/agent-handler"
@@ -40,18 +40,43 @@ import type { CanvasSelectionContext } from '@/types/canvas'
 
 function buildCanvasSelectionContext(context: CanvasSelectionContext | null) {
   if (!context) return ''
+  const nodeLabels = new Map(context.nodes.map(node => [node.id, node.label]))
   const nodes = context.nodes.length > 0
-    ? context.nodes.map(node => `- id=${node.id}; type=${node.type}; label=${JSON.stringify(node.label)}`).join('\n')
+    ? context.nodes.map(node => {
+        const details = [
+          `id=${node.id}`,
+          `type=${node.type}`,
+          `label=${JSON.stringify(node.label)}`,
+          node.description ? `description=${JSON.stringify(node.description)}` : '',
+          node.filePath ? `filePath=${JSON.stringify(node.filePath)}` : '',
+          node.recordId !== undefined ? `recordId=${node.recordId}` : '',
+          node.url ? `url=${JSON.stringify(node.url)}` : '',
+          node.checked !== undefined ? `checked=${node.checked}` : '',
+          node.chart ? `chartData=${JSON.stringify({
+            title: node.chart.title,
+            type: node.chart.type,
+            categoryLabel: node.chart.categoryLabel,
+            series: node.chart.series,
+            data: node.chart.data,
+            primarySeriesId: node.chart.primarySeriesId,
+            sourceFormat: node.chart.sourceFormat,
+          })}` : '',
+        ].filter(Boolean)
+        return `- ${details.join('; ')}`
+      }).join('\n')
     : '- 无'
   const edges = context.edges.length > 0
     ? context.edges.map(edge => (
-        `- id=${edge.id}; source=${edge.source}; target=${edge.target}${edge.label ? `; label=${JSON.stringify(edge.label)}` : ''}`
+        `- id=${edge.id}; source=${edge.source}${nodeLabels.has(edge.source) ? ` (${JSON.stringify(nodeLabels.get(edge.source))})` : ''}; target=${edge.target}${nodeLabels.has(edge.target) ? ` (${JSON.stringify(nodeLabels.get(edge.target))})` : ''}${edge.label ? `; label=${JSON.stringify(edge.label)}` : ''}`
       )).join('\n')
     : '- 无'
+  const selectionGuidance = context.scope === 'selection'
+    ? '以下节点是用户为本次对话明确选中的操作对象；连线包含用户选中的连线，以及所选节点之间已有的关联。回答或调用画布工具时优先使用这些精确 ID；除非用户明确要求，不要修改未选中的元素。'
+    : '以下是用户关联的整个画布。回答时请结合节点内容与连线关系；调用画布工具时使用这里提供的精确 ID。'
   return [
-    '## 用户关联的画布元素',
+    context.scope === 'selection' ? '## 用户选择的画布节点与关系' : '## 用户关联的画布',
     `画布：${context.canvasTitle}（ID: ${context.canvasId}）`,
-    '以下节点和连线是用户为本次对话明确选中的操作对象。回答或调用画布工具时优先使用这些精确 ID；除非用户明确要求，不要修改未选中的元素。',
+    selectionGuidance,
     '',
     '节点：',
     nodes,
@@ -115,6 +140,10 @@ interface ChatSendProps {
   fileAttachments?: RuntimeChatAttachment[];
   quoteData?: QuoteData | null;
   canvasSelectionContext?: CanvasSelectionContext | null;
+  selectedSkillIds?: string[];
+  mentionedFiles?: MarkdownFile[];
+  mentionedRecords?: QuoteData[];
+  mentionedCanvases?: CanvasSelectionContext[];
   dockStyle?: boolean;
 }
 
@@ -126,6 +155,10 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   fileAttachments = [],
   quoteData = null,
   canvasSelectionContext = null,
+  selectedSkillIds = [],
+  mentionedFiles = [],
+  mentionedRecords = [],
+  mentionedCanvases = [],
   dockStyle = false,
 }, ref) => {
   const { primaryModel, agentPermissionMode } = useSettingStore()
@@ -233,6 +266,47 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
     }
 
     context += buildCanvasSelectionContext(canvasSelectionContext)
+    context += await buildMentionedContext()
+
+    return context
+  }
+
+  const buildMentionedContext = async () => {
+    let context = ''
+
+    for (const file of mentionedFiles) {
+      try {
+        const workspace = await getWorkspacePath()
+        const content = workspace.isCustom
+          ? await readTextFile(file.path)
+          : await getFilePathOptions(file.path).then(({ path, baseDir }) =>
+              readTextFile(path, { baseDir })
+            )
+        context += [
+          '## 用户通过 @ 关联的文件',
+          `文件：${file.relativePath}`,
+          '',
+          content,
+          '',
+        ].join('\n')
+      } catch (error) {
+        console.error('Failed to read @ mentioned file:', error)
+      }
+    }
+
+    for (const record of mentionedRecords) {
+      context += [
+        '## 用户通过 @ 关联的记录',
+        `记录：${record.fileName}`,
+        '',
+        record.fullContent,
+        '',
+      ].join('\n')
+    }
+
+    for (const canvas of mentionedCanvases) {
+      context += buildCanvasSelectionContext(canvas)
+    }
 
     return context
   }
@@ -445,6 +519,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         runId: currentState.agentState.runId,
         status: aborted ? 'stopped' : 'failed',
         loadedSkills: currentState.agentState.loadedSkills || [],
+        selectedSkills: currentState.agentState.selectedSkills || [],
         iterations: currentState.agentState.currentIteration,
       }
 
@@ -498,6 +573,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         : undefined,
       attachments: fileAttachments,
       imageAttachments: agentImageAttachments,
+      selectedSkills: selectedSkillIds,
       onFinalAnswerRender: (markdownContent) => {
         // 检测到 Final Answer 时触发渲染
         setAgentState({
@@ -546,6 +622,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           runId: agentState.runId,
           status: effectivelyStopped ? 'stopped' : agentState.status,
           loadedSkills: agentState.loadedSkills || [],
+          selectedSkills: agentState.selectedSkills || [],
           iterations: agentState.currentIteration,
         }
 
@@ -893,6 +970,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       }
 
       context += buildCanvasSelectionContext(canvasSelectionContext)
+      context += await buildMentionedContext()
 
       // 6. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
       const compactionContext = [
@@ -1065,6 +1143,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         const payload: AgentSteeringPayload = {
           sequence,
           text,
+          selectedSkills: selectedSkillIds,
           additionalContext,
           currentQuote: steeringQuote,
           attachments: fileAttachments,

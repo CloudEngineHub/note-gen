@@ -2881,6 +2881,34 @@
           "noFiles": "Nenhum arquivo encontrado",
           "loading": "Carregando..."
         },
+        "composerMenu": {
+          "loading": "Carregando...",
+          "empty": "Nenhum resultado correspondente",
+          "commands": {
+            "title": "Comandos rápidos",
+            "placeholder": "Pesquisar comandos...",
+            "summarize": { "label": "Resumir", "description": "Extrair pontos principais e conclusões", "prompt": "Resuma o conteúdo a seguir e extraia os pontos principais e as conclusões:" },
+            "organize": { "label": "Organizar como nota", "description": "Criar Markdown estruturado", "prompt": "Organize o conteúdo a seguir em uma nota Markdown clara e estruturada:" },
+            "rewrite": { "label": "Aprimorar", "description": "Melhorar a redação sem alterar o sentido", "prompt": "Aprimore o conteúdo a seguir preservando seu significado:" },
+            "translate": { "label": "Traduzir", "description": "Traduzir para o idioma escolhido", "prompt": "Traduza o conteúdo a seguir para:" },
+            "searchNotes": { "label": "Pesquisar notas", "description": "Encontrar conteúdo relacionado na base de conhecimento", "prompt": "Pesquise na minha base de notas e responda:" },
+            "createNote": { "label": "Criar nota", "description": "Criar uma nota Markdown estruturada", "prompt": "Crie uma nova nota Markdown com base nestes requisitos:" }
+          },
+          "skills": {
+            "title": "Skills",
+            "scope": { "global": "Global", "project": "Workspace" }
+          },
+          "resources": {
+            "title": "Vincular contexto",
+            "placeholder": "Pesquisar arquivos, registros ou telas...",
+            "files": "Arquivos",
+            "records": "Registros",
+            "canvases": "Telas",
+            "untitledRecord": "Registro sem título",
+            "recordFallback": "Conteúdo do registro",
+            "canvasSummary": "{nodes} nós, {edges} conexões"
+          }
+        },
         "stopped": "A conversa foi encerrada",
         "newChat": "Novo Chat",
         "temporaryChat": "Chat temporário"
@@ -3017,7 +3045,7 @@
     "arrange": { "title": "Alinhar e agrupar", "description": "Organize os nós selecionados.", "alignHorizontal": "Alinhar centros horizontais", "alignVertical": "Alinhar centros verticais", "distributeHorizontal": "Distribuir horizontalmente", "distributeVertical": "Distribuir verticalmente", "group": "Criar grupo" },
     "group": { "defaultLabel": "Grupo" },
     "edge": { "title": "Estilo da conexão", "description": "Ajuste o caminho e o rótulo da conexão selecionada.", "orthogonal": "Ortogonal", "straight": "Reta", "curve": "Curva", "editLabel": "Editar rótulo", "labelPrompt": "Digite o rótulo da conexão", "labelDescription": "O rótulo aparece no centro da conexão. Deixe vazio para remover.", "saveLabel": "Salvar rótulo" },
-    "selection": { "tools": "Ferramentas do nó", "style": "Estilo do nó", "color": "Destaque", "customColor": "Cor personalizada", "border": "Borda", "solid": "Sólida", "dashed": "Tracejada", "dotted": "Pontilhada", "borderWidth": "Espessura da borda", "fill": "Fundo", "transparent": "Transparente", "customFill": "Cor de fundo personalizada", "lock": "Bloquear nós", "unlock": "Desbloquear nós", "copyStyle": "Copiar estilo", "pasteStyle": "Colar estilo", "styleCopied": "Estilo do nó copiado", "stylePasted": "Estilo do nó aplicado", "imagePasted": "Imagem colada na tela", "imagePasteError": "Não foi possível colar a imagem", "chatContext": "Seleção da tela: {nodes} nós, {edges} conexões", "removeChatContext": "Remover seleção da tela" },
+    "selection": { "tools": "Ferramentas do nó", "style": "Estilo do nó", "color": "Destaque", "customColor": "Cor personalizada", "border": "Borda", "solid": "Sólida", "dashed": "Tracejada", "dotted": "Pontilhada", "borderWidth": "Espessura da borda", "fill": "Fundo", "transparent": "Transparente", "customFill": "Cor de fundo personalizada", "lock": "Bloquear nós", "unlock": "Desbloquear nós", "copyStyle": "Copiar estilo", "pasteStyle": "Colar estilo", "styleCopied": "Estilo do nó copiado", "stylePasted": "Estilo do nó aplicado", "imagePasted": "Imagem colada na tela", "imagePasteError": "Não foi possível colar a imagem", "chatContext": "Seleção da tela: {nodes} nós, {edges} conexões", "chatContextNodes": "{nodes} nós", "chatContextNodesAndRelations": "{nodes} nós · {relations} relações", "removeChatContext": "Remover seleção da tela" },
     "layer": { "front": "Trazer para frente", "forward": "Avançar uma camada", "backward": "Recuar uma camada", "back": "Enviar para trás" },
     "noteNode": { "title": "Adicionar referência de nota", "description": "Escolha uma nota no gerenciador de arquivos. Clique duas vezes no nó para abrir o arquivo original.", "search": "Buscar notas...", "empty": "Nenhuma nota encontrada", "group": "Notas do espaço de trabalho", "added": "Nota “{name}” adicionada" },
     "footer": {

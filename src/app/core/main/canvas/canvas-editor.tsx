@@ -430,7 +430,11 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   useEffect(() => {
     if (activeCanvasId !== canvasId) return
     const selectedNodes = nodes.filter(node => node.selected)
-    const selectedEdges = edges.filter(edge => edge.selected)
+    const selectedNodeIds = new Set(selectedNodes.map(node => node.id))
+    const selectedEdges = edges.filter(edge => (
+      edge.selected
+      || (selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target))
+    ))
     if (selectedNodes.length === 0 && selectedEdges.length === 0) {
       setCanvasSelectionContext(null)
       return
@@ -438,10 +442,17 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     setCanvasSelectionContext({
       canvasId,
       canvasTitle: projects.find(project => project.id === canvasId)?.title || t('untitled'),
+      scope: 'selection',
       nodes: selectedNodes.map(node => ({
         id: node.id,
         type: node.type as CanvasNode['type'],
         label: String(node.data.label || node.type || t('untitled')),
+        description: typeof node.data.description === 'string' ? node.data.description : undefined,
+        filePath: typeof node.data.filePath === 'string' ? node.data.filePath : undefined,
+        recordId: typeof node.data.recordId === 'number' ? node.data.recordId : undefined,
+        url: typeof node.data.url === 'string' ? node.data.url : undefined,
+        checked: typeof node.data.checked === 'boolean' ? node.data.checked : undefined,
+        chart: node.data.chart,
       })),
       edges: selectedEdges.map(edge => ({
         id: edge.id,

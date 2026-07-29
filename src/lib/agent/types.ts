@@ -80,6 +80,7 @@ export interface AgentContextSnapshot {
   userInput: string
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
+  selectedSkills?: string[]
   selectedMcpServerIds?: string[]
   attachments?: RuntimeChatAttachment[]
   imageAttachments?: AgentImageAttachment[]
@@ -227,6 +228,7 @@ export interface AgentRuntimeInput {
   currentEditorState?: AgentEditorStateSnapshot
   currentQuote?: AgentQuoteSnapshot
   availableSkills?: AgentSkillSummary[]
+  selectedSkills?: string[]
   selectedMcpServerIds?: string[]
   attachments?: RuntimeChatAttachment[]
   imageAttachments?: AgentImageAttachment[]
@@ -239,6 +241,7 @@ export interface AgentRuntimeInput {
 export interface AgentSteeringPayload {
   sequence: number
   text: string
+  selectedSkills?: string[]
   imageUrls?: string[]
   additionalContext?: string
   currentQuote?: AgentQuoteSnapshot
