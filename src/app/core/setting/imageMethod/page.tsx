@@ -21,7 +21,7 @@ export default function ImageMethod() {
             <ItemTitle>{t('enable.title')}</ItemTitle>
             <ItemDescription>{t('enable.desc')}</ItemDescription>
           </ItemContent>
-          <ItemActions>
+          <ItemActions className="mobile-setting-inline-action">
             <Switch
               checked={enableImageRecognition}
               onCheckedChange={setEnableImageRecognition}

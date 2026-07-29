@@ -124,7 +124,7 @@ function SortableItem({ item, config, onToggle, t }: SortableItemProps) {
           <ItemTitle>{config ? t(config.titleKey) : item.id}</ItemTitle>
           <ItemDescription className="line-clamp-1">{config ? t(config.descKey) : ''}</ItemDescription>
         </ItemContent>
-        <ItemActions onClick={(e) => e.stopPropagation()}>
+        <ItemActions className="mobile-setting-inline-action" onClick={(e) => e.stopPropagation()}>
           <Switch
             checked={item.enabled}
             onCheckedChange={() => onToggle(item.id)}

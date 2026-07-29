@@ -27,7 +27,7 @@ export default function SourceWrap() {
         <ItemTitle>{t('title')}</ItemTitle>
         <ItemDescription>{t('desc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="mobile-setting-inline-action">
         <Switch
           checked={editorSourceWrap}
           aria-label={t('title')}

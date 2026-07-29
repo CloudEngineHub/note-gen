@@ -35,7 +35,7 @@ export default function Outline({ showPosition = true }: { showPosition?: boolea
         <ItemTitle>{t('outlineEnable')}</ItemTitle>
         <ItemDescription>{t('outlineEnableDesc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="mobile-setting-inline-action">
         <Switch
           checked={enableOutline}
           aria-label={t('outlineEnable')}

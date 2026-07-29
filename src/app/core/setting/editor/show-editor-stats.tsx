@@ -27,7 +27,7 @@ export default function ShowEditorStats() {
         <ItemTitle>{t('title')}</ItemTitle>
         <ItemDescription>{t('desc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="mobile-setting-inline-action">
         <Switch
           checked={showEditorStats}
           aria-label={t('title')}

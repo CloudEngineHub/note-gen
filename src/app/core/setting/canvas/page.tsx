@@ -108,7 +108,7 @@ export default function CanvasSettingPage({ mobile = false }: { mobile?: boolean
               <ItemTitle>{t('display.showGrid.title')}</ItemTitle>
               <ItemDescription>{t('display.showGrid.desc')}</ItemDescription>
             </ItemContent>
-            <ItemActions>
+            <ItemActions className="mobile-setting-inline-action">
               <Switch
                 checked={canvasGridVisible}
                 aria-label={t('display.showGrid.title')}
@@ -125,7 +125,7 @@ export default function CanvasSettingPage({ mobile = false }: { mobile?: boolean
               <ItemTitle>{t('display.snapToGrid.title')}</ItemTitle>
               <ItemDescription>{t('display.snapToGrid.desc')}</ItemDescription>
             </ItemContent>
-            <ItemActions>
+            <ItemActions className="mobile-setting-inline-action">
               <Switch
                 checked={canvasSnapToGrid}
                 aria-label={t('display.snapToGrid.title')}
@@ -142,7 +142,7 @@ export default function CanvasSettingPage({ mobile = false }: { mobile?: boolean
               <ItemTitle>{t('display.minimap.title')}</ItemTitle>
               <ItemDescription>{t('display.minimap.desc')}</ItemDescription>
             </ItemContent>
-            <ItemActions>
+            <ItemActions className="mobile-setting-inline-action">
               <Switch
                 checked={canvasMinimapVisible}
                 aria-label={t('display.minimap.title')}

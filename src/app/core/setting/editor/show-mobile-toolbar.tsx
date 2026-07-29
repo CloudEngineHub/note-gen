@@ -27,7 +27,7 @@ export default function ShowMobileToolbar() {
         <ItemTitle>{t('title')}</ItemTitle>
         <ItemDescription>{t('desc')}</ItemDescription>
       </ItemContent>
-      <ItemActions>
+      <ItemActions className="mobile-setting-inline-action">
         <Switch
           checked={showMobileEditorToolbar}
           aria-label={t('title')}

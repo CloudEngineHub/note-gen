@@ -301,7 +301,7 @@ html, body {
     color: hsl(var(--destructive-foreground));
   }
 
-  .mobile-setting-screen [data-slot="item"].mobile-setting-skill-card:has(> [data-slot="item-actions"]) {
+  .mobile-setting-screen [data-slot="item"].mobile-setting-skill-card {
     flex-wrap: wrap;
     align-items: flex-start;
   }

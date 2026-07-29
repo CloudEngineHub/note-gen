@@ -453,7 +453,7 @@ export default function SyncPage() {
                         <ItemTitle>{t('settings.sync.autoPullOnOpen')}</ItemTitle>
                         <ItemDescription>{t('settings.sync.autoPullOnOpenDesc')}</ItemDescription>
                       </ItemContent>
-                      <ItemActions>
+                      <ItemActions className="mobile-setting-inline-action">
                         <Switch
                           checked={autoPullOnOpen}
                           onCheckedChange={setAutoPullOnOpen}
@@ -479,7 +479,7 @@ export default function SyncPage() {
                         <ItemTitle>{t('settings.sync.autoDataSync')}</ItemTitle>
                         <ItemDescription>{t('settings.sync.autoDataSyncDesc')}</ItemDescription>
                       </ItemContent>
-                      <ItemActions>
+                      <ItemActions className="mobile-setting-inline-action">
                         <Switch
                           checked={autoDataSyncEnabled}
                           onCheckedChange={setAutoDataSyncEnabled}
@@ -518,7 +518,7 @@ export default function SyncPage() {
                         <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
                         <ItemDescription>{t('settings.sync.autoDataSyncPrivacyDesc')}</ItemDescription>
                       </ItemContent>
-                      <ItemActions>
+                      <ItemActions className="mobile-setting-inline-action">
                         <Switch
                           checked={excludeSensitiveConfig}
                           onCheckedChange={handleExcludeSensitiveConfigChange}

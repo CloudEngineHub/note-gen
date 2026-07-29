@@ -332,7 +332,7 @@ export function ServerList({ mobile = false }: { mobile?: boolean }) {
                     </ItemTitle>
                     {safeEndpoint && <ItemDescription className="break-all font-mono">{safeEndpoint}</ItemDescription>}
                   </ItemContent>
-                  <ItemActions>
+                  <ItemActions className="mobile-setting-inline-action">
                     <Switch
                       checked={server.enabled}
                       onCheckedChange={(enabled) => handleServerEnabledChange(server, enabled)}

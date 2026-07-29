@@ -112,7 +112,7 @@ export function SystemBehaviorSettings() {
             <ItemTitle>{t('autostart.title')}</ItemTitle>
             <ItemDescription>{t('autostart.desc')}</ItemDescription>
           </ItemContent>
-          <ItemActions className="ml-auto">
+          <ItemActions className="ml-auto mobile-setting-inline-action">
             <Switch
               checked={autostart}
               disabled={autostartLoading}

@@ -174,9 +174,9 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
         <SheetContent
           side="left"
           showCloseButton={false}
-          overlayClassName="bg-background/20 duration-500 supports-backdrop-filter:backdrop-blur-md"
+          overlayClassName="mobile-me-sheet-overlay duration-500"
           className={cn(
-            "gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none",
+            "mobile-me-sheet-content gap-0 overflow-hidden border-0 bg-transparent p-0 shadow-none",
             "data-[side=left]:w-[88vw] data-[side=left]:max-w-[22.5rem] data-[side=left]:border-r-0",
             "duration-0 data-open:animate-none data-closed:animate-none"
           )}
@@ -184,7 +184,7 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
           <motion.div
             ref={swipeSurfaceRef}
             style={{ x: surfaceX }}
-            className="relative flex h-full min-h-0 w-full touch-pan-y flex-col overflow-hidden border-r bg-background/95 shadow-2xl supports-backdrop-filter:bg-background/85"
+            className="mobile-me-sheet-surface relative flex h-full min-h-0 w-full touch-pan-y flex-col overflow-hidden border-r bg-background shadow-2xl"
             drag="x"
             dragConstraints={{ left: -480, right: 0 }}
             dragDirectionLock
@@ -192,9 +192,6 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
             dragMomentum={false}
             onDragEnd={handleSwipeEnd}
           >
-            <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-primary/10 blur-3xl" />
-            <div aria-hidden className="pointer-events-none absolute -left-20 top-1/3 size-44 rounded-full bg-muted/70 blur-3xl" />
-
             <SheetTitle className="sr-only">{tNavigation("me")}</SheetTitle>
             <SheetDescription className="sr-only">{tNavigation("me")}</SheetDescription>
 

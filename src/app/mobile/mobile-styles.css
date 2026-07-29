@@ -5,7 +5,7 @@ input, textarea, select, [contenteditable] {
 }
 
 :root {
-  --mobile-viewport-height: 100dvh;
+  --mobile-viewport-height: 100vh;
   --mobile-viewport-width: 100vw;
   --mobile-viewport-offset-top: 0px;
   --mobile-keyboard-inset: 0px;
@@ -14,6 +14,12 @@ input, textarea, select, [contenteditable] {
   --mobile-footbar-bottom: calc(env(safe-area-inset-bottom) + var(--mobile-footbar-gap));
   --mobile-footbar-reserved-space: calc(var(--mobile-footbar-height) + var(--mobile-footbar-gap) + env(safe-area-inset-bottom));
   --mobile-footbar-fade-height: calc(var(--mobile-footbar-reserved-space) + 2rem);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --mobile-viewport-height: 100dvh;
+  }
 }
 
 /*
@@ -88,7 +94,7 @@ select,
 .mobile-app-shell {
   position: relative;
   width: 100%;
-  height: var(--mobile-viewport-height, 100dvh);
+  height: var(--mobile-viewport-height, 100vh);
   min-height: 0;
   overflow: hidden;
   transform: translateY(var(--mobile-viewport-offset-top, 0px));
@@ -165,6 +171,177 @@ select,
 .mobile-setting-screen .shadow-xl,
 .mobile-setting-screen .shadow-2xl {
   box-shadow: none;
+}
+
+/*
+ * Android System WebView 104 predates Tailwind CSS 4's browser baseline.
+ * Keep the personal/settings sheet on plain CSS values so its essential
+ * layout does not depend on color-mix(), @property, :has(), or range media
+ * queries.
+ */
+.mobile-me-sheet-surface,
+.mobile-setting-backdrop-surface,
+.mobile-setting-header {
+  background-color: hsl(var(--background)) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.mobile-me-sheet-content {
+  background-color: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.mobile-me-sheet-overlay,
+.mobile-setting-backdrop {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.mobile-setting-header {
+  border-color: hsl(var(--border)) !important;
+}
+
+.mobile-setting-screen .mobile-setting-inline-item {
+  display: flex;
+  min-width: 0;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+.mobile-setting-screen .mobile-setting-inline-item > [data-slot="item-content"] {
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.mobile-setting-screen .mobile-setting-inline-item [data-slot="item-title"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mobile-setting-screen .mobile-setting-inline-action {
+  width: auto !important;
+  min-width: 1rem;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+  margin-left: auto;
+  align-self: center;
+  justify-content: flex-end;
+}
+
+.mobile-setting-screen button[data-variant="destructive"],
+.mobile-setting-screen [role="button"][data-variant="destructive"] {
+  background-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive-foreground)) !important;
+  opacity: 1;
+}
+
+.mobile-setting-screen button[data-variant="destructive"] > svg,
+.mobile-setting-screen button[data-variant="destructive"] > span,
+.mobile-setting-screen [role="button"][data-variant="destructive"] > svg,
+.mobile-setting-screen [role="button"][data-variant="destructive"] > span {
+  color: inherit !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.mobile-setting-screen [data-slot="badge"][data-variant="destructive"] {
+  background-color: hsl(var(--destructive) / 0.12) !important;
+  color: hsl(var(--destructive)) !important;
+}
+
+.mobile-setting-screen [data-slot="alert"][data-variant="destructive"] {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--destructive)) !important;
+}
+
+.mobile-setting-screen [data-slot="item"][data-variant="muted"],
+.mobile-setting-screen [data-slot="card-footer"] {
+  background-color: hsl(var(--muted)) !important;
+}
+
+/*
+ * Tailwind 4 emits color-mix() for color opacity utilities. WebView 104
+ * drops those declarations, so muted/status surfaces become transparent.
+ * Keep the fallback local to mobile settings and let newer WebViews use the
+ * generated Tailwind values.
+ */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .mobile-setting-screen [class~="bg-muted/10"] {
+    background-color: hsl(var(--muted) / 0.1) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-muted/20"] {
+    background-color: hsl(var(--muted) / 0.2) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-muted/30"] {
+    background-color: hsl(var(--muted) / 0.3) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-muted/40"] {
+    background-color: hsl(var(--muted) / 0.4) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-muted/50"] {
+    background-color: hsl(var(--muted) / 0.5) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-primary/5"] {
+    background-color: hsl(var(--primary) / 0.05) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-primary/10"] {
+    background-color: hsl(var(--primary) / 0.1) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-destructive/10"] {
+    background-color: hsl(var(--destructive) / 0.1) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-destructive/20"] {
+    background-color: hsl(var(--destructive) / 0.2) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-input/30"] {
+    background-color: hsl(var(--input) / 0.3) !important;
+  }
+
+  .mobile-setting-screen [class~="bg-input/50"] {
+    background-color: hsl(var(--input) / 0.5) !important;
+  }
+
+  .mobile-setting-screen [class~="border-border/30"] {
+    border-color: hsl(var(--border) / 0.3) !important;
+  }
+
+  .mobile-setting-screen [class~="border-border/50"] {
+    border-color: hsl(var(--border) / 0.5) !important;
+  }
+
+  .mobile-setting-screen [class~="border-border/60"] {
+    border-color: hsl(var(--border) / 0.6) !important;
+  }
+
+  .mobile-setting-screen [class~="border-destructive/30"] {
+    border-color: hsl(var(--destructive) / 0.3) !important;
+  }
+
+  .mobile-setting-screen [class~="border-primary/20"] {
+    border-color: hsl(var(--primary) / 0.2) !important;
+  }
+
+  .mobile-setting-screen [class~="border-primary/30"] {
+    border-color: hsl(var(--primary) / 0.3) !important;
+  }
 }
 
 .mobile-setting-screen [data-setting-page] {
@@ -279,6 +456,6 @@ input, textarea, select {
 @media (orientation: landscape) and (max-height: 520px) {
   .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"],
   .mobile-app-active [data-slot="drawer-content"][data-vaul-drawer-direction="top"] {
-    max-height: min(92vh, var(--mobile-viewport-height, 100dvh));
+    max-height: min(92vh, var(--mobile-viewport-height, 100vh));
   }
 }

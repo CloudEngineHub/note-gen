@@ -18,7 +18,7 @@ export default function ShowUndoRedo() {
       <ItemTitle>{t('showUndoRedo')}</ItemTitle>
       <ItemDescription>{t('showUndoRedoDesc')}</ItemDescription>
     </ItemContent>
-    <ItemActions>
+    <ItemActions className="mobile-setting-inline-action">
       <Switch
         checked={showEditorUndoRedo}
         aria-label={t('showUndoRedo')}

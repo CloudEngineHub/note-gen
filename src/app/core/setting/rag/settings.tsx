@@ -329,7 +329,7 @@ export function Settings() {
               <ItemTitle>{t('automaticSearchTitle')}</ItemTitle>
               <ItemDescription>{t('automaticSearchDesc')}</ItemDescription>
             </ItemContent>
-            <ItemActions>
+            <ItemActions className="mobile-setting-inline-action">
               <Switch
                 checked={automaticSearchEnabled}
                 aria-label={t('automaticSearchTitle')}
