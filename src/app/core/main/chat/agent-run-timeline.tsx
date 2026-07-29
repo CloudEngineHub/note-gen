@@ -329,7 +329,11 @@ export function AgentRunTimeline({
     return null
   }
 
-  const showStatusRow = events.length === 0 && (status === "failed" || status === "stopped")
+  const showStatusRow = events.length === 0 && (
+    isRunning ||
+    status === "failed" ||
+    status === "stopped"
+  )
   const durationEvents = traceEvents.length > 0 ? traceEvents : events
   const processStartedAt = durationEvents.length > 0
     ? Math.min(...durationEvents.map((event) => event.timestamp))

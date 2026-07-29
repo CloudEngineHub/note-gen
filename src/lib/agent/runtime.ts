@@ -589,6 +589,10 @@ function selectToolsForContext(
     selectedTools = selectedTools.filter((tool) => tool.category !== 'attachment')
   }
 
+  if (!context.imageAttachments?.length) {
+    selectedTools = selectedTools.filter((tool) => tool.category !== 'image')
+  }
+
   return selectedTools
 }
 
@@ -681,6 +685,7 @@ export class AgentRuntime {
       availableSkills: input.availableSkills,
       selectedMcpServerIds: input.selectedMcpServerIds,
       attachments: input.attachments,
+      imageAttachments: input.imageAttachments,
     }
 
     const aiConfig = await getAISettings()
@@ -973,6 +978,12 @@ export class AgentRuntime {
       context.userInput = latest.text
       context.currentQuote = latest.currentQuote
       context.attachments = latest.attachments ?? context.attachments
+      if (latest.imageAttachments?.length) {
+        context.imageAttachments = [
+          ...(context.imageAttachments ?? []),
+          ...latest.imageAttachments,
+        ].slice(-6)
+      }
       context.currentEditorState = undefined
       tools = selectToolsForContext(context, allTools, input.permissionMode)
       editorStateReadLocked = false

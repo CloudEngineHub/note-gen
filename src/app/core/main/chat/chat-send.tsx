@@ -22,6 +22,15 @@ import { serializeChatAttachments, type RuntimeChatAttachment } from '@/lib/chat
 import { retainCompletedAgentTraceEvents } from '@/lib/agent/trace-retention'
 import { getAISettings } from '@/lib/ai/utils'
 import {
+  buildChatImageContext,
+  buildHistoricalImageContext,
+  collectAgentImageAttachments,
+  createPendingChatImageAnalyses,
+  serializeChatImageAnalyses,
+  type PersistedChatImageAnalysis,
+} from '@/lib/chat-image-context'
+import type { Chat } from '@/db/chats'
+import {
   confirmEstimatedContextWindow,
   learnContextWindow,
   parseContextOverflowError,
@@ -130,6 +139,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
     linkedResourcePreview,
   } = useChatStore()
   const abortControllerRef = useRef<AbortController | null>(null)
+  const imageAnalysisAbortControllerRef = useRef<AbortController | null>(null)
   const agentHandlerRef = useRef<AgentHandler | null>(null)
   const manualStopRequestedRef = useRef(false)
   const steeringSequenceRef = useRef(0)
@@ -373,7 +383,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   }
 
   // Agent 模式处理
-  async function handleAgentMode(imageUrls: string[]) {
+  async function handleAgentMode(images: ImageAttachment[], userMessage: Chat) {
     // 先创建一个占位的 AI 消息
     const placeholderMessage = await insert({
       tagId: currentTagId,
@@ -396,6 +406,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
     let pendingCapacityProbe: { contextWindow: number } | undefined
     let deferredOverflowError: string | undefined
     let contextCapacityProbeActive = false
+    const agentImageAttachments = collectAgentImageAttachments(
+      useChatStore.getState().chats.filter(chat => chat.id !== userMessage.id)
+    )
 
     const persistAgentError = async (error: string) => {
       const currentState = useChatStore.getState()
@@ -484,6 +497,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           }
         : undefined,
       attachments: fileAttachments,
+      imageAttachments: agentImageAttachments,
       onFinalAnswerRender: (markdownContent) => {
         // 检测到 Final Answer 时触发渲染
         setAgentState({
@@ -660,7 +674,72 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       // 构建上下文信息
       let context = ''
 
-      // 1. 当前编辑器内容由 AgentHandler 在模型调用前读取实时快照并注入系统提示词。
+      // 1. 图片先由专用视觉模型识别，失败时回退 OCR。
+      // 主聊天模型只接收结构化识别结果，不依赖自身的视觉能力。
+      if (images.length > 0) {
+        imageAnalysisAbortControllerRef.current?.abort()
+        const imageAnalysisAbortController = new AbortController()
+        imageAnalysisAbortControllerRef.current = imageAnalysisAbortController
+        let liveAnalyses = createPendingChatImageAnalyses(images, requestText)
+        const updatePersistedAnalysis = (analyses: PersistedChatImageAnalysis[], persist: boolean) => {
+          const updatedMessage = {
+            ...userMessage,
+            imageAnalyses: serializeChatImageAnalyses(analyses),
+          }
+          if (persist) {
+            return saveChat(updatedMessage, true)
+          } else {
+            useChatStore.getState().updateChat(updatedMessage)
+          }
+        }
+
+        setAgentState({
+          status: 'analyzing_images',
+          isRunning: true,
+          isThinking: false,
+        })
+        const imageResult = await buildChatImageContext(images, requestText, {
+          signal: imageAnalysisAbortController.signal,
+          onProgress: (progress) => {
+            liveAnalyses = liveAnalyses.map(analysis => (
+              analysis.imageId === progress.imageId
+                ? {
+                    ...analysis,
+                    status: progress.status,
+                    method: progress.method ?? analysis.method,
+                    errorCode: progress.errorCode,
+                    updatedAt: Date.now(),
+                  }
+                : analysis
+            ))
+            updatePersistedAnalysis(liveAnalyses, false)
+          },
+        })
+        imageAnalysisAbortControllerRef.current = null
+        await updatePersistedAnalysis(imageResult.analyses, true)
+        agentImageAttachments.push(...imageResult.analyses.map(analysis => ({
+          ...analysis,
+          chatId: userMessage.id,
+        })))
+        if (imageResult.context) {
+          context += `${imageResult.context}\n`
+        }
+
+        agentDebugLog('chat_context_images_analyzed', {
+          imageCount: images.length,
+          contextLength: imageResult.context.length,
+          preview: previewText(imageResult.context),
+        })
+      }
+
+      const historicalImageContext = buildHistoricalImageContext(
+        useChatStore.getState().chats.filter(chat => chat.id !== userMessage.id)
+      )
+      if (historicalImageContext) {
+        context += `${historicalImageContext}\n`
+      }
+
+      // 2. 当前编辑器内容由 AgentHandler 在模型调用前读取实时快照并注入系统提示词。
       // 这里不再重复追加 currentArticle，避免同一篇正文占用两份上下文。
 
       agentDebugLog('chat_context_active_note', {
@@ -670,7 +749,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         injectedByRuntimeSnapshot: Boolean(articleStore.activeFilePath),
         preview: previewText(articleStore.currentArticle || ''),
       })
-      // 2. 关联文件夹作为 Agent 自动检索时的优先范围，不在发送前预先检索。
+      // 3. 关联文件夹作为 Agent 自动检索时的优先范围，不在发送前预先检索。
       if (linkedResource && isLinkedFolder(linkedResource)) {
         context += [
           '## 用户关联的笔记文件夹',
@@ -680,7 +759,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         ].join('\n')
       }
 
-      // 3. 如果有关联文件（非文件夹），始终注入完整内容作为 Agent 上下文
+      // 4. 如果有关联文件（非文件夹），始终注入完整内容作为 Agent 上下文
       const linkedResourceIsActiveFile = linkedResource && !isLinkedFolder(linkedResource) && (
         linkedResource.relativePath === articleStore.activeFilePath ||
         linkedResource.path === articleStore.activeFilePath ||
@@ -723,7 +802,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         })
       }
 
-      // 4. 如果有引用内容，添加引用上下文（在构建消息之前）
+      // 5. 如果有引用内容，添加引用上下文（在构建消息之前）
       if (quoteData) {
         const { fileName, startLine, endLine, fullContent, from, to } = quoteData
         let lineInfo = ''
@@ -815,7 +894,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 
       context += buildCanvasSelectionContext(canvasSelectionContext)
 
-      // 5. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
+      // 6. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
       const compactionContext = [
         context,
         articleStore.activeFilePath ? articleStore.currentArticle || '' : '',
@@ -834,7 +913,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
             chats,
             currentUserInput: requestText,
             additionalContext: compactionContext,
-            imageCount: imageUrls.length,
+            imageCount: 0,
           })
           pendingCapacityProbe = preparedHistory.capacityProbe
           contextCapacityProbeActive = Boolean(
@@ -880,7 +959,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       })
 
       try {
-        await agentHandler.execute(requestText, messages, imageUrls)
+        await agentHandler.execute(requestText, messages)
       } catch (error) {
         const parsedOverflow = parseContextOverflowError(error)
         const overflow =
@@ -907,7 +986,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
           chats: useChatStore.getState().chats,
           currentUserInput: requestText,
           additionalContext: compactionContext,
-          imageCount: imageUrls.length,
+          imageCount: 0,
           force: true,
         })
         pendingCapacityProbe = preparedHistory.capacityProbe
@@ -930,7 +1009,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
             coveredThroughChatId: preparedHistory.compaction?.coveredThroughChatId,
           }
         )
-        await agentHandler.execute(requestText, messages, imageUrls)
+        await agentHandler.execute(requestText, messages)
       }
     } catch (error) {
       if (deferredOverflowError) {
@@ -951,7 +1030,6 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     if (activeRunRef.current) {
       const sequence = ++steeringSequenceRef.current
       const text = requestText
-      const imageUrls = attachedImages.map(img => img.url)
       const steeringQuote = quoteData ? {
         fileName: quoteData.fileName,
         startLine: quoteData.startLine,
@@ -967,18 +1045,30 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       steeringChainRef.current = steeringChainRef.current.then(async () => {
         if (manualStopRequestedRef.current) return
         let additionalContext = ''
+        let steeringImageAttachments: PersistedChatImageAnalysis[] | undefined
         try {
           additionalContext = await buildSteeringContext()
         } catch (error) {
           console.error('Failed to build steering context:', error)
         }
+        if (attachedImages.length > 0) {
+          imageAnalysisAbortControllerRef.current?.abort()
+          const controller = new AbortController()
+          imageAnalysisAbortControllerRef.current = controller
+          const imageResult = await buildChatImageContext(attachedImages, text, {
+            signal: controller.signal,
+          })
+          imageAnalysisAbortControllerRef.current = null
+          additionalContext = [additionalContext, imageResult.context].filter(Boolean).join('\n\n')
+          steeringImageAttachments = imageResult.analyses
+        }
         const payload: AgentSteeringPayload = {
           sequence,
           text,
-          imageUrls,
           additionalContext,
           currentQuote: steeringQuote,
           attachments: fileAttachments,
+          imageAttachments: steeringImageAttachments,
         }
         if (agentHandlerRef.current) {
           agentHandlerRef.current.steer(payload)
@@ -998,17 +1088,22 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     setLoading(true)
     try {
       const imageUrls = attachedImages.map(img => img.url)
-      await insert({
+      const userMessage = await insert({
         tagId: currentTagId,
         role: 'user',
         content: inputValue,
         type: 'chat',
         inserted: false,
         images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
+        imageAnalyses: attachedImages.length > 0
+          ? serializeChatImageAnalyses(createPendingChatImageAnalyses(attachedImages, requestText))
+          : undefined,
         attachments: fileAttachments.length > 0 ? serializeChatAttachments(fileAttachments) : undefined,
         quoteData: quoteData ? JSON.stringify(quoteData) : undefined,
       })
-      await handleAgentMode(imageUrls)
+      if (userMessage) {
+        await handleAgentMode(attachedImages, userMessage)
+      }
     } finally {
       activeRunRef.current = false
       setLoading(false)
@@ -1019,6 +1114,8 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
     manualStopRequestedRef.current = true
     activeRunRef.current = false
     pendingSteeringRef.current = []
+    imageAnalysisAbortControllerRef.current?.abort()
+    imageAnalysisAbortControllerRef.current = null
 
     // 停止普通对话的流式输出
     if (abortControllerRef.current) {

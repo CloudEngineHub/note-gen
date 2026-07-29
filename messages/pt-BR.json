@@ -2774,7 +2774,19 @@
           "saveFailed": "Falha ao salvar a imagem. Tente novamente",
           "saveFailedMultiple": "Falha ao salvar {count} imagens. Tente novamente",
           "selectFailed": "Falha ao selecionar imagens. Tente novamente",
-          "dropHint": "Solte as imagens para anexar"
+          "dropHint": "Solte as imagens para anexar",
+          "analysis": {
+            "pending": "Aguardando",
+            "normalizing": "Processando imagem",
+            "recognizing": "Reconhecendo",
+            "vlm": "Modelo visual",
+            "ocr": "OCR",
+            "ocrFallback": "Fallback de OCR",
+            "hybrid": "Visão + OCR",
+            "failed": "Falha no reconhecimento",
+            "cancelled": "Reconhecimento interrompido",
+            "retry": "Tentar novamente"
+          }
         },
         "contextUsage": {
           "label": "Uso do contexto: {percent}%",

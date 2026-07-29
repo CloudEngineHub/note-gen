@@ -44,6 +44,7 @@ import { listTagsTool, createTagTool, updateTagTool, deleteTagTool, searchTagsTo
 import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
 import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool } from './tools/memory-tools'
 import { attachmentTools } from './tools/attachment-tools'
+import { imageTools } from './tools/image-tools'
 import { canvasTools } from './tools/canvas-tools'
 import { webTools } from './tools/web-tools'
 import {
@@ -2330,6 +2331,7 @@ function buildTools(): AgentTool[] {
     buildMcpCallTool(),
     ...canvasTools,
     ...attachmentTools,
+    ...imageTools,
     ...webTools,
   ]
 }

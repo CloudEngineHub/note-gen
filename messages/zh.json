@@ -2780,7 +2780,19 @@
           "saveFailed": "图片保存失败，请重试",
           "saveFailedMultiple": "{count} 张图片保存失败，请重试",
           "selectFailed": "选择图片失败，请重试",
-          "dropHint": "松开以附加图片"
+          "dropHint": "松开以附加图片",
+          "analysis": {
+            "pending": "等待识别",
+            "normalizing": "正在处理图片",
+            "recognizing": "正在识别",
+            "vlm": "视觉模型",
+            "ocr": "OCR",
+            "ocrFallback": "OCR 回退",
+            "hybrid": "视觉模型 + OCR",
+            "failed": "识别失败",
+            "cancelled": "识别已停止",
+            "retry": "重新识别"
+          }
         },
         "imageSelector": {
           "title": "选择图片",

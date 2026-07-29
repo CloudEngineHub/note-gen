@@ -2700,7 +2700,19 @@
           "saveFailed": "画像の保存に失敗しました。もう一度お試しください",
           "saveFailedMultiple": "{count} 枚の画像の保存に失敗しました。もう一度お試しください",
           "selectFailed": "画像の選択に失敗しました。もう一度お試しください",
-          "dropHint": "離すと画像を添付します"
+          "dropHint": "離すと画像を添付します",
+          "analysis": {
+            "pending": "認識待ち",
+            "normalizing": "画像を処理中",
+            "recognizing": "認識中",
+            "vlm": "視覚モデル",
+            "ocr": "OCR",
+            "ocrFallback": "OCR フォールバック",
+            "hybrid": "視覚モデル + OCR",
+            "failed": "認識に失敗",
+            "cancelled": "認識を停止",
+            "retry": "再認識"
+          }
         },
         "contextUsage": {
           "label": "コンテキスト使用率：{percent}%",

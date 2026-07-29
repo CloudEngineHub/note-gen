@@ -8,6 +8,7 @@ import { AgentRuntime, isRequestAbortError } from './runtime'
 import { readCurrentEditorState } from './tools/editor-tools'
 import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
+import type { AgentImageAttachment } from '@/lib/chat-image-context'
 import { retainCompletedAgentTraceEvents } from './trace-retention'
 
 export interface AgentHandlerConfig {
@@ -46,6 +47,7 @@ export interface AgentHandlerConfig {
     fullContent?: string
   }
   attachments?: RuntimeChatAttachment[]
+  imageAttachments?: AgentImageAttachment[]
 }
 
 export class AgentHandler {
@@ -126,6 +128,7 @@ export class AgentHandler {
         availableSkills: skillsInfo,
         selectedMcpServerIds,
         attachments: this.config.attachments,
+        imageAttachments: this.config.imageAttachments,
         permissionMode: this.config.permissionMode,
         conversationId: this.config.conversationId,
         workspaceId: this.config.workspaceId,

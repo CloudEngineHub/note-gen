@@ -2846,7 +2846,19 @@
           "saveFailed": "Failed to save image. Please try again",
           "saveFailedMultiple": "Failed to save {count} images. Please try again",
           "selectFailed": "Failed to select images. Please try again",
-          "dropHint": "Drop images to attach"
+          "dropHint": "Drop images to attach",
+          "analysis": {
+            "pending": "Waiting",
+            "normalizing": "Processing image",
+            "recognizing": "Recognizing",
+            "vlm": "Vision model",
+            "ocr": "OCR",
+            "ocrFallback": "OCR fallback",
+            "hybrid": "Vision + OCR",
+            "failed": "Recognition failed",
+            "cancelled": "Recognition stopped",
+            "retry": "Retry recognition"
+          }
         },
         "imageSelector": {
           "title": "Select Images",

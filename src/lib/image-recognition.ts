@@ -13,12 +13,18 @@ export interface ImageRecognitionResult {
 interface RecognizeImageOptions {
   imagePath?: string | null
   base64?: string | null
+  prompt?: string
+  maxTokens?: number
   shouldGenerateDescription?: boolean
   onProgress?: (stage: ImageRecognitionStage) => void
 }
 
-async function tryRecognizeWithVlm(base64: string): Promise<string | null> {
-  const content = await fetchAiDescByImage(base64)
+async function tryRecognizeWithVlm(
+  base64: string,
+  prompt?: string,
+  maxTokens?: number
+): Promise<string | null> {
+  const content = await fetchAiDescByImage(base64, prompt, maxTokens)
   return content?.trim() ? content : null
 }
 
@@ -54,6 +60,8 @@ async function recognizeWithOcr(
 export async function recognizeImageWithFallback({
   imagePath,
   base64,
+  prompt,
+  maxTokens,
   shouldGenerateDescription = false,
   onProgress,
 }: RecognizeImageOptions): Promise<ImageRecognitionResult> {
@@ -61,7 +69,7 @@ export async function recognizeImageWithFallback({
     const vlmConfig = base64 ? await getAISettings('imageMethodModel') : undefined
     if (base64 && vlmConfig?.model) {
       onProgress?.('vlm')
-      const content = await tryRecognizeWithVlm(base64)
+      const content = await tryRecognizeWithVlm(base64, prompt, maxTokens)
 
       if (content) {
         return {

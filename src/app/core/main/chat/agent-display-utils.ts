@@ -2,6 +2,7 @@ import type { AgentRunStatus, AgentTraceEvent } from "@/lib/agent/types"
 
 export const agentStatusText: Record<AgentRunStatus, string> = {
   idle: "空闲",
+  analyzing_images: "正在识别图片",
   preparing_context: "准备上下文",
   thinking: "思考中",
   calling_tool: "执行工具",

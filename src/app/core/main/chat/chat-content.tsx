@@ -19,6 +19,12 @@ import { McpToolCallCard } from './mcp-tool-call'
 import { AgentExecutionStatus } from './agent-execution-status'
 import { AgentPanelWithRag } from './agent-panel-with-rag'
 import { ChatImages } from "./chat-images"
+import {
+  buildChatImageContext,
+  parseChatImageAnalyses,
+  serializeChatImageAnalyses,
+  type PersistedChatImageAnalysis,
+} from '@/lib/chat-image-context'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { parsePersistedChatAttachments } from '@/lib/chat-attachments'
@@ -208,7 +214,7 @@ const ChatContent = React.memo(function ChatContent() {
                 <div className="flex w-full min-w-0">
                   <div className="flex flex-1 items-center gap-2 text-sm leading-6 text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                    <span>{t('record.chat.agent.thinking')}</span>
+                    <span>{t('record.chat.input.agent.thinking')}</span>
                   </div>
                 </div>
               </MessageScrollerItem>
@@ -282,7 +288,7 @@ MessageWrapper.displayName = 'MessageWrapper'
 
 const Message = React.memo(function Message({ chat }: { chat: Chat }) {
   const t = useTranslations()
-  const { chats, deleteChat, getMcpToolCallsByChatId, loading, agentState } = useChatStore()
+  const { chats, deleteChat, getMcpToolCallsByChatId, loading, agentState, saveChat } = useChatStore()
   const content = chat.content
   const isActiveAgentMessage = chat.role === 'system' && agentState.activeChatId === chat.id
   const latestChatId = chats[chats.length - 1]?.id
@@ -341,6 +347,57 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
       return []
     }
   }, [chat.images])
+  const imageAnalyses = useMemo(
+    () => parseChatImageAnalyses(chat.imageAnalyses),
+    [chat.imageAnalyses]
+  )
+  const displayImageAnalyses = useMemo(
+    () => images.map((imageUrl, index) => (
+      imageAnalyses[index] ?? {
+        imageId: `legacy-${chat.id}-${index}`,
+        sourceUrl: imageUrl,
+        name: `image-${index + 1}`,
+        status: 'failed' as const,
+        method: 'none' as const,
+        errorCode: 'recognition_failed' as const,
+        errorMessage: 'This image has not been analyzed yet.',
+        updatedAt: chat.createdAt,
+      }
+    )),
+    [chat.createdAt, chat.id, imageAnalyses, images]
+  )
+  const retryImageAnalysis = useCallback(async (
+    analysis: PersistedChatImageAnalysis,
+    index: number
+  ) => {
+    const pendingAnalyses = displayImageAnalyses.map(item => (
+      item.imageId === analysis.imageId
+        ? { ...item, status: 'pending' as const, errorCode: undefined, errorMessage: undefined }
+        : item
+    ))
+    const pendingMessage = {
+      ...chat,
+      imageAnalyses: serializeChatImageAnalyses(pendingAnalyses),
+    }
+    await saveChat(pendingMessage, true)
+    const result = await buildChatImageContext(
+      [{
+        id: analysis.imageId,
+        url: images[index] || analysis.sourceUrl,
+        name: analysis.name,
+      }],
+      chat.content?.trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt')
+    )
+    const completedAnalyses = displayImageAnalyses.map(item => (
+      item.imageId === analysis.imageId
+        ? result.analyses[0]
+        : item
+    ))
+    await saveChat({
+      ...chat,
+      imageAnalyses: serializeChatImageAnalyses(completedAnalyses),
+    }, true)
+  }, [chat, displayImageAnalyses, images, saveChat, t])
 
   const attachments = useMemo(
     () => parsePersistedChatAttachments(chat.attachments),
@@ -476,7 +533,13 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
           // 用户消息
           <div className="w-full space-y-3 text-primary">
             {/* 显示用户消息中的图片 */}
-            {images.length > 0 && <ChatImages images={images} />}
+            {images.length > 0 && (
+              <ChatImages
+                images={images}
+                analyses={displayImageAnalyses}
+                onRetry={retryImageAnalysis}
+              />
+            )}
             <ChatAttachmentSummary attachments={attachments} />
             {/* 显示用户消息中的引用 */}
             {quoteData && (

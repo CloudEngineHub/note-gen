@@ -203,6 +203,29 @@ function formatAttachments(context: AgentContextSnapshot) {
   ].join('\n')
 }
 
+function formatImageAttachments(context: AgentContextSnapshot) {
+  const attachments = context.imageAttachments ?? []
+  if (attachments.length === 0) return ''
+
+  return [
+    '## Available image attachments',
+    'These images were uploaded in the current or recent conversation. Persisted OCR and visual summaries may already appear in the conversation context.',
+    'If the user asks for details that are missing from that context, call image_inspect with an exact imageId. Never invent unseen visual details.',
+    ...attachments.map((attachment) => {
+      const metadata = [
+        `imageId=${JSON.stringify(attachment.imageId)}`,
+        `name=${JSON.stringify(attachment.name)}`,
+        `status=${attachment.status}`,
+        `method=${attachment.method}`,
+        attachment.width && attachment.height
+          ? `dimensions=${attachment.width}x${attachment.height}`
+          : '',
+      ].filter(Boolean).join(', ')
+      return `- ${metadata}`
+    }),
+  ].join('\n')
+}
+
 export class AgentPromptAssembler {
   assemble(
     context: AgentContextSnapshot,
@@ -229,6 +252,7 @@ export class AgentPromptAssembler {
       formatEditorSelection(context),
       formatQuote(context),
       formatAttachments(context),
+      formatImageAttachments(context),
       formatSkills(context),
       formatMcpCatalog(context),
       memoryContext,

@@ -22,11 +22,13 @@ export async function initAllDatabases() {
   const { initActivityDb } = await import('./activity');
   const { initCanvasesDb } = await import('./canvases');
   const { initConversationCompactionsDb } = await import('./conversation-compactions');
+  const { initImageAnalysisCacheDb } = await import('./image-analysis-cache');
 
   // 执行初始化：先确保基础表存在，再做 conversations 对 chats 的迁移/补列。
   await initChatsDb();
   await initConversationsDb();
   await initConversationCompactionsDb();
+  await initImageAnalysisCacheDb();
   await initMarksDb();
   await initNotesDb();
   await initTagsDb();

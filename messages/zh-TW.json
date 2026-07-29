@@ -2697,7 +2697,19 @@
           "saveFailed": "圖片儲存失敗，請重試",
           "saveFailedMultiple": "{count} 張圖片儲存失敗，請重試",
           "selectFailed": "選擇圖片失敗，請重試",
-          "dropHint": "放開以附加圖片"
+          "dropHint": "放開以附加圖片",
+          "analysis": {
+            "pending": "等待識別",
+            "normalizing": "正在處理圖片",
+            "recognizing": "正在識別",
+            "vlm": "視覺模型",
+            "ocr": "OCR",
+            "ocrFallback": "OCR 回退",
+            "hybrid": "視覺模型 + OCR",
+            "failed": "識別失敗",
+            "cancelled": "識別已停止",
+            "retry": "重新識別"
+          }
         },
         "imageSelector": {
           "title": "選擇圖片",
