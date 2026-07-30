@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "筆記生成器",
-    "description": "你的 AI 驅動的筆記助手"
+    "title": "NoteGen",
+    "description": "先記錄，再整理。"
   },
   "tray": {
     "quickRecord": "快速記錄",

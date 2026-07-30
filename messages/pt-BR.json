@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "Gerador de Notas",
-    "description": "Seu assistente de anotações com IA"
+    "title": "NoteGen",
+    "description": "Registre primeiro. Organize depois."
   },
   "tray": {
     "quickRecord": "Registro rápido",

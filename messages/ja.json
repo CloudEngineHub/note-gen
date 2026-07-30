@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "ノート生成ツール",
-    "description": "あなたのAI搭載ノートアシスタント"
+    "title": "NoteGen",
+    "description": "まず記録、整理はあとで。"
   },
   "tray": {
     "quickRecord": "クイック記録",

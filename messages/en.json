@@ -1,7 +1,7 @@
 {
   "app": {
-    "title": "Note Generator",
-    "description": "Your AI-powered note taking assistant"
+    "title": "NoteGen",
+    "description": "Capture first. Organize later."
   },
   "tray": {
     "quickRecord": "Quick Record",
