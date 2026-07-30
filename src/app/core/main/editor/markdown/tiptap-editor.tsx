@@ -39,7 +39,7 @@ import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
 import { appDataDir, join } from '@tauri-apps/api/path'
 import { handleImageUpload, saveImageToWorkspace } from '@/lib/image-handler'
 import useArticleStore from '@/stores/article'
-import { cn, convertImageByWorkspace } from '@/lib/utils'
+import { cn, convertImage, convertImageByWorkspace } from '@/lib/utils'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
 import { getFilePathOptions, getWorkspacePath, isAbsoluteFsPath } from '@/lib/workspace'
 import { isMobileDevice } from '@/lib/check'
@@ -88,6 +88,7 @@ import {
 } from '@/lib/editor-layout-styles'
 import { getCanvasDragId, hasCanvasDragData } from '@/lib/canvas/canvas-dnd'
 import { canvasDocumentToPngFile } from '@/lib/canvas/static-export'
+import { isRecordTabPath } from '@/app/core/main/mark/mark-record-tab'
 import { getCanvasProject } from '@/db/canvases'
 import useCanvasStore from '@/stores/canvas'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -3882,15 +3883,22 @@ export function TipTapEditor({
       const editorDom = editor.view.dom
       const images = editorDom.querySelectorAll('img')
 
-      const currentFilePath = useArticleStore.getState().activeFilePath
+      const currentFilePath = activeFilePath || useArticleStore.getState().activeFilePath
+
+      const resolveEditorImageSource = (src: string) => {
+        if (isRecordTabPath(currentFilePath)) {
+          return convertImage(src.replace(/^\.?\//, ''))
+        }
+        const fullRelativePath = resolveImagePathFromMarkdown(currentFilePath, src)
+        return convertImageByWorkspace(fullRelativePath)
+      }
 
       for (const img of images) {
         const src = img.getAttribute('src')
         // 如果是相对路径，转换为 asset://
         if (src && currentFilePath && shouldTransformImageSrcToWorkspaceAsset(src)) {
-          const fullRelativePath = resolveImagePathFromMarkdown(currentFilePath, src)
           // 异步转换路径
-          convertImageByWorkspace(fullRelativePath).then((assetUrl: string) => {
+          resolveEditorImageSource(src).then((assetUrl: string) => {
             // 只有当 src 仍然是相对路径时才更新（避免覆盖已转换的）
             const currentSrc = img.getAttribute('src')
             if (currentSrc === src || !currentSrc?.startsWith('asset://')) {
@@ -3903,8 +3911,7 @@ export function TipTapEditor({
           img.onerror = async () => {
             const currentSrc = img.getAttribute('src')
             if (currentSrc && currentFilePath && shouldTransformImageSrcToWorkspaceAsset(currentSrc)) {
-              const fullRelativePath = resolveImagePathFromMarkdown(currentFilePath, currentSrc)
-              const assetUrl = await convertImageByWorkspace(fullRelativePath)
+              const assetUrl = await resolveEditorImageSource(currentSrc)
               img.setAttribute('src', assetUrl)
             }
           }

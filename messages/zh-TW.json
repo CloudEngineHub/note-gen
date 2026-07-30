@@ -2339,7 +2339,16 @@
         "title": "連結記錄",
         "description": "輸入網頁連結，系統將自動爬取頁面內容並保存",
         "save": "保存",
-        "autoReadClipboard": "自動讀取剪貼簿連結"
+        "autoReadClipboard": "自動讀取剪貼簿連結",
+        "searchExcerpt": "以下內容來自網路搜尋摘要，並非完整網頁正文：",
+        "savedPartialTitle": "連結已保存，正文擷取不完整",
+        "savedFromSearch": "原網頁無法完整讀取，已使用網路搜尋補充標題和摘要。",
+        "captureStatus": {
+          "partial": "僅擷取到部分網頁正文，可以稍後重新擷取。",
+          "metadata-only": "僅保存了網頁標題或描述，沒有擷取到正文。",
+          "blocked": "網頁要求登入或驗證，已保留連結。",
+          "failed": "網頁請求失敗，已保留連結。"
+        }
       },
       "todo": {
         "title": "待辦記錄",

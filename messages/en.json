@@ -2359,7 +2359,16 @@
         "title": "Record Link",
         "description": "Enter a webpage link, and the system will automatically crawl the page content and save it",
         "save": "Save",
-        "autoReadClipboard": "Auto-read clipboard link"
+        "autoReadClipboard": "Auto-read clipboard link",
+        "searchExcerpt": "The following content is a web search snippet, not the full page:",
+        "savedPartialTitle": "Link saved with incomplete content",
+        "savedFromSearch": "The original page could not be fully read, so web search was used to supplement its title and snippet.",
+        "captureStatus": {
+          "partial": "Only part of the page content was extracted. You can retry later.",
+          "metadata-only": "Only the page title or description was saved; no main content was extracted.",
+          "blocked": "The page requires sign-in or verification. The link was still saved.",
+          "failed": "The page request failed. The link was still saved."
+        }
       },
       "todo": {
         "title": "Todo Record",

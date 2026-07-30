@@ -2,12 +2,12 @@ import { fetch as httpFetch } from '@tauri-apps/plugin-http'
 import type { AiConfig, WebSearchProvider } from '@/app/core/setting/config'
 import { getAISettings } from '@/lib/ai/utils'
 import { invokeAiJson, resolveAiRequestConfig } from '@/lib/ai/tauri-client'
+import { capturePublicWebPage } from '@/lib/web-capture/service'
 import type { WebPageResponse, WebSearchResponse, WebSearchSource } from './types'
 import { normalizeWebSearchProviderOrder } from './settings'
 
 const SEARCH_TIMEOUT_MS = 7_000
 const TOTAL_SEARCH_TIMEOUT_MS = 20_000
-const PAGE_TIMEOUT_MS = 12_000
 const MAX_PAGE_CHARACTERS = 18_000
 const MAX_SEARCH_RESULTS = 8
 const unsupportedNativeSearch = new Set<string>()
@@ -515,106 +515,18 @@ export async function searchWeb(query: string, signal?: AbortSignal): Promise<We
   }
 }
 
-function isPrivateHostname(hostname: string) {
-  const normalized = hostname.toLowerCase()
-  if (normalized === 'localhost' || normalized.endsWith('.local')) return true
-
-  const ipv4MappedMatch = normalized.match(
-    /^\[?::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})\]?$/
-  )
-  if (ipv4MappedMatch) {
-    const high = Number.parseInt(ipv4MappedMatch[1], 16)
-    const low = Number.parseInt(ipv4MappedMatch[2], 16)
-    const mappedIpv4 = [
-      high >> 8,
-      high & 0xff,
-      low >> 8,
-      low & 0xff,
-    ].join('.')
-    return isPrivateHostname(mappedIpv4)
-  }
-
-  if (
-    normalized === '::' ||
-    normalized === '[::]' ||
-    normalized === '::1' ||
-    normalized === '[::1]' ||
-    normalized.startsWith('[fc') ||
-    normalized.startsWith('[fd') ||
-    normalized.startsWith('[fe8') ||
-    normalized.startsWith('[fe9') ||
-    normalized.startsWith('[fea') ||
-    normalized.startsWith('[feb')
-  ) return true
-  if (/^127\./.test(normalized) || /^10\./.test(normalized) || /^169\.254\./.test(normalized)) return true
-  if (/^192\.168\./.test(normalized)) return true
-
-  const match = normalized.match(/^172\.(\d{1,3})\./)
-  return Boolean(match && Number(match[1]) >= 16 && Number(match[1]) <= 31)
-}
-
-function assertPublicWebUrl(value: string) {
-  const url = new URL(value)
-  if (!['http:', 'https:'].includes(url.protocol) || isPrivateHostname(url.hostname)) {
-    throw new Error('Only public HTTP(S) URLs can be read')
-  }
-  return url
-}
-
 export async function readWebPage(value: string, signal?: AbortSignal): Promise<WebPageResponse> {
-  let url = assertPublicWebUrl(value)
-  const timeout = createTimeoutSignal(signal, PAGE_TIMEOUT_MS)
+  const result = await capturePublicWebPage(value, { signal })
+  if (result.status === 'failed' || result.status === 'blocked') {
+    throw new Error(result.errorMessage || 'The web page could not be read')
+  }
 
-  try {
-    for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-      const response = await httpFetch(url.href, {
-        method: 'GET',
-        redirect: 'manual',
-        headers: {
-          Accept: 'text/html,application/xhtml+xml,text/plain',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.6',
-        },
-        signal: timeout.signal,
-      })
+  const content = (result.plainText || result.excerpt || '').slice(0, MAX_PAGE_CHARACTERS)
+  if (!content) throw new Error('The web page did not contain readable text')
 
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location')
-        if (!location) throw new Error('Web page redirected without a location')
-        url = assertPublicWebUrl(new URL(location, url).href)
-        continue
-      }
-
-      if (!response.ok) throw new Error(`Web page request failed with HTTP ${response.status}`)
-      const contentType = response.headers.get('content-type') || ''
-      if (!/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
-        throw new Error(`Unsupported web page content type: ${contentType || 'unknown'}`)
-      }
-
-      const text = await response.text()
-      if (/text\/plain/i.test(contentType)) {
-        return {
-          title: url.hostname,
-          url: url.href,
-          content: text.slice(0, MAX_PAGE_CHARACTERS),
-        }
-      }
-
-      const document = new DOMParser().parseFromString(text, 'text/html')
-      document.querySelectorAll('script, style, noscript, nav, footer, form, iframe, svg')
-        .forEach(element => element.remove())
-      const contentRoot = document.querySelector('article, main, [role="main"]') || document.body
-      const content = contentRoot?.textContent?.replace(/\s+/g, ' ').trim() || ''
-      if (!content) throw new Error('The web page did not contain readable text')
-
-      return {
-        title: document.title.trim() || url.hostname,
-        url: url.href,
-        content: content.slice(0, MAX_PAGE_CHARACTERS),
-      }
-    }
-
-    throw new Error('Web page exceeded the redirect limit')
-  } finally {
-    timeout.dispose()
+  return {
+    title: result.title,
+    url: result.canonicalUrl || result.finalUrl,
+    content,
   }
 }

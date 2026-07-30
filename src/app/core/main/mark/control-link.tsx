@@ -27,7 +27,6 @@ import useMarkStore from "@/stores/mark"
 import useTagStore from "@/stores/tag"
 import { Link, CircleX } from "lucide-react"
 import { useState, useEffect, useCallback } from "react"
-import { fetch } from '@tauri-apps/plugin-http'
 import { v4 as uuidv4 } from 'uuid'
 import emitter from '@/lib/emitter'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -39,6 +38,11 @@ import { RecordSaveTarget } from './record-save-target'
 import useSettingStore from '@/stores/setting'
 import { getRecordSaveTagIdFromTags } from '@/lib/record-save-target'
 import { useRecordCompletion } from './use-record-completion'
+import { captureLink } from '@/lib/link-capture'
+import {
+  localizeCapturedImages,
+  removeLinkAssetGroup,
+} from '@/lib/web-capture/images'
 
 export function ControlLink() {
   const t = useTranslations();
@@ -178,8 +182,8 @@ export function ControlLink() {
 
   async function handleSuccess() {
     if (!url) return
-    let targetUrl = url
-    if (!targetUrl.startsWith('http')) {
+    let targetUrl = url.trim()
+    if (!/^https?:\/\//i.test(targetUrl)) {
       targetUrl = `https://${targetUrl}`
       setUrl(targetUrl)
     }
@@ -195,61 +199,56 @@ export function ControlLink() {
       progress: '0%',
       startTime: Date.now()
     })
+    let shouldCleanupAssets = false
 
     try {
       setQueue(queueId, { progress: '30%' });
-      
-      // 使用 Tauri 的 HTTP 插件获取页面内容
-      const response = await fetch(targetUrl, {
-        method: 'GET',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP 错误: ${response.status}`);
-      }
-      
-      setQueue(queueId, { progress: '60%' });
-      
-      // 获取 HTML 内容
-      const html = await response.text();
+      const page = await captureLink(targetUrl)
+      setQueue(queueId, { progress: '65%' })
+      const localizedImages = await localizeCapturedImages(page, queueId)
+      shouldCleanupAssets = localizedImages.savedPaths.length > 0
+      setQueue(queueId, { progress: '90%' })
 
-      // 创建一个 DOMParser 来解析 HTML
-      const pageContent = await parseHtmlContent(html, targetUrl);
-      
-      setQueue(queueId, { progress: '90%' });
-      
-      if (pageContent.error) {
-        throw new Error(pageContent.error);
-      }
-      
-      // 提取有用的内容
-      const { title, metaDesc, mainContent, bodyText } = pageContent;
-      
-      // 构建描述
-      const desc = `${title}\n${metaDesc}`;
-      
-      // 构建内容（优先使用主要内容，如果没有则使用正文）
-      const content = mainContent || bodyText;
+      const savedUrl = page.canonicalUrl || page.finalUrl || targetUrl
+      const fallbackContent = page.excerpt
+        ? page.method === 'search'
+          ? `> ${t('record.mark.link.searchExcerpt')}\n>\n> ${page.excerpt}`
+          : page.excerpt
+        : ''
+      const content = localizedImages.contentMarkdown || fallbackContent
       
       // 保存到数据库
       const result = await insertMark({
         tagId: selectedTagId,
         type: 'link', 
-        desc: desc, 
+        desc: page.title,
         content: content,
-        url: targetUrl 
+        url: savedUrl,
       });
+      shouldCleanupAssets = false
       const markId = Number(result.lastInsertId || 0) || null
       await completeRecord({
         markId,
         tagId: selectedTagId,
         typeLabel: t('record.mark.type.link'),
       })
+
+      if (page.status !== 'success') {
+        toast({
+          title: t('record.mark.link.savedPartialTitle'),
+          description: page.method === 'search'
+            ? t('record.mark.link.savedFromSearch')
+            : t(`record.mark.link.captureStatus.${page.status}`),
+        })
+      }
       
       setUrl('');
       setOpen(false);
       
     } catch (error) {
+      if (shouldCleanupAssets) {
+        await removeLinkAssetGroup(queueId)
+      }
       console.error('Error crawling page:', error);
       toast({
         title: t('common.error'),
@@ -260,66 +259,6 @@ export function ControlLink() {
       removeQueue(queueId);
       setLoading(false);
     }
-  }
-
-  // 在浏览器环境中解析 HTML 内容
-  function parseHtmlContent(html: string, url: string): Promise<any> {
-    return new Promise((resolve) => {
-      try {
-        // 创建一个临时的 div 元素
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // 获取页面标题
-        const title = doc.title || new URL(url).hostname;
-        
-        // 获取元描述
-        const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-        
-        // 尝试获取主要内容
-        let mainContent = '';
-        const mainElement = doc.querySelector('main') || 
-                           doc.querySelector('article') || 
-                           doc.querySelector('#content') || 
-                           doc.querySelector('.content');
-        
-        if (mainElement) {
-          mainContent = mainElement.textContent || '';
-        }
-        
-        // 获取所有文本内容作为备选
-        let bodyText = '';
-        if (doc.body) {
-          bodyText = doc.body.textContent || '';
-        }
-        
-        // 限制文本长度
-        if (mainContent.length > 10000) {
-          mainContent = mainContent.substring(0, 10000);
-        }
-        
-        if (bodyText.length > 10000) {
-          bodyText = bodyText.substring(0, 10000);
-        }
-        
-        resolve({
-          title,
-          metaDesc,
-          mainContent,
-          bodyText,
-          url
-        });
-      } catch (error) {
-        resolve({ 
-          error: `解析 HTML 内容失败: ${error}`,
-          title: new URL(url).hostname,
-          metaDesc: '',
-          mainContent: '',
-          bodyText: '',
-          url
-        });
-      }
-    });
   }
 
   return (

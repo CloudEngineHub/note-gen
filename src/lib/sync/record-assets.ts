@@ -12,6 +12,7 @@ import {
 type RecordAssetMark = {
   type: 'scan' | 'text' | 'image' | 'link' | 'file' | 'recording' | 'todo'
   url: string
+  content?: string
 }
 
 const HTTP_URL_PATTERN = /^https?:\/\//i
@@ -48,6 +49,19 @@ export function getMarkLocalAssetPath(mark: RecordAssetMark): string | null {
   return null
 }
 
+export function getMarkLocalAssetPaths(mark: RecordAssetMark): string[] {
+  const paths: string[] = []
+  const primaryPath = getMarkLocalAssetPath(mark)
+  if (primaryPath) paths.push(primaryPath)
+
+  if (mark.type === 'link' && mark.content) {
+    const matches = mark.content.match(/link-assets\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+/g) || []
+    paths.push(...matches.map(normalizeStoredPath))
+  }
+
+  return Array.from(new Set(paths))
+}
+
 function getRemoteAssetPath(localPath: string): string {
   return `${RECORD_ASSET_REMOTE_DIR}/${normalizeStoredPath(localPath)}`
 }
@@ -61,8 +75,7 @@ async function ensureLocalAssetDirectory(localPath: string) {
 
 export async function queueRecordAssetRemoteDeletions(marks: RecordAssetMark[]) {
   const paths = marks
-    .map(getMarkLocalAssetPath)
-    .filter((path): path is string => Boolean(path))
+    .flatMap(getMarkLocalAssetPaths)
     .map(getRemoteAssetPath)
   if (paths.length === 0) return
 
@@ -90,7 +103,7 @@ export async function uploadRecordAssets(marks: RecordAssetMark[]) {
   await flushPendingRecordAssetRemoteDeletions()
 
   const localPaths = Array.from(new Set(
-    marks.map(getMarkLocalAssetPath).filter((path): path is string => Boolean(path))
+    marks.flatMap(getMarkLocalAssetPaths)
   ))
 
   for (const localPath of localPaths) {
@@ -110,7 +123,7 @@ export async function uploadRecordAssets(marks: RecordAssetMark[]) {
 
 export async function downloadRecordAssets(marks: RecordAssetMark[]) {
   const localPaths = Array.from(new Set(
-    marks.map(getMarkLocalAssetPath).filter((path): path is string => Boolean(path))
+    marks.flatMap(getMarkLocalAssetPaths)
   ))
 
   const downloadedPaths: string[] = []

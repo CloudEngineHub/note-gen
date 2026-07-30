@@ -2323,7 +2323,16 @@
         "title": "Gravar Link",
         "description": "Insira um link de página da web, e o sistema rastreará automaticamente o conteúdo da página e o salvará",
         "save": "Salvar",
-        "autoReadClipboard": "Ler link da área de transferência automaticamente"
+        "autoReadClipboard": "Ler link da área de transferência automaticamente",
+        "searchExcerpt": "O conteúdo abaixo é um resumo da pesquisa na web, não a página completa:",
+        "savedPartialTitle": "Link salvo com conteúdo incompleto",
+        "savedFromSearch": "A página original não pôde ser lida por completo; a pesquisa na web complementou o título e o resumo.",
+        "captureStatus": {
+          "partial": "Apenas parte do conteúdo da página foi extraída. Você pode tentar novamente mais tarde.",
+          "metadata-only": "Apenas o título ou a descrição da página foi salvo; o conteúdo principal não foi extraído.",
+          "blocked": "A página exige login ou verificação. O link foi salvo.",
+          "failed": "A solicitação da página falhou. O link foi salvo."
+        }
       },
       "todo": {
         "title": "Registro Todo",

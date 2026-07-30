@@ -3,7 +3,11 @@ import { BaseDirectory, exists, mkdir, remove } from "@tauri-apps/plugin-fs"
 import { insertActivityEvent } from './activity'
 import { truncateActivityText } from '@/lib/activity/events'
 import { enqueueAutoDataSync } from '@/lib/sync/auto-data-sync-queue'
-import { getMarkLocalAssetPath, queueRecordAssetRemoteDeletions } from '@/lib/sync/record-assets'
+import {
+  getMarkLocalAssetPath,
+  getMarkLocalAssetPaths,
+  queueRecordAssetRemoteDeletions,
+} from '@/lib/sync/record-assets'
 import { getRecordImageThumbnailPath } from '@/lib/record-image-thumbnail'
 
 export { getMarkLocalAssetPath }
@@ -19,12 +23,7 @@ export interface Mark {
   createdAt: number
 }
 
-async function deleteMarkLocalAsset(mark: Pick<Mark, 'type' | 'url'>) {
-  const assetPath = getMarkLocalAssetPath(mark)
-  if (!assetPath) {
-    return
-  }
-
+async function deleteMarkLocalAsset(assetPath: string) {
   const fileExists = await exists(assetPath, { baseDir: BaseDirectory.AppData })
   if (!fileExists) {
     return
@@ -33,12 +32,13 @@ async function deleteMarkLocalAsset(mark: Pick<Mark, 'type' | 'url'>) {
   await remove(assetPath, { baseDir: BaseDirectory.AppData })
 }
 
-async function deleteMarkLocalAssets(marks: Pick<Mark, 'type' | 'url'>[]) {
-  for (const mark of marks) {
+async function deleteMarkLocalAssets(marks: Pick<Mark, 'type' | 'url' | 'content'>[]) {
+  const assetPaths = Array.from(new Set(marks.flatMap(getMarkLocalAssetPaths)))
+  for (const assetPath of assetPaths) {
     try {
-      await deleteMarkLocalAsset(mark)
+      await deleteMarkLocalAsset(assetPath)
     } catch (error) {
-      console.error('Error deleting mark local asset:', mark.url, error)
+      console.error('Error deleting mark local asset:', assetPath, error)
     }
   }
 }
@@ -174,7 +174,7 @@ export async function getAllMarks() {
 
 export async function updateMark(mark: Mark) {
   const db = await getDb();
-  const previousMarks = await db.select<Mark[]>("select type, url from marks where id = $1", [mark.id])
+  const previousMarks = await db.select<Mark[]>("select type, url, content from marks where id = $1", [mark.id])
   const res = await db.execute(
     "update marks set tagId = $1, url = $2, desc = $3, content = $4, createdAt = $5 where id = $6",
     [mark.tagId, mark.url, mark.desc, mark.content, mark.createdAt, mark.id]
@@ -182,7 +182,8 @@ export async function updateMark(mark: Mark) {
   const previousMark = previousMarks[0]
   if (
     previousMark &&
-    getMarkLocalAssetPath(previousMark) !== getMarkLocalAssetPath(mark)
+    JSON.stringify(getMarkLocalAssetPaths(previousMark).sort())
+      !== JSON.stringify(getMarkLocalAssetPaths(mark).sort())
   ) {
     await queueRecordAssetRemoteDeletions([previousMark])
   }
@@ -257,7 +258,7 @@ export async function insertMarks(marks: Partial<Mark>[]) {
 
 export async function delMarkForever(id: number) {
   const db = await getDb();
-  const marks = await db.select<Mark[]>("select type, url from marks where id = $1", [id])
+  const marks = await db.select<Mark[]>("select type, url, content from marks where id = $1", [id])
   await queueRecordAssetRemoteDeletions(marks)
   await deleteMarkLocalAssets(marks)
   const result = await db.execute("delete from marks where id = $1", [id])
@@ -267,7 +268,7 @@ export async function delMarkForever(id: number) {
 
 export async function clearTrash() {
   const db = await getDb();
-  const marks = await db.select<Mark[]>("select type, url from marks where deleted = $1", [1])
+  const marks = await db.select<Mark[]>("select type, url, content from marks where deleted = $1", [1])
   await queueRecordAssetRemoteDeletions(marks)
   await deleteMarkLocalAssets(marks)
   const result = await db.execute("delete from marks where deleted = $1", [1])
