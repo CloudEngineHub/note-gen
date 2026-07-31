@@ -3,6 +3,7 @@ mod analytics;
 #[cfg(target_os = "android")]
 mod android_ocr;
 mod backup;
+mod database_recovery;
 mod device;
 mod fonts;
 #[cfg(target_os = "ios")]
@@ -86,6 +87,7 @@ pub fn run() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            database_recovery::delete_local_database,
             import_skill,
             import_skill_zip,
             validate_skill_package,

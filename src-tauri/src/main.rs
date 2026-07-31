@@ -7,6 +7,7 @@ mod analytics;
 mod android_ocr;
 mod app_setup;
 mod backup;
+mod database_recovery;
 mod device;
 mod file_open;
 mod fonts;
@@ -95,6 +96,7 @@ fn main() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            database_recovery::delete_local_database,
             import_skill,
             import_skill_zip,
             validate_skill_package,

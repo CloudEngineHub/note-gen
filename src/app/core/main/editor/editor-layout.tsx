@@ -10,6 +10,7 @@ import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import useChatStore from '@/stores/chat'
 import { OnboardingSpotlight } from '@/components/onboarding-spotlight'
+import { TabContentErrorBoundary } from '@/components/tab-content-error-boundary'
 import {
   Dialog,
   DialogContent,
@@ -758,7 +759,15 @@ export function EditorLayout() {
       />
 
       {/* Only render active tab content - improves performance with many tabs */}
-      {tabs.filter(tab => tab.id === localActiveTabId).map(tab => renderContentPanel(tab, true))}
+      {tabs.filter(tab => tab.id === localActiveTabId).map(tab => (
+        <TabContentErrorBoundary
+          key={tab.id}
+          tabName={tab.name}
+          onClose={() => handleCloseTab(tab.path)}
+        >
+          {renderContentPanel(tab, true)}
+        </TabContentErrorBoundary>
+      ))}
       <OnboardingSpotlight
         targetId={activeOnboardingStep ? getOnboardingSpotlightTarget(activeOnboardingStep) : null}
         title={spotlightTitle}

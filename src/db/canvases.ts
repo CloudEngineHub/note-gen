@@ -214,6 +214,12 @@ export async function permanentlyDeleteCanvasProject(id: string) {
   await db.execute('delete from canvases where id = $1', [id])
 }
 
+export async function clearCanvasProjects() {
+  const db = await getDb()
+  await db.execute('delete from canvases')
+  enqueueCanvasSync('canvases-cleared')
+}
+
 export async function replaceAllCanvasProjects(projects: CanvasProject[]) {
   const db = await getDb()
   for (const project of projects) {
