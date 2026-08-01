@@ -46,6 +46,7 @@ import { Badge } from '@/components/ui/badge'
 import { getFileTreeSyncStatus, validateFileTreeName, type FileTreeSyncStatus } from "../file-tree-action-policy";
 import { FileTreeDecorations } from "../file-tree-decorations";
 import { moveEntryToSystemTrash } from '../system-trash'
+import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
 
 export function FolderItem({
   item,
@@ -478,6 +479,22 @@ export function FolderItem({
             oldPathBaseDir: BaseDirectory.AppData
           })
         }
+        try {
+          await rewriteWorkspaceMarkdownMediaPaths([{
+            sourcePath: path,
+            targetPath: targetRelativePath,
+          }])
+        } catch (error) {
+          if (workspace.isCustom) {
+            await rename(newPathOptions.path, oldPathOptions.path)
+          } else {
+            await rename(newPathOptions.path, oldPathOptions.path, {
+              newPathBaseDir: BaseDirectory.AppData,
+              oldPathBaseDir: BaseDirectory.AppData,
+            })
+          }
+          throw error
+        }
       } catch (error) {
         setRenameError(error instanceof Error ? error.message : String(error))
         setTimeout(() => inputRef.current?.focus(), 0)
@@ -485,6 +502,11 @@ export function FolderItem({
       }
       const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
       await renameVectorDocumentsByPrefix(path, targetRelativePath)
+      const nextActiveFilePath = getPathAfterMove(activeFilePath, path, targetRelativePath)
+      await syncOpenTabsForPathChange(path, targetRelativePath)
+      if (nextActiveFilePath !== activeFilePath) {
+        setActiveFilePath(nextActiveFilePath)
+      }
     } else {
       // 已有文件夹但名称未改变，直接取消编辑
       if (item.name !== '' && nextName === item.name) {

@@ -1,6 +1,7 @@
 import { exists, rename } from "@tauri-apps/plugin-fs"
 
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
+import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
 
 export const FILE_MANAGER_DRAG_MIME = "application/x-notegen-file-path"
 let activeFileManagerDragPaths: string[] = []
@@ -196,6 +197,10 @@ export async function moveFileManagerEntries(
       const result = await moveFileManagerEntry(plan.sourcePath, targetDirectoryPath)
       if (result.moved) moved.push(result)
     }
+    await rewriteWorkspaceMarkdownMediaPaths(moved.map(result => ({
+      sourcePath: result.sourcePath,
+      targetPath: result.targetPath,
+    })))
     return { moved, failed: [], rolledBack: false }
   } catch {
     let rollbackFailed = false

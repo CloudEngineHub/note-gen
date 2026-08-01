@@ -44,6 +44,7 @@ import { getFileTreeSyncStatus, getSyncConfiguration, validateFileTreeName, type
 import { useSettingsDialogStore } from "@/stores/settings-dialog";
 import { FileTreeDecorations } from "./file-tree-decorations";
 import { moveEntryToSystemTrash } from './system-trash'
+import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -510,6 +511,22 @@ export function FileItem({
               newPathBaseDir: BaseDirectory.AppData,
               oldPathBaseDir: BaseDirectory.AppData
             })
+          }
+          try {
+            await rewriteWorkspaceMarkdownMediaPaths([{
+              sourcePath: path,
+              targetPath: targetRelativePath,
+            }])
+          } catch (error) {
+            if (workspace.isCustom) {
+              await rename(newPathOptions.path, oldPathOptions.path)
+            } else {
+              await rename(newPathOptions.path, oldPathOptions.path, {
+                newPathBaseDir: BaseDirectory.AppData,
+                oldPathBaseDir: BaseDirectory.AppData,
+              })
+            }
+            throw error
           }
         } catch (error) {
           setRenameError(error instanceof Error ? error.message : String(error))
