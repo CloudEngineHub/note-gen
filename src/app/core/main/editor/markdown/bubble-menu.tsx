@@ -7,6 +7,8 @@ import {
   Strikethrough,
   Underline,
   Code,
+  Link,
+  Unlink,
   ExternalLink,
   Highlighter,
   Quote,
@@ -23,13 +25,21 @@ import {
   Timer,
   ListTodo,
 } from 'lucide-react'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { TextSelection } from '@tiptap/pm/state'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/ui/input-group'
 
 const POPULAR_LANGUAGES = [
   { name: 'English', code: 'English', i18nKey: 'languages.English' },
@@ -81,6 +91,14 @@ interface BubbleMenuProps {
   openLinkInputSignal?: number
 }
 
+interface LinkEditorState {
+  from: number
+  to: number
+  text: string
+  url: string
+  existing: boolean
+}
+
 function getSelectedText(editor: Editor): string {
   const { from, to } = editor.state.selection
 
@@ -96,18 +114,6 @@ function hasTextSelection(editor: Editor): boolean {
   }
 
   return getSelectedText(editor).trim().length > 0
-}
-
-function getEditableLinkSourceElement(editor: Editor): HTMLElement | null {
-  return editor.view.dom.querySelector<HTMLElement>('.tiptap-editable-link-source')
-}
-
-function getCurrentLinkHref(editor: Editor): string {
-  const editableHref = getEditableLinkSourceElement(editor)?.dataset.linkHref?.trim()
-  if (editableHref) return editableHref
-
-  const href = editor.getAttributes('link').href
-  return typeof href === 'string' ? href.trim() : ''
 }
 
 function isKeyboardSelectionIntent(event: KeyboardEvent): boolean {
@@ -139,13 +145,14 @@ export function BubbleMenu({
   openLinkInputSignal = 0,
 }: BubbleMenuProps) {
   const t = useTranslations('editor')
+  const linkTextInputId = useId()
+  const linkUrlInputId = useId()
   const [show, setShow] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [showAISubmenu, setShowAISubmenu] = useState(false)
   const [showTranslateSubmenu, setShowTranslateSubmenu] = useState(false)
   const [customTranslateLang, setCustomTranslateLang] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
-  const [showLinkInput, setShowLinkInput] = useState(false)
+  const [linkEditor, setLinkEditor] = useState<LinkEditorState | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isInteractingWithMenu, setIsInteractingWithMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -159,7 +166,7 @@ export function BubbleMenu({
     setShow(false)
     setShowAISubmenu(false)
     setShowTranslateSubmenu(false)
-    setShowLinkInput(false)
+    setLinkEditor(null)
   }, [])
 
   const collapseSelection = useCallback(() => {
@@ -197,20 +204,19 @@ export function BubbleMenu({
   const updatePosition = useCallback(() => {
     const { selection } = editor.state
     const { from, to } = selection
-    const editableLinkSource = getEditableLinkSourceElement(editor)
 
     if (isComposingRef.current) {
       hideMenu()
       return false
     }
 
-    if (isPointerSelectingRef.current && !editableLinkSource) {
+    if (isPointerSelectingRef.current) {
       hideMenu()
       return false
     }
 
     // 应用启动或文件恢复时可能会还原一个非空选区，但这不是用户本次主动选择的文本。
-    if (!editableLinkSource && !hasUserSelectionIntentRef.current) {
+    if (!hasUserSelectionIntentRef.current) {
       if (hasTextSelection(editor)) {
         collapseSelection()
       }
@@ -219,7 +225,7 @@ export function BubbleMenu({
     }
 
     // 检查选区是否有效（空选区、光标位置、无实际文本内容都不显示）
-    if (!editableLinkSource && !hasTextSelection(editor)) {
+    if (!hasTextSelection(editor)) {
       hideMenu()
       return false
     }
@@ -229,7 +235,7 @@ export function BubbleMenu({
       return false
     }
 
-    const node = editableLinkSource ? null : editor.state.doc.nodeAt(from)
+    const node = editor.state.doc.nodeAt(from)
 
     // 检查是否是图片节点
     if (node?.type.name === 'image') {
@@ -244,37 +250,40 @@ export function BubbleMenu({
     }
 
     // 获取编辑器元素和滚动容器
-    const editorElement = document.querySelector('.ProseMirror')
-    const scrollContainer = editorElement?.parentElement
+    const editorElement = editor.view.dom
+    const scrollContainer = editorElement.parentElement
     if (!editorElement || !scrollContainer) {
       hideMenu()
       return false
     }
 
     try {
-      const sourceBounds = editableLinkSource?.getBoundingClientRect()
-      const coords = sourceBounds ?? editor.view.coordsAtPos(from)
+      const startCoords = editor.view.coordsAtPos(from)
+      const endCoords = editor.view.coordsAtPos(to)
       const containerBounds = scrollContainer.getBoundingClientRect()
 
       // 转换为滚动容器内的相对坐标
-      const relativeTop = coords.top - containerBounds.top + scrollContainer.scrollTop
-      const relativeLeft = coords.left - containerBounds.left + scrollContainer.scrollLeft
-
-      // 计算菜单位置（顶部在选区上方）
-      const top = relativeTop - 48 // 48 是大约的菜单高度 + 间距
+      const anchorTop = Math.min(startCoords.top, endCoords.top) - containerBounds.top + scrollContainer.scrollTop
+      const anchorBottom = Math.max(startCoords.bottom, endCoords.bottom) - containerBounds.top + scrollContainer.scrollTop
+      const relativeLeft = startCoords.left - containerBounds.left + scrollContainer.scrollLeft
+      const menuHeight = menuRef.current?.offsetHeight || 40
+      const gap = 8
 
       // 边界检测：left 在 [0, 容器宽度 - 菜单宽度] 范围内
       const currentMenuWidth = menuRef.current?.offsetWidth || 360
       // maxLeft 不能为负数
-      const maxLeft = Math.max(0, containerBounds.width - currentMenuWidth)
-      const left = Math.min(relativeLeft, maxLeft)
+      const maxLeft = Math.max(8, containerBounds.width - currentMenuWidth - 8)
+      const left = Math.max(8, Math.min(relativeLeft, maxLeft))
 
-      // 如果上方空间不够，改为在光标下方显示
-      if (relativeTop < 48) {
-        setPosition({ top: relativeTop + 24, left })
-      } else {
-        setPosition({ top, left })
-      }
+      const spaceAbove = Math.min(startCoords.top, endCoords.top) - containerBounds.top
+      const preferredTop = spaceAbove >= menuHeight + gap
+        ? anchorTop - menuHeight - gap
+        : anchorBottom + gap
+      const visibleTop = scrollContainer.scrollTop + 8
+      const visibleBottom = scrollContainer.scrollTop + scrollContainer.clientHeight - 8
+      const maxTop = Math.max(visibleTop, visibleBottom - menuHeight)
+      const top = Math.max(visibleTop, Math.min(preferredTop, maxTop))
+      setPosition({ top, left })
 
       setShow(true)
       return true
@@ -301,14 +310,7 @@ export function BubbleMenu({
       isComposingRef.current = false
     }
 
-    const handlePointerStart = (event: MouseEvent | TouchEvent) => {
-      if ((event.target as HTMLElement | null)?.closest('.tiptap-editable-link-source')) {
-        isPointerSelectingRef.current = false
-        hasUserSelectionIntentRef.current = true
-        requestAnimationFrame(updatePosition)
-        return
-      }
-
+    const handlePointerStart = () => {
       isPointerSelectingRef.current = true
       hasUserSelectionIntentRef.current = false
       if (hasTextSelection(editor)) {
@@ -318,13 +320,6 @@ export function BubbleMenu({
     }
 
     const finishPointerSelection = () => {
-      if (getEditableLinkSourceElement(editor)) {
-        isPointerSelectingRef.current = false
-        hasUserSelectionIntentRef.current = true
-        requestAnimationFrame(updatePosition)
-        return
-      }
-
       if (!isPointerSelectingRef.current) {
         return
       }
@@ -392,7 +387,7 @@ export function BubbleMenu({
 
     setShowAISubmenu(true)
     setShowTranslateSubmenu(false)
-    setShowLinkInput(false)
+    setLinkEditor(null)
   }, [openAiMenuSignal, updatePosition])
 
   useEffect(() => {
@@ -404,22 +399,64 @@ export function BubbleMenu({
 
     setShowAISubmenu(true)
     setShowTranslateSubmenu(true)
-    setShowLinkInput(false)
+    setLinkEditor(null)
   }, [openTranslateMenuSignal, updatePosition])
 
   useEffect(() => {
     if (!openLinkInputSignal) return
 
-    if (!updatePosition()) {
-      return
-    }
+    const { from, to } = editor.state.selection
+    const text = getSelectedText(editor)
+    if (!text.trim()) return
 
-    const previousUrl = editor.getAttributes('link').href
-    setLinkUrl(previousUrl || '')
-    setShowLinkInput(true)
+    const url = editor.getAttributes('link').href
+    hasUserSelectionIntentRef.current = true
+    setLinkEditor({ from, to, text, url: typeof url === 'string' ? url : '', existing: Boolean(url) })
+    setShow(true)
     setShowAISubmenu(false)
     setShowTranslateSubmenu(false)
-  }, [editor, openLinkInputSignal, updatePosition])
+  }, [editor, openLinkInputSignal])
+
+  useEffect(() => {
+    const handleLinkEdit = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        editor?: unknown
+        from?: unknown
+        to?: unknown
+        label?: unknown
+        href?: unknown
+      }>).detail
+
+      if (
+        !detail
+        || detail.editor !== editor
+        || typeof detail.from !== 'number'
+        || typeof detail.to !== 'number'
+        || typeof detail.label !== 'string'
+        || typeof detail.href !== 'string'
+      ) return
+
+      hasUserSelectionIntentRef.current = true
+      setLinkEditor({
+        from: detail.from,
+        to: detail.to,
+        text: detail.label,
+        url: detail.href,
+        existing: true,
+      })
+      setShowAISubmenu(false)
+      setShowTranslateSubmenu(false)
+      setShow(true)
+    }
+
+    document.addEventListener('tiptap-link-edit', handleLinkEdit)
+    return () => document.removeEventListener('tiptap-link-edit', handleLinkEdit)
+  }, [editor])
+
+  useLayoutEffect(() => {
+    if (!show) return
+    updatePosition()
+  }, [linkEditor, show, updatePosition])
 
   // AI子菜单边界检测
   useEffect(() => {
@@ -483,8 +520,7 @@ export function BubbleMenu({
   useEffect(() => {
     const updateHandler = () => updatePosition()
 
-    // 文本选区或正在编辑的 Markdown 链接源码都显示工具栏。
-    if (hasTextSelection(editor) || getEditableLinkSourceElement(editor)) {
+    if (hasTextSelection(editor)) {
       updatePosition()
     } else {
       hideMenu()
@@ -512,7 +548,7 @@ export function BubbleMenu({
 
   // Update position on scroll
   useEffect(() => {
-    const scrollContainer = document.querySelector('.ProseMirror')?.parentElement
+    const scrollContainer = editor.view.dom.parentElement
     if (!scrollContainer) return
 
     const handleScroll = () => {
@@ -523,63 +559,80 @@ export function BubbleMenu({
 
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
     return () => scrollContainer.removeEventListener('scroll', handleScroll)
-  }, [show, updatePosition])
+  }, [editor, show, updatePosition])
 
-  const setLink = useCallback(() => {
-    if (showLinkInput) {
-      if (linkUrl === '') {
-        editor.chain().focus().extendMarkRange('link').unsetLink().run()
-      } else {
-        editor.chain().focus().extendMarkRange('link').setLink({ href: linkUrl }).run()
-      }
-      setShowLinkInput(false)
-      setLinkUrl('')
-    } else {
-      const previousUrl = editor.getAttributes('link').href
-      setLinkUrl(previousUrl || '')
-      setShowLinkInput(true)
-    }
-  }, [editor, linkUrl, showLinkInput])
+  const openLinkEditorForSelection = useCallback(() => {
+    const { from, to } = editor.state.selection
+    const text = getSelectedText(editor)
+    if (!text.trim()) return
 
-  const toggleEditableLinkMark = (mark: string, fallback: () => void) => {
-    if (!getEditableLinkSourceElement(editor)) {
-      fallback()
-      return
-    }
+    const url = editor.getAttributes('link').href
+    setLinkEditor({ from, to, text, url: typeof url === 'string' ? url : '', existing: Boolean(url) })
+    setShowAISubmenu(false)
+    setShowTranslateSubmenu(false)
+  }, [editor])
 
-    document.dispatchEvent(new CustomEvent('tiptap-editable-link-toggle-mark', {
-      detail: { mark },
+  const applyLink = useCallback(() => {
+    if (!linkEditor) return
+
+    const text = linkEditor.text.trim()
+    const url = linkEditor.url.trim()
+    const { from, to } = linkEditor
+    if (!text || !url || from < 0 || to > editor.state.doc.content.size || from >= to) return
+
+    const linkMark = editor.state.schema.marks.link
+    if (!linkMark) return
+
+    const marks = (editor.state.doc.nodeAt(from)?.marks ?? editor.state.doc.resolve(from).marks())
+      .filter(mark => mark.type !== linkMark)
+    const linkedText = editor.state.schema.text(text, [...marks, linkMark.create({ href: url })])
+    const transaction = editor.state.tr.replaceWith(from, to, linkedText)
+    transaction.setSelection(TextSelection.near(transaction.doc.resolve(from + linkedText.nodeSize)))
+    editor.view.dispatch(transaction)
+    editor.view.focus()
+    hideMenu()
+  }, [editor, hideMenu, linkEditor])
+
+  const removeLink = useCallback(() => {
+    if (!linkEditor) return
+
+    const text = linkEditor.text.trim()
+    const { from, to } = linkEditor
+    if (!text || from < 0 || to > editor.state.doc.content.size || from >= to) return
+
+    const linkMark = editor.state.schema.marks.link
+    const marks = (editor.state.doc.nodeAt(from)?.marks ?? editor.state.doc.resolve(from).marks())
+      .filter(mark => mark.type !== linkMark)
+    const plainText = editor.state.schema.text(text, marks)
+    const transaction = editor.state.tr.replaceWith(from, to, plainText)
+    transaction.setSelection(TextSelection.near(transaction.doc.resolve(from + plainText.nodeSize)))
+    editor.view.dispatch(transaction)
+    editor.view.focus()
+    hideMenu()
+  }, [editor, hideMenu, linkEditor])
+
+  const openCurrentLink = useCallback(() => {
+    const url = linkEditor?.url.trim()
+    if (!url) return
+
+    document.dispatchEvent(new CustomEvent('tiptap-current-link-open', {
+      detail: { editor, href: url },
     }))
-  }
+  }, [editor, linkEditor])
 
-  const toggleBold = () => toggleEditableLinkMark('bold', () => editor.chain().focus().toggleBold().run())
-  const toggleItalic = () => toggleEditableLinkMark('italic', () => editor.chain().focus().toggleItalic().run())
-  const toggleStrike = () => toggleEditableLinkMark('strike', () => editor.chain().focus().toggleStrike().run())
-  const toggleUnderline = () => toggleEditableLinkMark('underline', () => editor.chain().focus().toggleUnderline().run())
-  const toggleCode = () => toggleEditableLinkMark('code', () => editor.chain().focus().toggleCode().run())
-  const toggleHighlight = () => toggleEditableLinkMark('highlight', () => editor.chain().focus().toggleHighlight().run())
+  const toggleBold = () => editor.chain().focus().toggleBold().run()
+  const toggleItalic = () => editor.chain().focus().toggleItalic().run()
+  const toggleStrike = () => editor.chain().focus().toggleStrike().run()
+  const toggleUnderline = () => editor.chain().focus().toggleUnderline().run()
+  const toggleCode = () => editor.chain().focus().toggleCode().run()
+  const toggleHighlight = () => editor.chain().focus().toggleHighlight().run()
   const toggleBlockquote = () => editor.chain().focus().toggleBlockquote().run()
   const toggleBulletList = () => editor.chain().focus().toggleBulletList().run()
   const toggleOrderedList = () => editor.chain().focus().toggleOrderedList().run()
   const toggleTaskList = () => editor.chain().focus().toggleTaskList().run()
   const toggleCodeBlock = () => editor.chain().focus().toggleCodeBlock().run()
 
-  const isActive = (name: string, attrs?: Record<string, unknown>) => {
-    const editableLinkSource = getEditableLinkSourceElement(editor)
-    if (editableLinkSource) {
-      if (name === 'link') return true
-      if (editableLinkSource.dataset.linkMarks?.split(' ').includes(name)) return true
-    }
-    return editor.isActive(name, attrs)
-  }
-
-  const currentLinkHref = getCurrentLinkHref(editor)
-  const openCurrentLink = () => {
-    if (!currentLinkHref) return
-    document.dispatchEvent(new CustomEvent('tiptap-current-link-open', {
-      detail: { href: currentLinkHref },
-    }))
-  }
+  const isActive = (name: string, attrs?: Record<string, unknown>) => editor.isActive(name, attrs)
 
   if (!show) return null
 
@@ -587,13 +640,86 @@ export function BubbleMenu({
     <div
       ref={menuRef}
       data-editor-bubble-menu
-      className="absolute z-50 transition-[top,left] duration-150 ease-out"
+      className="absolute z-50 max-w-[calc(100%_-_1rem)] transition-[top,left] duration-150 ease-out"
       style={{
         top: position.top,
         left: position.left
       }}
     >
-      {/* 工具栏 */}
+      {linkEditor ? (
+        <form
+          className="w-96 max-w-full rounded-lg bg-popover p-3 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+          onSubmit={(event) => {
+            event.preventDefault()
+            applyLink()
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            hideMenu()
+            editor.view.focus()
+          }}
+        >
+          <FieldGroup className="gap-2">
+            <Field className="gap-1">
+              <FieldLabel htmlFor={linkTextInputId}>
+                {t('bubbleMenu.linkText')}
+              </FieldLabel>
+              <Input
+                id={linkTextInputId}
+                value={linkEditor.text}
+                onChange={(event) => setLinkEditor(current => current && ({ ...current, text: event.target.value }))}
+                placeholder={t('bubbleMenu.linkTextPlaceholder')}
+                aria-label={t('bubbleMenu.linkText')}
+              />
+            </Field>
+            <Field className="gap-1">
+              <FieldLabel htmlFor={linkUrlInputId}>
+                {t('bubbleMenu.linkUrl')}
+              </FieldLabel>
+              <InputGroup>
+                <InputGroupInput
+                  id={linkUrlInputId}
+                  value={linkEditor.url}
+                  onChange={(event) => setLinkEditor(current => current && ({ ...current, url: event.target.value }))}
+                  placeholder={t('bubbleMenu.linkPlaceholder')}
+                  aria-label={t('bubbleMenu.linkUrl')}
+                  autoFocus
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    size="icon-xs"
+                    onClick={openCurrentLink}
+                    disabled={!linkEditor.url.trim()}
+                    title={t('bubbleMenu.openLink')}
+                  >
+                    <ExternalLink />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
+            </Field>
+          </FieldGroup>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <div>
+              {linkEditor.existing && (
+                <Button type="button" variant="ghost" size="xs" onClick={removeLink}>
+                  <Unlink data-icon="inline-start" />
+                  {t('bubbleMenu.removeLink')}
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="xs" onClick={hideMenu}>
+                {t('bubbleMenu.cancel')}
+              </Button>
+              <Button type="submit" size="xs" disabled={!linkEditor.text.trim() || !linkEditor.url.trim()}>
+                {t('bubbleMenu.saveLink')}
+              </Button>
+            </div>
+          </div>
+        </form>
+      ) : (
       <div
         className="flex items-center gap-1 rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
       >
@@ -688,18 +814,9 @@ export function BubbleMenu({
 
         <ToolbarSeparator />
 
-        {showLinkInput && (
-          <>
-            <div className="relative">
-              <div className="flex items-center gap-1 px-1">
-                <Input type="url" placeholder={t('bubbleMenu.linkPlaceholder')} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setLink() } else if (e.key === 'Escape') { setShowLinkInput(false); setLinkUrl('') } }} className="w-32" autoFocus />
-                <Button type="button" variant="ghost" size="xs" onClick={setLink}>{t('bubbleMenu.confirm')}</Button>
-                <Button type="button" variant="ghost" size="xs" onClick={() => { setShowLinkInput(false); setLinkUrl('') }}>{t('bubbleMenu.cancel')}</Button>
-              </div>
-            </div>
-            <ToolbarSeparator />
-          </>
-        )}
+        <ToolbarButton active={isActive('link')} onClick={openLinkEditorForSelection} title={t('bubbleMenu.link')}><Link /></ToolbarButton>
+
+        <ToolbarSeparator />
 
         {/* 块级元素 */}
         <div className="flex gap-0.5">
@@ -710,13 +827,8 @@ export function BubbleMenu({
           <ToolbarButton active={isActive('codeBlock')} onClick={toggleCodeBlock} title={t('bubbleMenu.codeBlock')}><Code /></ToolbarButton>
         </div>
 
-        {currentLinkHref && (
-          <>
-            <ToolbarSeparator />
-            <ToolbarButton onClick={openCurrentLink} title={t('bubbleMenu.openLink')}><ExternalLink /></ToolbarButton>
-          </>
-        )}
       </div>
+      )}
     </div>
   )
 }
