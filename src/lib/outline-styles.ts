@@ -4,7 +4,7 @@ export function getOutlinePanelClass(
 ) {
   const placementClass = position === 'left'
     ? `${floating ? 'left-0' : ''} border-r`
-    : `${floating ? 'right-0' : ''} border-l`
+    : `${floating ? 'right-3' : ''} border-l`
 
   const layoutClass = floating
     ? 'absolute top-0 bottom-6 z-20'

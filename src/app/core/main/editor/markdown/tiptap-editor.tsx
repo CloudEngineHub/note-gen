@@ -31,7 +31,7 @@ import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type UIEvent as ReactUIEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent } from 'react'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
 import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
@@ -120,6 +120,173 @@ const IMAGE_RESIZE_DIRECTIONS: ResizableNodeViewDirection[] = [
   'bottom-left',
   'bottom-right',
 ]
+
+const EDITOR_SCROLLBAR_MIN_THUMB_SIZE = 44
+
+interface EditorScrollMetrics {
+  clientHeight: number
+  scrollHeight: number
+  scrollTop: number
+}
+
+function EditorScrollbar({
+  refreshKey,
+  scrollContainerRef,
+}: {
+  refreshKey: EditorViewMode
+  scrollContainerRef: { current: HTMLDivElement | null }
+}) {
+  const dragStateRef = useRef<{ pointerId: number; startY: number; startScrollTop: number } | null>(null)
+  const [metrics, setMetrics] = useState<EditorScrollMetrics>({
+    clientHeight: 0,
+    scrollHeight: 0,
+    scrollTop: 0,
+  })
+
+  const updateMetrics = useCallback(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    setMetrics({
+      clientHeight: scrollContainer.clientHeight,
+      scrollHeight: scrollContainer.scrollHeight,
+      scrollTop: scrollContainer.scrollTop,
+    })
+  }, [scrollContainerRef])
+
+  useLayoutEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    const resizeObserver = new ResizeObserver(updateMetrics)
+    resizeObserver.observe(scrollContainer)
+    if (scrollContainer.firstElementChild) {
+      resizeObserver.observe(scrollContainer.firstElementChild)
+    }
+    const editorContent = scrollContainer.querySelector('.ProseMirror, textarea')
+    if (editorContent) {
+      resizeObserver.observe(editorContent)
+    }
+
+    scrollContainer.addEventListener('scroll', updateMetrics, { passive: true })
+    updateMetrics()
+
+    return () => {
+      resizeObserver.disconnect()
+      scrollContainer.removeEventListener('scroll', updateMetrics)
+    }
+  }, [refreshKey, scrollContainerRef, updateMetrics])
+
+  const maxScrollTop = Math.max(0, metrics.scrollHeight - metrics.clientHeight)
+  const thumbHeight = metrics.scrollHeight > 0
+    ? Math.min(
+      metrics.clientHeight,
+      Math.max(EDITOR_SCROLLBAR_MIN_THUMB_SIZE, metrics.clientHeight ** 2 / metrics.scrollHeight)
+    )
+    : metrics.clientHeight
+  const thumbTravel = Math.max(0, metrics.clientHeight - thumbHeight)
+  const thumbTop = maxScrollTop > 0 ? metrics.scrollTop / maxScrollTop * thumbTravel : 0
+  const hasOverflow = maxScrollTop > 1
+
+  const scrollToThumbPosition = useCallback((thumbPosition: number) => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer || thumbTravel <= 0) return
+
+    const clampedPosition = Math.max(0, Math.min(thumbTravel, thumbPosition))
+    scrollContainer.scrollTop = clampedPosition / thumbTravel * maxScrollTop
+  }, [maxScrollTop, scrollContainerRef, thumbTravel])
+
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !hasOverflow) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const clickedThumb = event.target instanceof Element
+      && event.target.closest('[data-editor-scrollbar-thumb]')
+
+    if (!clickedThumb) {
+      const trackRect = event.currentTarget.getBoundingClientRect()
+      scrollToThumbPosition(event.clientY - trackRect.top - thumbHeight / 2)
+    }
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startScrollTop: scrollContainerRef.current?.scrollTop ?? 0,
+    }
+  }, [hasOverflow, scrollContainerRef, scrollToThumbPosition, thumbHeight])
+
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current
+    const scrollContainer = scrollContainerRef.current
+    if (!dragState || dragState.pointerId !== event.pointerId || !scrollContainer || thumbTravel <= 0) return
+
+    event.preventDefault()
+    const scrollDelta = (event.clientY - dragState.startY) / thumbTravel * maxScrollTop
+    scrollContainer.scrollTop = Math.max(0, Math.min(maxScrollTop, dragState.startScrollTop + scrollDelta))
+  }, [maxScrollTop, scrollContainerRef, thumbTravel])
+
+  const handlePointerEnd = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current?.pointerId !== event.pointerId) return
+    dragStateRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }, [])
+
+  const handleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer || !hasOverflow) return
+
+    const pageSize = Math.max(40, scrollContainer.clientHeight * 0.85)
+    const scrollBy = event.key === 'ArrowUp'
+      ? -40
+      : event.key === 'ArrowDown'
+        ? 40
+        : event.key === 'PageUp'
+          ? -pageSize
+          : event.key === 'PageDown'
+            ? pageSize
+            : null
+
+    if (scrollBy !== null) {
+      event.preventDefault()
+      scrollContainer.scrollBy({ top: scrollBy })
+    } else if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      scrollContainer.scrollTo({ top: event.key === 'Home' ? 0 : maxScrollTop })
+    }
+  }, [hasOverflow, maxScrollTop, scrollContainerRef])
+
+  return (
+    <div
+      role="scrollbar"
+      aria-label="编辑器滚动条"
+      aria-orientation="vertical"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(maxScrollTop)}
+      aria-valuenow={Math.round(metrics.scrollTop)}
+      tabIndex={hasOverflow ? 0 : -1}
+      className={cn(
+        'editor-custom-scrollbar absolute inset-y-0 right-0 z-30 w-3 touch-none select-none',
+        !hasOverflow && 'pointer-events-none opacity-0'
+      )}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        data-editor-scrollbar-thumb
+        className="editor-custom-scrollbar-thumb absolute left-0 right-0"
+        style={{ height: thumbHeight, transform: `translateY(${thumbTop}px)` }}
+      />
+    </div>
+  )
+}
 
 const AI_GENERATION_LOADING_TEXT = '···'
 const MOBILE_SCROLL_TOP_THRESHOLD = 160
@@ -4980,21 +5147,23 @@ export function TipTapEditor({
       )}
 
       {/* Editor content - scrollable area */}
-      <div
-        ref={scrollContainerRef}
-        className={cn(
-          "relative overflow-x-hidden",
-          scrollable ? "flex-1 overflow-y-auto" : "overflow-y-visible",
-          isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
-          isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
-        )}
-        onMouseDownCapture={handleEditorMouseDownCapture}
-        onScroll={handleEditorScroll}
-        onDragEnter={viewMode === 'visual' ? handleEditorDragOver : undefined}
-        onDragOver={viewMode === 'visual' ? handleEditorDragOver : undefined}
-        onDragLeave={viewMode === 'visual' ? handleEditorDragLeave : undefined}
-        onDropCapture={viewMode === 'visual' ? handleEditorDrop : undefined}
-      >
+      <div className={cn('relative min-h-0', scrollable ? 'flex-1' : 'min-h-full')}>
+        <div
+          ref={scrollContainerRef}
+          className={cn(
+            "editor-scroll-container relative overflow-x-hidden",
+            scrollable ? "h-full overflow-y-auto" : "overflow-y-visible",
+            scrollable && !isMobile && "editor-scroll-container-custom",
+            isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
+            isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
+          )}
+          onMouseDownCapture={handleEditorMouseDownCapture}
+          onScroll={handleEditorScroll}
+          onDragEnter={viewMode === 'visual' ? handleEditorDragOver : undefined}
+          onDragOver={viewMode === 'visual' ? handleEditorDragOver : undefined}
+          onDragLeave={viewMode === 'visual' ? handleEditorDragLeave : undefined}
+          onDropCapture={viewMode === 'visual' ? handleEditorDrop : undefined}
+        >
         {(isCanvasDragOver || isCanvasDropPending) && (
           <div className={cn(
             'pointer-events-none absolute inset-0 z-40 flex items-center justify-center border-2 border-primary/60 bg-primary/5 transition-colors duration-150',
@@ -5127,6 +5296,10 @@ export function TipTapEditor({
           </>
         )}
         </div>
+        </div>
+        {scrollable && !isMobile ? (
+          <EditorScrollbar refreshKey={viewMode} scrollContainerRef={scrollContainerRef} />
+        ) : null}
       </div>
 
       {isMobile && showMobileScrollTop && (

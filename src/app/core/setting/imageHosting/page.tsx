@@ -241,7 +241,7 @@ export default function ImageHostingPage({ mobile = false }: { mobile?: boolean 
             <CardTitle>{t('settings.imageHosting.platformSettings')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-[52vh] overflow-y-auto pr-1">
+            <div className="app-panel-scrollbar max-h-[52vh] overflow-y-auto pr-1">
               <ItemGroup className="gap-1">
                 <Item
                   asChild

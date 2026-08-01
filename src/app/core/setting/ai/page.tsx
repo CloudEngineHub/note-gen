@@ -423,7 +423,7 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                   />
                 </div>
 
-                <div className="hidden max-h-[52vh] flex-col gap-3 overflow-y-auto pr-1 lg:flex">
+                <div className="app-panel-scrollbar hidden max-h-[52vh] flex-col gap-3 overflow-y-auto pr-1 lg:flex">
                   <ItemGroup className="gap-2">
                     {sortedUserCustomModels.map(provider => {
                       const selected = provider.key === selectedAiConfig

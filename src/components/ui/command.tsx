@@ -115,7 +115,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        "max-h-72 min-h-0 scroll-py-1 overflow-x-hidden overflow-y-auto overscroll-contain outline-none [scrollbar-gutter:stable] [scrollbar-width:thin]",
+        "max-h-72 min-h-0 scroll-py-1 overflow-x-hidden overflow-y-auto overscroll-contain outline-none [scrollbar-gutter:stable]",
         className
       )}
       onWheel={handleWheel}

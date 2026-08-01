@@ -302,6 +302,11 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       return
     }
 
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    if (e.clientX >= containerRect.right - 12) {
+      return
+    }
+
     focusSidebar()
     selectionStartRef.current = { x: e.clientX, y: e.clientY }
     selectingRef.current = false
@@ -890,7 +895,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     <div
       ref={containerRef}
       className={cn(
-        "relative h-full min-h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors",
+        "app-panel-scrollbar relative h-full min-h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors [scrollbar-gutter:stable]",
         isDragging && "bg-accent/60 outline-2 outline-dashed -outline-offset-4 outline-ring/60"
       )}
       onDrop={(e) => handleDrop(e)}

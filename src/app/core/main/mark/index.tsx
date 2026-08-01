@@ -46,7 +46,7 @@ export function NoteSidebar() {
           <MarkList />
         </>
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div className="app-panel-scrollbar flex-1 overflow-y-auto [scrollbar-gutter:stable]">
           <TagManage />
         </div>
       )}

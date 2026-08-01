@@ -55,7 +55,7 @@ export const MarkList = React.memo(function MarkList() {
 
   return (
     <PhotoPreviewProvider>
-      <div className="flex-1 overflow-y-auto">
+      <div className="app-panel-scrollbar flex-1 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="px-0">
           <div>
             {!trashState && hasActiveRecordFilters() ? (

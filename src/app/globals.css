@@ -178,6 +178,10 @@
     --component-inactive-color: var(--muted-foreground);
     --component-bg: var(--card);
     --component-shadow: var(--border);
+    --scrollbar-size: 12px;
+    --scrollbar-thumb: hsl(var(--muted-foreground) / 0.34);
+    --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.58);
+    --scrollbar-thumb-active: hsl(var(--foreground) / 0.7);
     --component-active-bg: var(--secondary);
     --component-line-inactive-color: var(--border);
     --component-active-color-default: var(--accent-foreground);
@@ -494,8 +498,8 @@ html, body {
 }
 
 :not(table)::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 
 :not(table)::-webkit-scrollbar-track {
@@ -504,11 +508,28 @@ html, body {
 
 :not(table)::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background-color: hsl(var(--border));
-  border-width: 1px;
+  background-color: var(--scrollbar-thumb);
+  border-width: 4px;
   border-style: solid;
   border-color: transparent;
   background-clip: padding-box;
+  transition: background-color 0.15s ease, border-width 0.15s ease;
+}
+
+:not(table)::-webkit-scrollbar-thumb:hover {
+  border-width: 2px;
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+:not(table)::-webkit-scrollbar-thumb:active {
+  border-width: 1px;
+  background-color: var(--scrollbar-thumb-active);
+}
+
+/* Main side panels keep the same visible scrollbar and a stable hit gutter. */
+.app-panel-scrollbar {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .setting-anchor {
@@ -591,9 +612,9 @@ ol {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 2px;
-  opacity: 0;
-  transition: opacity 0.2s;
+  height: 6px;
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
   pointer-events: none;
 }
 
@@ -604,9 +625,17 @@ ol {
 .tab-scrollbar-thumb {
   position: absolute;
   height: 100%;
-  background: hsl(var(--muted-foreground) / 0.4);
-  border-radius: 2px;
+  border-block: 2px solid transparent;
+  border-radius: 9999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
   min-width: 20px;
+  transition: background-color 0.15s ease, border-width 0.15s ease;
+}
+
+.tab-scrollbar-wrapper:hover .tab-scrollbar-thumb {
+  border-block-width: 1px;
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 @layer base {
@@ -676,47 +705,6 @@ ol {
 .notegen-canvas .react-flow__resize-control.line {
   z-index: 30;
   border-color: hsl(var(--ring) / 0.75);
-}
-
-/* Keep long overlay lists visibly scrollable in desktop webviews. */
-:is(
-  [data-slot="command-list"],
-  [data-slot="select-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="context-menu-content"]
-) {
-  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
-  scrollbar-width: thin;
-}
-
-:is(
-  [data-slot="command-list"],
-  [data-slot="select-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="context-menu-content"]
-)::-webkit-scrollbar {
-  width: 8px;
-}
-
-:is(
-  [data-slot="command-list"],
-  [data-slot="select-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="context-menu-content"]
-)::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-:is(
-  [data-slot="command-list"],
-  [data-slot="select-content"],
-  [data-slot="dropdown-menu-content"],
-  [data-slot="context-menu-content"]
-)::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.45);
-  background-clip: padding-box;
-  border: 2px solid transparent;
-  border-radius: 9999px;
 }
 
 /* Tiptap 搜索替换高亮样式 */
