@@ -382,6 +382,27 @@ export function isUnsupportedToolChoiceError(error: unknown): boolean {
     && /不支持|不存在|not\s+support|unsupported|unknown\s+(?:parameter|field)|invalid\s+(?:parameter|field)|does\s+not\s+exist\s+in\s+tools|not\s+found\s+in\s+tools|not\s+available/i.test(message)
 }
 
+type ReasoningAssistantToolCallMessage = OpenAI.Chat.ChatCompletionAssistantMessageParam & {
+  reasoning_content?: string
+}
+
+/**
+ * 思考模型在工具调用后的续请求中，需要原样回传本轮 reasoning_content。
+ * 空正文使用空字符串，以兼容要求 assistant content 非 null 的 OpenAI 兼容接口。
+ */
+export function createAssistantToolCallMessage(
+  content: string,
+  toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[],
+  reasoningContent?: string
+): ReasoningAssistantToolCallMessage {
+  return {
+    role: 'assistant',
+    content,
+    tool_calls: toolCalls,
+    ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+  }
+}
+
 function omitToolChoice(
   params: OpenAI.Chat.ChatCompletionCreateParamsStreaming
 ): OpenAI.Chat.ChatCompletionCreateParamsStreaming {

@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import { createChatCompletionStreamWithToolChoiceFallback, createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
+import { createAssistantToolCallMessage, createChatCompletionStreamWithToolChoiceFallback, createOpenAIClient, getAISettings, getChatTokenLimitParams, getSystemPromptContent, handleAIError, validateAIService, withFastAiRequestOptions } from '@/lib/ai/utils'
 import { estimateTokens } from '@/lib/ai/token-counter'
 import { AgentContextManager } from './context-manager'
 import { agentEventBus } from './event-bus'
@@ -1395,11 +1395,11 @@ export class AgentRuntime {
           }
         }
 
-        messages.push({
-          role: 'assistant',
-          content: assistantContent || null,
-          tool_calls: toolUses,
-        })
+        messages.push(createAssistantToolCallMessage(
+          assistantContent,
+          toolUses,
+          assistantReasoning
+        ))
 
         const cancelRemainingToolCalls = (afterIndex: number, reason: string) => {
           for (const pendingToolUse of toolUses.slice(afterIndex + 1)) {

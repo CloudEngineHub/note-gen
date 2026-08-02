@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, createChatCompletionStreamWithToolChoiceFallback, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
+import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, createAssistantToolCallMessage, createChatCompletionStreamWithToolChoiceFallback, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
 
 /**
  * 非流式方式获取AI结果
@@ -160,7 +160,14 @@ export async function fetchAiStream(
       const content = delta?.content || ''
       
       if (thinkingContent) {
-        // 处理思考内容
+        thinking += thinkingContent
+        if (onThinkingUpdate) {
+          onThinkingUpdate(thinking)
+        }
+      }
+
+      if (content) {
+        fullContent += content
       }
       
       // 处理工具调用
@@ -201,19 +208,6 @@ export async function fetchAiStream(
         continue
       }
       
-      // 处理思考内容（通过独立回调）
-      if (thinkingContent) {
-        thinking += thinkingContent
-        if (onThinkingUpdate) {
-          onThinkingUpdate(thinking)
-        }
-      }
-      
-      // 处理普通内容
-      if (content) {
-        fullContent += content
-      }
-
       onUpdate(fullContent)
     }
 
@@ -325,11 +319,7 @@ export async function fetchAiStream(
         // 将工具调用和结果添加到消息历史
         conversationMessages = [
           ...conversationMessages,
-          {
-            role: 'assistant' as const,
-            content: null,
-            tool_calls: currentToolCalls
-          },
+          createAssistantToolCallMessage(fullContent, currentToolCalls, thinking),
           ...toolResults
         ]
         
@@ -360,6 +350,16 @@ export async function fetchAiStream(
           const delta = chunk.choices[0]?.delta
           const thinkingContent = (delta as any)?.reasoning_content || ''
           const content = delta?.content || ''
+
+          if (thinkingContent) {
+            thinking += thinkingContent
+            if (onThinkingUpdate) {
+              onThinkingUpdate(thinking)
+            }
+          }
+          if (content) {
+            fullContent += content
+          }
           
           // 检查是否又有新的工具调用
           if (delta?.tool_calls) {
@@ -395,16 +395,6 @@ export async function fetchAiStream(
             continue
           }
           
-          // 处理思考内容（通过独立回调）
-          if (thinkingContent) {
-            thinking += thinkingContent
-            if (onThinkingUpdate) {
-              onThinkingUpdate(thinking)
-            }
-          }
-          if (content) {
-            fullContent += content
-          }
           onUpdate(fullContent)
         }
         
