@@ -164,18 +164,33 @@ export async function updateConversationTime(id: number): Promise<void> {
 // 删除会话及其相关聊天记录
 export async function deleteConversation(id: number): Promise<void> {
   const db = await getDb()
-  await db.execute(
-    "delete from memory_conversation_policy where conversation_id = $1",
-    [id]
+  const optionalTables = await db.select<{ name: string }[]>(
+    `select name from sqlite_master
+     where type = 'table'
+       and name in ('memory_conversation_policy', 'memory_jobs', 'conversation_compactions')`,
+    []
   )
-  await db.execute(
-    "delete from memory_jobs where conversation_id = $1",
-    [id]
-  )
-  await db.execute(
-    "delete from conversation_compactions where conversationId = $1",
-    [id]
-  )
+  const existingOptionalTables = new Set(optionalTables.map(table => table.name))
+
+  // 这些关联表由可选功能在不同版本中引入，旧数据库中可能尚不存在。
+  if (existingOptionalTables.has('memory_conversation_policy')) {
+    await db.execute(
+      "delete from memory_conversation_policy where conversation_id = $1",
+      [id]
+    )
+  }
+  if (existingOptionalTables.has('memory_jobs')) {
+    await db.execute(
+      "delete from memory_jobs where conversation_id = $1",
+      [id]
+    )
+  }
+  if (existingOptionalTables.has('conversation_compactions')) {
+    await db.execute(
+      "delete from conversation_compactions where conversationId = $1",
+      [id]
+    )
+  }
   // 先删除会话的所有聊天记录
   await db.execute(
     "delete from chats where conversationId = $1",
