@@ -88,7 +88,7 @@ function getTone(phase: AutoDataSyncPhase, showSuccess: boolean): BannerTone {
 
 function isRecordTransferState(syncState: AutoDataSyncState) {
   if (syncState.phase === 'downloading') {
-    return true
+    return syncState.affectedDomains.includes('records')
   }
 
   if (syncState.phase !== 'uploading') {
@@ -157,6 +157,10 @@ export function RecordSyncStatusBanner({
 
   const phase = syncState.phase
   const shouldShow = useMemo(() => {
+    if (!syncState.affectedDomains.includes('records') && phase !== 'waiting_provider') {
+      return false
+    }
+
     if (phase === 'queued' || phase === 'checking_remote' || phase === 'waiting_provider') {
       return false
     }
@@ -205,7 +209,7 @@ export function RecordSyncStatusBanner({
             variant="ghost"
             size="xs"
             className="shrink-0"
-            onClick={() => void retryAutoDataSync()}
+            onClick={() => void retryAutoDataSync('records')}
           >
             <RefreshCw data-icon="inline-start" />
             {t('retry')}

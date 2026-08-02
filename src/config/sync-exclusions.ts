@@ -61,11 +61,41 @@ export interface SyncExclusionOptions {
 }
 
 export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
+  // 运行时、设备和页面会话状态
+  'activeFilePath',
+  'activeTabId',
+  'collapsibleList',
+  'currentPage',
+  'fileTreeScrollTop',
+  'lastSettingPage',
+  'openTabs',
+  'analyticsInstallId',
+  'analyticsLastActiveDate',
+  'analyticsSeenVersions',
+  'desktopOnboardingProgress',
+  'lastVectorProcessTime',
+  'ragIndexNeedsRebuild',
+  'learnedContextWindows',
+
+  // 可重新生成或重新获取的本地缓存
+  'githubReleasesCache',
+  'noteGenDefaultModelsCache',
+  'providerTemplatesCache',
+  'remoteSkills.searchCache',
+  'lastDownloadedRagSnapshot',
+
+  // 文件、画布和应用数据同步的本地进度
+  'canvasSyncVersions',
   'autoDataSyncEnabled',
+  'autoRecordSyncEnabled',
+  'autoSettingsSyncEnabled',
   'autoVectorEnabled',
   'closeBehavior',
   'excludeSensitiveConfig',
   'syncedFileShas',
+  'lastSyncTimes',
+  'lastRestoreTimes',
+  'fileLocks',
   'syncQueue',
   'lastAppliedRemoteRev',
   'deviceId',
@@ -77,6 +107,11 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   'autoDataSyncRecordSnapshots',
   'autoDataSyncBaselineFingerprints',
   'lastRecordTagId',
+  'workspaceSyncRepos',
+  'githubCustomSyncRepo',
+  'giteeCustomSyncRepo',
+  'gitlabCustomSyncRepo',
+  'giteaCustomSyncRepo',
 ]
 
 export const SENSITIVE_SYNC_EXCLUDED_FIELDS: string[] = [
@@ -126,7 +161,7 @@ export function shouldExcludeFromSync(fieldName: string, options: SyncExclusionO
   const normalizedFieldName = fieldName.toLowerCase()
   const excludeSensitiveConfig = options.excludeSensitiveConfig !== false
 
-  if (ALWAYS_SYNC_EXCLUDED_FIELDS.includes(fieldName)) {
+  if (ALWAYS_SYNC_EXCLUDED_FIELDS.some(field => fieldName === field || fieldName.startsWith(`${field}:`))) {
     return true
   }
 

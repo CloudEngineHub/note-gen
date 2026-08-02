@@ -6,7 +6,7 @@ import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileCont
 import { uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileContent as giteaGetFileContent } from '@/lib/sync/gitea';
 import { s3Upload, s3Delete, s3HeadObject, s3Download } from '@/lib/sync/s3'
 import { webdavUpload, webdavDelete, webdavHeadObject, webdavDownload } from '@/lib/sync/webdav'
-import { getSyncRepoName } from '@/lib/sync/repo-utils';
+import { getDataSyncRepoName } from '@/lib/sync/repo-utils';
 import { getRemoteFileContent } from '@/lib/sync/remote-file';
 import { Store } from '@tauri-apps/plugin-store';
 import { locales } from '@/lib/locales';
@@ -507,7 +507,7 @@ const useChatStore = create<ChatState>((set, get) => ({
     const fullPath = `${path}/${filename}`;
     switch (primaryBackupMethod) {
       case 'github':
-        const githubRepo = await getSyncRepoName('github')
+        const githubRepo = await getDataSyncRepoName('github')
         files = await githubGetFiles({ path: fullPath, repo: githubRepo })
         res = await uploadGithubFile({
           file: jsonToBase64(chats),
@@ -517,7 +517,7 @@ const useChatStore = create<ChatState>((set, get) => ({
         })
         break;
       case 'gitee':
-        const giteeRepo = await getSyncRepoName('gitee')
+        const giteeRepo = await getDataSyncRepoName('gitee')
         files = await giteeGetFiles({ path: fullPath, repo: giteeRepo })
         res = await uploadGiteeFile({
           file: jsonToBase64(chats),
@@ -527,7 +527,7 @@ const useChatStore = create<ChatState>((set, get) => ({
         })
         break;
       case 'gitlab':
-        const gitlabRepo = await getSyncRepoName('gitlab')
+        const gitlabRepo = await getDataSyncRepoName('gitlab')
         files = await gitlabGetFiles({ path, repo: gitlabRepo })
         const chatFile = Array.isArray(files)
           ? files.find(file => file.name === filename)
@@ -541,7 +541,7 @@ const useChatStore = create<ChatState>((set, get) => ({
         })
         break;
       case 'gitea':
-        const giteaRepo = await getSyncRepoName('gitea')
+        const giteaRepo = await getDataSyncRepoName('gitea')
         files = await giteaGetFiles({ path, repo: giteaRepo })
         const giteaChatFile = Array.isArray(files)
           ? files.find(file => file.name === filename)
@@ -617,19 +617,19 @@ const useChatStore = create<ChatState>((set, get) => ({
     let files;
     switch (primaryBackupMethod) {
       case 'github':
-        const githubRepo2 = await getSyncRepoName('github')
+        const githubRepo2 = await getDataSyncRepoName('github')
         files = await githubGetFiles({ path: `${path}/${filename}`, repo: githubRepo2 })
         break;
       case 'gitee':
-        const giteeRepo2 = await getSyncRepoName('gitee')
+        const giteeRepo2 = await getDataSyncRepoName('gitee')
         files = await giteeGetFiles({ path: `${path}/${filename}`, repo: giteeRepo2 })
         break;
       case 'gitlab':
-        const gitlabRepo2 = await getSyncRepoName('gitlab')
+        const gitlabRepo2 = await getDataSyncRepoName('gitlab')
         files = await gitlabGetFileContent({ path: `${path}/${filename}`, ref: 'main', repo: gitlabRepo2 })
         break;
       case 'gitea':
-        const giteaRepo2 = await getSyncRepoName('gitea')
+        const giteaRepo2 = await getDataSyncRepoName('gitea')
         files = await giteaGetFileContent({ path: `${path}/${filename}`, ref: 'main', repo: giteaRepo2 })
         break;
       case 's3': {

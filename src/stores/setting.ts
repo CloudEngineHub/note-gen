@@ -196,8 +196,11 @@ interface SettingState {
   autoSync: string
   setAutoSync: (autoSync: string) => Promise<void>
 
-  autoDataSyncEnabled: boolean
-  setAutoDataSyncEnabled: (enabled: boolean) => Promise<void>
+  autoRecordSyncEnabled: boolean
+  setAutoRecordSyncEnabled: (enabled: boolean) => Promise<void>
+
+  autoSettingsSyncEnabled: boolean
+  setAutoSettingsSyncEnabled: (enabled: boolean) => Promise<void>
 
   excludeSensitiveConfig: boolean
   setExcludeSensitiveConfig: (enabled: boolean) => Promise<void>
@@ -402,23 +405,29 @@ export interface RecordToolbarItem {
 
 let settingAutoSyncReady = false
 let settingAutoSyncSubscriptionInitialized = false
+const SETTING_LOCAL_PERSIST_DEBOUNCE_MS = 300
+let pendingSettingPersistTimer: ReturnType<typeof setTimeout> | null = null
+let pendingSettingPersistState: SettingState | null = null
+const pendingSettingPersistKeys = new Set<string>()
+const pendingSettingSyncKeys = new Set<string>()
+let settingPersistQueue = Promise.resolve()
 
-function getChangedSyncableSettingKeys(current: SettingState, previous: SettingState): string[] {
+function getChangedSettingKeys(current: SettingState, previous: SettingState): string[] {
   const currentRecord = current as unknown as Record<string, unknown>
   const previousRecord = previous as unknown as Record<string, unknown>
-  const excludeSensitiveConfig = current.excludeSensitiveConfig !== false
 
   return Object.keys(currentRecord).filter((key) => {
     if (typeof currentRecord[key] === 'function') {
       return false
     }
 
-    if (shouldExcludeFromSync(key, { excludeSensitiveConfig })) {
-      return false
-    }
-
     return currentRecord[key] !== previousRecord[key]
   })
+}
+
+function getSyncableSettingKeys(state: SettingState, changedKeys: string[]): string[] {
+  const excludeSensitiveConfig = state.excludeSensitiveConfig !== false
+  return changedKeys.filter(key => !shouldExcludeFromSync(key, { excludeSensitiveConfig }))
 }
 
 function initSettingAutoSyncSubscription() {
@@ -433,16 +442,75 @@ function initSettingAutoSyncSubscription() {
       return
     }
 
-    const changedKeys = getChangedSyncableSettingKeys(current, previous)
+    const changedKeys = getChangedSettingKeys(current, previous)
     if (changedKeys.length === 0) {
       return
     }
 
-    void persistChangedSyncableSettings(current, changedKeys)
+    scheduleChangedSettingsPersist(
+      current,
+      changedKeys,
+      getSyncableSettingKeys(current, changedKeys),
+    )
+  })
+
+  window.addEventListener('pagehide', () => {
+    void flushChangedSyncableSettingsPersist()
+  })
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void flushChangedSyncableSettingsPersist()
+    }
   })
 }
 
-async function persistChangedSyncableSettings(state: SettingState, changedKeys: string[]) {
+function scheduleChangedSettingsPersist(
+  state: SettingState,
+  changedKeys: string[],
+  syncableKeys: string[],
+) {
+  pendingSettingPersistState = state
+  changedKeys.forEach(key => pendingSettingPersistKeys.add(key))
+  syncableKeys.forEach(key => pendingSettingSyncKeys.add(key))
+
+  if (pendingSettingPersistTimer) {
+    clearTimeout(pendingSettingPersistTimer)
+  }
+
+  pendingSettingPersistTimer = setTimeout(() => {
+    pendingSettingPersistTimer = null
+    void flushChangedSyncableSettingsPersist()
+  }, SETTING_LOCAL_PERSIST_DEBOUNCE_MS)
+}
+
+async function flushChangedSyncableSettingsPersist() {
+  if (pendingSettingPersistTimer) {
+    clearTimeout(pendingSettingPersistTimer)
+    pendingSettingPersistTimer = null
+  }
+
+  const state = pendingSettingPersistState
+  const changedKeys = Array.from(pendingSettingPersistKeys)
+  const syncableKeys = Array.from(pendingSettingSyncKeys)
+  pendingSettingPersistState = null
+  pendingSettingPersistKeys.clear()
+  pendingSettingSyncKeys.clear()
+  if (!state || changedKeys.length === 0) return
+
+  settingPersistQueue = settingPersistQueue
+    .then(() => persistChangedSettings(state, changedKeys, syncableKeys))
+    .catch(error => {
+      console.error('Failed to persist changed settings:', error)
+    })
+  await settingPersistQueue
+}
+
+async function persistChangedSettings(
+  state: SettingState,
+  changedKeys: string[],
+  syncableKeys: string[],
+) {
   const store = await Store.load('store.json')
   const stateRecord = state as unknown as Record<string, unknown>
 
@@ -451,7 +519,9 @@ async function persistChangedSyncableSettings(state: SettingState, changedKeys: 
   }
 
   await store.save()
-  enqueueAutoDataSync('settings', `settings:${changedKeys.join(',')}`)
+  if (syncableKeys.length > 0) {
+    enqueueAutoDataSync('settings', `settings:${syncableKeys.join(',')}`)
+  }
 }
 
 
@@ -459,6 +529,14 @@ const useSettingStore = create<SettingState>((set, get) => ({
   initSettingData: async () => {
     const store = await Store.load('store.json');
     await get().setVersion()
+
+    const legacyAutoDataSyncEnabled = await store.get<boolean>('autoDataSyncEnabled')
+    if (await store.get<boolean>('autoRecordSyncEnabled') === undefined) {
+      await store.set('autoRecordSyncEnabled', legacyAutoDataSyncEnabled !== false)
+    }
+    if (await store.get<boolean>('autoSettingsSyncEnabled') === undefined) {
+      await store.set('autoSettingsSyncEnabled', legacyAutoDataSyncEnabled !== false)
+    }
 
     let preferencesChanged = false
     const storedEditorContentWidth = await store.get('editorContentWidth')
@@ -1110,12 +1188,24 @@ const useSettingStore = create<SettingState>((set, get) => ({
     await store.set('autoSync', autoSync)
   },
 
-  autoDataSyncEnabled: true,
-  setAutoDataSyncEnabled: async (autoDataSyncEnabled: boolean) => {
-    set({ autoDataSyncEnabled })
+  autoRecordSyncEnabled: true,
+  setAutoRecordSyncEnabled: async (autoRecordSyncEnabled: boolean) => {
+    set({ autoRecordSyncEnabled })
     const store = await Store.load('store.json')
-    await store.set('autoDataSyncEnabled', autoDataSyncEnabled)
+    await store.set('autoRecordSyncEnabled', autoRecordSyncEnabled)
+    await store.set('autoDataSyncEnabled', autoRecordSyncEnabled || get().autoSettingsSyncEnabled)
     await store.save()
+    if (autoRecordSyncEnabled) enqueueAutoDataSync('records', 'records-sync-enabled')
+  },
+
+  autoSettingsSyncEnabled: true,
+  setAutoSettingsSyncEnabled: async (autoSettingsSyncEnabled: boolean) => {
+    set({ autoSettingsSyncEnabled })
+    const store = await Store.load('store.json')
+    await store.set('autoSettingsSyncEnabled', autoSettingsSyncEnabled)
+    await store.set('autoDataSyncEnabled', autoSettingsSyncEnabled || get().autoRecordSyncEnabled)
+    await store.save()
+    if (autoSettingsSyncEnabled) enqueueAutoDataSync('settings', 'settings-sync-enabled')
   },
 
   excludeSensitiveConfig: true,

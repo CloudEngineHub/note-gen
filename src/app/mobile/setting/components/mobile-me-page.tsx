@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { loadActivityCalendarData } from '@/lib/activity'
 import type { ActivityCalendarData, ActivityDaySummary } from '@/lib/activity/types'
 import { SyncStateEnum, type UserInfo } from '@/lib/sync/github.types'
-import { getSyncRepoName } from '@/lib/sync/repo-utils'
+import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import { testS3Connection } from '@/lib/sync/s3'
 import { testWebDAVConnection } from '@/lib/sync/webdav'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
@@ -86,7 +86,14 @@ export function MobileMePage({
   const restoredScrollRef = useRef(false)
   const refreshOnMountRef = useRef(refreshOnMount)
 
-  const { primaryBackupMethod } = useSettingStore()
+  const {
+    primaryBackupMethod,
+    workspacePath,
+    githubCustomSyncRepo,
+    giteeCustomSyncRepo,
+    gitlabCustomSyncRepo,
+    giteaCustomSyncRepo,
+  } = useSettingStore()
   const {
     userInfo,
     giteeUserInfo,
@@ -151,9 +158,8 @@ export function MobileMePage({
 
             const [{ getUserInfo, checkSyncRepoState }, repoName] = await Promise.all([
               import('@/lib/sync/github'),
-              getSyncRepoName('github'),
+              getOptionalSyncRepoName('github'),
             ])
-
             const user = await getUserInfo()
             const githubUser = user && typeof user === 'object' && 'data' in user
               ? user.data as UserInfo
@@ -162,6 +168,11 @@ export function MobileMePage({
             if (!cancelled && githubUser) {
               syncState.setUserInfo(githubUser)
               await settingState.setGithubUsername(githubUser.login)
+            }
+
+            if (!repoName) {
+              syncState.setSyncRepoState(SyncStateEnum.fail)
+              return
             }
 
             const repo = await checkSyncRepoState(repoName)
@@ -184,12 +195,16 @@ export function MobileMePage({
 
             const [{ getUserInfo, checkSyncRepoState }, repoName] = await Promise.all([
               import('@/lib/sync/gitee'),
-              getSyncRepoName('gitee'),
+              getOptionalSyncRepoName('gitee'),
             ])
-
             const user = await getUserInfo()
             if (!cancelled && user) {
               syncState.setGiteeUserInfo(user)
+            }
+
+            if (!repoName) {
+              syncState.setGiteeSyncRepoState(SyncStateEnum.fail)
+              return
             }
 
             const repo = await checkSyncRepoState(repoName)
@@ -212,13 +227,17 @@ export function MobileMePage({
 
             const [{ getUserInfo, checkSyncProjectState }, repoName] = await Promise.all([
               import('@/lib/sync/gitlab'),
-              getSyncRepoName('gitlab'),
+              getOptionalSyncRepoName('gitlab'),
             ])
-
             const user = await getUserInfo()
             if (!cancelled && user) {
               syncState.setGitlabUserInfo(user)
               await settingState.setGitlabUsername(user.username)
+            }
+
+            if (!repoName) {
+              syncState.setGitlabSyncProjectState(SyncStateEnum.fail)
+              return
             }
 
             const project = await checkSyncProjectState(repoName)
@@ -241,13 +260,17 @@ export function MobileMePage({
 
             const [{ getUserInfo, checkSyncRepoState }, repoName] = await Promise.all([
               import('@/lib/sync/gitea'),
-              getSyncRepoName('gitea'),
+              getOptionalSyncRepoName('gitea'),
             ])
-
             const user = await getUserInfo()
             if (!cancelled && user) {
               syncState.setGiteaUserInfo(user)
               await settingState.setGiteaUsername(user.login)
+            }
+
+            if (!repoName) {
+              syncState.setGiteaSyncRepoState(SyncStateEnum.fail)
+              return
             }
 
             const repo = await checkSyncRepoState(repoName)
@@ -319,7 +342,14 @@ export function MobileMePage({
     return () => {
       cancelled = true
     }
-  }, [primaryBackupMethod])
+  }, [
+    primaryBackupMethod,
+    workspacePath,
+    githubCustomSyncRepo,
+    giteeCustomSyncRepo,
+    gitlabCustomSyncRepo,
+    giteaCustomSyncRepo,
+  ])
 
   useLayoutEffect(() => {
     if (restoredScrollRef.current) return

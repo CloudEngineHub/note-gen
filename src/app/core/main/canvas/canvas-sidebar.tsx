@@ -392,7 +392,7 @@ export function CanvasSidebar() {
     if (syncState.isSyncing
       && syncState.currentDomain === 'records'
       && syncState.phase === 'uploading') return 'uploading'
-    if (syncState.status === 'failed') return 'failed'
+    if (syncState.status === 'failed' && syncState.affectedDomains.includes('records')) return 'failed'
     return 'pending'
   }
 
@@ -521,7 +521,7 @@ export function CanvasSidebar() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ScrollArea className="min-h-0 flex-1">
-        {syncState.phase === 'downloading' && (
+        {syncState.phase === 'downloading' && syncState.affectedDomains.includes('records') && (
           <div
             role="status"
             className="border-y border-border bg-muted/35 px-3 py-2 text-foreground"

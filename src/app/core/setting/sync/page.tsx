@@ -15,9 +15,7 @@ import {
   RefreshCcw,
   Server,
   Settings2,
-  ShieldCheck,
   SlidersHorizontal,
-  UploadCloud,
   type LucideIcon,
 } from 'lucide-react'
 import Image from 'next/image'
@@ -33,9 +31,7 @@ import { UsePlatformButton } from './components/use-platform-button'
 import { WorkspaceRepoMapping } from './components/workspace-repo-mapping'
 import { DataSyncOverview } from './components/data-sync-overview'
 import { SettingType } from '../components/setting-base'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -63,7 +59,6 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
 import { checkSyncProviderStatus } from '@/lib/sync/provider-status'
@@ -95,8 +90,10 @@ export default function SyncPage() {
     setPrimaryBackupMethod,
     autoSync,
     setAutoSync,
-    autoDataSyncEnabled,
-    setAutoDataSyncEnabled,
+    autoRecordSyncEnabled,
+    setAutoRecordSyncEnabled,
+    autoSettingsSyncEnabled,
+    setAutoSettingsSyncEnabled,
     excludeSensitiveConfig,
     setExcludeSensitiveConfig,
     autoPullOnOpen,
@@ -222,81 +219,11 @@ export default function SyncPage() {
 
   const currentSyncState = getSyncState(platform)
   const isAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
-  const shouldShowInitialSyncChoice = autoDataSyncEnabled
-    && currentSyncState === SyncStateEnum.success
-    && initialSyncChoiceVisible
   const currentPlatformInfo = SYNC_PLATFORM_INFO[platform]
-
-  useEffect(() => {
-    async function loadInitialChoiceState() {
-      if (!autoDataSyncEnabled || currentSyncState !== SyncStateEnum.success) {
-        setInitialSyncChoiceVisible(false)
-        return
-      }
-
-      const store = await Store.load('store.json')
-      const confirmed = await store.get<boolean>(getInitialSyncChoiceKey(platform))
-      setInitialSyncChoiceVisible(confirmed !== true)
-    }
-
-    void loadInitialChoiceState()
-  }, [autoDataSyncEnabled, currentSyncState, platform])
 
   function handlePlatformChange(nextPlatform: SyncPlatform) {
     setPlatform(nextPlatform)
     setActiveTab('connection')
-  }
-
-  function getInitialSyncChoiceKey(targetPlatform: SyncPlatform) {
-    return `autoDataSyncInitialChoice:${targetPlatform}`
-  }
-
-  async function finishInitialSyncChoice() {
-    const store = await Store.load('store.json')
-    await store.set(getInitialSyncChoiceKey(platform), true)
-    await store.save()
-    setInitialSyncChoiceVisible(false)
-  }
-
-  async function handleInitialUpload() {
-    setInitialSyncBusy('upload')
-    try {
-      await uploadAutoDataSyncNow()
-      await finishInitialSyncChoice()
-      toast({ description: t('settings.sync.autoDataSyncInitialSuccess') })
-    } catch (error) {
-      console.error('Initial upload failed:', error)
-      toast({ description: t('settings.sync.autoDataSyncInitialFailed'), variant: 'destructive' })
-    } finally {
-      setInitialSyncBusy(null)
-    }
-  }
-
-  async function handleInitialDownload() {
-    setInitialSyncBusy('download')
-    try {
-      const ok = await downloadAutoDataSyncNow()
-      if (!ok) throw new Error('Failed to download remote data')
-
-      await Promise.all([fetchTags(), fetchMarks()])
-      init(currentTagId)
-      await finishInitialSyncChoice()
-      toast({ description: t('settings.sync.autoDataSyncInitialSuccess') })
-    } catch (error) {
-      console.error('Initial download failed:', error)
-      toast({ description: t('settings.sync.autoDataSyncInitialFailed'), variant: 'destructive' })
-    } finally {
-      setInitialSyncBusy(null)
-    }
-  }
-
-  async function handleInitialLater() {
-    setInitialSyncBusy('later')
-    try {
-      await finishInitialSyncChoice()
-    } finally {
-      setInitialSyncBusy(null)
-    }
   }
 
   async function handleExcludeSensitiveConfigChange(checked: boolean) {
@@ -516,68 +443,15 @@ export default function SyncPage() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('settings.sync.recordConfigSettings')}</CardTitle>
-                  <CardDescription>{t('settings.sync.recordConfigSettingsDesc')}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ItemGroup>
-                    <Item variant="outline">
-                      <ItemMedia variant="icon"><UploadCloud /></ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>{t('settings.sync.autoDataSync')}</ItemTitle>
-                        <ItemDescription>{t('settings.sync.autoDataSyncDesc')}</ItemDescription>
-                      </ItemContent>
-                      <ItemActions className="mobile-setting-inline-action">
-                        <Switch
-                          checked={autoDataSyncEnabled}
-                          onCheckedChange={setAutoDataSyncEnabled}
-                        />
-                      </ItemActions>
-                    </Item>
+              <DataSyncOverview
+                autoRecordSyncEnabled={autoRecordSyncEnabled}
+                autoSettingsSyncEnabled={autoSettingsSyncEnabled}
+                excludeSensitiveConfig={excludeSensitiveConfig}
+                onRecordSyncChange={setAutoRecordSyncEnabled}
+                onSettingsSyncChange={setAutoSettingsSyncEnabled}
+                onSensitiveConfigChange={handleExcludeSensitiveConfigChange}
+              />
 
-                    {shouldShowInitialSyncChoice ? (
-                      <Alert>
-                        <ShieldCheck />
-                        <AlertTitle>{t('settings.sync.autoDataSyncInitialTitle')}</AlertTitle>
-                        <AlertDescription>
-                          <div className="flex flex-col gap-3">
-                            <p>{t('settings.sync.autoDataSyncInitialDesc')}</p>
-                            <div className="flex flex-wrap gap-2">
-                              <Button size="sm" onClick={handleInitialUpload} disabled={initialSyncBusy !== null}>
-                                {initialSyncBusy === 'upload' ? <Loader2 data-icon="inline-start" className="animate-spin" /> : null}
-                                {t('settings.sync.autoDataSyncInitialUploadLocal')}
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleInitialDownload} disabled={initialSyncBusy !== null}>
-                                {initialSyncBusy === 'download' ? <Loader2 data-icon="inline-start" className="animate-spin" /> : null}
-                                {t('settings.sync.autoDataSyncInitialPullRemote')}
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={handleInitialLater} disabled={initialSyncBusy !== null}>
-                                {t('settings.sync.autoDataSyncInitialLater')}
-                              </Button>
-                            </div>
-                          </div>
-                        </AlertDescription>
-                      </Alert>
-                    ) : null}
-
-                    <Item variant="outline">
-                      <ItemMedia variant="icon"><ShieldCheck /></ItemMedia>
-                      <ItemContent>
-                        <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
-                        <ItemDescription>{t('settings.sync.autoDataSyncPrivacyDesc')}</ItemDescription>
-                      </ItemContent>
-                      <ItemActions className="mobile-setting-inline-action">
-                        <Switch
-                          checked={excludeSensitiveConfig}
-                          onCheckedChange={handleExcludeSensitiveConfigChange}
-                        />
-                      </ItemActions>
-                    </Item>
-                  </ItemGroup>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </div>

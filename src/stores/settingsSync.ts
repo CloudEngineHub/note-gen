@@ -6,7 +6,7 @@ import { uploadFile as uploadGiteeFile, getFiles as giteeGetFiles } from '@/lib/
 import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileContent as gitlabGetFileContent } from '@/lib/sync/gitlab'
 import { uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileContent as giteaGetFileContent } from '@/lib/sync/gitea'
 import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileError } from '@/lib/sync/remote-file'
-import { getSyncRepoName } from '@/lib/sync/repo-utils'
+import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
 import { s3Download, s3Upload } from '@/lib/sync/s3'
 import { webdavDownload, webdavUpload } from '@/lib/sync/webdav'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
@@ -132,7 +132,7 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
       }
 
       // 获取仓库名称
-      const repoName = await getSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
+      const repoName = await getDataSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
       
       // 根据主要备份方式选择上传函数
       let uploadFile: typeof uploadGithubFile
@@ -252,7 +252,7 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
       // 获取仓库名称
       const repoName = primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav'
         ? ''
-        : await getSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
+        : await getDataSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
 
       // 根据主要备份方式选择获取函数
       let getFiles: typeof githubGetFiles

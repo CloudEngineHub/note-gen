@@ -27,7 +27,6 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
 import { TextSizeProvider } from "@/contexts/text-size-context"
 import { SyncConfirmDialog } from "@/components/sync-confirm-dialog"
-import { AutoDataSyncConflictDialog } from "@/components/auto-data-sync-conflict-dialog"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { applyAppFontFamily } from "@/lib/font-settings"
 import emitter from "@/lib/emitter"
@@ -454,7 +453,6 @@ export default function RootLayout({
         <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
         <SettingsDialog />
         <SyncConfirmDialog />
-        <AutoDataSyncConflictDialog />
         <MemoryAutoNotifications />
         <CloseBehaviorGuard />
       </TextSizeProvider>

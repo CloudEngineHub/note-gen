@@ -1,6 +1,6 @@
 'use client'
 
-import { FileDown, Loader2, RefreshCcw, ShieldCheck, UploadCloud } from 'lucide-react'
+import { FileDown, Loader2, RefreshCcw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
@@ -30,8 +30,10 @@ export default function SyncPage() {
     setPrimaryBackupMethod,
     autoSync,
     setAutoSync,
-    autoDataSyncEnabled,
-    setAutoDataSyncEnabled,
+    autoRecordSyncEnabled,
+    setAutoRecordSyncEnabled,
+    autoSettingsSyncEnabled,
+    setAutoSettingsSyncEnabled,
     excludeSensitiveConfig,
     setExcludeSensitiveConfig,
     autoPullOnOpen,
@@ -117,22 +119,6 @@ export default function SyncPage() {
 
   const currentSyncState = getCurrentSyncState(tab)
   const isFileAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
-  const shouldShowInitialSyncChoice = autoDataSyncEnabled && currentSyncState === SyncStateEnum.success && initialSyncChoiceVisible
-
-  useEffect(() => {
-    async function loadInitialChoiceState() {
-      if (!autoDataSyncEnabled || currentSyncState !== SyncStateEnum.success) {
-        setInitialSyncChoiceVisible(false)
-        return
-      }
-
-      const store = await Store.load('store.json')
-      const confirmed = await store.get<boolean>(getInitialSyncChoiceKey(tab))
-      setInitialSyncChoiceVisible(confirmed !== true)
-    }
-
-    void loadInitialChoiceState()
-  }, [autoDataSyncEnabled, currentSyncState, tab])
 
   function getCurrentSyncState(platform: SyncPlatform) {
     switch (platform) {
@@ -153,10 +139,6 @@ export default function SyncPage() {
     }
   }
 
-  function getInitialSyncChoiceKey(platform: SyncPlatform) {
-    return `autoDataSyncInitialChoice:${platform}`
-  }
-
   function getProviderLabel(platform: SyncPlatform) {
     return platform.charAt(0).toUpperCase() + platform.slice(1)
   }
@@ -164,63 +146,6 @@ export default function SyncPage() {
   function handleTabChange(value: string) {
     const nextTab = value as SyncPlatform
     setTab(nextTab)
-  }
-
-  async function finishInitialSyncChoice() {
-    const store = await Store.load('store.json')
-    await store.set(getInitialSyncChoiceKey(tab), true)
-    await store.save()
-    setInitialSyncChoiceVisible(false)
-  }
-
-  async function refreshDownloadedData() {
-    await Promise.all([
-      fetchTags(),
-      fetchMarks(),
-    ])
-    init(currentTagId)
-  }
-
-  async function handleInitialUpload() {
-    setInitialSyncBusy('upload')
-    try {
-      await uploadAutoDataSyncNow()
-      await finishInitialSyncChoice()
-      toast({ description: t('settings.sync.autoDataSyncInitialSuccess') })
-    } catch (error) {
-      console.error('Initial upload failed:', error)
-      toast({ description: t('settings.sync.autoDataSyncInitialFailed'), variant: 'destructive' })
-    } finally {
-      setInitialSyncBusy(null)
-    }
-  }
-
-  async function handleInitialDownload() {
-    setInitialSyncBusy('download')
-    try {
-      const ok = await downloadAutoDataSyncNow()
-      if (!ok) {
-        throw new Error('Failed to download remote data')
-      }
-
-      await refreshDownloadedData()
-      await finishInitialSyncChoice()
-      toast({ description: t('settings.sync.autoDataSyncInitialSuccess') })
-    } catch (error) {
-      console.error('Initial download failed:', error)
-      toast({ description: t('settings.sync.autoDataSyncInitialFailed'), variant: 'destructive' })
-    } finally {
-      setInitialSyncBusy(null)
-    }
-  }
-
-  async function handleInitialLater() {
-    setInitialSyncBusy('later')
-    try {
-      await finishInitialSyncChoice()
-    } finally {
-      setInitialSyncBusy(null)
-    }
   }
 
   async function handleExcludeSensitiveConfigChange(checked: boolean) {
@@ -353,62 +278,14 @@ export default function SyncPage() {
 
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">{t('settings.sync.recordConfigSettings')}</h2>
-
-        <Item variant="outline">
-          <ItemMedia variant="icon"><UploadCloud className="size-4" /></ItemMedia>
-          <ItemContent>
-            <ItemTitle>{t('settings.sync.autoDataSync')}</ItemTitle>
-            <ItemDescription>{t('settings.sync.autoDataSyncDesc')}</ItemDescription>
-          </ItemContent>
-          <ItemActions className="mobile-setting-inline-action">
-            <Switch
-              checked={autoDataSyncEnabled}
-              onCheckedChange={setAutoDataSyncEnabled}
-            />
-          </ItemActions>
-        </Item>
-
-        {shouldShowInitialSyncChoice && (
-          <Alert>
-            <ShieldCheck />
-            <AlertTitle>{t('settings.sync.autoDataSyncInitialTitle')}</AlertTitle>
-            <AlertDescription>
-              <div className="flex flex-col gap-3">
-                <p>{t('settings.sync.autoDataSyncInitialDesc')}</p>
-                <div className="flex flex-col gap-2">
-                  <Button size="sm" onClick={handleInitialUpload} disabled={initialSyncBusy !== null}>
-                    {initialSyncBusy === 'upload' && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {t('settings.sync.autoDataSyncInitialUploadLocal')}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleInitialDownload} disabled={initialSyncBusy !== null}>
-                    {initialSyncBusy === 'download' && <Loader2 className="mr-2 size-4 animate-spin" />}
-                    {t('settings.sync.autoDataSyncInitialPullRemote')}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleInitialLater} disabled={initialSyncBusy !== null}>
-                    {t('settings.sync.autoDataSyncInitialLater')}
-                  </Button>
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Item variant="outline">
-          <ItemMedia variant="icon"><ShieldCheck className="size-4" /></ItemMedia>
-          <ItemContent>
-            <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
-            <ItemDescription>{t('settings.sync.autoDataSyncPrivacyDesc')}</ItemDescription>
-          </ItemContent>
-          <ItemActions className="mobile-setting-inline-action">
-            <Switch
-              checked={excludeSensitiveConfig}
-              onCheckedChange={handleExcludeSensitiveConfigChange}
-            />
-          </ItemActions>
-        </Item>
-      </section>
+      <DataSyncOverview
+        autoRecordSyncEnabled={autoRecordSyncEnabled}
+        autoSettingsSyncEnabled={autoSettingsSyncEnabled}
+        excludeSensitiveConfig={excludeSensitiveConfig}
+        onRecordSyncChange={setAutoRecordSyncEnabled}
+        onSettingsSyncChange={setAutoSettingsSyncEnabled}
+        onSensitiveConfigChange={handleExcludeSensitiveConfigChange}
+      />
     </div>
   )
 }

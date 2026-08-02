@@ -67,7 +67,6 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
   const [addingTemplateKey, setAddingTemplateKey] = useState('')
   const [activeTab, setActiveTab] = useState('connection')
   const aiModelListRef = useRef(aiModelList)
-  const storeWriteQueueRef = useRef<Promise<void>>(Promise.resolve())
   const isTitleComposingRef = useRef(false)
 
   useEffect(() => {
@@ -184,12 +183,6 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
     aiModelListRef.current = updatedList
     setAiModelList(updatedList)
 
-    storeWriteQueueRef.current = storeWriteQueueRef.current.then(async () => {
-      const store = await Store.load('store.json')
-      await store.set('aiModelList', updatedList)
-    })
-
-    await storeWriteQueueRef.current
   }
 
   const addProviderFromTemplate = async (template: AiConfig) => {
@@ -701,8 +694,11 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                                               const pairs = [...headerPairs]
                                               pairs[index] = { ...pairs[index], key: event.target.value }
                                               setHeaderPairs(pairs)
+                                              void updateAiConfig({
+                                                ...currentConfig,
+                                                customHeaders: convertKeyValueToJson(pairs),
+                                              })
                                             }}
-                                            onBlur={() => void updateAiConfig({ ...currentConfig, customHeaders: convertKeyValueToJson(headerPairs) })}
                                           />
                                           <Input
                                             aria-label={t('headerValue')}
@@ -712,8 +708,11 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                                               const pairs = [...headerPairs]
                                               pairs[index] = { ...pairs[index], value: event.target.value }
                                               setHeaderPairs(pairs)
+                                              void updateAiConfig({
+                                                ...currentConfig,
+                                                customHeaders: convertKeyValueToJson(pairs),
+                                              })
                                             }}
-                                            onBlur={() => void updateAiConfig({ ...currentConfig, customHeaders: convertKeyValueToJson(headerPairs) })}
                                           />
                                           <Button
                                             variant="outline"

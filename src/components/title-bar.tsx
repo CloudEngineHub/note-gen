@@ -8,7 +8,6 @@ import { Search, Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, C
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
-import { SyncToggle } from './title-bar-toolbars/sync-toggle'
 import AppStatus from './app-status'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
@@ -335,8 +334,6 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
             </TooltipContent>
           </Tooltip>
 
-          <SyncToggle />
-          
           <PinToggle />
           
           <Tooltip>

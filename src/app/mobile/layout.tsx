@@ -43,10 +43,6 @@ const SyncConfirmDialog = dynamic(
   () => import('@/components/sync-confirm-dialog').then(module => module.SyncConfirmDialog),
   { ssr: false },
 )
-const AutoDataSyncConflictDialog = dynamic(
-  () => import('@/components/auto-data-sync-conflict-dialog').then(module => module.AutoDataSyncConflictDialog),
-  { ssr: false },
-)
 const MobileUpdateChecker = dynamic(
   () => import('./components/mobile-update-prompt').then(module => module.MobileUpdateChecker),
   { ssr: false },
@@ -225,7 +221,6 @@ export default function RootLayout({
             </div>
           </TooltipProvider>
           <SyncConfirmDialog />
-          <AutoDataSyncConflictDialog />
           <MobileUpdateChecker />
           <MemoryAutoNotifications />
         </TextSizeProvider>

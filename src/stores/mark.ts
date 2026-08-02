@@ -6,7 +6,7 @@ import { uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileConten
 import { s3Upload, s3Delete, s3HeadObject, s3Download } from '@/lib/sync/s3'
 import { webdavUpload, webdavDelete, webdavHeadObject, webdavDownload } from '@/lib/sync/webdav'
 import { WebDAVConfig } from '@/types/sync'
-import { getSyncRepoName } from '@/lib/sync/repo-utils';
+import { getDataSyncRepoName } from '@/lib/sync/repo-utils';
 import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileError } from '@/lib/sync/remote-file';
 import { Store } from '@tauri-apps/plugin-store';
 import { create } from 'zustand'
@@ -381,7 +381,7 @@ const useMarkStore = create<MarkState>((set, get) => ({
     try {
     switch (primaryBackupMethod) {
       case 'github':
-        const githubRepoName = await getSyncRepoName('github')
+        const githubRepoName = await getDataSyncRepoName('github')
         files = await githubGetFiles({ path: fullPath, repo: githubRepoName })
         res = await uploadGithubFile({
           file: JSON.stringify(marks),
@@ -391,7 +391,7 @@ const useMarkStore = create<MarkState>((set, get) => ({
         })
         break;
       case 'gitee':
-        const giteeRepoName = await getSyncRepoName('gitee')
+        const giteeRepoName = await getDataSyncRepoName('gitee')
         try {
           files = await giteeGetFiles({ path: fullPath, repo: giteeRepoName })
           const sha = files?.sha
@@ -409,7 +409,7 @@ const useMarkStore = create<MarkState>((set, get) => ({
         }
         break;
       case 'gitlab': {
-        const gitlabRepoName = await getSyncRepoName('gitlab')
+        const gitlabRepoName = await getDataSyncRepoName('gitlab')
         try {
           files = await gitlabGetFiles({ path, repo: gitlabRepoName })
         } catch (e) {
@@ -450,7 +450,7 @@ const useMarkStore = create<MarkState>((set, get) => ({
         break;
       }
       case 'gitea':
-        const giteaRepoName = await getSyncRepoName('gitea')
+        const giteaRepoName = await getDataSyncRepoName('gitea')
         files = await giteaGetFiles({ path, repo: giteaRepoName })
         const giteaMarkFile = Array.isArray(files)
           ? files.find(file => file.name === filename)
@@ -507,19 +507,19 @@ const useMarkStore = create<MarkState>((set, get) => ({
     let files;
     switch (primaryBackupMethod) {
       case 'github':
-        const githubRepoName = await getSyncRepoName('github')
+        const githubRepoName = await getDataSyncRepoName('github')
         files = await githubGetFiles({ path: `${path}/${filename}`, repo: githubRepoName })
         break;
       case 'gitee':
-        const giteeRepoName = await getSyncRepoName('gitee')
+        const giteeRepoName = await getDataSyncRepoName('gitee')
         files = await giteeGetFiles({ path: `${path}/${filename}`, repo: giteeRepoName })
         break;
       case 'gitlab':
-        const gitlabRepoName = await getSyncRepoName('gitlab')
+        const gitlabRepoName = await getDataSyncRepoName('gitlab')
         files = await gitlabGetFileContent({ path: `${path}/${filename}`, ref: 'main', repo: gitlabRepoName })
         break;
       case 'gitea':
-        const giteaRepoName = await getSyncRepoName('gitea')
+        const giteaRepoName = await getDataSyncRepoName('gitea')
         files = await giteaGetFileContent({ path: `${path}/${filename}`, ref: 'main', repo: giteaRepoName })
         break;
       case 's3': {

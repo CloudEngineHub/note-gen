@@ -31,7 +31,7 @@ import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent } from 'react'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
 import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
@@ -131,9 +131,11 @@ interface EditorScrollMetrics {
 
 function EditorScrollbar({
   refreshKey,
+  scrollContainerId,
   scrollContainerRef,
 }: {
   refreshKey: EditorViewMode
+  scrollContainerId: string
   scrollContainerRef: { current: HTMLDivElement | null }
 }) {
   const dragStateRef = useRef<{ pointerId: number; startY: number; startScrollTop: number } | null>(null)
@@ -264,6 +266,7 @@ function EditorScrollbar({
     <div
       role="scrollbar"
       aria-label="编辑器滚动条"
+      aria-controls={scrollContainerId}
       aria-orientation="vertical"
       aria-valuemin={0}
       aria-valuemax={Math.round(maxScrollTop)}
@@ -1251,6 +1254,7 @@ export function TipTapEditor({
   // 编辑器容器 ref，用于应用字体缩放
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollContainerId = useId()
   const sourceTextareaRef = useRef<HTMLTextAreaElement>(null)
   const sourceMirrorRef = useRef<HTMLDivElement>(null)
   const sourceLines = useMemo(() => sourceMarkdown.split('\n'), [sourceMarkdown])
@@ -5150,6 +5154,7 @@ export function TipTapEditor({
       <div className={cn('relative min-h-0', scrollable ? 'flex-1' : 'min-h-full')}>
         <div
           ref={scrollContainerRef}
+          id={scrollContainerId}
           className={cn(
             "editor-scroll-container relative overflow-x-hidden",
             scrollable ? "h-full overflow-y-auto" : "overflow-y-visible",
@@ -5298,7 +5303,11 @@ export function TipTapEditor({
         </div>
         </div>
         {scrollable && !isMobile ? (
-          <EditorScrollbar refreshKey={viewMode} scrollContainerRef={scrollContainerRef} />
+          <EditorScrollbar
+            refreshKey={viewMode}
+            scrollContainerId={scrollContainerId}
+            scrollContainerRef={scrollContainerRef}
+          />
         ) : null}
       </div>
 
