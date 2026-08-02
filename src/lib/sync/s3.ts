@@ -15,6 +15,20 @@ function roundMs(value: number) {
   return Math.round(value)
 }
 
+function useVirtualHostedStyle(endpoint: string) {
+  return endpoint.includes('amazonaws.com')
+    || endpoint.includes('aliyuncs.com')
+    || endpoint.includes('myqcloud.com')
+}
+
+function applyBucketHostname(url: URL, bucket: string) {
+  if (url.hostname !== bucket && !url.hostname.startsWith(`${bucket}.`)) {
+    url.hostname = `${bucket}.${url.hostname}`
+  }
+
+  return url
+}
+
 // 生成 AWS 签名 V4 (使用 Web Crypto API)
 async function generateSignature(
   method: string,
@@ -193,20 +207,17 @@ function buildS3Url(config: S3Config, key: string): string {
 
   let url = ''
 
-  // 针对阿里云 OSS、AWS S3 等支持 Virtual Hosted Style 的服务
-  const isAliyun = cleanEndpoint.includes('aliyuncs.com')
-  const isAWS = cleanEndpoint.includes('amazonaws.com')
+  // 针对阿里云 OSS、腾讯云 COS、AWS S3 等支持 Virtual Hosted Style 的服务
   const isCloudflareR2 = cleanEndpoint.includes('cloudflarestorage.com')
 
   // Cloudflare R2 需要使用 Path Style，不是 Virtual Hosted Style
   if (isCloudflareR2) {
     // 使用 Path Style: https://endpoint/bucket/key
     url = `${cleanEndpoint}/${bucket}/${encodedFullKey}`
-  } else if (isAliyun || isAWS) {
+  } else if (useVirtualHostedStyle(cleanEndpoint)) {
     // 使用 Virtual Hosted Style: https://bucket.endpoint/key
     try {
-      const urlObj = new URL(cleanEndpoint)
-      urlObj.hostname = `${bucket}.${urlObj.hostname}`
+      const urlObj = applyBucketHostname(new URL(cleanEndpoint), bucket)
       url = `${urlObj.toString()}/${encodedFullKey}`
       // 处理可能的双斜杠
       url = url.replace(/([^:]\/)\/+/g, '$1')
@@ -232,14 +243,10 @@ function buildS3BaseUrl(config: S3Config): string {
   // 移除 endpoint 末尾的斜杠
   const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint
 
-  // 针对阿里云 OSS、AWS S3 等支持 Virtual Hosted Style 的服务进行优化
-  const isAliyun = cleanEndpoint.includes('aliyuncs.com')
-  const isAWS = cleanEndpoint.includes('amazonaws.com')
-
-  if (isAliyun || isAWS) {
+  // 针对阿里云 OSS、腾讯云 COS、AWS S3 等支持 Virtual Hosted Style 的服务进行优化
+  if (useVirtualHostedStyle(cleanEndpoint)) {
     try {
-      const urlObj = new URL(cleanEndpoint)
-      urlObj.hostname = `${bucket}.${urlObj.hostname}`
+      const urlObj = applyBucketHostname(new URL(cleanEndpoint), bucket)
       return urlObj.toString().replace(/\/+$/, '')
     } catch {
       console.warn('[S3 Sync] Failed to switch to Virtual Hosted Style, using Path Style')
