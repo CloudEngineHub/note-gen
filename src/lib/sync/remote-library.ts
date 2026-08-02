@@ -7,7 +7,7 @@ import { deleteFile as deleteGiteaFile, getFileContent as getGiteaFileContent, g
 import { s3Delete, s3DownloadBytes, s3HeadObject, s3ListObjects, s3Upload } from './s3'
 import { webdavDelete, webdavDownloadBytes, webdavHeadObject, webdavListObjects, webdavUpload } from './webdav'
 import { ensureDirectoryExists, pullRemoteFile } from './auto-sync'
-import { getSyncRepoName } from './repo-utils'
+import { getDataSyncRepoName, getSyncRepoName } from './repo-utils'
 import { getFilePathOptions } from '@/lib/workspace'
 import { decodeBase64ToBytes, getRemoteFileContent } from './remote-file'
 import type { S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
@@ -37,6 +37,8 @@ const STATIC_ASSET_CONTENT_TYPES: Record<string, string> = {
 export type RemoteLibraryOptions = {
   includeStaticAssets?: boolean
 }
+
+export type RemoteRepositoryScope = 'workspace' | 'data'
 
 type GitRemoteEntry = {
   name?: string
@@ -76,6 +78,15 @@ export type UploadAllResult = {
 
 async function getPlatform(store: Store): Promise<SyncPlatform> {
   return await store.get<SyncPlatform>('primaryBackupMethod') || 'github'
+}
+
+async function getGitRepository(
+  platform: Exclude<SyncPlatform, 's3' | 'webdav'>,
+  scope: RemoteRepositoryScope,
+) {
+  return scope === 'data'
+    ? getDataSyncRepoName(platform)
+    : getSyncRepoName(platform)
 }
 
 function isLibraryPath(path: string, options: RemoteLibraryOptions): boolean {
@@ -370,7 +381,10 @@ async function saveLocalBytes(path: string, content: Uint8Array): Promise<void> 
   }
 }
 
-export async function downloadRemoteBytes(path: string): Promise<Uint8Array> {
+export async function downloadRemoteBytes(
+  path: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<Uint8Array> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
 
@@ -388,7 +402,7 @@ export async function downloadRemoteBytes(path: string): Promise<Uint8Array> {
     return file.content
   }
 
-  const repo = await getSyncRepoName(platform)
+  const repo = await getGitRepository(platform, scope)
   let file: unknown
   switch (platform) {
     case 'github':
@@ -456,7 +470,8 @@ async function uploadRemoteContent(
   path: string,
   content: string | Uint8Array,
   message: string,
-  contentType?: string
+  contentType?: string,
+  scope: RemoteRepositoryScope = 'workspace',
 ): Promise<string> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
@@ -475,7 +490,7 @@ async function uploadRemoteContent(
     return result.etag || `uploaded:${path}`
   }
 
-  const repo = await getSyncRepoName(platform)
+  const repo = await getGitRepository(platform, scope)
   const sha = await getExistingRemoteSha(platform, path, repo)
   const filename = path.split('/').pop() || path
   let response: unknown
@@ -507,16 +522,20 @@ export async function uploadRemoteBytes(
   path: string,
   content: Uint8Array,
   message: string,
-  contentType: string
+  contentType: string,
+  scope: RemoteRepositoryScope = 'workspace',
 ): Promise<string> {
-  return await uploadRemoteContent(path, content, message, contentType)
+  return await uploadRemoteContent(path, content, message, contentType, scope)
 }
 
 export async function downloadRemoteText(path: string): Promise<string> {
   return await pullRemoteFile(path)
 }
 
-export async function remoteFileExists(path: string): Promise<boolean> {
+export async function remoteFileExists(
+  path: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<boolean> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
 
@@ -530,11 +549,14 @@ export async function remoteFileExists(path: string): Promise<boolean> {
     return config ? Boolean(await webdavHeadObject(config, path)) : false
   }
 
-  const repo = await getSyncRepoName(platform)
+  const repo = await getGitRepository(platform, scope)
   return Boolean(await getExistingRemoteSha(platform, path, repo))
 }
 
-export async function deleteRemoteFile(path: string): Promise<void> {
+export async function deleteRemoteFile(
+  path: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<void> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
 
@@ -554,7 +576,7 @@ export async function deleteRemoteFile(path: string): Promise<void> {
     return
   }
 
-  const repo = await getSyncRepoName(platform)
+  const repo = await getGitRepository(platform, scope)
   const sha = await getExistingRemoteSha(platform, path, repo)
   if (!sha) return
 

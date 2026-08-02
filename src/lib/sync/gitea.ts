@@ -685,6 +685,28 @@ export async function checkSyncRepoState(name: string): Promise<GiteaRepositoryI
   }
 }
 
+export async function listUserRepositories(): Promise<string[]> {
+  const store = await Store.load('store.json')
+  const username = await store.get<string>('giteaUsername')
+  const baseUrl = await getGiteaApiBaseUrl()
+  const headers = await getCommonHeaders()
+  const proxy = await getProxyConfig()
+  const response = await fetch(`${baseUrl}/user/repos?limit=100`, {
+    method: 'GET',
+    headers,
+    proxy,
+  })
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`获取仓库列表失败: ${response.status}`)
+  }
+
+  const repositories = await response.json() as GiteaRepositoryInfo[]
+  return repositories
+    .filter(repository => !username || repository.owner.login === username)
+    .map(repository => repository.name)
+    .filter(Boolean)
+}
+
 /**
  * 创建同步仓库
  * @param name 仓库名称

@@ -21,7 +21,12 @@ export default function DownloadFolder({ item, mobile = false }: { item: DirTree
     if (isSyncing) return
     const sync = await getSyncConfiguration()
     if (!sync.configured) {
-      toast({ title: t('context.syncNotConfigured'), description: t('context.configureSync') })
+      toast({
+        title: sync.reason === 'missing-repository'
+          ? t('context.syncRepoRequired')
+          : t('context.syncNotConfigured'),
+        description: t('context.configureSync'),
+      })
       useSettingsDialogStore.getState().openSettings('sync')
       return
     }

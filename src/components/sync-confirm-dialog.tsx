@@ -58,7 +58,12 @@ export function SyncConfirmDialog() {
 
   // 监听 SHA 不匹配事件，显示确认对话框
   useEffect(() => {
-    const handleShaMismatch = async (data: { path: string; localSha?: string; remoteSha?: string }) => {
+    const handleShaMismatch = async (data: {
+      path: string
+      workspacePath: string
+      localSha?: string
+      remoteSha?: string
+    }) => {
       const fileName = data.path.split('/').pop() || data.path
       const syncPushQueue = getSyncPushQueue()
 
@@ -68,7 +73,7 @@ export function SyncConfirmDialog() {
         remoteSha: data.remoteSha,
         onForceUpload: async () => {
           // 用户确认强制上传
-          await syncPushQueue.forcePush(data.path)
+          await syncPushQueue.forcePush(data.path, data.workspacePath)
         },
         onCancel: () => {
           // 用户取消，不做任何操作

@@ -19,7 +19,10 @@ export function UploadFolder({ item, mobile = false }: { item: DirTree; mobile?:
     if (isUploading || !item.isLocale || !item.isDirectory) return
     const sync = await getSyncConfiguration()
     if (!sync.configured) {
-      toast({ title: t('syncNotConfigured'), description: t('configureSync') })
+      toast({
+        title: sync.reason === 'missing-repository' ? t('syncRepoRequired') : t('syncNotConfigured'),
+        description: t('configureSync'),
+      })
       useSettingsDialogStore.getState().openSettings('sync')
       return
     }

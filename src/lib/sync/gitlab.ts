@@ -618,6 +618,27 @@ export async function checkSyncProjectState(name: string): Promise<GitlabProject
   }
 }
 
+export async function listUserRepositories(): Promise<string[]> {
+  const store = await Store.load('store.json')
+  const username = await store.get<string>('gitlabUsername')
+  const baseUrl = await getGitlabApiBaseUrl()
+  const headers = await getCommonHeaders()
+  const proxy = await getProxyConfig()
+  const response = await fetch(
+    `${baseUrl}/projects?owned=true&order_by=last_activity_at&sort=desc&per_page=100`,
+    { method: 'GET', headers, proxy }
+  )
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`获取项目列表失败: ${response.status}`)
+  }
+
+  const projects = await response.json() as GitlabProjectInfo[]
+  return projects
+    .filter(project => !username || project.namespace.path === username)
+    .map(project => project.name)
+    .filter(Boolean)
+}
+
 /**
  * 创建同步项目
  * @param name 项目名称

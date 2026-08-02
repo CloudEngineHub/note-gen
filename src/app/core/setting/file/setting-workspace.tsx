@@ -7,7 +7,7 @@ import { BaseDirectory, exists, mkdir } from "@tauri-apps/plugin-fs"
 import { useTranslations } from 'next-intl'
 import useArticleStore from "@/stores/article"
 import { useSkillsStore } from "@/stores/skills"
-import { X, FolderOpen, History, Trash2, ChevronDown } from "lucide-react"
+import { X, FolderOpen, History, Trash2, ChevronDown, Loader2 } from "lucide-react"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command"
 import {
   ResponsivePopover,
@@ -16,6 +16,7 @@ import {
 } from "@/components/responsive-popover"
 import { useState } from "react"
 import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
+import { toast } from "@/hooks/use-toast"
 
 export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) {
   const {
@@ -29,6 +30,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
   const { refreshSkills } = useSkillsStore()
   const t = useTranslations('settings.file')
   const [open, setOpen] = useState(false)
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false)
 
   // 选择工作区目录
   async function handleSelectWorkspace() {
@@ -48,18 +50,41 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
     }
   }
 
-  // 切换工作区（统一处理）
+  async function restoreWorkspaceContent() {
+    setActiveFilePath('')
+    setCurrentArticle('')
+    const lastActivePath = await loadWorkspaceCollapsibleList()
+    await loadFileTree()
+    if (lastActivePath) await setActiveFilePath(lastActivePath)
+  }
+
+  // 切换工作区（统一处理文件树、上次文件、Skills 和失败回滚）
   async function switchWorkspace(path: string) {
+    if (switchingWorkspace || path === workspacePath) return
+
+    const previousWorkspacePath = workspacePath
+    setSwitchingWorkspace(true)
     try {
       await setWorkspacePath(path)
-      setActiveFilePath('')
-      setCurrentArticle('')
-      const lastActivePath = await loadWorkspaceCollapsibleList()
-      await loadFileTree()
-      if (lastActivePath) await setActiveFilePath(lastActivePath)
+      await restoreWorkspaceContent()
       await refreshSkills()
     } catch (error) {
       console.error('切换工作区失败:', error)
+
+      try {
+        await setWorkspacePath(previousWorkspacePath)
+        await restoreWorkspaceContent()
+        await refreshSkills()
+      } catch (rollbackError) {
+        console.error('恢复原工作区失败:', rollbackError)
+      }
+
+      toast({
+        title: t('workspace.switchFailed'),
+        variant: 'destructive',
+      })
+    } finally {
+      setSwitchingWorkspace(false)
     }
   }
 
@@ -77,15 +102,13 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
       if (!exists1) {
         await mkdir('article', { baseDir: BaseDirectory.AppData })
       }
-      await setWorkspacePath('')
-      setActiveFilePath('')
-      setCurrentArticle('')
-      const lastActivePath = await loadWorkspaceCollapsibleList()
-      await loadFileTree()
-      if (lastActivePath) await setActiveFilePath(lastActivePath)
-      await refreshSkills()
+      await switchWorkspace('')
     } catch (error) {
       console.error('重置工作区失败:', error)
+      toast({
+        title: t('workspace.switchFailed'),
+        variant: 'destructive',
+      })
     }
   }
 
@@ -101,6 +124,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
                 role="combobox"
                 aria-expanded={open}
                 aria-label={t('workspace.current')}
+                disabled={switchingWorkspace}
                 className="w-full justify-between p-3 h-auto text-left font-normal"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -109,7 +133,11 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
                     {workspacePath || t('workspace.default')}
                   </span>
                 </div>
-                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                {switchingWorkspace ? (
+                  <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin opacity-50" />
+                ) : (
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                )}
               </Button>
             </ResponsivePopoverTrigger>
             <ResponsivePopoverContent className="w-full p-0" align="start">
@@ -121,6 +149,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
                   {/* 选择新工作区 */}
                   <CommandGroup heading={t('workspace.actions')}>
                     <CommandItem
+                      disabled={switchingWorkspace}
                       onSelect={() => {
                         setOpen(false)
                         handleSelectWorkspace()
@@ -131,6 +160,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
                     </CommandItem>
                     {workspacePath && (
                       <CommandItem
+                        disabled={switchingWorkspace}
                         onSelect={() => {
                           setOpen(false)
                           handleResetWorkspace()
@@ -150,6 +180,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
                         {workspaceHistory.map((path, index) => (
                           <CommandItem
                             key={index}
+                            disabled={switchingWorkspace}
                             onSelect={() => {
                               setOpen(false)
                               switchWorkspace(path)

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BaseDirectory, copyFile, exists, mkdir, readDir, remove, rename as fsRename, stat, writeTextFile } from '@tauri-apps/plugin-fs'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import type { Editor } from '@tiptap/react'
 import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, Folder, FolderDown, FolderInput, FolderPlus, FolderUp, List, Pencil, Redo2, RefreshCw, Scissors, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,7 @@ import { CloudLibraryMenu } from '@/app/core/main/file/cloud-library-menu'
 import { pullRemoteLibraryFolder, uploadLocalLibraryFile, uploadLocalLibraryFolder } from '@/lib/sync/remote-library'
 import useClipboardStore from '@/stores/clipboard'
 import { generateCopyFilename, generateCopyFoldername } from '@/lib/default-filename'
+import { getSyncConfiguration } from '@/app/core/main/file/file-tree-action-policy'
 
 interface WritingHeaderProps {
   editor: Editor | null
@@ -54,6 +56,7 @@ type DragPoint = {
 }
 
 export function WritingHeader({ editor }: WritingHeaderProps) {
+  const router = useRouter()
   const t = useTranslations('record.chat.input.fileLink')
   const tFile = useTranslations('article.file')
   const tContext = useTranslations('article.file.context')
@@ -62,6 +65,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const tEditor = useTranslations('article.editor')
   const tOutline = useTranslations('editor.outline')
   const tEditorCommands = useTranslations('settings.shortcuts.editorShortcuts.commands')
+  const tSync = useTranslations('settings.sync')
   const {
     activeFilePath,
     setActiveFilePath,
@@ -82,6 +86,20 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder,
   } = useArticleStore()
+
+  const ensureSyncConfigured = useCallback(async () => {
+    const sync = await getSyncConfiguration()
+    if (sync.configured) return true
+
+    toast({
+      description: sync.reason === 'missing-repository'
+        ? tSync('repositoryRequired')
+        : tSync('status.unconfigured'),
+      variant: 'destructive',
+    })
+    router.push('/mobile/setting/pages/sync')
+    return false
+  }, [router, tSync])
   const { clipboardItem, clipboardItems, clipboardOperation, setClipboardItem } = useClipboardStore()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -533,6 +551,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
   const handleUploadEntry = async (entry: BrowserEntry) => {
     if (!entry.isLocale || entry.isLoading) return
+    if (!await ensureSyncConfigured()) return
 
     setEntryLoading(entry.relativePath, true)
     const isFolder = entry.type === 'folder'
@@ -589,6 +608,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
   const handleSyncFolder = async (entry: BrowserEntry) => {
     if (entry.type !== 'folder' || entry.isLoading) return
+    if (!await ensureSyncConfigured()) return
 
     setEntryLoading(entry.relativePath, true)
     const progressToast = toast({
@@ -922,6 +942,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
   const handleDeleteSyncFile = async (entry: BrowserEntry) => {
     if (entry.type !== 'file' || !entry.sha) return
+    if (!await ensureSyncConfigured()) return
 
     const ok = await confirm(`${tContext('deleteSyncFile')}?`, {
       title: entry.name,

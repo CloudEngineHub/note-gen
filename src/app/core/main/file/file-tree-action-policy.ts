@@ -1,5 +1,6 @@
 import { Store } from '@tauri-apps/plugin-store'
 
+import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import type { DirTree } from '@/stores/article'
 import type { S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
 
@@ -53,6 +54,7 @@ export function buildFileTreeSyncStatusMap(tree: DirTree[]) {
 export async function getSyncConfiguration(): Promise<{
   configured: boolean
   platform: SyncPlatform
+  reason?: 'missing-credentials' | 'missing-repository'
 }> {
   const store = await Store.load('store.json')
   const platform = await store.get<SyncPlatform>('primaryBackupMethod') ?? 'github'
@@ -85,5 +87,12 @@ export async function getSyncConfiguration(): Promise<{
     store.get<string>(usernameKey),
   ])
 
-  return { platform, configured: Boolean(token?.trim() && username?.trim()) }
+  if (!token?.trim() || !username?.trim()) {
+    return { platform, configured: false, reason: 'missing-credentials' }
+  }
+
+  const repo = await getOptionalSyncRepoName(platform)
+  return repo
+    ? { platform, configured: true }
+    : { platform, configured: false, reason: 'missing-repository' }
 }

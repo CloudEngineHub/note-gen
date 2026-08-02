@@ -557,6 +557,32 @@ export async function checkSyncRepoState(name: string) {
   }
 }
 
+export async function listUserRepositories(): Promise<string[]> {
+  const store = await Store.load('store.json')
+  const accessToken = await store.get<string>('giteeAccessToken')
+  if (!accessToken) throw new Error('Gitee Access Token 未配置')
+
+  const proxyUrl = await store.get<string>('proxy')
+  const proxy: Proxy | undefined = proxyUrl ? { all: proxyUrl } : undefined
+  const params = new URLSearchParams({
+    access_token: accessToken,
+    type: 'owner',
+    sort: 'updated',
+    direction: 'desc',
+    per_page: '100',
+  })
+  const response = await fetch(`https://gitee.com/api/v5/user/repos?${params.toString()}`, {
+    method: 'GET',
+    proxy,
+  })
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`获取仓库列表失败: ${response.status}`)
+  }
+
+  const repositories = await response.json() as GiteeRepoInfo[]
+  return repositories.map(repository => repository.name).filter(Boolean)
+}
+
 // 创建 Gitee 仓库
 export async function createSyncRepo(name: string, isPrivate?: boolean) {
   const store = await Store.load('store.json');

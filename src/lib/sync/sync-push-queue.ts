@@ -52,6 +52,8 @@ async function getProxyConfig(): Promise<{ all: string } | undefined> {
 interface PushTask {
   path: string
   timestamp: number
+  workspacePath: string
+  generation: number
 }
 
 function getPerfNow() {
@@ -78,6 +80,8 @@ class SyncPushQueue {
   private isProcessing = false
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
   private lastInputTime: number = Date.now()
+  private generation = 0
+  private workspaceSwitchPauseDepth = 0
 
   private get IDLE_THRESHOLD(): number {
     // 动态读取 autoSync 设置
@@ -156,10 +160,14 @@ class SyncPushQueue {
    * 每次调用都会重新开始 10 秒计时
    */
   addTask(path: string) {
+    if (this.workspaceSwitchPauseDepth > 0) return
+
     const now = Date.now()
     const task: PushTask = {
       path,
-      timestamp: now
+      timestamp: now,
+      workspacePath: useSettingStore.getState().workspacePath,
+      generation: this.generation,
     }
 
     // 重置 lastInputTime，确保从现在开始计算 10 秒
@@ -228,10 +236,12 @@ class SyncPushQueue {
     const taskMap = new Map<string, PushTask>()
     while (this.queue.length > 0) {
       const task = this.queue.shift()!
+      if (task.generation !== this.generation) continue
       // Only keep the newest task for each path
-      const existing = taskMap.get(task.path)
+      const taskKey = `${task.workspacePath}\0${task.path}`
+      const existing = taskMap.get(taskKey)
       if (!existing || task.timestamp > existing.timestamp) {
-        taskMap.set(task.path, task)
+        taskMap.set(taskKey, task)
       }
     }
     const tasksToProcess = Array.from(taskMap.values()).sort((a, b) => b.timestamp - a.timestamp)
@@ -240,6 +250,8 @@ class SyncPushQueue {
 
     // Process each task
     for (const task of tasksToProcess) {
+      if (task.generation !== this.generation) continue
+      if (task.workspacePath !== useSettingStore.getState().workspacePath) continue
       this.isProcessing = true
 
       try {
@@ -701,6 +713,7 @@ class SyncPushQueue {
           // 发射事件让 UI 显示确认对话框
           emitter.emit('sync-sha-mismatch', {
             path,
+            workspacePath: useSettingStore.getState().workspacePath,
             localSha: localRecordedSha || undefined,
             remoteSha: remoteFileSha || undefined,
             force: false
@@ -760,8 +773,18 @@ class SyncPushQueue {
    * 强制推送文件到远程（忽略 SHA 不匹配）
    * 用于用户确认后强制覆盖远程文件
    */
-  async forcePush(path: string): Promise<{ success: boolean; sha?: string }> {
+  async forcePush(
+    path: string,
+    expectedWorkspacePath = useSettingStore.getState().workspacePath,
+  ): Promise<{ success: boolean; sha?: string }> {
     try {
+      if (
+        this.workspaceSwitchPauseDepth > 0
+        || expectedWorkspacePath !== useSettingStore.getState().workspacePath
+      ) {
+        return { success: false }
+      }
+
       if (!await isSyncConfigured()) {
         return { success: false }
       }
@@ -918,11 +941,25 @@ class SyncPushQueue {
    * 清空队列
    */
   clear() {
+    this.generation += 1
     this.queue = []
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer)
       this.debounceTimer = null
     }
+  }
+
+  async prepareForWorkspaceSwitch() {
+    this.workspaceSwitchPauseDepth += 1
+    this.clear()
+    while (this.isProcessing) {
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+  }
+
+  finishWorkspaceSwitch() {
+    this.workspaceSwitchPauseDepth = Math.max(0, this.workspaceSwitchPauseDepth - 1)
+    this.lastInputTime = Date.now()
   }
 }
 

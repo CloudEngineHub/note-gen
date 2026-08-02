@@ -22,7 +22,6 @@ import {
   Upload,
 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -40,7 +39,8 @@ import { toast } from '@/hooks/use-toast'
 import useArticleStore from '@/stores/article'
 import useCloudLibraryStore from '@/stores/cloud-library'
 import useVectorStore from '@/stores/vector'
-import { isSyncConfigured } from '@/lib/sync/sync-manager'
+import { getSyncConfiguration } from './file-tree-action-policy'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 type FileMoreMenuProps = {
   isImporting: boolean
@@ -51,6 +51,8 @@ type FileMoreMenuProps = {
 export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: FileMoreMenuProps) {
   const t = useTranslations('article.file.cloudLibrary')
   const tToolbar = useTranslations('article.file.toolbar')
+  const tSync = useTranslations('settings.sync')
+  const { openSettings } = useSettingsDialogStore()
   const {
     loadFileTree,
     loadRemoteSyncFiles,
@@ -83,16 +85,21 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
     uploadKnowledgeBase,
     downloadKnowledgeBase,
   } = useCloudLibraryStore()
-  const [syncConfigured, setSyncConfigured] = useState(false)
   const busy = operation !== null || isProcessing || isImporting
 
-  async function refreshSyncConfigured() {
-    setSyncConfigured(await isSyncConfigured())
-  }
+  async function ensureSyncConfigured() {
+    const sync = await getSyncConfiguration()
+    if (sync.configured) return true
 
-  useEffect(() => {
-    void refreshSyncConfigured()
-  }, [])
+    toast({
+      description: sync.reason === 'missing-repository'
+        ? tSync('repositoryRequired')
+        : tSync('status.unconfigured'),
+      variant: 'destructive',
+    })
+    openSettings('sync')
+    return false
+  }
 
   async function handleAutoVectorChange(enabled: boolean) {
     await setAutoVectorEnabled(enabled)
@@ -100,6 +107,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
   }
 
   async function handleUploadFiles() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t(syncStaticAssets ? 'uploadFilesWithAssetsWarning' : 'uploadFilesWarning'), {
       title: t('uploadFiles'),
       kind: 'warning',
@@ -146,6 +154,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
   }
 
   async function handleDownloadFiles() {
+    if (!await ensureSyncConfigured()) return
     const progressToast = toast({
       title: t('operations.pull-files'),
       description: t('preparingFiles'),
@@ -183,6 +192,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
   }
 
   async function handleUploadKnowledgeBase() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t('uploadPrivacyWarning'), {
       title: t('uploadKnowledgeBase'),
       kind: 'warning',
@@ -204,6 +214,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
   }
 
   async function handleDownloadKnowledgeBase() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t('downloadOverwriteWarning'), {
       title: t('downloadKnowledgeBase'),
       kind: 'warning',
@@ -236,9 +247,7 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
   }
 
   return (
-    <DropdownMenu onOpenChange={(open) => {
-      if (open) void refreshSyncConfigured()
-    }}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -338,11 +347,11 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
             aria-label={t('syncStaticAssets')}
           />
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!syncConfigured} onSelect={() => void handleUploadFiles()}>
+        <DropdownMenuItem onSelect={() => void handleUploadFiles()}>
           <Upload className="mr-2 size-4" />
           {t('uploadFiles')}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!syncConfigured} onSelect={() => void handleDownloadFiles()}>
+        <DropdownMenuItem onSelect={() => void handleDownloadFiles()}>
           <Download className="mr-2 size-4" />
           {t('downloadFiles')}
         </DropdownMenuItem>
@@ -369,11 +378,11 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
           <Database className="mr-2 size-4" />
           {t('recalculate')}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!syncConfigured} onSelect={() => void handleUploadKnowledgeBase()}>
+        <DropdownMenuItem onSelect={() => void handleUploadKnowledgeBase()}>
           <Upload className="mr-2 size-4" />
           {t('uploadKnowledgeBase')}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!syncConfigured} onSelect={() => void handleDownloadKnowledgeBase()}>
+        <DropdownMenuItem onSelect={() => void handleDownloadKnowledgeBase()}>
           <Download className="mr-2 size-4" />
           {t('downloadKnowledgeBase')}
         </DropdownMenuItem>

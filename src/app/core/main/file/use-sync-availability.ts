@@ -1,13 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { SyncStateEnum } from '@/lib/sync/github.types'
+import { checkSyncProviderStatus } from '@/lib/sync/provider-status'
 import useSettingStore from '@/stores/setting'
 import { useSettingsDialogStore } from '@/stores/settings-dialog'
+import useSyncStore from '@/stores/sync'
 import type { SyncPlatform } from '@/types/sync'
 import { useShallow } from 'zustand/react/shallow'
 
 import { getSyncConfiguration } from './file-tree-action-policy'
+
+export type SyncAvailabilityStatus = 'not-configured' | 'checking' | 'available' | 'unavailable'
 
 export function useSyncAvailability() {
   const credentials = useSettingStore(useShallow(state => ({
@@ -19,18 +24,44 @@ export function useSyncAvailability() {
     gitlabUsername: state.gitlabUsername,
     giteaAccessToken: state.giteaAccessToken,
     giteaUsername: state.giteaUsername,
+    workspacePath: state.workspacePath,
+    githubCustomSyncRepo: state.githubCustomSyncRepo,
+    giteeCustomSyncRepo: state.giteeCustomSyncRepo,
+    gitlabCustomSyncRepo: state.gitlabCustomSyncRepo,
+    giteaCustomSyncRepo: state.giteaCustomSyncRepo,
   })))
   const settingsOpen = useSettingsDialogStore(state => state.open)
+  const providerStates = useSyncStore(useShallow(state => ({
+    github: state.syncRepoState,
+    gitee: state.giteeSyncRepoState,
+    gitlab: state.gitlabSyncProjectState,
+    gitea: state.giteaSyncRepoState,
+    s3: state.s3Connected,
+    webdav: state.webdavConnected,
+  })))
   const [state, setState] = useState<{ configured: boolean; platform: SyncPlatform }>({
     configured: false,
     platform: credentials.primaryBackupMethod,
   })
+  const [configurationChecking, setConfigurationChecking] = useState(true)
   const [configurationRevision, setConfigurationRevision] = useState(0)
+  const configurationRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    const next = await getSyncConfiguration()
-    setState(next)
-    return next
+    const requestId = ++configurationRequestRef.current
+    setConfigurationChecking(true)
+    try {
+      const next = await getSyncConfiguration()
+      if (next.configured && (next.platform === 's3' || next.platform === 'webdav')) {
+        await checkSyncProviderStatus(next.platform)
+      }
+      if (configurationRequestRef.current === requestId) setState(next)
+      return next
+    } finally {
+      if (configurationRequestRef.current === requestId) {
+        setConfigurationChecking(false)
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -38,5 +69,21 @@ export function useSyncAvailability() {
     void refresh()
   }, [credentials, refresh, settingsOpen])
 
-  return { ...state, configurationRevision, refresh }
+  let status: SyncAvailabilityStatus
+  if (configurationChecking) {
+    status = 'checking'
+  } else if (!state.configured) {
+    status = 'not-configured'
+  } else if (state.platform === 's3' || state.platform === 'webdav') {
+    status = providerStates[state.platform] ? 'available' : 'unavailable'
+  } else {
+    const providerState = providerStates[state.platform]
+    status = providerState === SyncStateEnum.success
+      ? 'available'
+      : providerState === SyncStateEnum.checking || providerState === SyncStateEnum.creating
+        ? 'checking'
+        : 'unavailable'
+  }
+
+  return { ...state, status, configurationRevision, refresh }
 }

@@ -10,7 +10,7 @@ import { s3ListObjects } from '@/lib/sync/s3'
 import { webdavListObjects } from '@/lib/sync/webdav'
 import { S3Config, WebDAVConfig } from '@/types/sync'
 import { hasNetworkConnection, ensureDirectoryExists, pullRemoteFile, saveLocalFile } from '@/lib/sync/auto-sync'
-import { syncOnOpen } from '@/lib/sync/sync-manager'
+import { isSyncConfigured, syncOnOpen } from '@/lib/sync/sync-manager'
 import { sanitizeFilePath, hasInvalidFileNameChars } from '@/lib/sync/filename-utils'
 import { getCurrentFolder, computedParentPath } from '@/lib/path'
 import useVectorStore from './vector'
@@ -28,6 +28,7 @@ import { buildRemotePathsToLoad } from './article-remote-sync'
 import { debugSyncPath } from '@/lib/sync/remote-file'
 import type { Mark } from '@/db/marks'
 import { getRecordTabName } from '@/app/core/main/mark/mark-record-tab'
+import { getCurrentSyncContext } from '@/lib/sync/sync-context'
 
 type SyncPushCompletedEvent = Events['sync-push-completed']
 type SyncPushCompletedListener = (event: SyncPushCompletedEvent) => void
@@ -47,6 +48,50 @@ let pendingVectorCalculation: { path: string; content: string } | null = null
 let vectorIndexedFilesInitPromise: Promise<void> | null = null
 const remoteFolderLoadPromises = new Map<string, Promise<void>>()
 const REMOTE_FOLDER_TIMEOUT_MS = 20_000
+let fileTreeWorkspaceKey: string | null = null
+let fileTreeLoadGeneration = 0
+
+type FileTreeRequestContext = {
+  workspaceKey: string
+  generation: number
+}
+
+type RemoteFileTreeRequestContext = FileTreeRequestContext & {
+  syncTargetKey: string
+}
+
+function normalizeWorkspacePath(path: string) {
+  return path.trim().replace(/\\/g, '/').replace(/\/+$/, '')
+}
+
+function getFileTreeWorkspaceKey(workspace: { path: string; isCustom: boolean }) {
+  return workspace.isCustom ? normalizeWorkspacePath(workspace.path) : '__default__'
+}
+
+function isFileTreeRequestCurrent(context: FileTreeRequestContext) {
+  return fileTreeWorkspaceKey === context.workspaceKey
+    && fileTreeLoadGeneration === context.generation
+}
+
+async function canApplyFileTreeRequest(context: FileTreeRequestContext) {
+  if (!isFileTreeRequestCurrent(context)) return false
+
+  const workspace = await getWorkspacePath()
+  return isFileTreeRequestCurrent(context)
+    && getFileTreeWorkspaceKey(workspace) === context.workspaceKey
+}
+
+function getRemoteSyncTargetKey(context: { workspaceKey: string; provider: string; repo: string }) {
+  return JSON.stringify([context.workspaceKey, context.provider, context.repo])
+}
+
+async function canApplyRemoteFileTreeRequest(context: RemoteFileTreeRequestContext) {
+  if (!await canApplyFileTreeRequest(context)) return false
+
+  const syncContext = await getCurrentSyncContext()
+  return isFileTreeRequestCurrent(context)
+    && getRemoteSyncTargetKey(syncContext) === context.syncTargetKey
+}
 
 async function withRemoteTimeout<T>(promise: Promise<T>, path: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -462,7 +507,7 @@ interface NoteState {
   moveLocalEntry: (oldPath: string, newPath: string) => boolean
   syncOpenTabsForPathChange: (oldPath: string, newPath: string) => Promise<void>
   loadFileTree: (options?: { skipRemoteSync?: boolean }) => Promise<void>
-  loadRemoteSyncFiles: () => Promise<void>
+  loadRemoteSyncFiles: (context?: FileTreeRequestContext) => Promise<void>
   loadCollapsibleFiles: (folderName: string, options?: { force?: boolean; skipRemoteSync?: boolean }) => Promise<void>
   loadFolderRemoteFiles: (folderName: string) => Promise<void>
   newFolder: () => void
@@ -1238,17 +1283,29 @@ const useArticleStore = create<NoteState>((set, get) => ({
   
   loadFileTree: async (options) => {
     set({ fileTreeLoading: true })
-    const cachedTree = get().fileTree
     // 知识库状态不应阻塞文件树展示；初始化函数会合并并发请求。
     void get().initVectorIndexedFiles()
+
+    // 必须先解析目标工作区，再决定是否复用现有文件树。
+    const workspace = await getWorkspacePath()
+    const workspaceKey = getFileTreeWorkspaceKey(workspace)
+    const workspaceChanged = fileTreeWorkspaceKey !== workspaceKey
+    const requestContext: FileTreeRequestContext = {
+      workspaceKey,
+      generation: ++fileTreeLoadGeneration,
+    }
+    fileTreeWorkspaceKey = workspaceKey
+
+    const cachedTree = workspaceChanged ? [] : get().fileTree
+    if (workspaceChanged) {
+      // 切换工作区时立即移除旧的本地树和仅远端节点。
+      set({ fileTree: [] })
+    }
 
     // 确保 collapsibleList 已初始化
     if (!get().collapsibleListInitialized) {
       await get().initCollapsibleList()
     }
-
-    // 获取当前工作区路径
-    const workspace = await getWorkspacePath()
     
     // 确保工作区目录存在
     if (workspace.isCustom) {
@@ -1380,6 +1437,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const sortedDirs = get().sortFileTree(
       mergeRefreshedLocalEntries(dirs, cachedTree)
     )
+    if (!await canApplyFileTreeRequest(requestContext)) return
+
     set({
       fileTree: sortedDirs,
       fileTreeInitialized: true,
@@ -1388,13 +1447,27 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // 异步加载远程同步文件（不阻塞界面）
     if (!options?.skipRemoteSync) {
-      void get().loadRemoteSyncFiles().catch(() => undefined)
+      void get().loadRemoteSyncFiles(requestContext).catch(() => undefined)
     }
   },
   
   // 加载远程同步文件（后台任务）
-  loadRemoteSyncFiles: async () => {
+  loadRemoteSyncFiles: async (context) => {
     try {
+      const syncContext = await getCurrentSyncContext()
+      if (fileTreeWorkspaceKey === null) {
+        fileTreeWorkspaceKey = syncContext.workspaceKey
+      }
+      const requestContext: RemoteFileTreeRequestContext = {
+        ...(context ?? {
+          workspaceKey: syncContext.workspaceKey,
+          generation: fileTreeLoadGeneration,
+        }),
+        syncTargetKey: getRemoteSyncTargetKey(syncContext),
+      }
+      if (!await canApplyRemoteFileTreeRequest(requestContext)) return
+      if (!await isSyncConfigured()) return
+      if (!await canApplyRemoteFileTreeRequest(requestContext)) return
       const store = await getStore();
       const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github'
       
@@ -1439,6 +1512,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
     // 目录树会在加载过程中逐步插入父级节点，因此这里必须按层级顺序加载。
     // 如果并发请求深层路径，远端子目录可能会在父目录节点尚未写入树时被跳过。
     for (const path of pathsToLoad) {
+      if (!await canApplyRemoteFileTreeRequest(requestContext)) return
       try {
         let files;
         switch (primaryBackupMethod) {
@@ -1474,6 +1548,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
           }
         }
 
+        if (!await canApplyRemoteFileTreeRequest(requestContext)) return
         if (files) {
           const dirs = get().fileTree
 
@@ -1488,6 +1563,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
               const config = await store.get<WebDAVConfig>('webdavSyncConfig')
               prefix = config?.pathPrefix ? config.pathPrefix.trim().replace(/\/+$/, '') : ''
             }
+            if (!await canApplyRemoteFileTreeRequest(requestContext)) return
             const fullPrefix = prefix ? `${prefix}/${path}` : path
 
             s3Files.forEach((file) => {
@@ -1629,9 +1705,12 @@ const useArticleStore = create<NoteState>((set, get) => ({
               }
             });
           }
-          set({ fileTree: [...dirs] })
+          if (isFileTreeRequestCurrent(requestContext)) {
+            set({ fileTree: [...dirs] })
+          }
         }
       } catch (error) {
+        if (!await canApplyRemoteFileTreeRequest(requestContext)) return
         firstRemoteLoadError ??= error
       }
     }
@@ -1639,9 +1718,16 @@ const useArticleStore = create<NoteState>((set, get) => ({
   } catch (error) {
     throw error
   }
-},
+  },
   // 加载文件夹内部的本地和远程文件（按需加载）
   loadCollapsibleFiles: async (fullpath: string, options?: { force?: boolean; skipRemoteSync?: boolean }) => {
+    const workspace = await getWorkspacePath()
+    const requestContext: FileTreeRequestContext = {
+      workspaceKey: getFileTreeWorkspaceKey(workspace),
+      generation: fileTreeLoadGeneration,
+    }
+    if (!await canApplyFileTreeRequest(requestContext)) return
+
     const cacheTree: DirTree[] = get().fileTree
     const currentFolder = getCurrentFolder(fullpath, cacheTree)
 
@@ -1664,7 +1750,6 @@ const useArticleStore = create<NoteState>((set, get) => ({
     }
     
     // 尝试加载本地子目录内容
-    const workspace = await getWorkspacePath()
     const fullFolderPath = await join(workspace.path, fullpath)
     
     let children: DirTree[] = []
@@ -1724,6 +1809,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // 文件监听触发的仅本地刷新也必须保留仅远程节点，否则下载一个远程文件后，
     // 同目录的其他远程文件会从列表中消失。
+    if (!await canApplyFileTreeRequest(requestContext)) return
     currentFolder.children = get().sortFileTree(
       mergeRefreshedLocalEntries(children, currentFolder.children ?? [], currentFolder)
     )
@@ -1739,10 +1825,29 @@ const useArticleStore = create<NoteState>((set, get) => ({
   
   // 加载特定文件夹的远程同步文件（后台任务）
   loadFolderRemoteFiles: async (fullpath: string) => {
-    const pending = remoteFolderLoadPromises.get(fullpath)
+    const syncContext = await getCurrentSyncContext()
+    if (fileTreeWorkspaceKey === null) {
+      fileTreeWorkspaceKey = syncContext.workspaceKey
+    }
+    const requestContext: RemoteFileTreeRequestContext = {
+      workspaceKey: syncContext.workspaceKey,
+      generation: fileTreeLoadGeneration,
+      syncTargetKey: getRemoteSyncTargetKey(syncContext),
+    }
+    if (!await canApplyRemoteFileTreeRequest(requestContext)) return
+
+    const pendingKey = JSON.stringify([
+      syncContext.workspaceKey,
+      syncContext.provider,
+      syncContext.repo,
+      fullpath,
+    ])
+    const pending = remoteFolderLoadPromises.get(pendingKey)
     if (pending) return pending
 
     const task = (async () => {
+    if (!await isSyncConfigured()) return
+    if (!await canApplyRemoteFileTreeRequest(requestContext)) return
     const store = await getStore();
     const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github';
     
@@ -1769,6 +1874,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
     // loading 只表示真实的远程目录请求。本地目录扫描（包括搜索第一阶段）
     // 不应改变这个状态。
+    if (!await canApplyRemoteFileTreeRequest(requestContext)) return
     const loadingTree = get().fileTree
     const loadingFolder = getCurrentFolder(fullpath, loadingTree)
     if (loadingFolder && !loadingFolder.loading) {
@@ -1823,6 +1929,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
         }
       }
 
+      if (!await canApplyRemoteFileTreeRequest(requestContext)) return
       if (files) {
         const cacheTree = get().fileTree
         const currentFolder = getCurrentFolder(fullpath, cacheTree)
@@ -1839,6 +1946,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
               const config = await store.get<WebDAVConfig>('webdavSyncConfig')
               prefix = config?.pathPrefix ? config.pathPrefix.trim().replace(/\/+$/, '') : ''
             }
+            if (!await canApplyRemoteFileTreeRequest(requestContext)) return
             const fullPrefix = prefix ? `${prefix}/${fullpath}` : fullpath
 
             s3Files.forEach((file) => {
@@ -1922,31 +2030,38 @@ const useArticleStore = create<NoteState>((set, get) => ({
             });
           }
 
-          set({ fileTree: [...cacheTree] })
+          if (isFileTreeRequestCurrent(requestContext)) {
+            set({ fileTree: [...cacheTree] })
+          }
         }
       }
-      get().setEntrySyncError(fullpath, undefined)
+      if (isFileTreeRequestCurrent(requestContext)) {
+        get().setEntrySyncError(fullpath, undefined)
+      }
     } catch (error) {
+      if (!await canApplyRemoteFileTreeRequest(requestContext)) return
       const message = error instanceof Error ? error.message : String(error)
       get().setEntrySyncError(fullpath, message)
       throw error
     } finally {
       // 成功、空结果或请求失败都必须结束该节点的加载状态。
-      const cacheTree = get().fileTree
-      const currentFolder = getCurrentFolder(fullpath, cacheTree)
-      if (currentFolder?.loading) {
-        currentFolder.loading = false
-        set({ fileTree: [...cacheTree] })
+      if (await canApplyRemoteFileTreeRequest(requestContext)) {
+        const cacheTree = get().fileTree
+        const currentFolder = getCurrentFolder(fullpath, cacheTree)
+        if (currentFolder?.loading) {
+          currentFolder.loading = false
+          set({ fileTree: [...cacheTree] })
+        }
       }
     }
     })()
 
-    remoteFolderLoadPromises.set(fullpath, task)
+    remoteFolderLoadPromises.set(pendingKey, task)
     try {
       await task
     } finally {
-      if (remoteFolderLoadPromises.get(fullpath) === task) {
-        remoteFolderLoadPromises.delete(fullpath)
+      if (remoteFolderLoadPromises.get(pendingKey) === task) {
+        remoteFolderLoadPromises.delete(pendingKey)
       }
     }
   },

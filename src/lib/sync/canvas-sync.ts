@@ -6,7 +6,7 @@ import { deleteFile as deleteGiteaFile, uploadFile as uploadGiteaFile, getFiles 
 import { s3Delete, s3Download, s3Upload } from '@/lib/sync/s3'
 import { webdavDelete, webdavDownload, webdavUpload } from '@/lib/sync/webdav'
 import { decodeBase64ToString, getRemoteFileContent, hasEmptyRemoteFileContent } from '@/lib/sync/remote-file'
-import { getSyncRepoName } from '@/lib/sync/repo-utils'
+import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
 import { normalizeCanvasDocument, type CanvasProject, type CanvasProjectType } from '@/types/canvas'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
 
@@ -235,7 +235,7 @@ async function createCanvasRemoteStorage(store: Store): Promise<CanvasRemoteStor
   const provider = await store.get<string>('primaryBackupMethod') || 'github'
 
   if (provider === 'github') {
-    const repo = await getSyncRepoName('github')
+    const repo = await getDataSyncRepoName('github')
     return {
       read: async path => decodeRemoteContent(await githubGetFiles({ path, repo }), path),
       write: async (path, content) => {
@@ -258,7 +258,7 @@ async function createCanvasRemoteStorage(store: Store): Promise<CanvasRemoteStor
   }
 
   if (provider === 'gitee') {
-    const repo = await getSyncRepoName('gitee')
+    const repo = await getDataSyncRepoName('gitee')
     return {
       read: async path => decodeRemoteContent(await giteeGetFiles({ path, repo }), path),
       write: async (path, content) => {
@@ -281,7 +281,7 @@ async function createCanvasRemoteStorage(store: Store): Promise<CanvasRemoteStor
   }
 
   if (provider === 'gitlab') {
-    const repo = await getSyncRepoName('gitlab')
+    const repo = await getDataSyncRepoName('gitlab')
     return {
       read: async path => decodeRemoteContent(
         await gitlabGetFileContent({ path, ref: 'main', repo }),
@@ -306,7 +306,7 @@ async function createCanvasRemoteStorage(store: Store): Promise<CanvasRemoteStor
   }
 
   if (provider === 'gitea') {
-    const repo = await getSyncRepoName('gitea')
+    const repo = await getDataSyncRepoName('gitea')
     return {
       read: async path => decodeRemoteContent(
         await giteaGetFileContent({ path, ref: 'main', repo }),

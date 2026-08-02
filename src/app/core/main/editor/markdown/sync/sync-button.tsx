@@ -2,11 +2,13 @@
 
 import { ArrowUpCircle, CheckCircle, Loader2, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useState, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
+import { toast } from '@/hooks/use-toast'
 import useArticleStore from '@/stores/article'
 import useSyncStore from '@/stores/sync'
 import { Store } from '@tauri-apps/plugin-store'
-import { getSyncRepoName } from '@/lib/sync/repo-utils'
+import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import { getWorkspacePath, getFilePathOptions } from '@/lib/workspace'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { isSyncConfigured } from '@/lib/sync/sync-manager'
@@ -15,6 +17,7 @@ import { setLocalRecordedSha } from '@/lib/sync/auto-sync'
 import { debugSyncPerf } from '@/lib/sync/remote-file'
 import { generateGitSyncCommitMessage } from '@/lib/sync/commit-message'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
+import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
 
@@ -74,6 +77,7 @@ function roundMs(value: number) {
 }
 
 export function SyncButton() {
+  const t = useTranslations()
   const { activeFilePath } = useArticleStore()
   const [isLoading, setIsLoading] = useState(false)
   const [isConfigured, setIsConfigured] = useState(false)
@@ -170,7 +174,13 @@ export function SyncButton() {
       const provider = (await store.get<string>('primaryBackupMethod') || 'github') as SyncProvider
       providerForLog = provider
       // S3 和 WebDAV 不需要 repo
-      const repo = (provider === 's3' || provider === 'webdav') ? '' : await getSyncRepoName(provider)
+      const repo = (provider === 's3' || provider === 'webdav') ? '' : await getOptionalSyncRepoName(provider)
+      if (provider !== 's3' && provider !== 'webdav' && !repo) {
+        toast({ description: t('settings.sync.repositoryRequired'), variant: 'destructive' })
+        useSettingsDialogStore.getState().openSettings('sync')
+        setIsLoading(false)
+        return
+      }
       logPerf('loadConfig', {
         hasRepo: Boolean(repo),
       })
@@ -417,7 +427,7 @@ export function SyncButton() {
       setIsLoading(false)
       emitter.emit('sync-push-completed', { path: activeFilePath, success: false })
     }
-  }, [activeFilePath, isLoading])
+  }, [activeFilePath, isLoading, t])
 
   // 如果没有配置同步，不显示按钮
   if (!isConfigured || !activeFilePath) return null

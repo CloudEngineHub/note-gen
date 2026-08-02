@@ -367,8 +367,34 @@ export async function checkSyncRepoState(name: string) {
     const data = await response.json();
     return data;
   }
-  
-  return false
+
+  if (response.status === 404) return false
+
+  throw new Error(`检查仓库状态失败: ${response.status}`)
+}
+
+export async function listUserRepositories(): Promise<string[]> {
+  const store = await Store.load('store.json')
+  const accessToken = await store.get<string>('accessToken')
+  if (!accessToken) throw new Error('GitHub Access Token 未配置')
+
+  const proxyUrl = await store.get<string>('proxy')
+  const proxy: Proxy | undefined = proxyUrl ? { all: proxyUrl } : undefined
+  const headers = new Headers()
+  headers.append('Authorization', `Bearer ${accessToken}`)
+  headers.append('Accept', 'application/vnd.github+json')
+  headers.append('X-GitHub-Api-Version', '2022-11-28')
+
+  const response = await fetch(
+    'https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100',
+    { method: 'GET', headers, proxy }
+  )
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`获取仓库列表失败: ${response.status}`)
+  }
+
+  const repositories = await response.json() as GithubRepoInfo[]
+  return repositories.map(repository => repository.name).filter(Boolean)
 }
 
 // 创建 Github 仓库

@@ -92,7 +92,7 @@ async function flushPendingRecordAssetRemoteDeletions() {
 
   const remaining = [...pending]
   for (const path of pending) {
-    await deleteRemoteFile(path)
+    await deleteRemoteFile(path, 'data')
     remaining.shift()
     await store.set(PENDING_RECORD_ASSET_DELETIONS_KEY, remaining)
     await store.save()
@@ -109,14 +109,15 @@ export async function uploadRecordAssets(marks: RecordAssetMark[]) {
   for (const localPath of localPaths) {
     if (!await exists(localPath, { baseDir: BaseDirectory.AppData })) continue
     const remotePath = getRemoteAssetPath(localPath)
-    if (await remoteFileExists(remotePath)) continue
+    if (await remoteFileExists(remotePath, 'data')) continue
 
     const content = await readFile(localPath, { baseDir: BaseDirectory.AppData })
     await uploadRemoteBytes(
       remotePath,
       content,
       `Upload record asset: ${localPath}`,
-      getRemoteContentType(localPath)
+      getRemoteContentType(localPath),
+      'data',
     )
   }
 }
@@ -131,9 +132,9 @@ export async function downloadRecordAssets(marks: RecordAssetMark[]) {
   for (const localPath of localPaths) {
     if (await exists(localPath, { baseDir: BaseDirectory.AppData })) continue
     const remotePath = getRemoteAssetPath(localPath)
-    if (!await remoteFileExists(remotePath)) continue
+    if (!await remoteFileExists(remotePath, 'data')) continue
 
-    const content = await downloadRemoteBytes(remotePath)
+    const content = await downloadRemoteBytes(remotePath, 'data')
     await ensureLocalAssetDirectory(localPath)
     await writeFile(localPath, content, { baseDir: BaseDirectory.AppData })
     downloadedPaths.push(localPath)

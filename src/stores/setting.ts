@@ -20,6 +20,7 @@ import {
 } from '@/lib/ai/system-prompt'
 import { APP_FONT_SYSTEM_VALUE, applyAppFontFamily } from '@/lib/font-settings'
 import type { AgentPermissionMode } from '@/lib/agent/types'
+import { getWorkspaceSyncRepos, setWorkspaceSyncRepo } from '@/lib/sync/workspace-repos'
 import {
   DEFAULT_EDITOR_CONTENT_WIDTH,
   DEFAULT_EDITOR_LINE_HEIGHT,
@@ -269,16 +270,16 @@ interface SettingState {
 
   // 自定义仓库名称设置
   githubCustomSyncRepo: string
-  setGithubCustomSyncRepo: (repo: string) => Promise<void>
+  setGithubCustomSyncRepo: (repo: string, workspacePath?: string) => Promise<void>
 
   giteeCustomSyncRepo: string
-  setGiteeCustomSyncRepo: (repo: string) => Promise<void>
+  setGiteeCustomSyncRepo: (repo: string, workspacePath?: string) => Promise<void>
 
   gitlabCustomSyncRepo: string
-  setGitlabCustomSyncRepo: (repo: string) => Promise<void>
+  setGitlabCustomSyncRepo: (repo: string, workspacePath?: string) => Promise<void>
 
   giteaCustomSyncRepo: string
-  setGiteaCustomSyncRepo: (repo: string) => Promise<void>
+  setGiteaCustomSyncRepo: (repo: string, workspacePath?: string) => Promise<void>
 
   githubCustomImageRepo: string
   setGithubCustomImageRepo: (repo: string) => Promise<void>
@@ -863,8 +864,20 @@ const useSettingStore = create<SettingState>((set, get) => ({
         await store.set(key, value)
       }
     }))
+    await store.save()
 
-    set(hydratedSettings as Partial<SettingState>)
+    const workspacePath = typeof hydratedSettings.workspacePath === 'string'
+      ? hydratedSettings.workspacePath
+      : get().workspacePath
+    const workspaceRepos = await getWorkspaceSyncRepos(workspacePath)
+
+    set({
+      ...hydratedSettings,
+      githubCustomSyncRepo: workspaceRepos.github || '',
+      giteeCustomSyncRepo: workspaceRepos.gitee || '',
+      gitlabCustomSyncRepo: workspaceRepos.gitlab || '',
+      giteaCustomSyncRepo: workspaceRepos.gitea || '',
+    } as Partial<SettingState>)
 
     initSettingAutoSyncSubscription()
     settingAutoSyncReady = true
@@ -1143,15 +1156,43 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
   workspacePath: '',
   setWorkspacePath: async (path: string) => {
-    set({ workspacePath: path })
-    const { invalidateMemoryCache } = await import('@/lib/memory/cache-version')
-    invalidateMemoryCache()
-    const store = await Store.load('store.json');
-    await store.set('workspacePath', path)
-    
-    // 如果路径不为空且不在历史记录中，则添加到历史记录
-    if (path && !get().workspaceHistory.includes(path)) {
-      await get().addWorkspaceHistory(path)
+    const { getSyncPushQueue } = await import('@/lib/sync/sync-push-queue')
+    const syncPushQueue = getSyncPushQueue()
+    await syncPushQueue.prepareForWorkspaceSwitch()
+
+    try {
+      const { invalidateMemoryCache } = await import('@/lib/memory/cache-version')
+      invalidateMemoryCache()
+      const store = await Store.load('store.json');
+      await store.set('workspacePath', path)
+      const workspaceRepos = await getWorkspaceSyncRepos(path)
+      set({
+        workspacePath: path,
+        githubCustomSyncRepo: workspaceRepos.github || '',
+        giteeCustomSyncRepo: workspaceRepos.gitee || '',
+        gitlabCustomSyncRepo: workspaceRepos.gitlab || '',
+        giteaCustomSyncRepo: workspaceRepos.gitea || '',
+      })
+
+      const { default: useSyncStore } = await import('@/stores/sync')
+      const { SyncStateEnum } = await import('@/lib/sync/github.types')
+      useSyncStore.setState({
+        syncRepoState: SyncStateEnum.fail,
+        syncRepoInfo: undefined,
+        giteeSyncRepoState: SyncStateEnum.fail,
+        giteeSyncRepoInfo: undefined,
+        gitlabSyncProjectState: SyncStateEnum.fail,
+        gitlabSyncProjectInfo: undefined,
+        giteaSyncRepoState: SyncStateEnum.fail,
+        giteaSyncRepoInfo: undefined,
+      })
+
+      // 如果路径不为空且不在历史记录中，则添加到历史记录
+      if (path && !get().workspaceHistory.includes(path)) {
+        await get().addWorkspaceHistory(path)
+      }
+    } finally {
+      syncPushQueue.finishWorkspaceSwitch()
     }
   },
 
@@ -1271,20 +1312,35 @@ const useSettingStore = create<SettingState>((set, get) => ({
   },
 
   giteaCustomSyncRepo: '',
-  setGiteaCustomSyncRepo: async (repo: string) => {
-    set({ giteaCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('giteaCustomSyncRepo', repo)
-    await store.save()
+  setGiteaCustomSyncRepo: async (repo: string, workspacePath = get().workspacePath) => {
+    await setWorkspaceSyncRepo('gitea', repo, workspacePath)
+    if (workspacePath === get().workspacePath) set({ giteaCustomSyncRepo: repo })
   },
 
   // 默认使用 GitHub 作为主要备份方式
   primaryBackupMethod: 'github',
   setPrimaryBackupMethod: async (method: 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav') => {
-    const store = await Store.load('store.json')
-    await store.set('primaryBackupMethod', method)
-    await store.save()
-    set({ primaryBackupMethod: method })
+    if (method === get().primaryBackupMethod) return
+
+    const [{ getSyncPushQueue }, autoDataSyncQueue] = await Promise.all([
+      import('@/lib/sync/sync-push-queue'),
+      import('@/lib/sync/auto-data-sync-queue'),
+    ])
+    const syncPushQueue = getSyncPushQueue()
+    await Promise.all([
+      syncPushQueue.prepareForWorkspaceSwitch(),
+      autoDataSyncQueue.prepareAutoDataSyncForRepositoryChange(),
+    ])
+
+    try {
+      const store = await Store.load('store.json')
+      await store.set('primaryBackupMethod', method)
+      await store.save()
+      set({ primaryBackupMethod: method })
+    } finally {
+      syncPushQueue.finishWorkspaceSwitch()
+      autoDataSyncQueue.finishAutoDataSyncRepositoryChange()
+    }
   },
 
   assetsPath: 'assets',
@@ -1450,27 +1506,21 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
   // 自定义仓库名称设置
   githubCustomSyncRepo: '',
-  setGithubCustomSyncRepo: async (repo: string) => {
-    set({ githubCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('githubCustomSyncRepo', repo)
-    await store.save()
+  setGithubCustomSyncRepo: async (repo: string, workspacePath = get().workspacePath) => {
+    await setWorkspaceSyncRepo('github', repo, workspacePath)
+    if (workspacePath === get().workspacePath) set({ githubCustomSyncRepo: repo })
   },
 
   giteeCustomSyncRepo: '',
-  setGiteeCustomSyncRepo: async (repo: string) => {
-    set({ giteeCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('giteeCustomSyncRepo', repo)
-    await store.save()
+  setGiteeCustomSyncRepo: async (repo: string, workspacePath = get().workspacePath) => {
+    await setWorkspaceSyncRepo('gitee', repo, workspacePath)
+    if (workspacePath === get().workspacePath) set({ giteeCustomSyncRepo: repo })
   },
 
   gitlabCustomSyncRepo: '',
-  setGitlabCustomSyncRepo: async (repo: string) => {
-    set({ gitlabCustomSyncRepo: repo })
-    const store = await Store.load('store.json');
-    await store.set('gitlabCustomSyncRepo', repo)
-    await store.save()
+  setGitlabCustomSyncRepo: async (repo: string, workspacePath = get().workspacePath) => {
+    await setWorkspaceSyncRepo('gitlab', repo, workspacePath)
+    if (workspacePath === get().workspacePath) set({ gitlabCustomSyncRepo: repo })
   },
 
   githubCustomImageRepo: '',

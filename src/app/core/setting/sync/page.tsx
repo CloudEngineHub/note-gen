@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { Store } from '@tauri-apps/plugin-store'
 import {
@@ -30,6 +30,8 @@ import { GitlabSync } from './gitlab-sync'
 import { S3Sync } from './s3-sync'
 import { WebDAVSync } from './webdav-sync'
 import { UsePlatformButton } from './components/use-platform-button'
+import { WorkspaceRepoMapping } from './components/workspace-repo-mapping'
+import { DataSyncOverview } from './components/data-sync-overview'
 import { SettingType } from '../components/setting-base'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -63,17 +65,11 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import {
-  downloadAutoDataSyncNow,
-  uploadAutoDataSyncNow,
-} from '@/lib/sync/auto-data-sync-queue'
-import { SyncStateEnum } from '@/lib/sync/github.types'
+import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
 import { checkSyncProviderStatus } from '@/lib/sync/provider-status'
-import useChatStore from '@/stores/chat'
-import useMarkStore from '@/stores/mark'
+import type { SyncRepoPlatform, WorkspaceSyncRepos } from '@/lib/sync/workspace-repos'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
-import useTagStore from '@/stores/tag'
 import { SYNC_PLATFORMS, SYNC_PLATFORM_INFO, type SyncPlatform } from '@/types/sync'
 
 const PLATFORM_ICONS: Record<SyncPlatform, LucideIcon> = {
@@ -105,6 +101,12 @@ export default function SyncPage() {
     setExcludeSensitiveConfig,
     autoPullOnOpen,
     setAutoPullOnOpen,
+    workspacePath,
+    workspaceHistory,
+    setGithubCustomSyncRepo,
+    setGiteeCustomSyncRepo,
+    setGitlabCustomSyncRepo,
+    setGiteaCustomSyncRepo,
   } = useSettingStore()
   const {
     syncRepoState,
@@ -114,17 +116,53 @@ export default function SyncPage() {
     s3Connected,
     webdavConnected,
   } = useSyncStore()
-  const { fetchMarks } = useMarkStore()
-  const { fetchTags, currentTagId } = useTagStore()
-  const { init } = useChatStore()
 
   const [platform, setPlatform] = useState<SyncPlatform>(primaryBackupMethod)
   const [activeTab, setActiveTab] = useState('connection')
   const [isLoading, setIsLoading] = useState(true)
   const [checkingPlatforms, setCheckingPlatforms] = useState<Set<SyncPlatform>>(new Set())
   const checkingPlatformsRef = useRef<Set<SyncPlatform>>(new Set())
-  const [initialSyncChoiceVisible, setInitialSyncChoiceVisible] = useState(false)
-  const [initialSyncBusy, setInitialSyncBusy] = useState<'upload' | 'download' | 'later' | null>(null)
+  const [workspaceRepos, setWorkspaceRepos] = useState<Record<string, WorkspaceSyncRepos>>({})
+
+  const workspaceOptions = useMemo(
+    () => Array.from(new Set([workspacePath, '', ...workspaceHistory])),
+    [workspaceHistory, workspacePath],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadWorkspaceRepos() {
+      const { getWorkspaceSyncRepos } = await import('@/lib/sync/workspace-repos')
+      const entries = await Promise.all(workspaceOptions.map(async (path) => {
+        return [path, await getWorkspaceSyncRepos(path)] as const
+      }))
+      if (!cancelled) setWorkspaceRepos(Object.fromEntries(entries))
+    }
+
+    void loadWorkspaceRepos()
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceOptions])
+
+  async function handleWorkspaceRepoChange(workspacePath: string, repoPlatform: SyncRepoPlatform, repo: string) {
+    const setters: Record<SyncRepoPlatform, (value: string, targetWorkspacePath?: string) => Promise<void>> = {
+      github: setGithubCustomSyncRepo,
+      gitee: setGiteeCustomSyncRepo,
+      gitlab: setGitlabCustomSyncRepo,
+      gitea: setGiteaCustomSyncRepo,
+    }
+
+    await setters[repoPlatform](repo, workspacePath)
+    setWorkspaceRepos(current => ({
+      ...current,
+      [workspacePath]: {
+        ...current[workspacePath],
+        [repoPlatform]: repo,
+      },
+    }))
+  }
 
   useEffect(() => {
     async function loadPrimaryBackupMethod() {
@@ -161,7 +199,7 @@ export default function SyncPage() {
   useEffect(() => {
     if (isLoading) return
     void checkPlatformStatus(platform)
-  }, [checkPlatformStatus, isLoading, platform])
+  }, [checkPlatformStatus, isLoading, platform, workspacePath])
 
   function getSyncState(targetPlatform: SyncPlatform) {
     if (checkingPlatforms.has(targetPlatform)) return SyncStateEnum.checking
@@ -405,7 +443,19 @@ export default function SyncPage() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="connection">{renderSyncContent()}</TabsContent>
+            <TabsContent value="connection" className="flex flex-col gap-4">
+              {renderSyncContent()}
+              {platform !== 's3' && platform !== 'webdav' ? (
+                <WorkspaceRepoMapping
+                  platform={platform}
+                  workspaceOptions={workspaceOptions}
+                  currentWorkspacePath={workspacePath}
+                  workspaceRepos={workspaceRepos}
+                  defaultRepoName={RepoNames.sync}
+                  onRepoChange={(targetWorkspacePath, repo) => handleWorkspaceRepoChange(targetWorkspacePath, platform, repo)}
+                />
+              ) : null}
+            </TabsContent>
 
             <TabsContent value="options" className="flex flex-col gap-4">
               <Card>

@@ -2,7 +2,7 @@ import { Store } from '@tauri-apps/plugin-store'
 import { calculateFileSha, getLocalFileMetadata, getRemoteFileInfo, compareFileVersions, pullRemoteFile, saveLocalFile, setLocalRecordedSha } from './auto-sync'
 import { decodeBase64ToString } from './github'
 import { updateFileSyncTime } from './conflict-resolution'
-import { getSyncRepoName } from './repo-utils'
+import { getOptionalSyncRepoName, getSyncRepoName } from './repo-utils'
 import { uploadFile as uploadToGithub, getFiles as getGithubFiles, deleteFile as deleteGithubFile } from './github'
 import { uploadFile as uploadToGitee, getFiles as getGiteeFiles, deleteFile as deleteGiteeFile } from './gitee'
 import { uploadFile as uploadToGitlab, getFileContent as getGitlabFile, deleteFile as deleteGitlabFile } from './gitlab'
@@ -831,17 +831,19 @@ export async function isSyncConfigured(): Promise<boolean> {
       case 'github': {
         const token = await store.get<string>('accessToken')
         const username = await store.get<string>('githubUsername')
-        return hasConfiguredText(token) && hasConfiguredText(username)
+        const repo = await getOptionalSyncRepoName('github')
+        return hasConfiguredText(token) && hasConfiguredText(username) && hasConfiguredText(repo)
       }
       case 'gitee': {
         const giteeToken = await store.get<string>('giteeAccessToken')
         const giteeUsername = await store.get<string>('giteeUsername')
-        return hasConfiguredText(giteeToken) && hasConfiguredText(giteeUsername)
+        const repo = await getOptionalSyncRepoName('gitee')
+        return hasConfiguredText(giteeToken) && hasConfiguredText(giteeUsername) && hasConfiguredText(repo)
       }
       case 'gitlab': {
         const gitlabToken = await store.get<string>('gitlabAccessToken')
         const gitlabUsername = await store.get<string>('gitlabUsername')
-        const repo = await getSyncRepoName('gitlab')
+        const repo = await getOptionalSyncRepoName('gitlab')
         const projectId = await store.get<string>(`gitlab_${repo}_project_id`)
         const instanceType = await store.get<string>('gitlabInstanceType')
         const customUrl = await store.get<string>('gitlabCustomUrl')
@@ -849,18 +851,21 @@ export async function isSyncConfigured(): Promise<boolean> {
 
         return hasConfiguredText(gitlabToken) &&
           hasConfiguredText(gitlabUsername) &&
+          hasConfiguredText(repo) &&
           hasConfiguredText(projectId) &&
           instanceConfigured
       }
       case 'gitea': {
         const giteaToken = await store.get<string>('giteaAccessToken')
         const giteaUsername = await store.get<string>('giteaUsername')
+        const repo = await getOptionalSyncRepoName('gitea')
         const instanceType = await store.get<string>('giteaInstanceType')
         const customUrl = await store.get<string>('giteaCustomUrl')
         const instanceConfigured = instanceType !== 'self-hosted' || hasConfiguredText(customUrl)
 
         return hasConfiguredText(giteaToken) &&
           hasConfiguredText(giteaUsername) &&
+          hasConfiguredText(repo) &&
           instanceConfigured
       }
       case 's3': {

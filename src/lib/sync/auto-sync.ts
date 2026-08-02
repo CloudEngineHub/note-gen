@@ -8,6 +8,7 @@ import { s3HeadObject, s3Download } from './s3'
 import { webdavHeadObject, webdavDownload } from './webdav'
 import { S3Config, WebDAVConfig } from '@/types/sync'
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
+import { getCurrentSyncContext, getSyncMetadataKey } from '@/lib/sync/sync-context'
 import { toast } from '@/hooks/use-toast'
 import { readTextFile, writeTextFile, stat, mkdir, exists } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
@@ -60,7 +61,11 @@ async function getGiteaBranch(): Promise<string> {
 export async function getLocalRecordedSha(filePath: string): Promise<string | null> {
   const store = await getStore()
   const syncedShas = await store.get<Record<string, string>>('syncedFileShas') || {}
-  return syncedShas[filePath] || null
+  const scopedKey = await getSyncMetadataKey(filePath)
+  if (syncedShas[scopedKey]) return syncedShas[scopedKey]
+
+  const context = await getCurrentSyncContext()
+  return context.workspaceKey === '__default__' ? syncedShas[filePath] || null : null
 }
 
 /**
@@ -69,8 +74,9 @@ export async function getLocalRecordedSha(filePath: string): Promise<string | nu
 export async function setLocalRecordedSha(filePath: string, sha: string): Promise<void> {
   const store = await getStore()
   const syncedShas = await store.get<Record<string, string>>('syncedFileShas') || {}
-  syncedShas[filePath] = sha
+  syncedShas[await getSyncMetadataKey(filePath)] = sha
   await store.set('syncedFileShas', syncedShas)
+  await store.save()
 }
 
 export interface FileMetadata {

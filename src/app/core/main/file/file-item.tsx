@@ -707,7 +707,12 @@ export function FileItem({
     if (isUploading || !item.isLocale || item.name === '') return
     const sync = await getSyncConfiguration()
     if (!sync.configured) {
-      toast({ title: t('context.syncNotConfigured'), description: t('context.configureSync') })
+      toast({
+        title: sync.reason === 'missing-repository'
+          ? t('context.syncRepoRequired')
+          : t('context.syncNotConfigured'),
+        description: t('context.configureSync'),
+      })
       useSettingsDialogStore.getState().openSettings('sync')
       return
     }

@@ -4,6 +4,7 @@ import { confirm } from '@tauri-apps/plugin-dialog'
 import { Cloud, Database, DatabaseZap, Download, EllipsisVertical, LoaderCircle, PackageOpen, Upload } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { ResponsiveActionMenu } from '@/components/responsive-action-menu'
@@ -12,9 +13,12 @@ import useArticleStore from '@/stores/article'
 import useCloudLibraryStore from '@/stores/cloud-library'
 import useVectorStore from '@/stores/vector'
 import { cn } from '@/lib/utils'
+import { getSyncConfiguration } from './file-tree-action-policy'
 
 export function CloudLibraryMenu({ className }: { className?: string }) {
   const t = useTranslations('article.file.cloudLibrary')
+  const tSync = useTranslations('settings.sync')
+  const router = useRouter()
   const {
     loadFileTree,
     loadRemoteSyncFiles,
@@ -42,7 +46,22 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
     void initShowCloudFiles()
   }, [initShowCloudFiles, initSyncStaticAssets])
 
+  async function ensureSyncConfigured() {
+    const sync = await getSyncConfiguration()
+    if (sync.configured) return true
+
+    toast({
+      description: sync.reason === 'missing-repository'
+        ? tSync('repositoryRequired')
+        : tSync('status.unconfigured'),
+      variant: 'destructive',
+    })
+    router.push('/mobile/setting/pages/sync')
+    return false
+  }
+
   async function handlePullAll() {
+    if (!await ensureSyncConfigured()) return
     try {
       const result = await pullAllFiles(undefined, { includeStaticAssets: true })
       await loadFileTree()
@@ -65,6 +84,7 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
   }
 
   async function handleUploadAll() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t(syncStaticAssets ? 'uploadFilesWithAssetsWarning' : 'uploadFilesWarning'), {
       title: t('uploadFiles'),
       kind: 'warning',
@@ -97,6 +117,7 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
   }
 
   async function handleUploadKnowledgeBase() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t('uploadPrivacyWarning'), {
       title: t('uploadKnowledgeBase'),
       kind: 'warning',
@@ -122,6 +143,7 @@ export function CloudLibraryMenu({ className }: { className?: string }) {
   }
 
   async function handleDownloadKnowledgeBase() {
+    if (!await ensureSyncConfigured()) return
     const accepted = await confirm(t('downloadOverwriteWarning'), {
       title: t('downloadKnowledgeBase'),
       kind: 'warning',
