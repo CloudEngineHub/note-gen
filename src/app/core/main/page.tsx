@@ -56,7 +56,9 @@ function ResizableWrapper() {
     leftSidebarVisible, 
     centerPanelVisible, 
     rightSidebarVisible, 
-    initSidebarState
+    initSidebarState,
+    toggleLeftSidebar,
+    toggleRightSidebar,
   } = useSidebarStore()
   
   const leftPanelRef = useRef<PanelImperativeHandle>(null)
@@ -69,6 +71,8 @@ function ResizableWrapper() {
   const [minLeftSidebarSize, setMinLeftSidebarSize] = useState(24)
   const [minRightSidebarSize, setMinRightSidebarSize] = useState(20)
   const [minEditorSize, setMinEditorSize] = useState(30)
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(!leftSidebarVisible)
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(!rightSidebarVisible)
   
   // 使用稳定的 layoutKey 用于存储，但不作为 React key
   const visiblePanels = [
@@ -154,6 +158,22 @@ function ResizableWrapper() {
   }
   
   const actualLayout = getActualLayout()
+
+  const revealLeftPanel = () => {
+    if (!leftSidebarVisible) {
+      void toggleLeftSidebar()
+      return
+    }
+    leftPanelRef.current?.expand()
+  }
+
+  const revealRightPanel = () => {
+    if (!rightSidebarVisible) {
+      void toggleRightSidebar()
+      return
+    }
+    rightPanelRef.current?.expand()
+  }
   
   const onLayout = (layout: Layout) => {
     // 保存当前面板布局
@@ -177,6 +197,7 @@ function ResizableWrapper() {
         minSize={`${minLeftSidebarSize}%`}
         collapsible={true}
         collapsedSize="0%"
+        onResize={(size) => setLeftPanelCollapsed(size.asPercentage < 0.1)}
       >
         <LeftSidebar />
       </ResizablePanel>
@@ -184,11 +205,16 @@ function ResizableWrapper() {
 
     // 左侧和中间之间的分隔条
     // 当中间面板可见时显示；当中间面板不可见但左右都可见时也显示（作为左右分隔条）
-    const shouldShowLeftHandle = leftSidebarVisible && (centerPanelVisible || rightSidebarVisible)
+    const shouldShowLeftHandle = centerPanelVisible || rightSidebarVisible
+    const isLeftHandleCollapsed = leftPanelCollapsed || !leftSidebarVisible
     panels.push(
       <ResizableHandle
         key="handle-left-center"
-        className={`${!shouldShowLeftHandle ? 'hidden' : ''}`}
+        withHandle
+        collapsed={isLeftHandleCollapsed}
+        expandDirection="right"
+        className={shouldShowLeftHandle ? undefined : 'hidden'}
+        onClick={isLeftHandleCollapsed ? revealLeftPanel : undefined}
       />
     )
 
@@ -208,11 +234,18 @@ function ResizableWrapper() {
     )
 
     // 中间和右侧之间的分隔条
-    // 只有当中间面板可见时才显示此分隔条
+    // 中间面板可见时作为右侧边界；仅左侧可见时保留右侧折叠句柄
+    const shouldShowRightHandle = centerPanelVisible
+      || (!centerPanelVisible && leftSidebarVisible && !rightSidebarVisible)
+    const isRightHandleCollapsed = rightPanelCollapsed || !rightSidebarVisible
     panels.push(
       <ResizableHandle
         key="handle-center-right"
-        className={`${!centerPanelVisible || !rightSidebarVisible ? 'hidden' : ''}`}
+        withHandle
+        collapsed={isRightHandleCollapsed}
+        expandDirection="left"
+        className={shouldShowRightHandle ? undefined : 'hidden'}
+        onClick={isRightHandleCollapsed ? revealRightPanel : undefined}
       />
     )
 
@@ -226,6 +259,7 @@ function ResizableWrapper() {
         minSize={`${minRightSidebarSize}%`}
         collapsible={true}
         collapsedSize="0%"
+        onResize={(size) => setRightPanelCollapsed(size.asPercentage < 0.1)}
       >
         <Chat />
       </ResizablePanel>
