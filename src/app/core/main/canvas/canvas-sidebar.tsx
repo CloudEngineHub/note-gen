@@ -39,7 +39,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import {
   ContextMenu,
@@ -520,7 +519,7 @@ export function CanvasSidebar() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ScrollArea className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {syncState.phase === 'downloading' && syncState.affectedDomains.includes('records') && (
           <div
             role="status"
@@ -715,7 +714,7 @@ export function CanvasSidebar() {
           </div>
         )}
 
-      </ScrollArea>
+      </div>
 
       {(projects.length > 0 || deletedProjects.length > 0) && (
         <div className="flex h-6 shrink-0 items-center overflow-hidden border-t border-border bg-background px-2 text-xs text-muted-foreground">
