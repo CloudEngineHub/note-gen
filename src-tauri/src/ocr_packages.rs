@@ -212,6 +212,12 @@ fn macos_builtin_provider_command(app_handle: &AppHandle) -> Result<PathBuf, Str
 
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
         candidates.push(resource_dir.join("ocr").join("notegen-ocr-vision"));
+        candidates.push(
+            resource_dir
+                .join("resources")
+                .join("ocr")
+                .join("notegen-ocr-vision"),
+        );
     }
 
     candidates.push(
