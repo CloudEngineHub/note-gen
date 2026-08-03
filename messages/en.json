@@ -2644,6 +2644,7 @@
         "organizeSuccess": "Notes organized successfully: {title}",
         "organizeError": "Failed to organize notes",
         "currentTag": "Current Tag",
+        "allTags": "All tags",
         "text": "Record Text",
         "recording": "Recording Record",
         "scan": "Scan Image",

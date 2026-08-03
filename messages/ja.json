@@ -2613,6 +2613,7 @@
         "organizeSuccess": "ノート整理成功：{title}",
         "organizeError": "ノート整理失敗",
         "currentTag": "現在のタグ",
+        "allTags": "すべてのタグ",
         "text": "テキスト記録",
         "recording": "音声記録",
         "scan": "画像スキャン",

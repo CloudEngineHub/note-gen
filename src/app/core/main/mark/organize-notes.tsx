@@ -81,6 +81,7 @@ type OrganizeStep = 'template' | 'records' | 'settings'
 
 const ROOT_FOLDER_VALUE = '__root__'
 const NO_TEMPLATE_VALUE = '__no_template__'
+const ALL_TAGS_VALUE = '__all_tags__'
 const ORGANIZE_STEP_ORDER: OrganizeStep[] = ['template', 'records', 'settings']
 
 function sanitizeMarkdownTitle(title: string) {
@@ -159,7 +160,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   const [open, setOpen] = useState(false)
   const { primaryModel, templateList } = useSettingStore()
   const { marks, fetchAllMarks, allMarks } = useMarkStore()
-  const { currentTagId, tags, fetchTags } = useTagStore()
+  const { tags, fetchTags } = useTagStore()
   const { activeFilePath, fileTree, setActiveFilePath, loadFileTree, readArticle, setCurrentArticle, setSkipSyncOnSave, setAiGeneratingFilePath, setAiTerminateFn } = useArticleStore()
   const { setLeftSidebarTab } = useSidebarStore()
   const router = useRouter()
@@ -173,7 +174,7 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   const [templateRange, setTemplateRange] = useState<GenTemplateRange>(GenTemplateRange.All)
   const [templateContent, setTemplateContent] = useState('')
   const [organizeStep, setOrganizeStep] = useState<OrganizeStep>('template')
-  const [selectedRecordTagId, setSelectedRecordTagId] = useState<number | null>(currentTagId || null)
+  const [selectedRecordTagId, setSelectedRecordTagId] = useState<number | null>(null)
   const [selectedRecordIds, setSelectedRecordIds] = useState<Set<number>>(new Set())
   const [outputTitle, setOutputTitle] = useState('')
   const [outputFolderValue, setOutputFolderValue] = useState(ROOT_FOLDER_VALUE)
@@ -219,15 +220,17 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
   }, [genTemplate])
 
   const recordSourceMarks = useMemo(() => {
-    if (!selectedRecordTagId) return marks
+    if (!selectedRecordTagId) {
+      return allMarks.length > 0 ? allMarks : marks
+    }
 
     const marksForSelectedTag = allMarks.filter(item => item.tagId === selectedRecordTagId)
-    if (marksForSelectedTag.length > 0 || selectedRecordTagId !== currentTagId) {
+    if (marksForSelectedTag.length > 0) {
       return marksForSelectedTag
     }
 
     return marks.filter(item => item.tagId === selectedRecordTagId)
-  }, [allMarks, currentTagId, marks, selectedRecordTagId])
+  }, [allMarks, marks, selectedRecordTagId])
 
   // 使用 useMemo 优化过滤的记录
   const marksByRange = useMemo(() => {
@@ -486,14 +489,14 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
     setTemplateContent(nextTemplate?.content ?? '')
     setOpen(true)
     setOrganizeStep('template')
-    setSelectedRecordTagId(currentTagId || null)
+    setSelectedRecordTagId(null)
     setAdditionalRequirement(inputValue ?? '')
     setOutputTitle('')
     setOutputFolderValue(activeFilePath.includes('/') ? activeFilePath.split('/').slice(0, -1).join('/') : ROOT_FOLDER_VALUE)
     void initGenTemplates()
     void fetchTags()
     void fetchAllMarks()
-  }, [activeFilePath, currentTagId, fetchAllMarks, fetchTags, inputValue, tab])
+  }, [activeFilePath, fetchAllMarks, fetchTags, inputValue, tab])
 
   const handleOrganize = useCallback(async (options?: { quick?: boolean }) => {
     if (loading || organizingRef.current) {
@@ -1067,14 +1070,15 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
                   )}>
                     <div className={cn(isMobile && "col-span-2")}>
                       <Select
-                        value={selectedRecordTagId ? String(selectedRecordTagId) : ''}
-                        onValueChange={(value) => setSelectedRecordTagId(Number(value))}
+                        value={selectedRecordTagId ? String(selectedRecordTagId) : ALL_TAGS_VALUE}
+                        onValueChange={(value) => setSelectedRecordTagId(value === ALL_TAGS_VALUE ? null : Number(value))}
                       >
                         <SelectTrigger className={cn("h-8 w-40", isMobile && "h-9 w-full rounded-xl")}>
                           <SelectValue placeholder={tMark('toolbar.filter.tag')} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
+                            <SelectItem value={ALL_TAGS_VALUE}>{tMark('toolbar.allTags')}</SelectItem>
                             {
                               tags.map(tag => (
                                 <SelectItem key={tag.id} value={String(tag.id)}>{tag.name}</SelectItem>

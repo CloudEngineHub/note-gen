@@ -2618,6 +2618,7 @@
         "organizeSuccess": "筆記整理成功：{title}",
         "organizeError": "整理筆記失敗",
         "currentTag": "當前標籤",
+        "allTags": "全部標籤",
         "text": "記錄文本",
         "recording": "錄音記錄",
         "scan": "掃描圖片",

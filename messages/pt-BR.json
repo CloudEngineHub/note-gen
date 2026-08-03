@@ -2602,6 +2602,7 @@
         "organizeSuccess": "Notas organizadas com sucesso: {title}",
         "organizeError": "Falha ao organizar notas",
         "currentTag": "Tag Atual",
+        "allTags": "Todas as tags",
         "text": "Gravar Texto",
         "recording": "Gravação de Áudio",
         "scan": "Digitalizar Imagem",

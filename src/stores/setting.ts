@@ -910,12 +910,7 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
       if (typeof value === 'function') return
       if (res !== undefined && key !== 'version') {
-        if (key === 'templateList') {
-          hydratedSettings[key] = []
-          setTimeout(() => {
-            set({ [key]: res as GenTemplate[] })
-          }, 0);
-        } else if (key === 'aiModelList' && hasNoteGenModels) {
+        if (key === 'aiModelList' && hasNoteGenModels) {
           // 如果已经有NoteGen模型，使用存储的配置
           hydratedSettings[key] = res as AiConfig[]
         } else if (key === 'recordToolbarConfig') {

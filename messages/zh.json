@@ -2660,6 +2660,7 @@
         "organizeSuccess": "笔记整理成功：{title}",
         "organizeError": "整理笔记失败",
         "currentTag": "当前标签",
+        "allTags": "全部标签",
         "restore": "还原",
         "delete": "删除",
         "deleteConfirm": "确定要删除吗？",
