@@ -451,7 +451,7 @@ export function AgentRunTimeline({
                   <div className="flex flex-col gap-2 pb-2 pl-6 text-xs">
                     {visibleMessage && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">{t('agent.thought')}</div>
+                        <div className="font-medium text-muted-foreground">{t('input.agent.resultSummary')}</div>
                         <div className="rounded bg-muted/60 p-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-muted-foreground">
                           {visibleMessage}
                         </div>
@@ -459,13 +459,13 @@ export function AgentRunTimeline({
                     )}
                     {inputDetail !== undefined && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">{t('agent.confirmation.parameters')}</div>
+                        <div className="font-medium text-muted-foreground">{t('input.agent.queryParameters')}</div>
                         <pre className={traceDetailClassName(event)}>{formatTraceDetail(inputDetail)}</pre>
                       </div>
                     )}
                     {outputDetail !== undefined && (
                       <div className="flex flex-col gap-1">
-                        <div className="font-medium text-muted-foreground">{t('mcp.result')}</div>
+                        <div className="font-medium text-muted-foreground">{t('input.agent.toolResult')}</div>
                         <pre className={traceDetailClassName(event)}>{formatTraceDetail(outputDetail)}</pre>
                       </div>
                     )}

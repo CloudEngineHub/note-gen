@@ -294,6 +294,22 @@
       "lexicalIndexRebuilt": "本機 BM25 索引已重新建立",
       "basicSettingsTitle": "基礎設定",
       "basicSettingsDesc": "AI 會自行判斷是否需要參考其他筆記；你也可以調整自動檢索的深度和匹配範圍。",
+      "sourceTypes": {
+        "article": { "title": "文章", "desc": "將 Markdown 文章加入語意知識庫。" },
+        "record": { "title": "記錄", "desc": "索引單條記錄、OCR、錄音轉寫和既有中繼資料。" },
+        "canvas": { "title": "畫布", "desc": "索引畫布節點文字和明確連線關係。" }
+      },
+      "globalSemanticSearchTitle": "全域語意搜尋",
+      "globalSemanticSearchDesc": "輸入停頓後補充相關內容；關閉後仍可使用本機精確搜尋。",
+      "structuredIndexTitle": "統一知識索引進度",
+      "pauseIndex": "暫停",
+      "continueIndex": "繼續",
+      "failedCount": "失敗 {count}",
+      "retrySource": "重試",
+      "unknownIndexError": "索引失敗",
+      "purgeDisabledIndex": "刪除已停用索引",
+      "purgeDisabledConfirm": "確定刪除所有已關閉來源類型的本機向量嗎？重新啟用後需要再次建置。",
+      "purgeDisabledSuccess": "已刪除停用來源的本機向量",
       "automaticSearchTitle": "允許 AI 參考其他筆記",
       "automaticSearchDesc": "問題依賴你的記錄時，AI 會自行查找相關筆記；一般問題和目前筆記內容足夠時不會檢索。",
       "agentStrategyTitle": "自動檢索策略",
@@ -1285,6 +1301,7 @@
       "setCurrentPlatform": "使用此服務",
       "status": {
         "connected": "已連接",
+        "configured": "已設定",
         "checking": "檢測中",
         "disconnected": "未連接"
       },
@@ -2778,6 +2795,9 @@
           "acting": "執行中",
           "observation": "觀察結果",
           "toolCalls": "工具調用",
+          "resultSummary": "結果摘要",
+          "queryParameters": "查詢參數",
+          "toolResult": "工具結果",
           "permissionMode": {
             "label": "Agent 權限模式",
             "modes": {
@@ -2916,8 +2936,20 @@
         "copied": "已複製"
       },
       "ragSources": {
-        "label": "參考了 {count} 篇筆記",
-        "openFile": "打開文件",
+        "label": "參考了 {sources}",
+        "articleCount": "{count} 篇文章",
+        "recordCount": "{count} 條記錄",
+        "canvasCount": "{count} 個畫布",
+        "sourceCount": "{count} 個來源",
+        "openArticle": "打開文章",
+        "openRecord": "打開記錄",
+        "openCanvas": "打開畫布",
+        "openSource": "打開來源",
+        "typeArticle": "文章",
+        "typeRecord": "記錄",
+        "typeCanvas": "畫布",
+        "typeSource": "來源",
+        "tagLabel": "標籤 {id}",
         "skillsUsed": "已使用 {count} 個技能",
         "expandDescription": "展開描述",
         "collapseDescription": "收起描述"
@@ -3037,6 +3069,10 @@
   "search": {
     "placeholder": "搜尋筆記、記錄和畫布...",
     "results": "{count} 個搜索結果",
+    "exactMatches": "精確匹配",
+    "relatedContent": "相關內容",
+    "searchingRelated": "正在尋找語意相關內容…",
+    "indexingProgress": "建庫 {ready}/{total}",
     "noResults": "暫無搜索結果",
     "tryDifferentKeywords": "嘗試使用不同的關鍵字搜索",
     "item": {
@@ -3937,6 +3973,7 @@
       "failed": "圖片處理失敗"
     },
     "mermaid": {
+      "title": "圖表",
       "rendering": "渲染中...",
       "renderError": "渲染錯誤",
       "clickToEdit": "點擊編輯源碼",

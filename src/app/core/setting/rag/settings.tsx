@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { Store } from "@tauri-apps/plugin-store";
@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import {
   AlertTriangle,
   BrainCircuit,
+  BookOpen,
   ChevronDown,
   FileSearch,
   FileText,
@@ -16,6 +17,10 @@ import {
   Search,
   Shield,
   Sparkles,
+  StickyNote,
+  Palette,
+  Pause,
+  Play,
   Target,
   Trash
 } from "lucide-react";
@@ -36,6 +41,10 @@ import { clearVectorDb, initVectorDb } from "@/db/vector";
 import { getContextForQuery, initBM25Search, type Keyword, type RagDiagnosticResult } from '@/lib/rag';
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Progress } from '@/components/ui/progress';
+import { getKnowledgeIndexStats, getKnowledgeSources } from '@/db/knowledge';
+import { purgeDisabledKnowledgeVectors, resumeKnowledgeIndexQueue, retryKnowledgeSource } from '@/lib/knowledge-index';
+import type { KnowledgeIndexStatus, KnowledgeSource, KnowledgeSourceType } from '@/types/knowledge';
 
 interface NumericSetting {
   key: 'chunkSize' | 'chunkOverlap' | 'resultCount' | 'similarityThreshold' | 'rerankThreshold';
@@ -71,6 +80,9 @@ export function Settings() {
     similarityThreshold,
     rerankThreshold,
     excludedPaths,
+    enabledSourceTypes,
+    globalSemanticSearchEnabled,
+    indexPaused,
     indexNeedsRebuild,
     initSettings,
     updateSetting,
@@ -96,11 +108,19 @@ export function Settings() {
   const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const [diagnosticCompleted, setDiagnosticCompleted] = useState(false);
   const [rebuildRequested, setRebuildRequested] = useState(false);
+  const [knowledgeStats, setKnowledgeStats] = useState<Record<KnowledgeSourceType, Record<KnowledgeIndexStatus, number>> | null>(null);
+  const [failedKnowledgeSources, setFailedKnowledgeSources] = useState<KnowledgeSource[]>([]);
+
+  const refreshKnowledgeStats = useCallback(async () => {
+    setKnowledgeStats(await getKnowledgeIndexStats());
+    setFailedKnowledgeSources(await getKnowledgeSources({ statuses: ['failed'] }));
+  }, []);
 
   useEffect(() => {
     void initSettings();
     void refreshIndexStats();
-  }, [initSettings, refreshIndexStats]);
+    void refreshKnowledgeStats();
+  }, [initSettings, refreshIndexStats, refreshKnowledgeStats]);
 
   useEffect(() => {
     setExcludedPathsDraft(excludedPaths.join('\n'));
@@ -195,6 +215,8 @@ export function Settings() {
     if (rebuildRequested) return;
     setRebuildRequested(true);
     try {
+      const consentStore = await Store.load('store.json');
+      await consentStore.set('ragStructuredKnowledgeConsent', true);
       if (hasEmbeddingModel) {
         await processAllDocuments();
       } else {
@@ -207,9 +229,38 @@ export function Settings() {
         toast({ title: t('lexicalIndexRebuilt'), variant: 'default' });
       }
       await refreshIndexStats();
+      await refreshKnowledgeStats();
     } finally {
       setRebuildRequested(false);
     }
+  }
+
+  async function toggleSourceType(sourceType: KnowledgeSourceType, enabled: boolean) {
+    const next = enabled
+      ? Array.from(new Set([...enabledSourceTypes, sourceType]))
+      : enabledSourceTypes.filter(type => type !== sourceType);
+    await updateSetting('enabledSourceTypes', next);
+  }
+
+  async function toggleIndexPaused(paused: boolean) {
+    await updateSetting('indexPaused', paused);
+    if (!paused) await resumeKnowledgeIndexQueue();
+    await refreshKnowledgeStats();
+  }
+
+  async function handlePurgeDisabledIndex() {
+    const confirmed = await confirm(t('purgeDisabledConfirm'));
+    if (!confirmed) return;
+    await purgeDisabledKnowledgeVectors();
+    await refreshIndexStats();
+    await refreshKnowledgeStats();
+    toast({ title: t('purgeDisabledSuccess'), variant: 'default' });
+  }
+
+  async function handleRetrySource(sourceKey: string) {
+    await retryKnowledgeSource(sourceKey);
+    await refreshKnowledgeStats();
+    await refreshIndexStats();
   }
 
   async function saveExcludedPaths() {
@@ -323,6 +374,40 @@ export function Settings() {
 
       <SettingSection title={t('basicSettingsTitle')} desc={t('basicSettingsDesc')}>
         <ItemGroup className="gap-4">
+          {([
+            ['article', BookOpen],
+            ['record', StickyNote],
+            ['canvas', Palette],
+          ] as const).map(([sourceType, Icon]) => (
+            <Item key={sourceType} variant="outline">
+              <ItemMedia variant="icon"><Icon /></ItemMedia>
+              <ItemContent>
+                <ItemTitle>{t(`sourceTypes.${sourceType}.title`)}</ItemTitle>
+                <ItemDescription>{t(`sourceTypes.${sourceType}.desc`)}</ItemDescription>
+              </ItemContent>
+              <ItemActions className="mobile-setting-inline-action">
+                <Switch
+                  checked={enabledSourceTypes.includes(sourceType)}
+                  aria-label={t(`sourceTypes.${sourceType}.title`)}
+                  onCheckedChange={checked => void toggleSourceType(sourceType, checked)}
+                />
+              </ItemActions>
+            </Item>
+          ))}
+          <Item variant="outline">
+            <ItemMedia variant="icon"><Search /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('globalSemanticSearchTitle')}</ItemTitle>
+              <ItemDescription>{t('globalSemanticSearchDesc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions className="mobile-setting-inline-action">
+              <Switch
+                checked={globalSemanticSearchEnabled}
+                aria-label={t('globalSemanticSearchTitle')}
+                onCheckedChange={checked => void updateSetting('globalSemanticSearchEnabled', checked)}
+              />
+            </ItemActions>
+          </Item>
           <Item variant="outline">
             <ItemMedia variant="icon"><Sparkles /></ItemMedia>
             <ItemContent>
@@ -364,6 +449,50 @@ export function Settings() {
             </ItemActions>
           </Item>
         </ItemGroup>
+        {knowledgeStats ? (
+          <Item variant="outline">
+            <ItemMedia variant="icon"><Layers /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('structuredIndexTitle')}</ItemTitle>
+              <ItemDescription>
+                {(['article', 'record', 'canvas'] as KnowledgeSourceType[]).map(type => (
+                  <span key={type} className="mr-3 inline-block">
+                    {t(`sourceTypes.${type}.title`)}: {knowledgeStats[type].ready}/{Object.values(knowledgeStats[type]).reduce((sum, value) => sum + value, 0)}
+                    {knowledgeStats[type].failed > 0 ? ` · ${t('failedCount', { count: knowledgeStats[type].failed })}` : ''}
+                  </span>
+                ))}
+              </ItemDescription>
+              <Progress
+                value={(() => {
+                  const values = Object.values(knowledgeStats).flatMap(stats => Object.values(stats));
+                  const total = values.reduce((sum, value) => sum + value, 0);
+                  const ready = Object.values(knowledgeStats).reduce((sum, stats) => sum + stats.ready, 0);
+                  return total > 0 ? ready / total * 100 : 100;
+                })()}
+              />
+            </ItemContent>
+            <ItemActions>
+              <Button size="sm" variant="outline" onClick={() => void toggleIndexPaused(!indexPaused)}>
+                {indexPaused ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+                {indexPaused ? t('continueIndex') : t('pauseIndex')}
+              </Button>
+            </ItemActions>
+          </Item>
+        ) : null}
+        {failedKnowledgeSources.map(source => (
+          <Item key={source.sourceKey} variant="outline">
+            <ItemMedia variant="icon"><AlertTriangle className="size-4 text-destructive" /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{source.title}</ItemTitle>
+              <ItemDescription>{source.error || t('unknownIndexError')}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button size="sm" variant="outline" onClick={() => void handleRetrySource(source.sourceKey)}>
+                <RefreshCw className="size-4" /> {t('retrySource')}
+              </Button>
+            </ItemActions>
+          </Item>
+        ))}
         <div className="flex flex-wrap gap-2">
           <ToggleGroup
             type="single"
@@ -486,6 +615,9 @@ export function Settings() {
         <div className="flex flex-wrap gap-2 rounded-lg border border-destructive/30 p-3">
           <Button variant="destructive" onClick={() => void handleDeleteIndex()}>
             <Trash className="size-4" /> {t('deleteVector')}
+          </Button>
+          <Button variant="outline" onClick={() => void handlePurgeDisabledIndex()}>
+            <Shield className="size-4" /> {t('purgeDisabledIndex')}
           </Button>
           <div className="flex min-w-0 flex-1 basis-60 items-center gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="size-4 shrink-0 text-destructive" />

@@ -831,7 +831,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         context += [
           '## 用户关联的笔记文件夹',
           `用户关联了文件夹“${linkedResource.name}”（${linkedResource.relativePath}）。`,
-          '如果当前请求需要查找用户笔记，请优先使用 note_search_files，并将 folderPath 设置为这个相对路径。不要在没有必要时搜索。',
+          '如果当前请求需要查找用户资料，请优先使用 knowledge_search，并将 folderPath 设置为这个相对路径。不要在没有必要时搜索。',
           '',
         ].join('\n')
       }

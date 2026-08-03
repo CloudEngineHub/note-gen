@@ -1,5 +1,13 @@
 import { db } from './index';
 import { getBM25Index } from '@/lib/bm25';
+import { createKnowledgeSourceKey, parseKnowledgeSourceKey } from '@/types/knowledge';
+
+export function normalizeVectorDocumentKey(value: string): string {
+  const normalized = value.replace(/\\/g, '/').replace(/^\.\//, '').trim();
+  return parseKnowledgeSourceKey(normalized)
+    ? normalized
+    : createKnowledgeSourceKey('article', normalized);
+}
 
 // 向量数据库表结构定义
 export interface VectorDocument {
@@ -167,6 +175,16 @@ export async function initVectorDb() {
         on vector_documents(filename)
       `);
 
+      // 旧版仅存 Markdown 路径。增加 article: 前缀即可完成来源迁移，
+      // 向量本身不变，因此不会产生新的 Embedding 请求。
+      await db.execute(`
+        update vector_documents
+        set filename = 'article:' || filename
+        where filename not like 'article:%'
+          and filename not like 'record:%'
+          and filename not like 'canvas:%'
+      `);
+
       // 初始化缓存。应用启动期间可能从多个入口调用初始化，确保只加载一次。
       await vectorCache.update();
     })().catch((error) => {
@@ -223,7 +241,7 @@ async function insertVectorDocumentSnapshots(documents: VectorDocumentSnapshot[]
         (filename, chunk_id, content, embedding, updated_at)
        values ($1, $2, $3, $4, $5)`,
       [
-        document.filename,
+        normalizeVectorDocumentKey(document.filename),
         document.chunk_id,
         document.content,
         document.embedding,
@@ -251,16 +269,44 @@ export async function replaceAllVectorDocuments(documents: VectorDocumentSnapsho
   }
 }
 
+export async function replaceVectorDocumentsByFilename(
+  filename: string,
+  documents: VectorDocumentSnapshot[]
+): Promise<void> {
+  const normalizedFilename = normalizeVectorDocumentKey(filename)
+  const previousDocuments = await getVectorDocumentsByFilename(normalizedFilename)
+  try {
+    await db.execute('delete from vector_documents where filename = $1', [normalizedFilename])
+    await insertVectorDocumentSnapshots(documents.map(document => ({
+      ...document,
+      filename: normalizedFilename,
+    })))
+    await vectorCache.update()
+  } catch (error) {
+    await db.execute('delete from vector_documents where filename = $1', [normalizedFilename])
+    await insertVectorDocumentSnapshots(previousDocuments.map(({ filename, chunk_id, content, embedding, updated_at }) => ({
+      filename,
+      chunk_id,
+      content,
+      embedding,
+      updated_at,
+    })))
+    await vectorCache.update()
+    throw error
+  }
+}
+
 // 插入或更新向量文档
 export async function upsertVectorDocument(doc: Omit<VectorDocument, 'id'>) {
+  const filename = normalizeVectorDocumentKey(doc.filename);
   await db.execute(
     "insert into vector_documents (filename, chunk_id, content, embedding, updated_at) values ($1, $2, $3, $4, $5) on conflict(filename, chunk_id) do update set content = excluded.content, embedding = excluded.embedding, updated_at = excluded.updated_at",
-    [doc.filename, doc.chunk_id, doc.content, doc.embedding, doc.updated_at]);
+    [filename, doc.chunk_id, doc.content, doc.embedding, doc.updated_at]);
 
   // 获取插入的文档ID并更新缓存
   const inserted = await db.select<VectorDocument[]>(
     "select * from vector_documents where filename = $1 and chunk_id = $2",
-    [doc.filename, doc.chunk_id]
+    [filename, doc.chunk_id]
   );
 
   if (inserted.length > 0) {
@@ -270,66 +316,74 @@ export async function upsertVectorDocument(doc: Omit<VectorDocument, 'id'>) {
 
 // 获取指定文件名的所有向量文档
 export async function getVectorDocumentsByFilename(filename: string) {
+  const normalizedFilename = normalizeVectorDocumentKey(filename);
   return await db.select<VectorDocument[]>(
     "select * from vector_documents where filename = $1 order by chunk_id",
-    [filename]);
+    [normalizedFilename]);
 }
 
 // 通过文件名删除向量文档
 export async function deleteVectorDocumentsByFilename(filename: string) {
+  const normalizedFilename = normalizeVectorDocumentKey(filename);
   await db.execute(
     "delete from vector_documents where filename = $1",
-    [filename]);
+    [normalizedFilename]);
 
   // 从缓存中删除
-  vectorCache.deleteByFilename(filename);
-  getBM25Index()?.deleteByFilename(filename);
+  vectorCache.deleteByFilename(normalizedFilename);
+  getBM25Index()?.deleteByFilename(normalizedFilename);
 }
 
 export async function renameVectorDocumentsByFilename(oldFilename: string, newFilename: string) {
-  if (oldFilename === newFilename) return;
-  await db.execute('delete from vector_documents where filename = $1', [newFilename]);
+  const normalizedOldFilename = normalizeVectorDocumentKey(oldFilename);
+  const normalizedNewFilename = normalizeVectorDocumentKey(newFilename);
+  if (normalizedOldFilename === normalizedNewFilename) return;
+  await db.execute('delete from vector_documents where filename = $1', [normalizedNewFilename]);
   await db.execute(
     'update vector_documents set filename = $1, updated_at = $2 where filename = $3',
-    [newFilename, Date.now(), oldFilename]
+    [normalizedNewFilename, Date.now(), normalizedOldFilename]
   );
-  getBM25Index()?.renameFilename(oldFilename, newFilename);
+  getBM25Index()?.renameFilename(normalizedOldFilename, normalizedNewFilename);
   await vectorCache.update();
 }
 
 export async function deleteVectorDocumentsByPrefix(prefix: string) {
+  const normalizedPrefix = normalizeVectorDocumentKey(prefix);
   await db.execute(
     'delete from vector_documents where filename = $1 or filename like $2',
-    [prefix, `${prefix}/%`]
+    [normalizedPrefix, `${normalizedPrefix}/%`]
   );
-  getBM25Index()?.deleteByFilenamePrefix(prefix);
+  getBM25Index()?.deleteByFilenamePrefix(normalizedPrefix);
   await vectorCache.update();
 }
 
 export async function renameVectorDocumentsByPrefix(oldPrefix: string, newPrefix: string) {
-  if (oldPrefix === newPrefix) return;
+  const normalizedOldPrefix = normalizeVectorDocumentKey(oldPrefix);
+  const normalizedNewPrefix = normalizeVectorDocumentKey(newPrefix);
+  if (normalizedOldPrefix === normalizedNewPrefix) return;
   const filenames = await db.select<{ filename: string }[]>(
     'select distinct filename from vector_documents where filename = $1 or filename like $2',
-    [oldPrefix, `${oldPrefix}/%`]
+    [normalizedOldPrefix, `${normalizedOldPrefix}/%`]
   );
   for (const { filename } of filenames) {
-    const suffix = filename.slice(oldPrefix.length);
-    const nextFilename = `${newPrefix}${suffix}`;
+    const suffix = filename.slice(normalizedOldPrefix.length);
+    const nextFilename = `${normalizedNewPrefix}${suffix}`;
     await db.execute('delete from vector_documents where filename = $1', [nextFilename]);
     await db.execute(
       'update vector_documents set filename = $1, updated_at = $2 where filename = $3',
       [nextFilename, Date.now(), filename]
     );
   }
-  getBM25Index()?.renameFilenamePrefix(oldPrefix, newPrefix);
+  getBM25Index()?.renameFilenamePrefix(normalizedOldPrefix, normalizedNewPrefix);
   await vectorCache.update();
 }
 
 // 检查文件是否已存在于向量数据库中
 export async function checkVectorDocumentExists(filename: string) {
+  const normalizedFilename = normalizeVectorDocumentKey(filename);
   const result = await db.select<{ count: number }[]>(
     "select count(*) as count from vector_documents where filename = $1",
-    [filename]);
+    [normalizedFilename]);
   
   return result[0]?.count > 0;
 }

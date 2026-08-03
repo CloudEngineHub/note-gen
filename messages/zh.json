@@ -294,6 +294,22 @@
       "lexicalIndexRebuilt": "本地 BM25 索引已重新构建",
       "basicSettingsTitle": "基础设置",
       "basicSettingsDesc": "AI 会自行判断是否需要参考其他笔记；你也可以调整自动检索的深度和匹配范围。",
+      "sourceTypes": {
+        "article": { "title": "文章", "desc": "将 Markdown 文章加入语义知识库。" },
+        "record": { "title": "记录", "desc": "索引单条记录、OCR、录音转写和已有元数据。" },
+        "canvas": { "title": "画布", "desc": "索引画布节点文字和显式连线关系。" }
+      },
+      "globalSemanticSearchTitle": "全局语义搜索",
+      "globalSemanticSearchDesc": "输入停顿后补充相关内容；关闭后仍可使用本地精确搜索。",
+      "structuredIndexTitle": "统一知识索引进度",
+      "pauseIndex": "暂停",
+      "continueIndex": "继续",
+      "failedCount": "失败 {count}",
+      "retrySource": "重试",
+      "unknownIndexError": "索引失败",
+      "purgeDisabledIndex": "删除已停用索引",
+      "purgeDisabledConfirm": "确定删除所有已关闭来源类型的本地向量吗？重新启用后需要再次构建。",
+      "purgeDisabledSuccess": "已删除停用来源的本地向量",
       "automaticSearchTitle": "允许 AI 参考其他笔记",
       "automaticSearchDesc": "问题依赖你的记录时，AI 会自行查找相关笔记；普通问题和当前笔记内容足够时不会检索。",
       "agentStrategyTitle": "自动检索策略",
@@ -1420,6 +1436,7 @@
       "setCurrentPlatform": "使用此服务",
       "status": {
         "connected": "已连接",
+        "configured": "已配置",
         "checking": "检测中",
         "disconnected": "未连接"
       },
@@ -2863,6 +2880,9 @@
           "thought": "思考",
           "action": "行动",
           "toolCalls": "工具调用",
+          "resultSummary": "结果摘要",
+          "queryParameters": "查询参数",
+          "toolResult": "工具结果",
           "permissionMode": {
             "label": "Agent 权限模式",
             "modes": {
@@ -3053,8 +3073,20 @@
         "copied": "已复制"
       },
       "ragSources": {
-        "label": "参考了 {count} 篇笔记",
-        "openFile": "打开文件",
+        "label": "参考了 {sources}",
+        "articleCount": "{count} 篇文章",
+        "recordCount": "{count} 条记录",
+        "canvasCount": "{count} 个画布",
+        "sourceCount": "{count} 个来源",
+        "openArticle": "打开文章",
+        "openRecord": "打开记录",
+        "openCanvas": "打开画布",
+        "openSource": "打开来源",
+        "typeArticle": "文章",
+        "typeRecord": "记录",
+        "typeCanvas": "画布",
+        "typeSource": "来源",
+        "tagLabel": "标签 {id}",
         "skillsUsed": "已使用 {count} 个技能",
         "expandDescription": "展开描述",
         "collapseDescription": "收起描述"
@@ -3170,6 +3202,10 @@
   "search": {
     "placeholder": "搜索笔记、记录和画布...",
     "results": "{count} 个搜索结果",
+    "exactMatches": "精确匹配",
+    "relatedContent": "相关内容",
+    "searchingRelated": "正在查找语义相关内容…",
+    "indexingProgress": "建库 {ready}/{total}",
     "noResults": "暂无搜索结果",
     "tryDifferentKeywords": "尝试使用不同的关键词搜索",
     "item": {
@@ -4078,6 +4114,7 @@
       "failed": "图片处理失败"
     },
     "mermaid": {
+      "title": "图表",
       "rendering": "渲染中...",
       "renderError": "渲染错误",
       "clickToEdit": "点击编辑源码",

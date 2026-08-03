@@ -1,15 +1,23 @@
 "use client"
 
 import * as React from "react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
+import { usePathname, useRouter } from "next/navigation"
 import {
   ChevronRight,
   Database,
   FileText,
   MoreHorizontal,
+  NotebookPen,
+  PanelsTopLeft,
   Sparkles,
 } from "lucide-react"
+import { createCanvasTab } from "@/app/core/main/canvas/canvas-tab"
 import useArticleStore from "@/stores/article"
+import useCanvasStore from "@/stores/canvas"
+import useMarkStore from "@/stores/mark"
+import { useSidebarStore } from "@/stores/sidebar"
+import useTagStore from "@/stores/tag"
 import type { AgentSkillSummary } from "@/lib/agent/types"
 import { cn } from "@/lib/utils"
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
@@ -18,6 +26,17 @@ export interface RagSourceDetail {
   filepath: string
   filename: string
   content: string
+  sourceKey?: string
+  sourceType?: 'article' | 'record' | 'canvas'
+  sourceId?: string
+  locator?: {
+    filePath?: string
+    markId?: number
+    tagId?: number
+    canvasId?: string
+    nodeIds?: string[]
+  }
+  updatedAt?: number
 }
 
 interface AgentContextTrayProps {
@@ -32,20 +51,89 @@ export function AgentContextTray({
   loadedSkills = [],
 }: AgentContextTrayProps) {
   const t = useTranslations('record.chat.ragSources')
+  const locale = useLocale()
   const [showRag, setShowRag] = React.useState(false)
   const [showSkills, setShowSkills] = React.useState(false)
   const [expandedSkillDescriptions, setExpandedSkillDescriptions] = React.useState<string[]>([])
   const { setActiveFilePath, readArticle } = useArticleStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const detailMap = React.useMemo(
     () => new Map(ragSourceDetails.map((detail) => [detail.filename, detail])),
     [ragSourceDetails]
   )
 
-  const openRagFile = (filepath: string) => {
+  const sourceSummary = React.useMemo(() => {
+    const counts = { article: 0, record: 0, canvas: 0, unknown: 0 }
+    ragSources.forEach((source) => {
+      const sourceType = detailMap.get(source)?.sourceType
+      if (sourceType) counts[sourceType] += 1
+      else counts.unknown += 1
+    })
+    const parts = [
+      counts.article ? t('articleCount', { count: counts.article }) : '',
+      counts.record ? t('recordCount', { count: counts.record }) : '',
+      counts.canvas ? t('canvasCount', { count: counts.canvas }) : '',
+      counts.unknown ? t('sourceCount', { count: counts.unknown }) : '',
+    ].filter(Boolean)
+    return new Intl.ListFormat(locale, { style: 'short', type: 'conjunction' }).format(parts)
+  }, [detailMap, locale, ragSources, t])
+
+  const openRagSource = async (detail: RagSourceDetail) => {
+    if (detail.sourceType === 'record' && detail.locator?.markId) {
+      if (detail.locator.tagId) {
+        await useTagStore.getState().setCurrentTagId(detail.locator.tagId)
+      }
+      await useSidebarStore.getState().setLeftSidebarTab('notes')
+      await useMarkStore.getState().fetchMarks()
+      useMarkStore.getState().setPendingScrollMarkId(detail.locator.markId)
+      useMarkStore.getState().setHighlightedMarkId(detail.locator.markId)
+      if (pathname.startsWith('/mobile')) router.push('/mobile/record')
+      return
+    }
+
+    if (detail.sourceType === 'canvas' && detail.locator?.canvasId) {
+      const canvasId = detail.locator.canvasId
+      useCanvasStore.getState().setPendingFocus({
+        canvasId,
+        nodeIds: detail.locator.nodeIds || [],
+      })
+      const project = await useCanvasStore.getState().openProject(canvasId)
+      if (!project) return
+      if (pathname.startsWith('/mobile')) {
+        router.push(`/mobile/canvas/editor?id=${encodeURIComponent(canvasId)}`)
+        return
+      }
+      await useArticleStore.getState().addTab(createCanvasTab(project))
+      await useSidebarStore.getState().setLeftSidebarTab('canvases')
+      return
+    }
+
+    const filepath = detail.locator?.filePath || detail.filepath
     if (!filepath) return
     setActiveFilePath(filepath)
-    void readArticle(filepath)
+    await readArticle(filepath)
+  }
+
+  const sourceIcon = (sourceType?: RagSourceDetail['sourceType']) => {
+    if (sourceType === 'record') return <NotebookPen />
+    if (sourceType === 'canvas') return <PanelsTopLeft />
+    return <FileText />
+  }
+
+  const sourceTypeLabel = (sourceType?: RagSourceDetail['sourceType']) => {
+    if (sourceType === 'record') return t('typeRecord')
+    if (sourceType === 'canvas') return t('typeCanvas')
+    if (sourceType === 'article') return t('typeArticle')
+    return t('typeSource')
+  }
+
+  const openSourceLabel = (sourceType?: RagSourceDetail['sourceType']) => {
+    if (sourceType === 'record') return t('openRecord')
+    if (sourceType === 'canvas') return t('openCanvas')
+    if (sourceType === 'article') return t('openArticle')
+    return t('openSource')
   }
 
   const toggleSkillDescription = (skillId: string) => {
@@ -71,7 +159,7 @@ export function AgentContextTray({
               onClick={() => setShowRag((value) => !value)}
             >
               <MarkerIcon><Database /></MarkerIcon>
-              <MarkerContent className="flex-1 truncate">{t('label', { count: ragSources.length })}</MarkerContent>
+              <MarkerContent className="flex-1 truncate">{t('label', { sources: sourceSummary })}</MarkerContent>
               <MarkerIcon>
                 <ChevronRight className={cn("transition-transform", showRag && "rotate-90")} />
               </MarkerIcon>
@@ -85,18 +173,28 @@ export function AgentContextTray({
                 return (
                   <div key={source} className="flex flex-col gap-1 py-1 text-xs">
                     <Marker>
-                      <MarkerIcon><FileText /></MarkerIcon>
+                      <MarkerIcon>{sourceIcon(detail?.sourceType)}</MarkerIcon>
                       <MarkerContent className="flex-1 truncate">{source}</MarkerContent>
-                      {detail?.filepath && (
+                      {detail && (
                         <button
                           type="button"
                           className="shrink-0 text-primary hover:underline"
-                          onClick={() => openRagFile(detail.filepath)}
+                          onClick={() => void openRagSource(detail)}
                         >
-                          {t('openFile')}
+                          {openSourceLabel(detail.sourceType)}
                         </button>
                       )}
                     </Marker>
+                    {detail && (
+                      <div className="truncate pl-6 text-[11px] text-muted-foreground">
+                        {[
+                          sourceTypeLabel(detail.sourceType),
+                          detail.sourceType === 'article' ? (detail.locator?.filePath || detail.filepath) : undefined,
+                          detail.sourceType === 'record' && detail.locator?.tagId ? t('tagLabel', { id: detail.locator.tagId }) : undefined,
+                          detail.updatedAt ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(detail.updatedAt) : undefined,
+                        ].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                     {detail?.content && (
                       <div className="truncate pl-6 text-muted-foreground">
                         {detail.content}

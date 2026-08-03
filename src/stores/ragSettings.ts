@@ -6,6 +6,7 @@ import {
   DEFAULT_RAG_AGENT_POLICY,
   type RagAgentStrategy,
 } from '@/lib/rag-agent-policy';
+import type { KnowledgeSourceType } from '@/types/knowledge';
 
 // RAG 设置参数接口
 export interface RagSettings {
@@ -25,6 +26,9 @@ export interface RagSettings {
   rerankThreshold: number;
   // 不参与索引和检索的路径前缀
   excludedPaths: string[];
+  enabledSourceTypes: KnowledgeSourceType[];
+  globalSemanticSearchEnabled: boolean;
+  indexPaused: boolean;
 }
 
 export type RagPreset = 'precision' | 'balanced' | 'recall';
@@ -38,7 +42,10 @@ export const DEFAULT_RAG_SETTINGS: RagSettings = {
   resultCount: 5,
   similarityThreshold: 0.25,
   rerankThreshold: 0.1,
-  excludedPaths: DEFAULT_EXCLUDED_RAG_PATHS
+  excludedPaths: DEFAULT_EXCLUDED_RAG_PATHS,
+  enabledSourceTypes: ['article', 'record', 'canvas'],
+  globalSemanticSearchEnabled: true,
+  indexPaused: false,
 };
 
 // RAG 设置状态接口
@@ -79,6 +86,9 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       const similarityThreshold = await store.get<number>('ragSimilarityThreshold') ?? DEFAULT_RAG_SETTINGS.similarityThreshold;
       const rerankThreshold = await store.get<number>('ragRerankThreshold') ?? DEFAULT_RAG_SETTINGS.rerankThreshold;
       const excludedPaths = await store.get<string[]>('ragExcludedPaths') ?? DEFAULT_RAG_SETTINGS.excludedPaths;
+      const enabledSourceTypes = await store.get<KnowledgeSourceType[]>('ragEnabledSourceTypes') ?? DEFAULT_RAG_SETTINGS.enabledSourceTypes;
+      const globalSemanticSearchEnabled = await store.get<boolean>('ragGlobalSemanticSearchEnabled') ?? DEFAULT_RAG_SETTINGS.globalSemanticSearchEnabled;
+      const indexPaused = await store.get<boolean>('ragKnowledgeIndexPaused') ?? DEFAULT_RAG_SETTINGS.indexPaused;
       const indexNeedsRebuild = await store.get<boolean>('ragIndexNeedsRebuild') ?? false;
       
       set({
@@ -90,6 +100,9 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
         similarityThreshold,
         rerankThreshold,
         excludedPaths,
+        enabledSourceTypes,
+        globalSemanticSearchEnabled,
+        indexPaused,
         indexNeedsRebuild
       });
     } catch (error) {
@@ -115,7 +128,10 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       
       // 保存到存储
       const store = await Store.load('store.json');
-      await store.set(`rag${key.charAt(0).toUpperCase() + key.slice(1)}`, resolvedValue);
+      const storageKey = key === 'indexPaused'
+        ? 'ragKnowledgeIndexPaused'
+        : `rag${key.charAt(0).toUpperCase() + key.slice(1)}`;
+      await store.set(storageKey, resolvedValue);
 
       if (key === 'chunkSize' && get().chunkOverlap >= (resolvedValue as number)) {
         const chunkOverlap = Math.max(0, (resolvedValue as number) - 50);
@@ -123,7 +139,10 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
         await store.set('ragChunkOverlap', chunkOverlap);
       }
 
-      if (key === 'chunkSize' || key === 'chunkOverlap' || key === 'excludedPaths') {
+      if (
+        key === 'chunkSize'
+        || key === 'chunkOverlap'
+      ) {
         set({ indexNeedsRebuild: true });
         await store.set('ragIndexNeedsRebuild', true);
       }
@@ -176,6 +195,9 @@ const useRagSettingsStore = create<RagSettingsState>((set, get) => ({
       await store.set('ragSimilarityThreshold', DEFAULT_RAG_SETTINGS.similarityThreshold);
       await store.set('ragRerankThreshold', DEFAULT_RAG_SETTINGS.rerankThreshold);
       await store.set('ragExcludedPaths', DEFAULT_RAG_SETTINGS.excludedPaths);
+      await store.set('ragEnabledSourceTypes', DEFAULT_RAG_SETTINGS.enabledSourceTypes);
+      await store.set('ragGlobalSemanticSearchEnabled', DEFAULT_RAG_SETTINGS.globalSemanticSearchEnabled);
+      await store.set('ragKnowledgeIndexPaused', DEFAULT_RAG_SETTINGS.indexPaused);
       await store.set('ragIndexNeedsRebuild', true);
     } catch (error) {
       toast({

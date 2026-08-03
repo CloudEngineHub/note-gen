@@ -59,6 +59,35 @@ function enqueueCanvasSync(reason: string) {
   enqueueAutoDataSync('records', reason)
 }
 
+function enqueueCanvasKnowledgeIndex(id: string) {
+  void import('@/lib/knowledge-index').then(({ enqueueKnowledgeSourceIndex }) => {
+    enqueueKnowledgeSourceIndex(`canvas:${id}`)
+  })
+}
+
+async function invalidateCanvasKnowledgeIndex(id: string) {
+  const db = await getDb()
+  try {
+    await db.execute(
+      "update knowledge_sources set status = 'pending', indexed_hash = null, error = null where source_key = $1",
+      [`canvas:${id}`]
+    )
+  } catch {
+    // 数据库首次初始化时来源注册表可能尚未创建。
+  }
+}
+
+async function removeCanvasKnowledgeIndex(id: string) {
+  const { removeKnowledgeSourceIndex } = await import('@/lib/knowledge-index')
+  await removeKnowledgeSourceIndex(`canvas:${id}`)
+}
+
+function reconcileCanvasKnowledgeIndex() {
+  void import('@/lib/knowledge-index').then(({ reconcileStructuredKnowledgeSources }) => {
+    void reconcileStructuredKnowledgeSources()
+  })
+}
+
 export async function initCanvasesDb() {
   const db = await getDb()
   await db.execute(`
@@ -134,6 +163,7 @@ export async function insertCanvasProject(input: {
     ]
   )
   enqueueCanvasSync('canvas-created')
+  enqueueCanvasKnowledgeIndex(input.id)
   return getCanvasProject(input.id)
 }
 
@@ -146,6 +176,8 @@ export async function updateCanvasDocument(id: string, document: CanvasDocument)
     [content, document.schemaVersion, updatedAt, id]
   )
   enqueueCanvasSync('canvas-updated')
+  await invalidateCanvasKnowledgeIndex(id)
+  enqueueCanvasKnowledgeIndex(id)
   return updatedAt
 }
 
@@ -165,6 +197,8 @@ export async function renameCanvasProject(id: string, title: string) {
     [title, updatedAt, id]
   )
   enqueueCanvasSync('canvas-renamed')
+  await invalidateCanvasKnowledgeIndex(id)
+  enqueueCanvasKnowledgeIndex(id)
   return updatedAt
 }
 
@@ -195,6 +229,7 @@ export async function softDeleteCanvasProject(
     [deletedAt, id]
   )
   if (options.enqueueSync !== false) enqueueCanvasSync('canvas-deleted')
+  await removeCanvasKnowledgeIndex(id)
   return deletedAt
 }
 
@@ -206,18 +241,21 @@ export async function restoreCanvasProject(id: string) {
     [updatedAt, id]
   )
   enqueueCanvasSync('canvas-restored')
+  enqueueCanvasKnowledgeIndex(id)
   return getCanvasProject(id)
 }
 
 export async function permanentlyDeleteCanvasProject(id: string) {
   const db = await getDb()
   await db.execute('delete from canvases where id = $1', [id])
+  await removeCanvasKnowledgeIndex(id)
 }
 
 export async function clearCanvasProjects() {
   const db = await getDb()
   await db.execute('delete from canvases')
   enqueueCanvasSync('canvases-cleared')
+  reconcileCanvasKnowledgeIndex()
 }
 
 export async function replaceAllCanvasProjects(projects: CanvasProject[]) {
@@ -263,4 +301,5 @@ export async function replaceAllCanvasProjects(projects: CanvasProject[]) {
       projectIds
     )
   }
+  reconcileCanvasKnowledgeIndex()
 }

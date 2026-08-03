@@ -5,15 +5,29 @@ import {
   replaceAllVectorDocuments,
   type VectorDocumentSnapshot,
 } from '@/db/vector'
+import { getCanvasProject } from '@/db/canvases'
+import { getKnowledgeSources, upsertKnowledgeSource } from '@/db/knowledge'
+import { getMarkById } from '@/db/marks'
 import { downloadRemoteText, isLocalLibraryFile, uploadRemoteText } from '@/lib/sync/remote-library'
+import {
+  createKnowledgeSourceKey,
+  parseKnowledgeSourceKey,
+  type KnowledgeLocator,
+  type KnowledgeSourceType,
+} from '@/types/knowledge'
 
 const RAG_SYNC_ROOT = '.data/rag'
 const RAG_MANIFEST_PATH = `${RAG_SYNC_ROOT}/manifest.json`
 const MAX_PAGE_BYTES = 750 * 1024
-const RAG_SNAPSHOT_SCHEMA_VERSION = 1
+const RAG_SNAPSHOT_SCHEMA_VERSION = 2
 
 type RagSourceFingerprint = {
   path: string
+  sourceKey?: string
+  sourceType?: KnowledgeSourceType
+  sourceId?: string
+  title?: string
+  locator?: KnowledgeLocator
   contentHash: string
   indexedAt: number
 }
@@ -28,7 +42,7 @@ export type RagSnapshotManifest = {
   chunkOverlap: number
   documentCount: number
   vectorCount: number
-  pages: Array<{ path: string; count: number; bytes: number }>
+  pages: Array<{ path: string; count: number; bytes: number; sourceType?: KnowledgeSourceType }>
   sources: RagSourceFingerprint[]
 }
 
@@ -71,7 +85,7 @@ function validateDocument(value: unknown): VectorDocumentSnapshot {
 function validateManifest(value: unknown): RagSnapshotManifest {
   if (!value || typeof value !== 'object') throw new Error('远端知识库清单格式无效')
   const manifest = value as Partial<RagSnapshotManifest>
-  if (manifest.schemaVersion !== RAG_SNAPSHOT_SCHEMA_VERSION) {
+  if (manifest.schemaVersion !== 1 && manifest.schemaVersion !== RAG_SNAPSHOT_SCHEMA_VERSION) {
     throw new Error(`不支持的知识库格式版本：${manifest.schemaVersion ?? 'unknown'}`)
   }
   if (
@@ -107,6 +121,9 @@ function splitDocumentsIntoPages(documents: VectorDocumentSnapshot[]): VectorDoc
 }
 
 async function buildSources(documents: VectorDocumentSnapshot[]): Promise<RagSourceFingerprint[]> {
+  const registeredSources = new Map(
+    (await getKnowledgeSources()).map(source => [source.sourceKey, source])
+  )
   const grouped = new Map<string, VectorDocumentSnapshot[]>()
   for (const document of documents) {
     const current = grouped.get(document.filename) || []
@@ -117,8 +134,18 @@ async function buildSources(documents: VectorDocumentSnapshot[]): Promise<RagSou
   const sources: RagSourceFingerprint[] = []
   for (const [path, chunks] of grouped.entries()) {
     chunks.sort((left, right) => left.chunk_id - right.chunk_id)
+    const parsed = parseKnowledgeSourceKey(path)
+    const sourceKey = parsed ? path : createKnowledgeSourceKey('article', path)
+    const registered = registeredSources.get(sourceKey)
     sources.push({
       path,
+      sourceKey,
+      sourceType: registered?.sourceType || parsed?.sourceType || 'article',
+      sourceId: registered?.sourceId || parsed?.sourceId || path,
+      title: registered?.title || path.split('/').pop() || path,
+      locator: registered?.locator || (parsed?.sourceType === 'article' || !parsed
+        ? { filePath: parsed?.sourceId || path }
+        : {}),
       contentHash: await sha256(chunks.map(chunk => chunk.content).join('\n\n')),
       indexedAt: Math.max(...chunks.map(chunk => chunk.updated_at)),
     })
@@ -136,18 +163,24 @@ export async function uploadKnowledgeBaseSnapshot(
   if (dimensions.size !== 1) throw new Error('本地知识库包含不同维度的向量，请先重新计算')
 
   const store = await Store.load('store.json')
-  const pages = splitDocumentsIntoPages(documents)
+  const pages = (['article', 'record', 'canvas'] as KnowledgeSourceType[]).flatMap(sourceType => (
+    splitDocumentsIntoPages(documents.filter(document => (
+      (parseKnowledgeSourceKey(document.filename)?.sourceType || 'article') === sourceType
+    ))).map((page, index) => ({ sourceType, index, documents: page }))
+  ))
   const pageMetadata: RagSnapshotManifest['pages'] = []
 
   for (let index = 0; index < pages.length; index++) {
-    const pagePath = `${RAG_SYNC_ROOT}/pages/${String(index + 1).padStart(5, '0')}.json`
-    const content = JSON.stringify(pages[index])
+    const page = pages[index]
+    const pagePath = `${RAG_SYNC_ROOT}/pages/${page.sourceType}-${String(page.index + 1).padStart(5, '0')}.json`
+    const content = JSON.stringify(page.documents)
     onProgress?.(index, pages.length + 1, pagePath)
     await uploadRemoteText(pagePath, content, `Upload RAG snapshot page ${index + 1}`)
     pageMetadata.push({
       path: pagePath,
-      count: pages[index].length,
+      count: page.documents.length,
       bytes: new TextEncoder().encode(content).byteLength,
+      sourceType: page.sourceType,
     })
   }
 
@@ -207,7 +240,39 @@ export async function downloadKnowledgeBaseSnapshot(
 
   const missingSourceFiles: string[] = []
   for (const source of manifest.sources) {
-    if (!await isLocalLibraryFile(source.path)) missingSourceFiles.push(source.path)
+    const parsed = source.sourceKey ? parseKnowledgeSourceKey(source.sourceKey) : parseKnowledgeSourceKey(source.path)
+    const sourceType = source.sourceType || parsed?.sourceType || 'article'
+    const sourceId = source.sourceId || parsed?.sourceId || source.path
+    const sourceKey = source.sourceKey || createKnowledgeSourceKey(sourceType, sourceId)
+    const locator = source.locator || (sourceType === 'article'
+      ? { filePath: sourceId }
+      : sourceType === 'record'
+        ? { markId: Number(sourceId) }
+        : { canvasId: sourceId })
+    let exists = false
+    if (sourceType === 'article') {
+      exists = await isLocalLibraryFile(locator.filePath || sourceId)
+    } else if (sourceType === 'record') {
+      const mark = await getMarkById(locator.markId || Number(sourceId))
+      exists = Boolean(mark && mark.deleted === 0)
+    } else {
+      const canvas = await getCanvasProject(locator.canvasId || sourceId)
+      exists = Boolean(canvas && !canvas.deletedAt)
+    }
+
+    if (!exists) missingSourceFiles.push(sourceKey)
+    await upsertKnowledgeSource({
+      sourceKey,
+      sourceType,
+      sourceId,
+      title: source.title || sourceId.split('/').pop() || sourceId,
+      locator,
+      contentHash: source.contentHash,
+      indexedHash: exists ? source.contentHash : null,
+      status: exists ? 'ready' : 'failed',
+      error: exists ? null : 'SOURCE_NOT_FOUND',
+      updatedAt: source.indexedAt,
+    })
   }
 
   onProgress?.(manifest.pages.length, manifest.pages.length, RAG_MANIFEST_PATH)

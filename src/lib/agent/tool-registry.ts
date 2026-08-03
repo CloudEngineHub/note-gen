@@ -32,7 +32,6 @@ import {
   createFileTool,
   updateMarkdownFileTool,
   deleteMarkdownFileTool,
-  searchMarkdownFilesTool,
   readMarkdownFilesBatchTool,
   listMarkdownFilesByDateTool,
   renameFileTool,
@@ -41,12 +40,13 @@ import {
 } from './tools/note-tools'
 import { listFoldersTool, checkFolderExistsTool, createFolderTool, deleteFolderTool } from './tools/folder-tools'
 import { listTagsTool, createTagTool, updateTagTool, deleteTagTool, searchTagsTool } from './tools/tag-tools'
-import { readMarksTool, searchMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
+import { readMarksTool, createMarkTool, updateMarkTool, deleteMarkTool } from './tools/mark-tools'
 import { saveMemoryTool, listMemoriesTool, deleteMemoryTool, clearMemoriesTool } from './tools/memory-tools'
 import { attachmentTools } from './tools/attachment-tools'
 import { imageTools } from './tools/image-tools'
 import { canvasTools } from './tools/canvas-tools'
 import { webTools } from './tools/web-tools'
+import { knowledgeTools } from './tools/knowledge-tools'
 import {
   executeRegisteredSkillScript,
   executeSkillScriptTool,
@@ -64,7 +64,6 @@ import type {
 } from './types'
 import type { EditorTransactionInput } from './editor-adapter'
 import { buildEditorChange, prepareEditorLineTransaction } from './editor-adapter'
-import { getRagAgentPolicy } from '@/lib/rag-agent-policy'
 import {
   ensureSafeWorkspaceRelativePath,
   toWorkspaceRelativePath,
@@ -89,86 +88,6 @@ function resultFromLegacy(result: ToolResult): AgentToolResult {
     message: result.message || result.error || (result.success ? '工具执行成功' : '工具执行失败'),
     data: result.data,
     error: result.error,
-  }
-}
-
-async function executeAgentNoteSearch(
-  input: Record<string, unknown>,
-  context: AgentToolExecutionContext
-): Promise<AgentToolResult> {
-  const policy = await getRagAgentPolicy()
-  if (!policy.automaticSearchEnabled) {
-    return {
-      ok: false,
-      message: '用户已在知识库设置中关闭 AI 自动参考笔记。本次无法搜索其他笔记。',
-      error: 'AUTOMATIC_NOTE_SEARCH_DISABLED',
-    }
-  }
-
-  const requestedQuery = asString(input.query)
-  const userInput = context.context.userInput.trim()
-  const explicitlyRequestsLiteralMatches = /(?:所有|全部|逐处|逐个).{0,8}(?:包含|出现|匹配)|exact matches?|literal occurrences?/i.test(userInput)
-  const mode = input.mode === 'keyword' && explicitlyRequestsLiteralMatches
-    ? 'keyword'
-    : 'rag'
-  const query = (
-    mode === 'rag'
-    && userInput.length > requestedQuery.length
-    && (!requestedQuery || userInput.toLocaleLowerCase().includes(requestedQuery.toLocaleLowerCase()))
-  )
-    ? userInput
-    : requestedQuery
-  const result = await searchMarkdownFilesTool.execute({
-    ...input,
-    mode,
-    query,
-  })
-
-  const normalized = resultFromLegacy(result)
-  if (!normalized.ok || !Array.isArray(normalized.data)) {
-    return normalized
-  }
-
-  const candidates = normalized.data.flatMap((item) => {
-    if (!item || typeof item !== 'object') return []
-    const candidate = item as {
-      filePath?: unknown
-      fileName?: unknown
-      matchedContent?: unknown
-      relevanceScore?: unknown
-    }
-    if (
-      typeof candidate.filePath !== 'string'
-      || typeof candidate.fileName !== 'string'
-      || typeof candidate.matchedContent !== 'string'
-    ) {
-      return []
-    }
-    return [{
-      filePath: candidate.filePath,
-      fileName: candidate.fileName,
-      matchedContent: candidate.matchedContent.slice(0, 1200),
-      relevanceScore: typeof candidate.relevanceScore === 'number'
-        ? candidate.relevanceScore
-        : 0,
-    }]
-  }).sort((a, b) => b.relevanceScore - a.relevanceScore)
-
-  if (mode !== 'rag' || candidates.length <= 1) {
-    return {
-      ...normalized,
-      data: candidates,
-    }
-  }
-
-  // 检索层只提供少量通用候选，不解释业务语义。
-  // 相关性、冲突、时效性与最终证据选择由 Agent 模型判断。
-  const selected = candidates.slice(0, 3)
-
-  return {
-    ...normalized,
-    message: `已筛选出 ${selected.length} 个最相关的笔记来源`,
-    data: selected,
   }
 }
 
@@ -721,58 +640,6 @@ const dateDifferenceTool: AgentTool = {
         signedDays,
         absoluteDays: Math.abs(signedDays),
       },
-    }
-  },
-}
-
-const noteCiteSourcesTool: AgentTool = {
-  name: 'note_cite_sources',
-  title: '确认回答来源',
-  description: 'Mark the retrieved note candidates actually used as evidence in the final answer. Call this after evaluating candidates and before the final answer. Do not include merely retrieved, conflicting, irrelevant, or unused notes.',
-  category: 'note',
-  risk: 'read',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      filePaths: {
-        type: 'array',
-        items: { type: 'string' },
-        minItems: 1,
-        description: 'Canonical workspace-relative paths from note_search_files that directly support the answer.',
-      },
-    },
-    required: ['filePaths'],
-    additionalProperties: false,
-  },
-  execute: async (input) => {
-    const requestedPaths = Array.isArray(input.filePaths)
-      ? input.filePaths.filter(
-          (filePath): filePath is string => typeof filePath === 'string' && filePath.trim().length > 0
-        )
-      : []
-    if (requestedPaths.length === 0) {
-      return {
-        ok: false,
-        message: 'filePaths 必须包含至少一个实际采用的检索候选路径。',
-        error: 'EMPTY_CITED_NOTE_PATHS',
-      }
-    }
-
-    try {
-      const filePaths = Array.from(new Set(
-        await Promise.all(requestedPaths.map(normalizeAgentWorkspacePath))
-      ))
-      return {
-        ok: true,
-        message: `已确认 ${filePaths.length} 个回答来源。`,
-        data: { filePaths },
-      }
-    } catch (error) {
-      return {
-        ok: false,
-        message: `回答来源路径无效：${String(error)}`,
-        error: 'INVALID_CITED_NOTE_PATHS',
-      }
     }
   },
 }
@@ -2051,7 +1918,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'note_read_file',
       title: '读取笔记文件',
-      description: 'Read a text-based NoteGen workspace file by canonical workspace-relative path. Pass a path returned by note_search_files unchanged. Search snippets often already contain enough evidence, so read only when more context is necessary. Never use this tool for a user-selected attachment; use attachment_read with its attachment ID.',
+      description: 'Read a text-based NoteGen workspace file only when its canonical workspace-relative path is already known. For knowledge discovery and evidence reading, use knowledge_search and knowledge_read_sources. Never use this tool for a user-selected attachment; use attachment_read with its attachment ID.',
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFileTool,
@@ -2068,7 +1935,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'note_read_files_batch',
       title: '批量读取笔记文件',
-      description: 'Read one or more notes using canonical workspace-relative paths returned by note_search_files. Never call this tool with an empty array, and do not reread files when search snippets already contain enough evidence.',
+      description: 'Read one or more notes only when their canonical workspace-relative paths are already known. For knowledge discovery, use knowledge_search. Never call this tool with an empty array.',
       category: 'note',
       risk: 'read',
       legacy: readMarkdownFilesBatchTool,
@@ -2079,7 +1946,7 @@ function buildTools(): AgentTool[] {
             type: 'array',
             items: { type: 'string' },
             minItems: 1,
-            description: 'One or more canonical workspace-relative paths returned by note_search_files.',
+            description: 'One or more known canonical workspace-relative paths.',
           },
         },
         required: ['filePaths'],
@@ -2087,22 +1954,7 @@ function buildTools(): AgentTool[] {
       },
       execute: executeReadFilesBatch,
     }),
-    adaptLegacyTool({
-      name: 'note_search_files',
-      title: '查找相关笔记',
-      description: [
-        'Search the user’s NoteGen notes when the answer depends on their personal records, prior decisions, past writing, or information spread across notes.',
-        'Decide automatically: search when the user asks about their notes, history, plans, opinions, or explicitly asks to find/compare/summarize recorded material. Do not search for general-knowledge questions or when the current open note already contains enough evidence. Respect explicit requests not to search other notes.',
-        'Use mode=rag for answering natural-language questions, including questions containing exact names, project IDs, dates, or code symbols. Use mode=keyword only when the user explicitly asks for every literal occurrence or exact-match location; rag is the default when mode is omitted.',
-        'Results are retrieval candidates, not automatically trusted evidence. Judge each candidate against the user’s original question, including whether it actually supports the answer, conflicts with another source, or appears outdated. Use snippets directly when sufficient. For comparisons or multi-part questions, you may search with distinct queries and then read only candidates that need more context. Pass returned paths unchanged and never call batch reading with an empty array. The configured search-round budget is enforced automatically. Before the final answer, call note_cite_sources with only the paths actually used.',
-        'Use folderPath when the user linked, named, or restricted the request to a folder.',
-      ].join(' '),
-      category: 'note',
-      risk: 'read',
-      legacy: searchMarkdownFilesTool,
-      execute: executeAgentNoteSearch,
-    }),
-    noteCiteSourcesTool,
+    ...knowledgeTools,
     dateDifferenceTool,
     adaptLegacyTool({
       name: 'note_create_file',
@@ -2204,7 +2056,6 @@ function buildTools(): AgentTool[] {
       ),
     }),
     adaptLegacyTool({ name: 'mark_list', title: '读取记录', category: 'mark', risk: 'read', legacy: readMarksTool }),
-    adaptLegacyTool({ name: 'mark_search', title: '搜索记录', category: 'mark', risk: 'read', legacy: searchMarksTool }),
     adaptLegacyTool({
       name: 'mark_create',
       title: '创建记录',

@@ -294,6 +294,22 @@
       "lexicalIndexRebuilt": "ローカル BM25 インデックスを再構築しました",
       "basicSettingsTitle": "基本設定",
       "basicSettingsDesc": "AI が他のノートを参照すべきか判断し、検索の深さと照合範囲を調整できます。",
+      "sourceTypes": {
+        "article": { "title": "記事", "desc": "Markdown 記事をセマンティック知識検索に追加します。" },
+        "record": { "title": "記録", "desc": "個別の記録、OCR、文字起こし、既存メタデータを索引化します。" },
+        "canvas": { "title": "キャンバス", "desc": "キャンバスのノード文字と明示的な接続を索引化します。" }
+      },
+      "globalSemanticSearchTitle": "グローバルセマンティック検索",
+      "globalSemanticSearchDesc": "入力停止後に関連結果を追加します。無効でもローカル完全一致検索は利用できます。",
+      "structuredIndexTitle": "統合知識インデックスの進行状況",
+      "pauseIndex": "一時停止",
+      "continueIndex": "続行",
+      "failedCount": "失敗 {count}",
+      "retrySource": "再試行",
+      "unknownIndexError": "インデックスに失敗しました",
+      "purgeDisabledIndex": "無効なインデックスを削除",
+      "purgeDisabledConfirm": "無効なソース種別のローカルベクトルを削除しますか？再度有効にすると再構築が必要です。",
+      "purgeDisabledSuccess": "無効なソースのベクトルを削除しました",
       "automaticSearchTitle": "AI に他のノートの参照を許可",
       "automaticSearchDesc": "質問が自分の記録に依存する場合、AI が関連ノートを自動的に探します。一般的な質問や現在のノートだけで十分な場合は検索しません。",
       "agentStrategyTitle": "自動検索戦略",
@@ -1285,6 +1301,7 @@
       "setCurrentPlatform": "このサービスを使用",
       "status": {
         "connected": "接続済み",
+        "configured": "設定済み",
         "checking": "確認中",
         "disconnected": "未接続"
       },
@@ -2772,6 +2789,9 @@
           "acting": "実行中",
           "observation": "観察結果",
           "toolCalls": "ツール呼び出し",
+          "resultSummary": "結果の概要",
+          "queryParameters": "検索パラメータ",
+          "toolResult": "ツールの結果",
           "permissionMode": {
             "label": "Agent の権限モード",
             "modes": {
@@ -2916,8 +2936,20 @@
         "copied": "コピーしました"
       },
       "ragSources": {
-        "label": "{count} 件のノートを参照",
-        "openFile": "ファイルを開く",
+        "label": "{sources}を参照",
+        "articleCount": "記事 {count} 件",
+        "recordCount": "記録 {count} 件",
+        "canvasCount": "キャンバス {count} 件",
+        "sourceCount": "ソース {count} 件",
+        "openArticle": "記事を開く",
+        "openRecord": "記録を開く",
+        "openCanvas": "キャンバスを開く",
+        "openSource": "ソースを開く",
+        "typeArticle": "記事",
+        "typeRecord": "記録",
+        "typeCanvas": "キャンバス",
+        "typeSource": "ソース",
+        "tagLabel": "タグ {id}",
         "skillsUsed": "{count} 個のスキルを使用",
         "expandDescription": "説明を展開",
         "collapseDescription": "説明を折りたたむ"
@@ -3190,6 +3222,10 @@
   "search": {
     "placeholder": "ノート、記録、キャンバスを検索...",
     "results": "{count} 件の検索結果",
+    "exactMatches": "完全一致",
+    "relatedContent": "関連コンテンツ",
+    "searchingRelated": "意味的に関連する内容を検索中…",
+    "indexingProgress": "インデックス {ready}/{total}",
     "noResults": "検索結果がありません",
     "tryDifferentKeywords": "別のキーワードで検索してみてください",
     "item": {
@@ -3947,6 +3983,7 @@
       "failed": "画像処理に失敗しました"
     },
     "mermaid": {
+      "title": "図表",
       "rendering": "レンダリング中...",
       "renderError": "レンダリングエラー",
       "clickToEdit": "クリックしてソースを編集",

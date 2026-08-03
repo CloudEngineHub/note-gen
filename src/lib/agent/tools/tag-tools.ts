@@ -3,7 +3,7 @@ import { getTags, insertTag, updateTag, delTag, Tag, insertTags } from '@/db/tag
 
 export const listTagsTool: Tool = {
   name: 'list_tags',
-  description: 'List all tags (organization categories for marks).',
+  description: 'List tag organization categories for an explicit tag-management or record-management operation. Never use this tool as a first step for knowledge discovery; use knowledge_search instead.',
   category: 'tag',
   requiresConfirmation: false,
   parameters: [],

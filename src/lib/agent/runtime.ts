@@ -306,7 +306,18 @@ function getNumberArg(args: Record<string, unknown>, key: string) {
 }
 
 function claimsUserNoteEvidence(content: string) {
-  return /根据(?:您|你).{0,12}(?:笔记|记录)|(?:according to|based on).{0,24}(?:your|the user's).{0,16}(?:notes?|records?)|(?:あなた|ユーザー).{0,16}(?:ノート|記録)|segundo.{0,24}(?:suas?|os seus).{0,16}(?:notas?|registros?)/i.test(content)
+  const positiveAttribution = /根据(?:您|你).{0,12}(?:知识库|笔记|记录|文章|画布)|(?:according to|based on).{0,24}(?:your|the user's).{0,16}(?:knowledge base|notes?|records?|articles?|canvases?)|(?:あなた|ユーザー).{0,16}(?:ナレッジベース|ノート|記録)|segundo.{0,24}(?:suas?|os seus).{0,16}(?:notas?|registros?)/i
+  const unsupportedAbsence = /(?:(?:知识库|笔记|记录|文章|画布|记忆|当前对话|上下文).{0,24}(?:没有|未找到|找不到|不存在|无法确认|不能确认)|(?:没有|未找到|找不到|无法).{0,24}(?:知识库|笔记|记录|文章|画布|记忆|当前对话|上下文))|(?:(?:could not|couldn't|did not|didn't|no).{0,24}(?:find|confirm|evidence).{0,24}(?:knowledge base|notes?|records?|articles?|canvases?|memory|conversation|context))|(?:(?:ナレッジベース|ノート|記録|メモリ|会話|コンテキスト).{0,24}(?:見つかりません|確認できません))|(?:(?:não|nenhum).{0,24}(?:encontrei|confirmar).{0,24}(?:notas?|registros?|memória|conversa|contexto))/i
+  return positiveAttribution.test(content) || unsupportedAbsence.test(content)
+}
+
+function explicitlyRequestsKnowledgeLookup(content: string) {
+  return /(?:(?:只|仅|只从|仅从|不要查(?:其他|其它|别的)).{0,12}(?:知识库|笔记|记录|文章|画布)|(?:知识库|笔记|记录|文章|画布).{0,12}(?:里|中|内).{0,8}(?:找|查|搜索|检索))|(?:(?:only|exclusively).{0,16}(?:knowledge base|notes?|records?|articles?|canvases?))/i.test(content)
+}
+
+function requestsSavedPersonalFact(content: string) {
+  return /(?:我的|我(?:之前|上次|曾经|过去)).{1,24}(?:是(?:什么|多少|哪|谁)?|叫什么|多少|何时|什么时候|哪天|在哪里|地址|号码|编号|计划|决定|偏好|习惯)(?:[？?]|$)/i.test(content)
+    || /(?:what|which|when|where|who).{0,16}(?:is|was|are|were).{0,12}my\b/i.test(content)
 }
 
 function validateQuotedEditorWrite(
@@ -725,7 +736,7 @@ export class AgentRuntime {
     const ragAgentPolicy = await getRagAgentPolicy()
     const allTools = [...agentToolRegistry.listTools(), ...mcpToolCatalog.directTools]
       .filter(tool =>
-        (ragAgentPolicy.automaticSearchEnabled || tool.name !== 'note_search_files')
+        (ragAgentPolicy.automaticSearchEnabled || tool.name !== 'knowledge_search')
         && (aiConfig.enableWebSearch === true || tool.category !== 'web')
       )
     const toolMap = new Map(allTools.map((tool) => [tool.name, tool]))
@@ -799,21 +810,43 @@ export class AgentRuntime {
     }>()
     const successfulMutationCalls = new Set<string>()
     const toolResultEvidence = new Set<string>()
-    let noteSearchCount = 0
+    let knowledgeSearchCount = 0
+    const readKnowledgeSourceKeys = new Set<string>()
+    const knowledgeReadLimit = ragAgentPolicy.strategy === 'fast'
+      ? 1
+      : ragAgentPolicy.strategy === 'deep' ? 5 : 3
     let directAnswerEvidenceChecked = false
+    let knowledgeCitationChecked = false
     const executeToolWithBudget = async (
       tool: AgentTool,
       args: Record<string, unknown>
     ): Promise<AgentToolResult> => {
-      if (tool.name === 'note_search_files') {
-        if (noteSearchCount >= ragAgentPolicy.maxSearchRounds) {
+      if (tool.name === 'knowledge_search') {
+        if (knowledgeSearchCount >= ragAgentPolicy.maxSearchRounds) {
           return {
             ok: false,
-            message: `本次任务已达到“${ragAgentPolicy.strategy}”策略允许的 ${ragAgentPolicy.maxSearchRounds} 轮笔记搜索上限。请基于已有证据完成回答。`,
-            error: 'NOTE_SEARCH_BUDGET_EXHAUSTED',
+            message: `本次任务已达到“${ragAgentPolicy.strategy}”策略允许的 ${ragAgentPolicy.maxSearchRounds} 轮知识搜索上限。请基于已有证据完成回答。`,
+            error: 'KNOWLEDGE_SEARCH_BUDGET_EXHAUSTED',
           }
         }
-        noteSearchCount += 1
+        knowledgeSearchCount += 1
+      }
+      if (tool.name === 'knowledge_read_sources') {
+        const requests = Array.isArray(args.requests) ? args.requests : []
+        const requestedKeys = requests.flatMap(request => {
+          if (!request || typeof request !== 'object') return []
+          const sourceKey = (request as { sourceKey?: unknown }).sourceKey
+          return typeof sourceKey === 'string' ? [sourceKey] : []
+        })
+        const nextKeys = requestedKeys.filter(sourceKey => !readKnowledgeSourceKeys.has(sourceKey))
+        if (readKnowledgeSourceKeys.size + new Set(nextKeys).size > knowledgeReadLimit) {
+          return {
+            ok: false,
+            message: `“${ragAgentPolicy.strategy}”策略最多定向读取 ${knowledgeReadLimit} 个知识来源。请只读取最相关的候选。`,
+            error: 'KNOWLEDGE_READ_BUDGET_EXHAUSTED',
+          }
+        }
+        requestedKeys.forEach(sourceKey => readKnowledgeSourceKeys.add(sourceKey))
       }
 
       return executeAgentTool(
@@ -1345,12 +1378,37 @@ export class AgentRuntime {
             throw new Error('AI response did not include a message')
           }
           if (
+            knowledgeSearchCount > 0
+            && !knowledgeCitationChecked
+            && !toolCalls.some(call => call.toolName === 'knowledge_cite_sources' && call.status === 'success')
+          ) {
+            knowledgeCitationChecked = true
+            callbacks.onCandidateAnswerClear?.()
+            messages.push(
+              { role: 'assistant', content: resolvedContent },
+              {
+                role: 'user',
+                content: [
+                  '## App Context',
+                  'A knowledge search occurred, but the draft did not identify which retrieved sources were actually used.',
+                  'If the draft relies on any retrieved source, call knowledge_cite_sources with only those source keys, then return the final answer.',
+                  'Do not cite sources that were merely retrieved, rejected, or left unread. If no retrieved source supports the draft, return the answer without claiming support from the knowledge base.',
+                  'Do not mention this internal citation check.',
+                ].join('\n'),
+              }
+            )
+            continue
+          }
+          if (
             !forceFinalResponseReason
             && !directAnswerEvidenceChecked
-            && noteSearchCount === 0
-            && toolCalls.length === 0
-            && offeredToolNames.has('note_search_files')
-            && claimsUserNoteEvidence(resolvedContent)
+            && knowledgeSearchCount === 0
+            && offeredToolNames.has('knowledge_search')
+            && (
+              claimsUserNoteEvidence(resolvedContent)
+              || explicitlyRequestsKnowledgeLookup(context.userInput)
+              || requestsSavedPersonalFact(context.userInput)
+            )
           ) {
             directAnswerEvidenceChecked = true
             callbacks.onCandidateAnswerClear?.()
@@ -1360,9 +1418,9 @@ export class AgentRuntime {
                 role: 'user',
                 content: [
                   '## App Context',
-                  'The draft above claims that its answer is supported by the user\'s notes or records, but no note search occurred in this run.',
+                  'The draft above answers a request that may depend on the user\'s saved knowledge, but no unified knowledge search occurred in this run. Calls to memory_list, tag_list, mark_list, or other tools do not replace knowledge_search.',
                   'Verify that attribution semantically, without relying on required keywords or fixed business fields. Do not treat the draft itself as evidence.',
-                  'If the claimed fact is not already supported by the conversation, current editor context, or saved memory context, call note_search_files now. If the existing context really supports it, return the final answer directly.',
+                  'If the claimed fact is not already supported by the conversation, current editor context, current canvas, or saved memory context, call knowledge_search now. If the existing context really supports it, return the final answer directly.',
                   'Do not mention this internal evidence-attribution check.',
                 ].join('\n'),
               }

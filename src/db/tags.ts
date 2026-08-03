@@ -86,6 +86,18 @@ export async function updateTag(tag: Tag) {
     [tag.name, tag.isLocked, tag.isPin, tag.sortOrder, tag.id]
   )
   enqueueRecordsAutoSync('tag:update')
+  void import('@/lib/knowledge-index').then(({ enqueueKnowledgeSourceIndex }) => {
+    void getDb().then(async database => {
+      const marks = await database.select<Array<{ id: number }>>('select id from marks where tagId = $1 and deleted = 0', [tag.id])
+      for (const mark of marks) {
+        await database.execute(
+          "update knowledge_sources set status = 'pending', indexed_hash = null, error = null where source_key = $1",
+          [`record:${mark.id}`]
+        )
+      }
+      marks.forEach(mark => enqueueKnowledgeSourceIndex(`record:${mark.id}`))
+    })
+  })
   return result
 }
 

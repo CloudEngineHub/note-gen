@@ -369,6 +369,17 @@ export interface AgentState {
     filepath: string
     filename: string
     content: string
+    sourceKey?: string
+    sourceType?: 'article' | 'record' | 'canvas'
+    sourceId?: string
+    locator?: {
+      filePath?: string
+      markId?: number
+      tagId?: number
+      canvasId?: string
+      nodeIds?: string[]
+    }
+    updatedAt?: number
   }>
   isFinalAnswerMode?: boolean
   finalAnswerContent?: string

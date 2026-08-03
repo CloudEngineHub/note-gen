@@ -24,6 +24,7 @@ export async function initAllDatabases() {
   const { initConversationCompactionsDb } = await import('./conversation-compactions');
   const { initConversationSyncStateDb } = await import('./conversation-sync-state');
   const { initImageAnalysisCacheDb } = await import('./image-analysis-cache');
+  const { initKnowledgeDb } = await import('./knowledge');
 
   // 执行初始化：先确保基础表存在，再做 conversations 对 chats 的迁移/补列。
   await initChatsDb();
@@ -38,6 +39,9 @@ export async function initAllDatabases() {
   await initMemoriesDb();
   await initActivityDb();
   await initCanvasesDb();
+  await initKnowledgeDb();
+  const { bootstrapStructuredKnowledgeRegistry } = await import('@/lib/knowledge-index');
+  await bootstrapStructuredKnowledgeRegistry();
 
   const { Store } = await import('@tauri-apps/plugin-store')
   const store = await Store.load('store.json')

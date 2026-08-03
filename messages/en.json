@@ -294,6 +294,22 @@
       "lexicalIndexRebuilt": "Local BM25 index rebuilt",
       "basicSettingsTitle": "Basic settings",
       "basicSettingsDesc": "AI decides when other notes are useful; you can tune how deeply it searches and how broadly it matches.",
+      "sourceTypes": {
+        "article": { "title": "Articles", "desc": "Include Markdown articles in semantic knowledge search." },
+        "record": { "title": "Records", "desc": "Index individual records, OCR, transcripts, and existing metadata." },
+        "canvas": { "title": "Canvases", "desc": "Index canvas node text and explicit connections." }
+      },
+      "globalSemanticSearchTitle": "Global semantic search",
+      "globalSemanticSearchDesc": "Add related results after typing pauses. Local exact search remains available when disabled.",
+      "structuredIndexTitle": "Unified knowledge index progress",
+      "pauseIndex": "Pause",
+      "continueIndex": "Continue",
+      "failedCount": "{count} failed",
+      "retrySource": "Retry",
+      "unknownIndexError": "Indexing failed",
+      "purgeDisabledIndex": "Delete disabled indexes",
+      "purgeDisabledConfirm": "Delete local vectors for all disabled source types? Re-enabling them will require rebuilding.",
+      "purgeDisabledSuccess": "Disabled source vectors deleted",
       "automaticSearchTitle": "Allow AI to reference other notes",
       "automaticSearchDesc": "When a question depends on your records, AI finds relevant notes automatically. It skips search for general questions or when the current note is sufficient.",
       "agentStrategyTitle": "Automatic search strategy",
@@ -1400,6 +1416,7 @@
       "setCurrentPlatform": "Use This Service",
       "status": {
         "connected": "Connected",
+        "configured": "Configured",
         "checking": "Checking",
         "disconnected": "Disconnected"
       },
@@ -2929,6 +2946,9 @@
           "thought": "Thought",
           "action": "Action",
           "toolCalls": "Tool Calls",
+          "resultSummary": "Result summary",
+          "queryParameters": "Query parameters",
+          "toolResult": "Tool result",
           "permissionMode": {
             "label": "Agent permission mode",
             "modes": {
@@ -3119,8 +3139,20 @@
         "copied": "Copied"
       },
       "ragSources": {
-        "label": "Referenced {count} notes",
-        "openFile": "Open file",
+        "label": "Referenced {sources}",
+        "articleCount": "{count, plural, one {# article} other {# articles}}",
+        "recordCount": "{count, plural, one {# record} other {# records}}",
+        "canvasCount": "{count, plural, one {# canvas} other {# canvases}}",
+        "sourceCount": "{count, plural, one {# source} other {# sources}}",
+        "openArticle": "Open article",
+        "openRecord": "Open record",
+        "openCanvas": "Open canvas",
+        "openSource": "Open source",
+        "typeArticle": "Article",
+        "typeRecord": "Record",
+        "typeCanvas": "Canvas",
+        "typeSource": "Source",
+        "tagLabel": "Tag {id}",
         "skillsUsed": "{count, plural, one {Used # skill} other {Used # skills}}",
         "expandDescription": "Expand description",
         "collapseDescription": "Collapse description"
@@ -3150,6 +3182,10 @@
   "search": {
     "placeholder": "Search notes, records, and canvases...",
     "results": "{count} search results",
+    "exactMatches": "Exact matches",
+    "relatedContent": "Related content",
+    "searchingRelated": "Finding semantically related content…",
+    "indexingProgress": "Indexing {ready}/{total}",
     "noResults": "No search results",
     "tryDifferentKeywords": "Try using different keywords",
     "item": {
@@ -4058,6 +4094,7 @@
       "failed": "Image processing failed"
     },
     "mermaid": {
+      "title": "Diagram",
       "rendering": "Rendering...",
       "renderError": "Render error",
       "clickToEdit": "Click to edit source",

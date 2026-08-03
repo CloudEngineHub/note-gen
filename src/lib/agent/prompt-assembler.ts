@@ -235,6 +235,19 @@ function formatImageAttachments(context: AgentContextSnapshot) {
   ].join('\n')
 }
 
+function formatKnowledgeGuidance(tools: AgentTool[]) {
+  if (!tools.some(tool => tool.name === 'knowledge_search')) return ''
+  return [
+    '## Unified Knowledge Retrieval',
+    'Use the current selection, current article, or current canvas first. Do not search the library when that context already answers the request.',
+    'Search saved knowledge automatically when the request depends on the user’s history, prior decisions, plans, records, or existing material. Do not search for general knowledge or a pure create/record command unless the user asks to base the creation on earlier material.',
+    'Questions about the user’s saved personal facts, such as their phone number, prior choices, identifiers, preferences, or plans, require knowledge_search when the current conversation or active content does not directly contain the answer. Memory, tag, and record-list tools do not replace unified knowledge retrieval.',
+    'When prior material is the basis of a new article or canvas, search and read the evidence before creating, then cite only the sources actually used.',
+    'For “find” requests, return an openable result list without forcing a synthesis. For knowledge questions, read only the strongest candidates and synthesize them.',
+    'If adopted sources conflict, state each conflicting claim with its source type and time, then explain the most likely current conclusion. Never silently let the newest source overwrite the others.',
+  ].join('\n')
+}
+
 export class AgentPromptAssembler {
   assemble(
     context: AgentContextSnapshot,
@@ -256,6 +269,7 @@ export class AgentPromptAssembler {
       '## Available Tools',
       'Structured tool definitions contain the authoritative descriptions and parameters. Use these exact names:',
       formatToolCatalog(tools),
+      formatKnowledgeGuidance(tools),
       formatActiveFile(context),
       formatActiveCanvas(context),
       formatEditorSelection(context),

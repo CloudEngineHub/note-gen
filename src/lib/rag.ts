@@ -1,13 +1,16 @@
 import { readTextFile, readDir, BaseDirectory, DirEntry } from "@tauri-apps/plugin-fs";
 import { fetchEmbedding, fetchEmbeddings, rerankDocuments } from "./ai";
 import {
-  upsertVectorDocument,
   deleteVectorDocumentsByFilename,
   getSimilarDocuments,
   getVectorDocumentsByFilename,
+  replaceVectorDocumentsByFilename,
   initVectorDb,
+  normalizeVectorDocumentKey,
   VectorDocument
 } from "@/db/vector";
+import { deleteKnowledgeSource, upsertKnowledgeSource, updateKnowledgeSourceIndexState } from '@/db/knowledge';
+import { createKnowledgeSourceKey, parseKnowledgeSourceKey } from '@/types/knowledge';
 import { invoke } from "@tauri-apps/api/core";
 import {
   BM25Document,
@@ -58,6 +61,11 @@ function handleRAGError(error: unknown, context: string, showToast: boolean = tr
  */
 function generateContentHash(content: string): string {
   return createHash('sha256').update(content.trim()).digest('hex');
+}
+
+function articlePathFromSourceKey(sourceKey: string): string {
+  const parsed = parseKnowledgeSourceKey(sourceKey);
+  return parsed?.sourceType === 'article' ? parsed.sourceId : sourceKey;
 }
 
 const queryEmbeddingCache = new Map<string, { embedding: number[]; expiresAt: number }>();
@@ -286,11 +294,16 @@ export function chunkText(
 export async function initBM25Search(): Promise<void> {
   try {
     const items = await collectMarkdownContents();
+    const { collectCanvasKnowledgeDocuments, collectRecordKnowledgeDocuments } = await import('@/lib/knowledge-content');
+    const structuredDocuments = [
+      ...await collectRecordKnowledgeDocuments(),
+      ...await collectCanvasKnowledgeDocuments(),
+    ];
     const store = await Store.load('store.json');
     const chunkSize = await store.get<number>('ragChunkSize');
     const chunkOverlap = await store.get<number>('ragChunkOverlap');
     const documents: BM25Document[] = items.flatMap(item => {
-      const filename = getVectorDocumentKey(item.id || item.title || 'unknown');
+      const filename = createKnowledgeSourceKey('article', getVectorDocumentKey(item.id || item.title || 'unknown'));
       return chunkText(item.article || '', chunkSize, chunkOverlap)
         .filter(content => content.trim().length > 0)
         .map((content, chunkId) => ({
@@ -298,6 +311,12 @@ export async function initBM25Search(): Promise<void> {
           content
         }));
     });
+    documents.push(...structuredDocuments.flatMap(document => (
+      document.chunks.map((chunk, chunkId) => ({
+        id: createBM25ChunkKey(document.sourceKey, chunkId),
+        content: chunk.content,
+      }))
+    )));
 
     initBM25Index(documents);
   } catch (error) {
@@ -585,7 +604,8 @@ export async function processMarkdownFile(
       const { path, baseDir } = await getFilePathOptions(filePath)
       content = fileContent || await readTextFile(path, { baseDir })
     }
-    const vectorDocumentKey = getVectorDocumentKey(filePath);
+    const articlePath = getVectorDocumentKey(filePath);
+    const vectorDocumentKey = createKnowledgeSourceKey('article', articlePath);
     const legacyFilename = filePath.split('/').pop() || filePath;
     // 空文件也视为成功处理，同时清理它可能遗留的旧索引。
     if (!content || content.trim().length === 0) {
@@ -593,6 +613,8 @@ export async function processMarkdownFile(
       if (legacyFilename !== vectorDocumentKey) {
         await deleteVectorDocumentsByFilename(legacyFilename);
       }
+      getBM25Index()?.deleteByFilename(vectorDocumentKey);
+      await deleteKnowledgeSource(vectorDocumentKey);
       return true;
     }
 
@@ -600,22 +622,40 @@ export async function processMarkdownFile(
     const chunkSize = await store.get<number>('ragChunkSize');
     const chunkOverlap = await store.get<number>('ragChunkOverlap');
     const chunks = chunkText(content, chunkSize, chunkOverlap).filter(chunk => chunk.trim().length > 0);
+    const contentHash = generateContentHash(content);
+    await upsertKnowledgeSource({
+      sourceKey: vectorDocumentKey,
+      sourceType: 'article',
+      sourceId: articlePath,
+      title: articlePath.split('/').pop() || articlePath,
+      locator: { filePath: articlePath },
+      contentHash,
+      indexedHash: null,
+      status: 'pending',
+      error: null,
+      updatedAt: Date.now(),
+    });
     // 没有有效分块时清理旧索引，避免空内容仍被检索到。
     if (chunks.length === 0) {
       await deleteVectorDocumentsByFilename(vectorDocumentKey);
       if (legacyFilename !== vectorDocumentKey) {
         await deleteVectorDocumentsByFilename(legacyFilename);
       }
+      getBM25Index()?.deleteByFilename(vectorDocumentKey);
       return true;
     }
     const scope = await resolveRetrievalScope({}, store);
-    if (!isPathAllowedForRag(vectorDocumentKey, scope)) {
+    if (!isPathAllowedForRag(articlePath, scope)) {
       await deleteVectorDocumentsByFilename(vectorDocumentKey);
       if (legacyFilename !== vectorDocumentKey) {
         await deleteVectorDocumentsByFilename(legacyFilename);
       }
+      getBM25Index()?.deleteByFilename(vectorDocumentKey);
       return true;
     }
+
+    // 字面检索始终使用最新正文，即使后续 Embedding 暂时失败。
+    getBM25Index()?.replaceByFilename(vectorDocumentKey, chunks);
 
     const existingDocuments = await getVectorDocumentsByFilename(vectorDocumentKey);
     const existingChunks = existingDocuments
@@ -626,6 +666,10 @@ export async function processMarkdownFile(
       && generateContentHash(existingChunks.join('\u0000')) === generateContentHash(chunks.join('\u0000'))
     ) {
       getBM25Index()?.replaceByFilename(vectorDocumentKey, chunks);
+      await updateKnowledgeSourceIndexState(vectorDocumentKey, {
+        status: 'ready',
+        indexedHash: contentHash,
+      });
       return true;
     }
 
@@ -635,32 +679,33 @@ export async function processMarkdownFile(
       embeddings.push(...await fetchEmbeddings(chunks.slice(offset, offset + embeddingBatchSize)));
     }
     if (embeddings.length !== chunks.length || embeddings.some(embedding => !embedding)) {
-      console.error(`无法完整计算文件 ${vectorDocumentKey} 的向量，保留旧索引`);
+      console.error(`无法完整计算文件 ${vectorDocumentKey} 的向量，旧向量保持休眠并使用最新字面索引`);
+      await updateKnowledgeSourceIndexState(vectorDocumentKey, {
+        status: 'failed',
+        indexedHash: null,
+        error: 'Embedding 返回不完整',
+      });
       return false;
     }
 
-    // 新向量全部计算成功后再替换，避免中途失败破坏旧索引。
-    await deleteVectorDocumentsByFilename(vectorDocumentKey);
+    // 新向量全部计算成功后再按来源替换；写入失败会恢复该来源旧向量。
     if (legacyFilename !== vectorDocumentKey) {
       await deleteVectorDocumentsByFilename(legacyFilename);
     }
 
-    // 处理每个文本块
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-
-      const embedding = embeddings[i];
-      if (!embedding) continue;
-
-      // 保存到数据库
-      await upsertVectorDocument({
+    await replaceVectorDocumentsByFilename(
+      vectorDocumentKey,
+      chunks.flatMap((chunk, index) => {
+        const embedding = embeddings[index];
+        return embedding ? [{
         filename: vectorDocumentKey,
-        chunk_id: i,
+        chunk_id: index,
         content: chunk,
         embedding: JSON.stringify(embedding),
         updated_at: Date.now()
-      });
-    }
+        }] : [];
+      })
+    );
 
     const bm25Index = getBM25Index();
     if (bm25Index) {
@@ -669,6 +714,11 @@ export async function processMarkdownFile(
         chunks
       );
     }
+
+    await updateKnowledgeSourceIndexState(vectorDocumentKey, {
+      status: 'ready',
+      indexedHash: contentHash,
+    });
 
     return true;
   } catch (error) {
@@ -740,6 +790,7 @@ export async function processAllMarkdownFiles(onProgress?: (current: number, tot
   total: number;
   success: number;
   failed: number;
+  paused: boolean;
   failedFiles: Array<{fileName: string, error: string}>;
 }> {
   try {
@@ -772,11 +823,15 @@ export async function processAllMarkdownFiles(onProgress?: (current: number, tot
     const results = await runWithConcurrencyLimit(
       filesToProcess.map(file => async () => {
         try {
+          const taskStore = await Store.load('store.json');
+          if (await taskStore.get<boolean>('ragKnowledgeIndexPaused') ?? false) {
+            return { success: false, paused: true, fileName: file.name, error: null };
+          }
           const success = await processMarkdownFile(file.path);
-          return { success, fileName: file.name, error: null };
+          return { success, paused: false, fileName: file.name, error: null };
         } catch (error) {
           handleRAGError(error, `处理文件 ${file.name} 失败`, false);
-          return { success: false, fileName: file.name, error: String(error) };
+          return { success: false, paused: false, fileName: file.name, error: String(error) };
         }
       }),
       3, // 并发限制为 3，避免过多 API 调用
@@ -792,8 +847,13 @@ export async function processAllMarkdownFiles(onProgress?: (current: number, tot
     const failedFiles: Array<{fileName: string, error: string}> = [];
     let success = 0;
     let failed = 0;
+    let paused = false;
 
     for (const result of results) {
+      if (result.paused) {
+        paused = true;
+        continue;
+      }
       if (result.success) {
         success++;
       } else {
@@ -808,6 +868,7 @@ export async function processAllMarkdownFiles(onProgress?: (current: number, tot
       total: filesToProcess.length,
       success,
       failed,
+      paused,
       failedFiles
     };
   } catch (error) {
@@ -951,7 +1012,7 @@ async function resolveSnippetToChunk(
   filepath: string,
   snippet: string
 ): Promise<{ stableId: string; filename: string; content: string }> {
-  const filename = getVectorDocumentKey(filepath);
+  const filename = normalizeVectorDocumentKey(getVectorDocumentKey(filepath));
   const chunks = await getVectorDocumentsByFilename(filename);
   if (chunks.length === 0) {
     return {
@@ -1070,7 +1131,9 @@ export async function getContextForQuery(
     const sortedKeywords = [...expandedKeywords].sort((a, b) => b.weight - a.weight);
     const lexicalQueries = buildLexicalQueries(query, sortedKeywords);
     const items = await collectMarkdownContents(resolvedScope);
-    const allowedVectorKeys = new Set(items.map(item => getVectorDocumentKey(item.id || item.title || '')));
+    const allowedVectorKeys = new Set(items.map(item => (
+      createKnowledgeSourceKey('article', getVectorDocumentKey(item.id || item.title || ''))
+    )));
 
     // 1. 使用逐个关键词进行模糊搜索找到相关文件内容
     try {
@@ -1119,7 +1182,7 @@ export async function getContextForQuery(
                 allResults.push({
                   stableId: resolvedChunk.stableId,
                   filename: resolvedChunk.filename,
-                  filepath: resolvedChunk.filename,
+                  filepath,
                   content: resolvedChunk.content,
                   rawScore: result.score,
                   normalizedScore: 0, // 稍后计算
@@ -1154,7 +1217,7 @@ export async function getContextForQuery(
           allResults.push({
             stableId: createChunkStableId(doc.filename, doc.chunk_id),
             filename: doc.filename,
-            filepath: doc.filename,
+            filepath: articlePathFromSourceKey(doc.filename),
             content: doc.content,
             rawScore: doc.similarity || 0,
             normalizedScore: 0,
@@ -1182,7 +1245,7 @@ export async function getContextForQuery(
           allResults.push({
             stableId: result.id,
             filename: chunkKey.filename,
-            filepath: chunkKey.filename,
+            filepath: articlePathFromSourceKey(chunkKey.filename),
             content: result.content,
             rawScore: result.score,
             normalizedScore: 0,
@@ -1641,7 +1704,9 @@ export async function getContextForQueryInFolder(
 
     // 收集文件夹范围内的文件
     const items = await collectMarkdownContentsInFolder(folderPath);
-    const folderVectorKeys = new Set(items.map(item => getVectorDocumentKey(item.id || item.title || '')));
+    const folderVectorKeys = new Set(items.map(item => (
+      createKnowledgeSourceKey('article', getVectorDocumentKey(item.id || item.title || ''))
+    )));
 
     // 1. 模糊搜索（限定到文件夹）
     try {
@@ -1684,7 +1749,7 @@ export async function getContextForQueryInFolder(
                 allResults.push({
                   stableId: resolvedChunk.stableId,
                   filename: resolvedChunk.filename,
-                  filepath: resolvedChunk.filename,
+                  filepath,
                   content: resolvedChunk.content,
                   rawScore: result.score,
                   normalizedScore: 0,
@@ -1718,7 +1783,7 @@ export async function getContextForQueryInFolder(
           allResults.push({
             stableId: createChunkStableId(doc.filename, doc.chunk_id),
             filename: doc.filename,
-            filepath: doc.filename,
+            filepath: articlePathFromSourceKey(doc.filename),
             content: doc.content,
             rawScore: doc.similarity || 0,
             normalizedScore: 0,
@@ -1746,7 +1811,7 @@ export async function getContextForQueryInFolder(
           allResults.push({
             stableId: result.id,
             filename: chunkKey.filename,
-            filepath: chunkKey.filename,
+            filepath: articlePathFromSourceKey(chunkKey.filename),
             content: result.content,
             rawScore: result.score,
             normalizedScore: 0,

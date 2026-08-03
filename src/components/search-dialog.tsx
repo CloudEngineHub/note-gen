@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { debounce } from 'lodash-es'
 import {
   Command,
@@ -29,6 +29,9 @@ import { EmitterRecordEvents } from '@/config/emitters'
 import { search, type SearchableItem } from '@/lib/search-utils'
 import useCanvasStore from '@/stores/canvas'
 import { createCanvasTab } from '@/app/core/main/canvas/canvas-tab'
+import { searchKnowledge } from '@/lib/knowledge-search'
+import { getKnowledgeIndexStats } from '@/db/knowledge'
+import type { KnowledgeSearchCandidate, KnowledgeSourceType } from '@/types/knowledge'
 
 interface SearchDialogProps {
   open: boolean
@@ -42,6 +45,8 @@ interface EnhancedSearchResult {
   markId?: number
   path?: string
   canvasId?: string
+  nodeIds?: string[]
+  sourceKey: string
   article?: string
   content?: string
   desc?: string
@@ -62,6 +67,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const pathname = usePathname()
   const [searchValue, setSearchValue] = useState('')
   const [searchResult, setSearchResult] = useState<EnhancedSearchResult[]>([])
+  const [relatedResult, setRelatedResult] = useState<EnhancedSearchResult[]>([])
+  const [relatedLoading, setRelatedLoading] = useState(false)
+  const [indexCoverage, setIndexCoverage] = useState<{ ready: number; total: number } | null>(null)
   const [searchFilter, setSearchFilter] = useState<SearchFilter>('all')
   const { allArticle, loadAllArticle, addTab, setActiveFilePath, setMatchPosition, setPendingSearchKeyword, setCollapsibleList } = useArticleStore()
   const { allMarks, fetchAllMarks, setPendingScrollMarkId } = useMarkStore()
@@ -70,8 +78,11 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const canvasProjects = useCanvasStore(state => state.projects)
   const loadCanvasProjects = useCanvasStore(state => state.loadProjects)
   const openCanvasProject = useCanvasStore(state => state.openProject)
+  const setPendingCanvasFocus = useCanvasStore(state => state.setPendingFocus)
   const isMobileRoute = pathname.startsWith('/mobile')
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const semanticRequestRef = useRef(0)
+  const lastSemanticRunRef = useRef<{ key: string; at: number } | null>(null)
 
   function extractTitleFromPath(path: string): string {
     if (!path) return ''
@@ -186,7 +197,8 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       }
     })
 
-    const canvasItems: SearchableItem[] = isMobileRoute ? [] : canvasProjects.map(project => ({
+    const normalizedCanvasQuery = value.trim().toLocaleLowerCase()
+    const canvasItems: SearchableItem[] = canvasProjects.map(project => ({
       id: `canvas-${project.id}`,
       title: project.title,
       content: [
@@ -200,6 +212,13 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       ].filter(value => typeof value === 'string').join(' '),
       metadata: {
         canvasId: project.id,
+        nodeIds: project.document.nodes.filter(node => [
+          node.data.label,
+          node.data.description,
+          node.data.filePath,
+          node.data.url,
+        ].some(field => typeof field === 'string' && field.toLocaleLowerCase().includes(normalizedCanvasQuery)))
+          .map(node => node.id),
         type: project.canvasType,
         searchType: 'canvas',
       },
@@ -214,12 +233,17 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     })
     
     // 转换为组件需要的格式
-    const results: EnhancedSearchResult[] = searchResults.map(result => {
+    const results: EnhancedSearchResult[] = searchResults.filter(result => result.matchType === 'exact').map(result => {
       const metadata = result.item.metadata || {}
       const firstMatch = result.matches[0]
       
       return {
         id: result.item.id,
+        sourceKey: metadata.searchType === 'article'
+          ? `article:${metadata.path}`
+          : metadata.searchType === 'record'
+            ? `record:${metadata.markId}`
+            : `canvas:${metadata.canvasId}`,
         title: result.item.title,
         searchType: metadata.searchType as 'article' | 'record' | 'canvas',
         highlightText: result.highlightText,
@@ -229,6 +253,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         path: metadata.path,
         article: metadata.article,
         canvasId: metadata.canvasId,
+        nodeIds: metadata.nodeIds,
         // 记录特定字段
         markId: metadata.markId,
         content: metadata.content,
@@ -241,7 +266,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     })
     
     setSearchResult(results)
-  }, [allArticle, allMarks, canvasProjects, isMobileRoute, tags])
+  }, [allArticle, allMarks, canvasProjects, tags])
 
   // 防抖搜索，300ms 延迟
   const debouncedSearch = useMemo(
@@ -255,6 +280,76 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
     }
     return searchResult.filter((item) => item.searchType === searchFilter)
   }, [searchFilter, searchResult])
+
+  const filteredRelatedResult = useMemo(() => {
+    const exactKeys = new Set(searchResult.map(item => item.sourceKey))
+    return relatedResult.filter(item => (
+      !exactKeys.has(item.sourceKey)
+      && (searchFilter === 'all' || item.searchType === searchFilter)
+    ))
+  }, [relatedResult, searchFilter, searchResult])
+
+  const groupedSearchResults = useMemo(() => [
+    ...filteredSearchResult.map(item => ({ item, section: 'exact' as const })),
+    ...filteredRelatedResult.map(item => ({ item, section: 'related' as const })),
+  ], [filteredRelatedResult, filteredSearchResult])
+
+  const mapKnowledgeCandidate = useCallback((candidate: KnowledgeSearchCandidate): EnhancedSearchResult => ({
+    id: `related-${candidate.sourceKey}`,
+    sourceKey: candidate.sourceKey,
+    searchType: candidate.sourceType,
+    title: candidate.title,
+    path: candidate.locator.filePath,
+    markId: candidate.locator.markId,
+    tagId: candidate.locator.tagId,
+    canvasId: candidate.locator.canvasId,
+    nodeIds: candidate.locator.nodeIds,
+    highlightText: candidate.fragments.map(fragment => fragment.content).join('\n\n'),
+    content: candidate.fragments[0]?.content,
+    score: candidate.relevanceScore,
+    type: candidate.sourceType,
+  }), [])
+
+  const runSemanticSearch = useCallback(async (value: string) => {
+    const query = value.trim()
+    const runKey = `${searchFilter}:${query}`
+    const previousRun = lastSemanticRunRef.current
+    if (previousRun?.key === runKey && Date.now() - previousRun.at < 1000) return
+    lastSemanticRunRef.current = { key: runKey, at: Date.now() }
+    const effectiveLength = query.replace(/[\p{P}\p{S}\s]/gu, '').length
+    const requestId = ++semanticRequestRef.current
+    if (effectiveLength < 2) {
+      setRelatedResult([])
+      setRelatedLoading(false)
+      return
+    }
+    const store = await Store.load('store.json')
+    const enabled = await store.get<boolean>('ragGlobalSemanticSearchEnabled') ?? true
+    if (!enabled || requestId !== semanticRequestRef.current) {
+      setRelatedResult([])
+      setRelatedLoading(false)
+      return
+    }
+    setRelatedLoading(true)
+    try {
+      const sourceTypes = searchFilter === 'all'
+        ? undefined
+        : [searchFilter as KnowledgeSourceType]
+      const candidates = await searchKnowledge(query, {
+        sourceTypes,
+        sourceMode: sourceTypes ? 'only' : undefined,
+        limit: 20,
+      })
+      if (requestId === semanticRequestRef.current) {
+        setRelatedResult(candidates.map(mapKnowledgeCandidate))
+      }
+    } catch (error) {
+      console.error('Global semantic search failed:', error)
+      if (requestId === semanticRequestRef.current) setRelatedResult([])
+    } finally {
+      if (requestId === semanticRequestRef.current) setRelatedLoading(false)
+    }
+  }, [mapKnowledgeCandidate, searchFilter])
 
   async function handleSelect(item: EnhancedSearchResult) {
     // 如果是记录类型，跳转到记录页面并设置对应的 tag
@@ -286,6 +381,13 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       setPendingSearchKeyword('')
       setMatchPosition(null)
       setPendingScrollMarkId(null)
+      if (item.canvasId && item.nodeIds?.length) {
+        setPendingCanvasFocus({ canvasId: item.canvasId, nodeIds: item.nodeIds })
+      }
+      if (isMobileRoute && item.canvasId) {
+        router.push(`/mobile/canvas/editor?id=${encodeURIComponent(item.canvasId)}`)
+        return
+      }
       await setLeftSidebarTab('canvases')
       const project = item.canvasId ? await openCanvasProject(item.canvasId) : null
       if (project) await addTab(createCanvasTab(project))
@@ -346,7 +448,14 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       loadAllArticle()
       fetchAllMarks()
       fetchTags()
-      if (!isMobileRoute) void loadCanvasProjects()
+      void loadCanvasProjects()
+      void getKnowledgeIndexStats().then(stats => {
+        const values = Object.values(stats).flatMap(sourceStats => Object.values(sourceStats))
+        setIndexCoverage({
+          ready: Object.values(stats).reduce((sum, sourceStats) => sum + sourceStats.ready, 0),
+          total: values.reduce((sum, value) => sum + value, 0),
+        })
+      })
     }
   }, [fetchAllMarks, fetchTags, isMobileRoute, loadAllArticle, loadCanvasProjects, open])
 
@@ -355,7 +464,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       const store = await Store.load('store.json')
       const savedFilter = await store.get<SearchFilter>('globalSearchFilter')
       if (savedFilter === 'all' || savedFilter === 'record' || savedFilter === 'article' || savedFilter === 'canvas') {
-        setSearchFilter(savedFilter === 'canvas' && isMobileRoute ? 'all' : savedFilter)
+        setSearchFilter(savedFilter)
       }
     }
 
@@ -374,6 +483,14 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   useEffect(() => {
     debouncedSearch(searchValue)
   }, [searchValue, debouncedSearch])
+
+  useEffect(() => {
+    semanticRequestRef.current += 1
+    const timer = setTimeout(() => {
+      void runSemanticSearch(searchValue)
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [runSemanticSearch, searchValue])
 
   useEffect(() => {
     if (!open || isMobileRoute) return
@@ -406,6 +523,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             placeholder={t('search.placeholder')}
             value={searchValue}
             onValueChange={setSearchValue}
+            onKeyDown={event => {
+              if (event.key === 'Enter') void runSemanticSearch(searchValue)
+            }}
             className="h-10 text-base font-medium"
           />
         </div>
@@ -416,8 +536,13 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           )}
         >
           <div className="text-sm font-semibold tracking-tight text-foreground/90">
-            {t('search.results', { count: filteredSearchResult.length })}
+            {t('search.results', { count: groupedSearchResults.length })}
           </div>
+          {indexCoverage && indexCoverage.ready < indexCoverage.total ? (
+            <Badge variant="outline">
+              {t('search.indexingProgress', indexCoverage)}
+            </Badge>
+          ) : null}
           {!isMobileRoute && <Separator orientation="vertical" className="h-5" />}
           <ToggleGroup
             type="single"
@@ -435,11 +560,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             <ToggleGroupItem value="article" aria-label={t('search.item.article')}>
               {t('search.item.article')}
             </ToggleGroupItem>
-            {!isMobileRoute && (
-              <ToggleGroupItem value="canvas" aria-label={t('search.item.canvas')}>
-                {t('search.item.canvas')}
-              </ToggleGroupItem>
-            )}
+            <ToggleGroupItem value="canvas" aria-label={t('search.item.canvas')}>
+              {t('search.item.canvas')}
+            </ToggleGroupItem>
           </ToggleGroup>
         </div>
       </div>
@@ -455,7 +578,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </EmptyHeader>
           </Empty>
         )}
-        {filteredSearchResult.length === 0 && searchValue && (
+        {groupedSearchResults.length === 0 && searchValue && !relatedLoading && (
           <Empty className="border-0">
             <EmptyHeader>
               <SearchX className="size-10 text-muted-foreground" />
@@ -466,15 +589,20 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
             </EmptyHeader>
           </Empty>
         )}
-        {searchResult.length > 0 && (
+        {(groupedSearchResults.length > 0 || relatedLoading) && (
           <CommandGroup>
             <div className="flex flex-col divide-y divide-border/60">
-              {filteredSearchResult.map((item) => {
+              {groupedSearchResults.map(({ item, section }, index) => {
               const resultMeta = getResultMeta(item)
               const MetaIcon = resultMeta.icon
               return (
+                <Fragment key={item.id}>
+                {(index === 0 || groupedSearchResults[index - 1].section !== section) ? (
+                  <div className="px-5 py-2 text-xs font-medium text-muted-foreground">
+                    {section === 'exact' ? t('search.exactMatches') : t('search.relatedContent')}
+                  </div>
+                ) : null}
                 <CommandItem
-                  key={item.id}
                   value={`${item.searchType}-${item.title || item.path}`}
                   onSelect={() => handleSelect(item)}
                   className={cn(
@@ -569,8 +697,12 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                     </div>
                   )}
                 </CommandItem>
+                </Fragment>
               )
             })}
+            {relatedLoading && filteredRelatedResult.length === 0 ? (
+              <div className="px-5 py-4 text-xs text-muted-foreground">{t('search.searchingRelated')}</div>
+            ) : null}
             </div>
           </CommandGroup>
         )}

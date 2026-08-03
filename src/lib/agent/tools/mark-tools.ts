@@ -17,7 +17,7 @@ function getCurrentTagId(tagId?: number): number {
 
 export const readMarksTool: Tool = {
   name: 'read_marks',
-  description: 'Read all content records (marks) under a specific tag. Uses current selected tag if tagId not specified.',
+  description: 'Read all records under a known, specific tag only when the user explicitly requests that complete tag or a record-management operation needs it. Never use this tool to discover saved knowledge or answer a knowledge question; use knowledge_search instead. Uses the current selected tag if tagId is omitted.',
   category: 'mark',
   requiresConfirmation: false,
   parameters: [

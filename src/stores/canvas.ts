@@ -67,6 +67,7 @@ interface CanvasState {
   documents: Record<string, CanvasDocument>
   activeCanvasId: string | null
   selectionContext: CanvasSelectionContext | null
+  pendingFocus: { canvasId: string; nodeIds: string[] } | null
   loading: boolean
   trashMode: boolean
   loadProjects: () => Promise<void>
@@ -76,6 +77,7 @@ interface CanvasState {
   openProject: (id: string) => Promise<CanvasProject | null>
   setActiveCanvasId: (id: string | null) => void
   setSelectionContext: (context: CanvasSelectionContext | null) => void
+  setPendingFocus: (focus: { canvasId: string; nodeIds: string[] } | null) => void
   updateDocument: (id: string, document: CanvasDocument) => void
   updateHistory: (id: string, history: CanvasHistoryState) => void
   saveProject: (id: string) => Promise<void>
@@ -96,6 +98,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
   documents: {},
   activeCanvasId: null,
   selectionContext: null,
+  pendingFocus: null,
   loading: false,
   trashMode: false,
 
@@ -190,6 +193,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     selectionContext: state.selectionContext?.canvasId === id ? state.selectionContext : null,
   })),
   setSelectionContext: (selectionContext) => set({ selectionContext }),
+  setPendingFocus: (pendingFocus) => set({ pendingFocus }),
 
   updateDocument: (id, document) => {
     set(state => ({ documents: { ...state.documents, [id]: document } }))

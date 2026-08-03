@@ -47,6 +47,36 @@ function enqueueRecordsAutoSync(reason: string) {
   enqueueAutoDataSync('records', reason)
 }
 
+function enqueueMarkKnowledgeIndex(id?: number | null) {
+  if (!id) return
+  void import('@/lib/knowledge-index').then(({ enqueueKnowledgeSourceIndex }) => {
+    enqueueKnowledgeSourceIndex(`record:${id}`)
+  })
+}
+
+async function invalidateMarkKnowledgeIndex(id: number) {
+  const db = await getDb()
+  try {
+    await db.execute(
+      "update knowledge_sources set status = 'pending', indexed_hash = null, error = null where source_key = $1",
+      [`record:${id}`]
+    )
+  } catch {
+    // 数据库首次初始化时来源注册表可能尚未创建。
+  }
+}
+
+async function removeMarkKnowledgeIndex(id: number) {
+  const { removeKnowledgeSourceIndex } = await import('@/lib/knowledge-index')
+  await removeKnowledgeSourceIndex(`record:${id}`)
+}
+
+function reconcileRecordKnowledgeIndex() {
+  void import('@/lib/knowledge-index').then(({ reconcileStructuredKnowledgeSources }) => {
+    void reconcileStructuredKnowledgeSources()
+  })
+}
+
 
 // 创建 marks 表
 export async function initMarksDb() {
@@ -133,6 +163,8 @@ export async function updateMarkTag(id: number, tagId: number) {
   const db = await getDb()
   const result = await db.execute("update marks set tagId = $1 where id = $2", [tagId, id])
   enqueueRecordsAutoSync('mark:update-tag')
+  await invalidateMarkKnowledgeIndex(id)
+  enqueueMarkKnowledgeIndex(id)
   return result
 }
 
@@ -163,6 +195,7 @@ export async function insertMark(mark: Partial<Mark>) {
   })
 
   enqueueRecordsAutoSync('mark:insert')
+  enqueueMarkKnowledgeIndex(result.lastInsertId)
 
   return result
 }
@@ -188,6 +221,8 @@ export async function updateMark(mark: Mark) {
     await queueRecordAssetRemoteDeletions([previousMark])
   }
   enqueueRecordsAutoSync('mark:update')
+  await invalidateMarkKnowledgeIndex(mark.id)
+  enqueueMarkKnowledgeIndex(mark.id)
   return res 
 }
 
@@ -199,6 +234,7 @@ export async function restoreMark(id: number) {
     [0, createdAt, id]
   )
   enqueueRecordsAutoSync('mark:restore')
+  enqueueMarkKnowledgeIndex(id)
   return result
 }
 
@@ -215,12 +251,16 @@ export async function delMark(id: number) {
     [1, createdAt, id]
   )
   enqueueRecordsAutoSync('mark:delete')
+  await removeMarkKnowledgeIndex(id)
   return result
 }
 
 export async function deleteAllMarks() {
   const db = await getDb();
-  return await db.execute("delete from marks")
+  const marks = await getAllMarks()
+  const result = await db.execute("delete from marks")
+  await Promise.all(marks.map(mark => removeMarkKnowledgeIndex(mark.id)))
+  return result
 }
 
 export async function insertMarks(marks: Partial<Mark>[]) {
@@ -250,6 +290,7 @@ export async function insertMarks(marks: Partial<Mark>[]) {
       );
     }
     enqueueRecordsAutoSync('mark:bulk-insert')
+    reconcileRecordKnowledgeIndex()
   } catch (error) {
     console.error('Error inserting marks:', error);
     throw error;
@@ -263,16 +304,18 @@ export async function delMarkForever(id: number) {
   await deleteMarkLocalAssets(marks)
   const result = await db.execute("delete from marks where id = $1", [id])
   enqueueRecordsAutoSync('mark:delete-forever')
+  await removeMarkKnowledgeIndex(id)
   return result
 }
 
 export async function clearTrash() {
   const db = await getDb();
-  const marks = await db.select<Mark[]>("select type, url, content from marks where deleted = $1", [1])
+  const marks = await db.select<Mark[]>("select id, type, url, content from marks where deleted = $1", [1])
   await queueRecordAssetRemoteDeletions(marks)
   await deleteMarkLocalAssets(marks)
   const result = await db.execute("delete from marks where deleted = $1", [1])
   enqueueRecordsAutoSync('mark:clear-trash')
+  await Promise.all(marks.map(mark => removeMarkKnowledgeIndex(mark.id)))
   return result
 }
 
@@ -286,6 +329,8 @@ export async function updateMarks(marks: Mark[]) {
       );
     }
     enqueueRecordsAutoSync('mark:bulk-update')
+    for (const mark of marks) await invalidateMarkKnowledgeIndex(mark.id)
+    reconcileRecordKnowledgeIndex()
   } catch (error) {
     console.error('Error updating marks:', error);
     throw error;
@@ -303,6 +348,7 @@ export async function deleteMarks(ids: number[]) {
       );
     }
     enqueueRecordsAutoSync('mark:bulk-delete')
+    await Promise.all(ids.map(removeMarkKnowledgeIndex))
   } catch (error) {
     console.error('Error deleting marks:', error);
     throw error;
@@ -320,6 +366,7 @@ export async function restoreMarks(ids: number[]) {
       );
     }
     enqueueRecordsAutoSync('mark:bulk-restore')
+    ids.forEach(enqueueMarkKnowledgeIndex)
   } catch (error) {
     console.error('Error restoring marks:', error);
     throw error;

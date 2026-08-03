@@ -57,10 +57,21 @@ export class AgentHandler {
   private readonly config: AgentHandlerConfig
   private steeringPending = false
   private pendingSteering: AgentSteeringPayload[] = []
-  private retrievedNoteSources = new Map<string, {
+  private retrievedKnowledgeSources = new Map<string, {
     filepath: string
     filename: string
     content: string
+    sourceKey: string
+    sourceType: 'article' | 'record' | 'canvas'
+    sourceId: string
+    locator?: {
+      filePath?: string
+      markId?: number
+      tagId?: number
+      canvasId?: string
+      nodeIds?: string[]
+    }
+    updatedAt?: number
   }>()
 
   constructor(config: AgentHandlerConfig) {
@@ -73,7 +84,7 @@ export class AgentHandler {
     imageUrls?: string[]
   ): Promise<string> {
     const store = useChatStore.getState()
-    this.retrievedNoteSources.clear()
+    this.retrievedKnowledgeSources.clear()
 
     store.resetAgentState()
     store.setAgentState({
@@ -356,58 +367,95 @@ export class AgentHandler {
       this.appendLoadedSkill(toolCall.params.skill_id)
     }
 
-    if (toolCall.toolName === 'note_search_files' && toolCall.status === 'success') {
-      this.captureNoteSearchCandidates(toolCall)
+    if (toolCall.toolName === 'knowledge_search' && toolCall.status === 'success') {
+      this.captureKnowledgeSearchCandidates(toolCall)
     }
-
-    if (toolCall.toolName === 'note_cite_sources' && toolCall.status === 'success') {
-      this.captureCitedNoteSources(toolCall)
+    if (toolCall.toolName === 'knowledge_read_sources' && toolCall.status === 'success') {
+      this.captureKnowledgeReadPages(toolCall)
+    }
+    if (toolCall.toolName === 'knowledge_cite_sources' && toolCall.status === 'success') {
+      this.captureCitedKnowledgeSources(toolCall)
     }
   }
 
-  private captureNoteSearchCandidates(toolCall: ToolCall) {
+  private captureKnowledgeSearchCandidates(toolCall: ToolCall) {
     const data = toolCall.result?.data
     if (!Array.isArray(data)) return
-
     for (const value of data) {
       if (!value || typeof value !== 'object') continue
-      const result = value as {
-        filePath?: unknown
-        fileName?: unknown
-        matchedContent?: unknown
+      const candidate = value as {
+        sourceKey?: unknown
+        sourceType?: unknown
+        sourceId?: unknown
+        title?: unknown
+        fragments?: unknown
+        locator?: unknown
+        updatedAt?: unknown
       }
-      if (typeof result.filePath !== 'string' || !result.filePath.trim()) continue
-
-      const filepath = result.filePath.trim()
-      const filename = typeof result.fileName === 'string' && result.fileName.trim()
-        ? result.fileName.trim()
-        : filepath.split('/').pop() || filepath
-      const content = typeof result.matchedContent === 'string'
-        ? result.matchedContent
-        : ''
-
-      this.retrievedNoteSources.set(filepath, {
-        filepath,
-        filename,
-        content,
+      if (
+        typeof candidate.sourceKey !== 'string'
+        || (candidate.sourceType !== 'article' && candidate.sourceType !== 'record' && candidate.sourceType !== 'canvas')
+      ) continue
+      const locator = candidate.locator && typeof candidate.locator === 'object'
+        ? candidate.locator as {
+            filePath?: string
+            markId?: number
+            tagId?: number
+            canvasId?: string
+            nodeIds?: string[]
+          }
+        : undefined
+      const fragments = Array.isArray(candidate.fragments)
+        ? candidate.fragments.flatMap(fragment => (
+            fragment && typeof fragment === 'object' && typeof (fragment as { content?: unknown }).content === 'string'
+              ? [(fragment as { content: string }).content]
+              : []
+          ))
+        : []
+      const title = typeof candidate.title === 'string' ? candidate.title : candidate.sourceKey
+      this.retrievedKnowledgeSources.set(candidate.sourceKey, {
+        sourceKey: candidate.sourceKey,
+        sourceType: candidate.sourceType,
+        sourceId: typeof candidate.sourceId === 'string' ? candidate.sourceId : candidate.sourceKey,
+        filepath: locator?.filePath || candidate.sourceKey,
+        filename: title,
+        content: fragments.join('\n\n'),
+        locator,
+        updatedAt: typeof candidate.updatedAt === 'number' ? candidate.updatedAt : undefined,
       })
     }
   }
 
-  private captureCitedNoteSources(toolCall: ToolCall) {
+  private captureKnowledgeReadPages(toolCall: ToolCall) {
+    const data = toolCall.result?.data
+    if (!Array.isArray(data)) return
+    for (const value of data) {
+      if (!value || typeof value !== 'object') continue
+      const page = value as { sourceKey?: unknown; content?: unknown }
+      if (typeof page.sourceKey !== 'string' || typeof page.content !== 'string') continue
+      const current = this.retrievedKnowledgeSources.get(page.sourceKey)
+      if (!current) continue
+      this.retrievedKnowledgeSources.set(page.sourceKey, {
+        ...current,
+        content: current.content.includes(page.content)
+          ? current.content
+          : [current.content, page.content].filter(Boolean).join('\n\n'),
+      })
+    }
+  }
+
+  private captureCitedKnowledgeSources(toolCall: ToolCall) {
     const data = toolCall.result?.data
     if (!data || typeof data !== 'object') return
-    const filePaths = (data as { filePaths?: unknown }).filePaths
-    if (!Array.isArray(filePaths)) return
-
-    const ragSourceDetails = filePaths.flatMap((filePath) => {
-      if (typeof filePath !== 'string') return []
-      const source = this.retrievedNoteSources.get(filePath)
-      return source ? [source] : []
-    })
-    const currentState = useChatStore.getState()
-    currentState.setAgentState({
-      ragSources: Array.from(new Set(ragSourceDetails.map(detail => detail.filename))),
+    const sourceKeys = (data as { sourceKeys?: unknown }).sourceKeys
+    if (!Array.isArray(sourceKeys)) return
+    const ragSourceDetails = sourceKeys.flatMap(sourceKey => (
+      typeof sourceKey === 'string' && this.retrievedKnowledgeSources.has(sourceKey)
+        ? [this.retrievedKnowledgeSources.get(sourceKey)!]
+        : []
+    ))
+    useChatStore.getState().setAgentState({
+      ragSources: ragSourceDetails.map(detail => detail.filename),
       ragSourceDetails,
     })
   }

@@ -294,6 +294,22 @@
       "lexicalIndexRebuilt": "Índice BM25 local reconstruído",
       "basicSettingsTitle": "Configurações básicas",
       "basicSettingsDesc": "A IA decide quando outras notas são úteis; você pode ajustar a profundidade e o alcance da busca.",
+      "sourceTypes": {
+        "article": { "title": "Artigos", "desc": "Inclui artigos Markdown na busca semântica." },
+        "record": { "title": "Registros", "desc": "Indexa registros individuais, OCR, transcrições e metadados existentes." },
+        "canvas": { "title": "Telas", "desc": "Indexa textos dos nós e conexões explícitas da tela." }
+      },
+      "globalSemanticSearchTitle": "Busca semântica global",
+      "globalSemanticSearchDesc": "Adiciona resultados relacionados após uma pausa na digitação; a busca exata local continua disponível.",
+      "structuredIndexTitle": "Progresso do índice de conhecimento unificado",
+      "pauseIndex": "Pausar",
+      "continueIndex": "Continuar",
+      "failedCount": "{count} com falha",
+      "retrySource": "Tentar novamente",
+      "unknownIndexError": "Falha na indexação",
+      "purgeDisabledIndex": "Excluir índices desativados",
+      "purgeDisabledConfirm": "Excluir os vetores locais de todos os tipos de fonte desativados? Será necessário reconstruí-los ao reativar.",
+      "purgeDisabledSuccess": "Vetores das fontes desativadas excluídos",
       "automaticSearchTitle": "Permitir que a IA consulte outras notas",
       "automaticSearchDesc": "Quando uma pergunta depender dos seus registros, a IA encontra notas relevantes automaticamente. A busca é ignorada em perguntas gerais ou quando a nota atual for suficiente.",
       "agentStrategyTitle": "Estratégia de busca automática",
@@ -1310,6 +1326,7 @@
       "setCurrentPlatform": "Usar Este Serviço",
       "status": {
         "connected": "Conectado",
+        "configured": "Configurado",
         "checking": "Verificando",
         "disconnected": "Desconectado"
       },
@@ -2846,6 +2863,9 @@
           "acting": "Agindo",
           "observation": "Observação",
           "toolCalls": "Chamadas de Ferramenta",
+          "resultSummary": "Resumo do resultado",
+          "queryParameters": "Parâmetros da consulta",
+          "toolResult": "Resultado da ferramenta",
           "permissionMode": {
             "label": "Modo de permissão do Agent",
             "modes": {
@@ -2990,8 +3010,20 @@
         "copied": "Copiado"
       },
       "ragSources": {
-        "label": "{count} notas referenciadas",
-        "openFile": "Abrir arquivo",
+        "label": "Referenciou {sources}",
+        "articleCount": "{count, plural, one {# artigo} other {# artigos}}",
+        "recordCount": "{count, plural, one {# registro} other {# registros}}",
+        "canvasCount": "{count, plural, one {# tela} other {# telas}}",
+        "sourceCount": "{count, plural, one {# fonte} other {# fontes}}",
+        "openArticle": "Abrir artigo",
+        "openRecord": "Abrir registro",
+        "openCanvas": "Abrir tela",
+        "openSource": "Abrir fonte",
+        "typeArticle": "Artigo",
+        "typeRecord": "Registro",
+        "typeCanvas": "Tela",
+        "typeSource": "Fonte",
+        "tagLabel": "Etiqueta {id}",
         "skillsUsed": "{count, plural, one {# habilidade usada} other {# habilidades usadas}}",
         "expandDescription": "Expandir descrição",
         "collapseDescription": "Recolher descrição"
@@ -3030,6 +3062,10 @@
   "search": {
     "placeholder": "Pesquisar notas, registros e telas...",
     "results": "{count} resultados da pesquisa",
+    "exactMatches": "Correspondências exatas",
+    "relatedContent": "Conteúdo relacionado",
+    "searchingRelated": "Buscando conteúdo semanticamente relacionado…",
+    "indexingProgress": "Indexando {ready}/{total}",
     "noResults": "Nenhum resultado de pesquisa",
     "tryDifferentKeywords": "Tente usar palavras-chave diferentes",
     "item": {
@@ -3897,6 +3933,7 @@
       "failed": "Falha ao processar imagem"
     },
     "mermaid": {
+      "title": "Diagrama",
       "rendering": "Renderizando...",
       "renderError": "Erro de renderização",
       "clickToEdit": "Clique para editar código",

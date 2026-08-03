@@ -65,6 +65,7 @@ const useVectorStore = create<VectorState>((set, get) => ({
       const store = await Store.load('store.json');
       const isAutoVectorEnabled = await store.get<boolean>('autoVectorEnabled') ?? true;
       const lastProcessTime = await store.get<number>('lastVectorProcessTime') || null;
+      const structuredKnowledgeConsent = await store.get<boolean>('ragStructuredKnowledgeConsent') ?? false;
 
       set({
         isAutoVectorEnabled,
@@ -80,6 +81,10 @@ const useVectorStore = create<VectorState>((set, get) => ({
             description: '未配置嵌入模型或模型不可用，请在AI设置中配置嵌入模型',
             variant: 'destructive',
           });
+        }
+        if (structuredKnowledgeConsent) {
+          const { resumeKnowledgeIndexQueue } = await import('@/lib/knowledge-index');
+          void resumeKnowledgeIndexQueue();
         }
       }
 
@@ -142,8 +147,17 @@ const useVectorStore = create<VectorState>((set, get) => ({
           duration: Infinity,
         });
       });
+      const { processStructuredKnowledgeSources } = await import('@/lib/knowledge-index');
+      const structuredResult = await processStructuredKnowledgeSources((current, total, title) => {
+        processingToast?.update({
+          title: '知识库处理中',
+          description: `已处理结构化内容 ${current}/${total}：${title}`,
+          duration: Infinity,
+        });
+      });
 
-      if (result.failed > 0 && previousDocuments) {
+      const totalFailed = result.failed + structuredResult.failed;
+      if ((totalFailed > 0 || result.paused || structuredResult.paused) && previousDocuments) {
         await replaceAllVectorDocuments(previousDocuments);
         await initBM25Search();
       }
@@ -156,20 +170,21 @@ const useVectorStore = create<VectorState>((set, get) => ({
       set({
         isProcessing: false,
         lastProcessTime: currentTime,
-        documentCount: result.success
+        documentCount: result.success + structuredResult.success
       });
 
       // 重新初始化 BM25 索引
       await initBM25Search();
-      if (result.failed === 0) {
+      if (totalFailed === 0 && !result.paused && !structuredResult.paused) {
         await useRagSettingsStore.getState().markIndexClean();
       }
       await get().refreshIndexStats();
 
       // 显示处理结果
       let description = `成功处理 ${result.success} 个文档`;
-      if (result.failed > 0) {
-        description += `，失败 ${result.failed} 个文档`;
+      description += `、${structuredResult.success} 条记录或画布`;
+      if (totalFailed > 0) {
+        description += `，失败 ${totalFailed} 个来源`;
         // 如果有失败文件，显示前几个
         if (result.failedFiles && result.failedFiles.length > 0) {
           const failedSample = result.failedFiles.slice(0, 3).map(f => f.fileName).join('、');
@@ -178,9 +193,9 @@ const useVectorStore = create<VectorState>((set, get) => ({
       }
 
       processingToast.update({
-        title: result.failed > 0 ? '向量处理完成（部分失败）' : '向量处理完成',
+        title: totalFailed > 0 || result.paused || structuredResult.paused ? '向量处理完成（部分未完成）' : '向量处理完成',
         description,
-        variant: result.failed > 0 ? 'destructive' : 'default',
+        variant: totalFailed > 0 ? 'destructive' : 'default',
         duration: 5000,
       });
     } catch (error) {

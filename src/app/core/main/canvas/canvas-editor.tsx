@@ -387,6 +387,8 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const appliedDefaultZoomRef = useRef('')
   const suppressViewportPersistRef = useRef(true)
   const { screenToFlowPosition, getViewport, getNodesBounds, fitView, setViewport } = useReactFlow()
+  const pendingFocus = useCanvasStore(state => state.pendingFocus)
+  const setPendingFocus = useCanvasStore(state => state.setPendingFocus)
   const viewport = useViewport()
   const activeBrushColor = tool === 'highlighter' ? highlighterColor : penColor
   const activeBrushSize = tool === 'highlighter' ? highlighterSize : penSize
@@ -426,6 +428,18 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const availableNotes = useMemo(() => flattenFileTree(fileTree).filter(entry => (
     entry.isFile && /\.(md|markdown|txt)$/i.test(entry.name)
   )), [fileTree])
+
+  useEffect(() => {
+    if (!pendingFocus || pendingFocus.canvasId !== canvasId || nodes.length === 0) return
+    const selectedIds = new Set(pendingFocus.nodeIds)
+    const matchingNodes = nodes.filter(node => selectedIds.has(node.id))
+    if (matchingNodes.length === 0) return
+    setPendingFocus(null)
+    setNodes(current => current.map(node => ({ ...node, selected: selectedIds.has(node.id) })))
+    requestAnimationFrame(() => {
+      void fitView({ nodes: matchingNodes, padding: 0.35, duration: 300 })
+    })
+  }, [canvasId, fitView, nodes, pendingFocus, setNodes, setPendingFocus])
 
   useEffect(() => {
     if (activeCanvasId !== canvasId) return
