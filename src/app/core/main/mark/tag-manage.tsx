@@ -1,7 +1,7 @@
 "use client"
 import * as React from "react"
 import { useTranslations } from 'next-intl'
-import { TagIcon, Inbox, SquareCheck } from "lucide-react"
+import { TagIcon, Inbox } from "lucide-react"
 import {
   Accordion,
   AccordionContent,
@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   Empty,
@@ -137,7 +138,7 @@ export function TagManage() {
   const [isAdding, setIsAdding] = React.useState(false)
   const [editingTagId, setEditingTagId] = React.useState<number | null>(null)
   const [editingName, setEditingName] = React.useState<string>("")
-  const [expandedTagId, setExpandedTagId] = React.useState("")
+  const [expandedTagIds, setExpandedTagIds] = React.useState<string[]>([])
   const [hasInitialized, setHasInitialized] = React.useState(false)
   const newTagInputRef = React.useRef<HTMLInputElement>(null)
   const { init } = useChatStore()
@@ -180,8 +181,10 @@ export function TagManage() {
 
   const {
     marks,
+    allMarks,
     queues,
     fetchMarks,
+    fetchAllMarks,
     recordFilters,
     hasActiveRecordFilters,
     setVisibleMarkIds,
@@ -191,6 +194,10 @@ export function TagManage() {
     setHighlightedMarkId,
   } = useMarkStore()
   const { recordViewMode, recordSortMode } = useSettingStore()
+
+  React.useEffect(() => {
+    void fetchAllMarks()
+  }, [fetchAllMarks, marks])
 
   async function handleAddTag() {
     if (!newTagName.trim()) return
@@ -204,7 +211,7 @@ export function TagManage() {
     setNewTagName("")
     setIsAdding(false)
     // 添加新标签后自动展开
-    setExpandedTagId(newTagId.toString())
+    setExpandedTagIds((current) => [...new Set([...current, newTagId.toString()])])
   }
 
   async function handleSelectTag(tag: Tag) {
@@ -214,8 +221,23 @@ export function TagManage() {
     await init(tag.id)
   }
 
+  function handleExpandedTagsChange(values: string[]) {
+    const openedTagId = values.find((value) => !expandedTagIds.includes(value))
+    setExpandedTagIds(values)
+
+    if (!openedTagId) {
+      return
+    }
+
+    const openedTag = tags.find((tag) => tag.id.toString() === openedTagId)
+    if (openedTag && openedTag.id !== currentTagId) {
+      void handleSelectTag(openedTag)
+    }
+  }
+
   async function handleDeleteTag(tagId: number) {
     await delTag(tagId)
+    setExpandedTagIds((current) => current.filter((id) => id !== tagId.toString()))
     await fetchTags()
     getCurrentTag()
   }
@@ -236,7 +258,7 @@ export function TagManage() {
 
   // 获取当前标签下的记录
   const getTagMarks = (tagId: number) => {
-    return marks.filter(mark => mark.tagId === tagId)
+    return allMarks.filter(mark => mark.tagId === tagId)
   }
 
   const filtersActive = hasActiveRecordFilters()
@@ -246,7 +268,7 @@ export function TagManage() {
       ...recordFilters,
       tagId: 'all',
     }), recordSortMode)
-  }, [marks, recordFilters, recordSortMode])
+  }, [allMarks, recordFilters, recordSortMode])
 
   const visibleTags = React.useMemo(() => {
     return tags.filter((tag) => {
@@ -318,7 +340,7 @@ export function TagManage() {
   // 初始化时展开当前标签（只执行一次）
   React.useEffect(() => {
     if (currentTag && !hasInitialized) {
-      setExpandedTagId(currentTag.id.toString())
+      setExpandedTagIds([currentTag.id.toString()])
       setHasInitialized(true)
     }
   }, [currentTag, hasInitialized])
@@ -327,7 +349,7 @@ export function TagManage() {
   React.useEffect(() => {
     const handleRefresh = () => {
       if (currentTagId) {
-        setExpandedTagId(currentTagId.toString())
+        setExpandedTagIds((current) => [...new Set([...current, currentTagId.toString()])])
         fetchMarks()
       }
     }
@@ -340,11 +362,11 @@ export function TagManage() {
   }, [currentTagId, fetchMarks])
 
   React.useEffect(() => {
-    if (!pendingScrollMarkId || expandedTagId !== currentTagId.toString()) {
+    if (!pendingScrollMarkId || !expandedTagIds.includes(currentTagId.toString())) {
       return
     }
 
-    if (!marks.some((mark) => mark.id === pendingScrollMarkId && mark.tagId === currentTagId)) {
+    if (!allMarks.some((mark) => mark.id === pendingScrollMarkId && mark.tagId === currentTagId)) {
       return
     }
 
@@ -377,7 +399,7 @@ export function TagManage() {
     return () => {
       cancelled = true
     }
-  }, [currentTagId, expandedTagId, marks, pendingScrollMarkId, setHighlightedMarkId, setPendingScrollMarkId])
+  }, [allMarks, currentTagId, expandedTagIds, pendingScrollMarkId, setHighlightedMarkId, setPendingScrollMarkId])
 
   React.useEffect(() => {
     if (!highlightedMarkId) {
@@ -408,8 +430,8 @@ export function TagManage() {
 
     if (filteredMarks.length === 0 && queues.filter(queue => queue.tagId === tagId).length === 0) {
       return (
-        <Empty className="min-h-48">
-          <EmptyHeader>
+        <Empty className="min-h-24 gap-2 rounded-none p-4">
+          <EmptyHeader className="gap-1">
             <EmptyMedia variant="icon">
               <Inbox />
             </EmptyMedia>
@@ -424,9 +446,9 @@ export function TagManage() {
 
     switch (recordViewMode) {
     case 'compact':
-      return <MarkListCompactView marks={filteredMarks} />
+      return <MarkListCompactView marks={filteredMarks} grouped />
     case 'cards':
-      return <MarkListCardView marks={filteredMarks} />
+      return <MarkListCardView marks={filteredMarks} grouped />
     case 'list':
     default:
       return <MarkListDefaultView marks={filteredMarks} />
@@ -470,14 +492,10 @@ export function TagManage() {
           >
             {/* 标签列表 */}
             <Accordion
-              type="single"
-              collapsible
-              value={expandedTagId}
-              onValueChange={(value) => {
-                // 直接设置展开状态，允许折叠（折叠时 value 为空字符串）
-                setExpandedTagId(value || "")
-              }}
-              className="w-full"
+              type="multiple"
+              value={expandedTagIds}
+              onValueChange={handleExpandedTagsChange}
+              className="flex w-full flex-col gap-2 p-2"
             >
               {visibleTags.length === 0 ? (
                 <Empty className="min-h-48">
@@ -493,23 +511,17 @@ export function TagManage() {
                 </Empty>
               ) : visibleTags.map((tag) => (
               <SortableTagItem key={tag.id} tag={tag}>
-                <AccordionItemWrapper value={tag.id.toString()}>
+                <AccordionItemWrapper
+                  value={tag.id.toString()}
+                  className="overflow-hidden rounded-xl border bg-background shadow-xs"
+                >
                   <ContextMenu>
                     <ContextMenuTrigger>
-                      <AccordionTrigger 
-                        className={`px-3 py-2 hover:no-underline opacity-50 ${currentTagId === tag.id && 'bg-accent opacity-100'}`}
-                        onClick={() => {
-                          if (tag.id !== currentTagId) {
-                            handleSelectTag(tag)
-                          }
-                        }}
+                      <AccordionTrigger
+                        className="items-center rounded-none border-0 bg-muted/20 px-3 py-2.5 hover:bg-muted/40 hover:no-underline data-[state=open]:bg-muted/60"
                       >
-                        <div className="flex items-center gap-2 flex-1">
-                          {
-                            currentTagId === tag.id ? 
-                            <SquareCheck className="size-3" />:
-                            <TagIcon className="size-3" />
-                          }
+                        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                          <TagIcon className="size-4 shrink-0 text-muted-foreground" />
                           {editingTagId === tag.id ? (
                             <Input
                               value={editingName}
@@ -524,9 +536,9 @@ export function TagManage() {
                               autoFocus
                             />
                           ) : (
-                            <div className="text-xs w-full flex items-center justify-between gap-2">
-                              <span className={`flex-1 ${currentTagId === tag.id && 'font-bold'}`}>{tag.name}</span>
-                              <span className="text-muted-foreground">{tag.total && tag.total > 0 ? tag.total : ''}</span>
+                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                              <span className="min-w-0 flex-1 truncate">{tag.name}</span>
+                              <Badge variant="secondary">{tag.total ?? 0}</Badge>
                               <TagMobileActions 
                                 tag={tag}
                                 onRename={startEditing}
@@ -547,7 +559,7 @@ export function TagManage() {
                       </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
-                  <AccordionContent className="h-auto px-0 pb-0">
+                  <AccordionContent className="h-auto bg-muted/10 px-0 pt-0 pb-1">
 
                     {/* 显示当前标签的队列（正在处理中的记录） */}
                     {queues.filter(queue => queue.tagId === tag.id).map((queue) => (

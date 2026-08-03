@@ -729,7 +729,17 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
 })
 MarkWrapper.displayName = 'MarkWrapper'
 
-export const MarkItem = React.memo(({mark, variant = 'list', interactive = true}: {mark: Mark, variant?: MarkItemVariant, interactive?: boolean}) => {
+export const MarkItem = React.memo(({
+  mark,
+  variant = 'list',
+  interactive = true,
+  grouped = false,
+}: {
+  mark: Mark
+  variant?: MarkItemVariant
+  interactive?: boolean
+  grouped?: boolean
+}) => {
   const t = useTranslations();
   const isMobile = useIsMobile()
   const {
@@ -925,9 +935,15 @@ export const MarkItem = React.memo(({mark, variant = 'list', interactive = true}
       className={cn(
         "relative transition-colors",
         variant === 'cards'
-          ? 'w-full min-w-0 max-w-full overflow-hidden rounded-md border border-border/70 bg-background p-2.5'
+          ? cn(
+              'w-full min-w-0 max-w-full overflow-hidden rounded-md p-2.5',
+              grouped ? 'bg-muted/35' : 'border border-border/70 bg-background'
+            )
           : variant === 'compact'
-            ? 'w-full min-w-0 max-w-full overflow-hidden rounded-md border border-border/60 bg-background px-3 py-2'
+            ? cn(
+                'w-full min-w-0 max-w-full overflow-hidden rounded-md py-2',
+                grouped ? 'bg-transparent px-2' : 'border border-border/60 bg-background px-3'
+              )
             : 'w-full min-w-0 max-w-full overflow-hidden border-b border-l-2 border-b-border/60 border-l-transparent bg-background last:border-b-0',
         highlightedMarkId === mark.id && (
           variant === 'list'
@@ -937,7 +953,9 @@ export const MarkItem = React.memo(({mark, variant = 'list', interactive = true}
         activeMarkId === mark.id && (
           variant === 'list'
             ? 'border-l-2 border-l-primary bg-accent/45'
-            : 'border-primary/60 bg-accent/50 shadow-sm'
+            : grouped
+              ? 'bg-accent/50 ring-1 ring-primary/40'
+              : 'border-primary/60 bg-accent/50 shadow-sm'
         ),
         interactive ? (
           variant === 'list'
