@@ -157,8 +157,7 @@ export function LocalImage({
       onLoad={localSrc ? onLoad : undefined}
       src={localSrc || BLANK_IMAGE_SRC}
       alt={alt}
-      width={width}
-      height={height}
+      {...(!props.fill ? { width, height } : {})}
       loading={loading ?? 'lazy'}
       decoding={decoding ?? 'async'}
       unoptimized

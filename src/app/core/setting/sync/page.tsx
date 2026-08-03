@@ -94,6 +94,8 @@ export default function SyncPage() {
     setAutoRecordSyncEnabled,
     autoSettingsSyncEnabled,
     setAutoSettingsSyncEnabled,
+    autoConversationSyncEnabled,
+    setAutoConversationSyncEnabled,
     excludeSensitiveConfig,
     setExcludeSensitiveConfig,
     autoPullOnOpen,
@@ -446,9 +448,11 @@ export default function SyncPage() {
               <DataSyncOverview
                 autoRecordSyncEnabled={autoRecordSyncEnabled}
                 autoSettingsSyncEnabled={autoSettingsSyncEnabled}
+                autoConversationSyncEnabled={autoConversationSyncEnabled}
                 excludeSensitiveConfig={excludeSensitiveConfig}
                 onRecordSyncChange={setAutoRecordSyncEnabled}
                 onSettingsSyncChange={setAutoSettingsSyncEnabled}
+                onConversationSyncChange={setAutoConversationSyncEnabled}
                 onSensitiveConfigChange={handleExcludeSensitiveConfigChange}
               />
 

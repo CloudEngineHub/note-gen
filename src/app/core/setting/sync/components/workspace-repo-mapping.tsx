@@ -503,6 +503,9 @@ export function WorkspaceRepoMapping({
                       <InputGroupInput
                         value={draftRepo}
                         disabled={isBusy}
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         placeholder={t('settings.sync.repositoryNamePlaceholder')}
                         onChange={(event) => {
                           updateDraftRepository(workspacePath, event.target.value)

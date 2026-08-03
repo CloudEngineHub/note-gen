@@ -1,4 +1,6 @@
 import { getDb } from './index'
+import { enqueueAutoDataSync } from '@/lib/sync/auto-data-sync-queue'
+import { nextConversationSyncTimestamp } from './conversation-sync-state'
 
 export interface ConversationCompaction {
   id: number
@@ -86,7 +88,7 @@ export async function insertConversationCompaction(compaction: NewConversationCo
   const db = await getDb()
   const latest = await getLatestConversationCompaction(compaction.conversationId)
   const revision = (latest?.revision || 0) + 1
-  const createdAt = Date.now()
+  const createdAt = await nextConversationSyncTimestamp()
   const result = await db.execute(
     `insert into conversation_compactions (
       conversationId,
@@ -119,6 +121,12 @@ export async function insertConversationCompaction(compaction: NewConversationCo
       createdAt,
     ]
   )
+  await db.execute(
+    'update conversations set syncUpdatedAt = $1 where id = $2',
+    [createdAt, compaction.conversationId]
+  )
+
+  enqueueAutoDataSync('conversations', 'conversation-compaction-created')
 
   return {
     ...compaction,
@@ -130,10 +138,16 @@ export async function insertConversationCompaction(compaction: NewConversationCo
 
 export async function deleteConversationCompactions(conversationId: number) {
   const db = await getDb()
+  const syncUpdatedAt = await nextConversationSyncTimestamp()
   await db.execute(
     'delete from conversation_compactions where conversationId = $1',
     [conversationId]
   )
+  await db.execute(
+    'update conversations set syncUpdatedAt = $1 where id = $2',
+    [syncUpdatedAt, conversationId]
+  )
+  enqueueAutoDataSync('conversations', 'conversation-compaction-deleted')
 }
 
 export async function deleteAllConversationCompactions() {

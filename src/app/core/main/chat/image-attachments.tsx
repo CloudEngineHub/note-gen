@@ -1,9 +1,8 @@
 "use client"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Image from "next/image"
-import { PhotoView } from "react-photo-view"
 import { PhotoPreviewProvider } from "@/components/photo-preview-provider"
+import { LocalImage } from '@/components/local-image'
 
 export interface ImageAttachment {
   id: string
@@ -29,15 +28,13 @@ export function ImageAttachments({ images, onRemove }: ImageAttachmentsProps) {
             className="relative group rounded-lg overflow-hidden border bg-muted cursor-pointer"
             style={{ width: '40px', height: '40px' }}
           >
-            <PhotoView src={image.url}>
-              <Image
-                src={image.url}
-                alt={image.name || 'Attached image'}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            </PhotoView>
+            <LocalImage
+              src={image.url}
+              alt={image.name || 'Attached image'}
+              fill
+              className="object-cover"
+              unoptimized
+            />
             <Button
               variant="destructive"
               size="icon"

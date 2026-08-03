@@ -1,4 +1,4 @@
-import { readFile } from '@tauri-apps/plugin-fs'
+import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
 import { platform } from '@tauri-apps/plugin-os'
 import { analyzeImagesWithVlm } from '@/lib/ai/description'
 import {
@@ -126,7 +126,9 @@ async function readImageBlob(attachment: ChatImageAttachment) {
 
   const filePath = resolveLocalImagePath(attachment.url)
   if (!filePath) throw new Error('IMAGE_PATH_UNAVAILABLE')
-  const bytes = await readFile(filePath)
+  const bytes = filePath.startsWith('/')
+    ? await readFile(filePath)
+    : await readFile(filePath, { baseDir: BaseDirectory.AppData })
   return new Blob([new Uint8Array(bytes)], {
     type: inferMimeType(attachment.name || filePath),
   })

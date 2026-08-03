@@ -15,7 +15,7 @@ function roundMs(value: number) {
   return Math.round(value)
 }
 
-function useVirtualHostedStyle(endpoint: string) {
+function shouldUseVirtualHostedStyle(endpoint: string) {
   return endpoint.includes('amazonaws.com')
     || endpoint.includes('aliyuncs.com')
     || endpoint.includes('myqcloud.com')
@@ -214,7 +214,7 @@ function buildS3Url(config: S3Config, key: string): string {
   if (isCloudflareR2) {
     // 使用 Path Style: https://endpoint/bucket/key
     url = `${cleanEndpoint}/${bucket}/${encodedFullKey}`
-  } else if (useVirtualHostedStyle(cleanEndpoint)) {
+  } else if (shouldUseVirtualHostedStyle(cleanEndpoint)) {
     // 使用 Virtual Hosted Style: https://bucket.endpoint/key
     try {
       const urlObj = applyBucketHostname(new URL(cleanEndpoint), bucket)
@@ -244,7 +244,7 @@ function buildS3BaseUrl(config: S3Config): string {
   const cleanEndpoint = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint
 
   // 针对阿里云 OSS、腾讯云 COS、AWS S3 等支持 Virtual Hosted Style 的服务进行优化
-  if (useVirtualHostedStyle(cleanEndpoint)) {
+  if (shouldUseVirtualHostedStyle(cleanEndpoint)) {
     try {
       const urlObj = applyBucketHostname(new URL(cleanEndpoint), bucket)
       return urlObj.toString().replace(/\/+$/, '')

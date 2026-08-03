@@ -13,6 +13,7 @@ import useSyncStore from '@/stores/sync'
 import { S3Config, WebDAVConfig } from '@/types/sync'
 import { debugSyncPerf } from './remote-file'
 import { generateGitSyncCommitMessage } from './commit-message'
+import { getSyncMetadataKey } from './sync-context'
 
 type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
 
@@ -82,6 +83,7 @@ class SyncPushQueue {
   private lastInputTime: number = Date.now()
   private generation = 0
   private workspaceSwitchPauseDepth = 0
+  private readonly WORKSPACE_SWITCH_WAIT_TIMEOUT = 3_000
 
   private get IDLE_THRESHOLD(): number {
     // 动态读取 autoSync 设置
@@ -259,7 +261,7 @@ class SyncPushQueue {
         await new Promise(resolve => setTimeout(resolve, 100))
         // 发送开始推送事件
         emitter.emit('sync-push-started', { path: task.path })
-        await this.pushToRemote(task.path)
+        await this.pushToRemote(task.path, task)
       } catch (error) {
         console.error(`[SyncPushQueue] Failed to push ${task.path}:`, error)
       } finally {
@@ -276,7 +278,13 @@ class SyncPushQueue {
   /**
    * 推送到远程仓库
    */
-  private async pushToRemote(path: string): Promise<{ success: boolean; sha?: string }> {
+  private isTaskCurrent(task: PushTask) {
+    return task.generation === this.generation
+      && task.workspacePath === useSettingStore.getState().workspacePath
+      && this.workspaceSwitchPauseDepth === 0
+  }
+
+  private async pushToRemote(path: string, task: PushTask): Promise<{ success: boolean; sha?: string }> {
     const maxRetries = 3
     const syncStartedAt = getPerfNow()
     let previousPerfAt = syncStartedAt
@@ -297,9 +305,12 @@ class SyncPushQueue {
       logPerf('skipped', { reason: 'sync-not-configured' })
       return { success: false }
     }
+    const taskSyncMetadataKey = await getSyncMetadataKey(path)
+    if (!this.isTaskCurrent(task)) return { success: false }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        if (!this.isTaskCurrent(task)) return { success: false }
         logPerf('startAttempt', {
           attempt,
           maxRetries,
@@ -334,15 +345,17 @@ class SyncPushQueue {
             isSameContent: remoteContent === content,
           })
           if (remoteContent === content) {
+            if (!this.isTaskCurrent(task)) return { success: false }
             // 获取远程 SHA 用于更新文件树
             const remoteSha = await this.getRemoteSha(path)
+            if (!this.isTaskCurrent(task)) return { success: false }
             logPerf('getRemoteShaWhenSame', {
               attempt,
               hasSha: Boolean(remoteSha),
             })
             // 更新本地记录的 SHA，这样下次推送时就会检测到 SHA 匹配而跳过
             if (remoteSha) {
-              await setLocalRecordedSha(path, remoteSha)
+              await setLocalRecordedSha(path, remoteSha, taskSyncMetadataKey)
               logPerf('recordLocalSha', {
                 attempt,
                 hasSha: true,
@@ -382,6 +395,8 @@ class SyncPushQueue {
             reason: 'provider-without-commits',
           })
         }
+
+        if (!this.isTaskCurrent(task)) return { success: false }
 
         let success = false
         let uploadedSha: string | undefined
@@ -603,7 +618,9 @@ class SyncPushQueue {
               success = true
               uploadedSha = result.etag // 使用 ETag 作为标识
               // 更新本地记录的 ETag
-              useSyncStore.getState().updateS3FileEtag(path, result.etag)
+              if (this.isTaskCurrent(task)) {
+                useSyncStore.getState().updateS3FileEtag(path, result.etag)
+              }
             }
             break
           }
@@ -640,16 +657,22 @@ class SyncPushQueue {
               success = true
               uploadedSha = result.etag || 'uploaded' // 使用 ETag 作为标识，空字符串使用默认值
               // 更新本地记录的 ETag
-              useSyncStore.getState().updateWebDAVFileEtag(path, result.etag || '')
+              if (this.isTaskCurrent(task)) {
+                useSyncStore.getState().updateWebDAVFileEtag(path, result.etag || '')
+              }
             }
             break
           }
         }
 
         if (success) {
+          if (!this.isTaskCurrent(task)) {
+            emitter.emit('sync-push-completed', { path, success: false })
+            return { success: false }
+          }
           // 推送成功后，保存远程 SHA 到本地 store
           if (uploadedSha) {
-            await setLocalRecordedSha(path, uploadedSha)
+            await setLocalRecordedSha(path, uploadedSha, taskSyncMetadataKey)
             logPerf('recordLocalSha', {
               attempt,
               hasSha: true,
@@ -673,6 +696,7 @@ class SyncPushQueue {
           return { success: false }
         }
       } catch (error: any) {
+        if (!this.isTaskCurrent(task)) return { success: false }
         logPerf('failedAttempt', {
           attempt,
           message: error instanceof Error ? error.message : String(error),
@@ -952,7 +976,12 @@ class SyncPushQueue {
   async prepareForWorkspaceSwitch() {
     this.workspaceSwitchPauseDepth += 1
     this.clear()
+    const deadline = Date.now() + this.WORKSPACE_SWITCH_WAIT_TIMEOUT
     while (this.isProcessing) {
+      if (Date.now() >= deadline) {
+        console.warn('[SyncPushQueue] 工作区切换等待同步任务超时，旧任务将在后台安全结束')
+        break
+      }
       await new Promise(resolve => setTimeout(resolve, 25))
     }
   }

@@ -202,6 +202,9 @@ interface SettingState {
   autoSettingsSyncEnabled: boolean
   setAutoSettingsSyncEnabled: (enabled: boolean) => Promise<void>
 
+  autoConversationSyncEnabled: boolean
+  setAutoConversationSyncEnabled: (enabled: boolean) => Promise<void>
+
   excludeSensitiveConfig: boolean
   setExcludeSensitiveConfig: (enabled: boolean) => Promise<void>
 
@@ -536,6 +539,10 @@ const useSettingStore = create<SettingState>((set, get) => ({
     }
     if (await store.get<boolean>('autoSettingsSyncEnabled') === undefined) {
       await store.set('autoSettingsSyncEnabled', legacyAutoDataSyncEnabled !== false)
+    }
+    const shouldInitializeConversationSync = await store.get<boolean>('autoConversationSyncEnabled') === undefined
+    if (shouldInitializeConversationSync) {
+      await store.set('autoConversationSyncEnabled', true)
     }
 
     let preferencesChanged = false
@@ -1193,7 +1200,10 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ autoRecordSyncEnabled })
     const store = await Store.load('store.json')
     await store.set('autoRecordSyncEnabled', autoRecordSyncEnabled)
-    await store.set('autoDataSyncEnabled', autoRecordSyncEnabled || get().autoSettingsSyncEnabled)
+    await store.set(
+      'autoDataSyncEnabled',
+      autoRecordSyncEnabled || get().autoSettingsSyncEnabled || get().autoConversationSyncEnabled,
+    )
     await store.save()
     if (autoRecordSyncEnabled) enqueueAutoDataSync('records', 'records-sync-enabled')
   },
@@ -1203,9 +1213,27 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ autoSettingsSyncEnabled })
     const store = await Store.load('store.json')
     await store.set('autoSettingsSyncEnabled', autoSettingsSyncEnabled)
-    await store.set('autoDataSyncEnabled', autoSettingsSyncEnabled || get().autoRecordSyncEnabled)
+    await store.set(
+      'autoDataSyncEnabled',
+      autoSettingsSyncEnabled || get().autoRecordSyncEnabled || get().autoConversationSyncEnabled,
+    )
     await store.save()
     if (autoSettingsSyncEnabled) enqueueAutoDataSync('settings', 'settings-sync-enabled')
+  },
+
+  autoConversationSyncEnabled: true,
+  setAutoConversationSyncEnabled: async (autoConversationSyncEnabled: boolean) => {
+    set({ autoConversationSyncEnabled })
+    const store = await Store.load('store.json')
+    await store.set('autoConversationSyncEnabled', autoConversationSyncEnabled)
+    await store.set(
+      'autoDataSyncEnabled',
+      autoConversationSyncEnabled || get().autoRecordSyncEnabled || get().autoSettingsSyncEnabled,
+    )
+    await store.save()
+    if (autoConversationSyncEnabled) {
+      enqueueAutoDataSync('conversations', 'conversations-sync-enabled')
+    }
   },
 
   excludeSensitiveConfig: true,

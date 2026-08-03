@@ -71,10 +71,14 @@ export async function getLocalRecordedSha(filePath: string): Promise<string | nu
 /**
  * 设置本地记录的远程 SHA
  */
-export async function setLocalRecordedSha(filePath: string, sha: string): Promise<void> {
+export async function setLocalRecordedSha(
+  filePath: string,
+  sha: string,
+  scopedKey?: string,
+): Promise<void> {
   const store = await getStore()
   const syncedShas = await store.get<Record<string, string>>('syncedFileShas') || {}
-  syncedShas[await getSyncMetadataKey(filePath)] = sha
+  syncedShas[scopedKey || await getSyncMetadataKey(filePath)] = sha
   await store.set('syncedFileShas', syncedShas)
   await store.save()
 }

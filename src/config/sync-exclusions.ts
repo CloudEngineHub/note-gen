@@ -86,9 +86,12 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
 
   // 文件、画布和应用数据同步的本地进度
   'canvasSyncVersions',
+  'conversationSyncVersions',
+  'conversationSyncInitialized',
   'autoDataSyncEnabled',
   'autoRecordSyncEnabled',
   'autoSettingsSyncEnabled',
+  'autoConversationSyncEnabled',
   'autoVectorEnabled',
   'closeBehavior',
   'excludeSensitiveConfig',
@@ -106,7 +109,13 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   'autoDataSyncLastAppliedRemoteMeta',
   'autoDataSyncRecordSnapshots',
   'autoDataSyncBaselineFingerprints',
+  // Development builds may have written this local-only diagnostic key.
+  'autoConversationSyncDiagnostic',
   'lastRecordTagId',
+  // 工作区和资源目录是设备本地状态，任何隐私设置下都不能跨设备覆盖。
+  'workspacePath',
+  'workspaceHistory',
+  'assetsPath',
   'workspaceSyncRepos',
   'githubCustomSyncRepo',
   'giteeCustomSyncRepo',
@@ -115,9 +124,6 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
 ]
 
 export const SENSITIVE_SYNC_EXCLUDED_FIELDS: string[] = [
-  'workspacePath',
-  'workspaceHistory',
-  'assetsPath',
   'appFontFamily',
   'uiScale',
   'contentTextScale',

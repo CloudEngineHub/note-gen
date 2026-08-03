@@ -18,8 +18,17 @@ import {
   parseCanvasSyncIndex,
   uploadCanvases,
 } from '@/lib/sync/canvas-sync'
+import {
+  CONVERSATION_SYNC_DIRECTORY,
+  CONVERSATION_SYNC_INDEX_PATH,
+  downloadConversations,
+  getLocalConversationSyncFingerprint,
+  getRemoteConversationSyncFingerprint,
+  hasRemoteConversationSyncData,
+  uploadConversations,
+} from '@/lib/sync/conversation-sync'
 
-export type AutoDataSyncDomain = 'records' | 'settings'
+export type AutoDataSyncDomain = 'records' | 'settings' | 'conversations'
 type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
 export type AutoDataSyncPhase =
   | 'idle'
@@ -113,12 +122,13 @@ type AutoDataSyncGlobalScope = typeof globalThis & {
 
 const DEFAULT_AUTO_DATA_SYNC_DELAY = 1_000
 const DEFAULT_AUTO_DATA_SYNC_META_CHECK_INTERVAL = 10_000
+const CONVERSATION_SYNC_BUSY_WAIT_TIMEOUT = 30_000
 const MAX_RETRY_COUNT = 3
 const AUTO_DATA_SYNC_META_PATH = '.data/meta.json'
 const AUTO_DATA_SYNC_TAGS_PATH = '.data/tags.json'
 const AUTO_DATA_SYNC_MARKS_PATH = '.data/marks.json'
 const AUTO_DATA_SYNC_SETTINGS_PATH = '.data/settings.json'
-const AUTO_DATA_SYNC_DOMAINS: AutoDataSyncDomain[] = ['records', 'settings']
+const AUTO_DATA_SYNC_DOMAINS: AutoDataSyncDomain[] = ['records', 'settings', 'conversations']
 const AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY = 'autoDataSyncDirtyDomains'
 const AUTO_DATA_SYNC_LAST_LOCAL_UPLOAD_META_MS_KEY = 'autoDataSyncLastLocalUploadMetaUpdatedAtMs'
 const AUTO_DATA_SYNC_LAST_APPLIED_REMOTE_META_MS_KEY = 'autoDataSyncLastAppliedRemoteMetaUpdatedAtMs'
@@ -142,6 +152,7 @@ const failedTasks: Partial<Record<AutoDataSyncDomain, AutoDataSyncTask>> = {}
 const failedTaskErrors: Partial<Record<AutoDataSyncDomain, string>> = {}
 let runtimeInitialized = false
 const pendingDirtyWrites = new Set<Promise<void>>()
+let dirtyWriteQueue: Promise<void> = Promise.resolve()
 
 let state: AutoDataSyncState = {
   isSyncing: false,
@@ -388,8 +399,10 @@ function updateState(next: Partial<AutoDataSyncState>) {
 function clearFailedAutoDataSyncTasks() {
   delete failedTasks.records
   delete failedTasks.settings
+  delete failedTasks.conversations
   delete failedTaskErrors.records
   delete failedTaskErrors.settings
+  delete failedTaskErrors.conversations
 }
 
 function clearFailedAutoDataSyncDomains(domains: AutoDataSyncDomain[]) {
@@ -480,6 +493,7 @@ export function enqueueAutoDataSync(domain: AutoDataSyncDomain, reason = 'change
 export function enqueueAllAutoDataSync(reason = 'manual-sync', mode: 'auto' | 'manual' = 'manual') {
   enqueueAutoDataSync('records', reason, mode)
   enqueueAutoDataSync('settings', reason, mode)
+  enqueueAutoDataSync('conversations', reason, mode)
 }
 
 export async function flushAutoDataSyncNow(): Promise<void> {
@@ -544,6 +558,18 @@ export function finishAutoDataSyncRepositoryChange() {
     syncMode: null,
     status: 'idle',
   })
+  void (async () => {
+    if (!await isAutoDataSyncProviderConfigured()) return
+
+    // A repository has its own independent baseline. Existing local data may
+    // be clean relative to the previous repository but still be absent from
+    // the new one, so every enabled domain must participate in the first
+    // reconciliation for the new target.
+    const enabledDomains = await getEnabledAutoDataSyncDomains()
+    await markAutoDataSyncDomainsDirty(enabledDomains)
+    startPeriodicAutoDataSyncMetaCheck()
+    await checkRemoteAutoDataSync('startup', { uploadDirtyDomains: true, force: true })
+  })()
 }
 
 function trackAutoDataSyncDirtyWrite(domain: AutoDataSyncDomain) {
@@ -658,9 +684,13 @@ export async function downloadAutoDataSyncNow(
   const domainsToDownload = options.domains?.length
     ? Array.from(new Set(options.domains))
     : await getEnabledAutoDataSyncDomains()
+  if (domainsToDownload.includes('conversations')) {
+    await waitForConversationSyncIdle()
+  }
   cancelPendingAutoDataSyncUpload(`download:${mode}`, domainsToDownload)
   const shouldDownloadRecords = domainsToDownload.includes('records')
   const shouldDownloadSettings = domainsToDownload.includes('settings')
+  const shouldDownloadConversations = domainsToDownload.includes('conversations')
   let remoteMeta = knownRemoteMeta
   if (!remoteMeta) {
     try {
@@ -705,6 +735,7 @@ export async function downloadAutoDataSyncNow(
     let tagResult: Tag[] = []
     let markResult: Mark[] = []
     let settingsResult = true
+    let conversationResult = true
 
     if (shouldDownloadRecords) {
       tagResult = await useTagStore.getState().downloadTags({ allowMissingRemote: true })
@@ -725,15 +756,19 @@ export async function downloadAutoDataSyncNow(
     if (shouldDownloadSettings) {
       settingsResult = await useSettingsSyncStore.getState().downloadSettings({ allowMissingRemote: true })
     }
+    if (shouldDownloadConversations) {
+      conversationResult = await downloadConversations({ allowMissingRemote: true })
+    }
     debugAutoDataSync('download domain results', {
       domains: domainsToDownload,
       tags: tagResult,
       marks: markResult,
       settings: settingsResult,
+      conversations: conversationResult,
     })
 
-    if (!tagResult || !markResult || !settingsResult) {
-      throw new Error('Failed to download records and settings')
+    if (!tagResult || !markResult || !settingsResult || !conversationResult) {
+      throw new Error('Failed to download app data')
     }
 
     if (shouldDownloadSettings) {
@@ -860,6 +895,10 @@ async function mergeAutoDataSyncDomains(targetDomains: AutoDataSyncDomain[]): Pr
   try {
     const mergeRecords = targetDomains.includes('records')
     const mergeSettings = targetDomains.includes('settings')
+    const mergeConversations = targetDomains.includes('conversations')
+    if (mergeConversations) {
+      await waitForConversationSyncIdle()
+    }
     if (mergeRecords) {
       localRecordSnapshot = await createAutoDataSyncLocalRecordSnapshot('before-automatic-merge')
     }
@@ -891,9 +930,12 @@ async function mergeAutoDataSyncDomains(targetDomains: AutoDataSyncDomain[]): Pr
     const settingsResult = mergeSettings
       ? await useSettingsSyncStore.getState().downloadSettings({ allowMissingRemote: true })
       : true
+    const conversationResult = mergeConversations
+      ? await downloadConversations({ allowMissingRemote: true })
+      : true
 
-    if (!settingsResult) {
-      throw new Error('Failed to merge remote settings')
+    if (!settingsResult || !conversationResult) {
+      throw new Error('Failed to merge remote app data')
     }
 
     const tagMergeResult = mergeTags(localTags, remoteTags)
@@ -1026,7 +1068,7 @@ export async function initAutoDataSyncRuntime(): Promise<void> {
 export async function retryAutoDataSync(domain?: AutoDataSyncDomain): Promise<void> {
   const failedTask = domain
     ? failedTasks[domain]
-    : failedTasks.records || failedTasks.settings
+    : failedTasks.records || failedTasks.settings || failedTasks.conversations
   if (failedTask) {
     queue.unshift({
       ...failedTask,
@@ -1046,11 +1088,33 @@ async function getAutoDataSyncDelay(): Promise<number> {
   return DEFAULT_AUTO_DATA_SYNC_DELAY
 }
 
+async function isConversationSyncBusy() {
+  const { default: useChatStore } = await import('@/stores/chat')
+  const chatState = useChatStore.getState()
+  return chatState.loading || chatState.agentState.isRunning
+}
+
+async function waitForConversationSyncIdle() {
+  const deadline = Date.now() + CONVERSATION_SYNC_BUSY_WAIT_TIMEOUT
+  while (await isConversationSyncBusy()) {
+    if (Date.now() >= deadline) {
+      throw new Error('Conversation sync is waiting for the active reply to finish')
+    }
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+}
+
 async function isAutoDataSyncDomainEnabled(domain: AutoDataSyncDomain): Promise<boolean> {
   const store = await Store.load('store.json')
-  const key = domain === 'records' ? 'autoRecordSyncEnabled' : 'autoSettingsSyncEnabled'
+  const key = domain === 'records'
+    ? 'autoRecordSyncEnabled'
+    : domain === 'settings'
+      ? 'autoSettingsSyncEnabled'
+      : 'autoConversationSyncEnabled'
   const enabled = await store.get<boolean>(key)
   if (enabled !== undefined) return enabled
+
+  if (domain === 'conversations') return true
 
   const legacyEnabled = await store.get<boolean>('autoDataSyncEnabled')
   return legacyEnabled !== false
@@ -1165,7 +1229,10 @@ function startPeriodicAutoDataSyncMetaCheck() {
         return
       }
 
-      void checkRemoteAutoDataSync('periodic', { uploadDirtyDomains: false })
+      // Dirty state is persisted independently from the in-memory queue. Always
+      // resume it here so a reload, a busy chat, or a transient queue failure
+      // cannot leave local changes pending forever.
+      void checkRemoteAutoDataSync('periodic', { uploadDirtyDomains: true })
     }, interval)
     currentGlobalRuntimeState.remoteMetaCheckTimer = remoteMetaCheckTimer
   })
@@ -1208,6 +1275,22 @@ async function processQueue() {
     return
   }
 
+  startPeriodicAutoDataSyncMetaCheck()
+  const dirtyDomains = (await getAutoDataSyncDirtyDomains(await Store.load('store.json')))
+    .filter(domain => enabledDomains.includes(domain))
+  for (const domain of dirtyDomains) {
+    if (queue.some(task => task.domain === domain)) continue
+    queue.push({
+      id: `${Date.now()}-${++seq}`,
+      seq,
+      domain,
+      reason: 'resume-dirty-domain',
+      createdAt: Date.now(),
+      retryCount: 0,
+      mode: 'auto',
+    })
+  }
+
   processing = true
   debugAutoDataSync('queue processing started', { pendingCount: queue.length })
 
@@ -1229,6 +1312,9 @@ async function processQueue() {
     const taskStartedAt = Date.now()
 
     try {
+      if (task.domain === 'conversations') {
+        await waitForConversationSyncIdle()
+      }
       updateState({
         isSyncing: true,
         phase: 'checking_remote',
@@ -1348,7 +1434,13 @@ async function processQueue() {
   }
 
   processing = false
-  const failedDomain = failedTasks.records ? 'records' : failedTasks.settings ? 'settings' : null
+  const failedDomain = failedTasks.records
+    ? 'records'
+    : failedTasks.settings
+      ? 'settings'
+      : failedTasks.conversations
+        ? 'conversations'
+        : null
   if (failedDomain) {
     updateState({
       isSyncing: false,
@@ -1415,6 +1507,14 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
     return
   }
 
+  if (domain === 'conversations') {
+    await waitForConversationSyncIdle()
+    const result = await uploadConversations()
+    debugAutoDataSync('conversations upload result', { conversations: result })
+    if (!result) throw new Error('Failed to upload conversations')
+    return
+  }
+
   const { default: useSettingsSyncStore } = await import('@/stores/settingsSync')
   const result = await useSettingsSyncStore.getState().uploadSettings()
   debugAutoDataSync('settings upload result', { settings: result })
@@ -1455,7 +1555,7 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
     }
   }
   const metadata = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     updatedAt: new Date(now).toISOString(),
     updatedAtMs: now,
     deviceId,
@@ -1466,6 +1566,7 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
     files: {
       records: [AUTO_DATA_SYNC_TAGS_PATH, AUTO_DATA_SYNC_MARKS_PATH, CANVAS_SYNC_PATH, CANVAS_SYNC_ITEMS_DIRECTORY],
       settings: [AUTO_DATA_SYNC_SETTINGS_PATH],
+      conversations: [CONVERSATION_SYNC_INDEX_PATH, CONVERSATION_SYNC_DIRECTORY],
       meta: AUTO_DATA_SYNC_META_PATH,
     },
     appVersion: await getAppVersion(),
@@ -1551,11 +1652,19 @@ async function guardAutoDataSyncUploadAgainstRemoteNewer(
     domain,
     ...queue.map(item => item.domain),
   ]))
-  const remoteChangedDomains = remoteMeta.lastUploadedDomains.length > 0
-    ? remoteMeta.lastUploadedDomains
-    : remoteMeta.domains.length > 0
-      ? remoteMeta.domains
-      : AUTO_DATA_SYNC_DOMAINS
+  // `lastUploadedDomains` only describes the latest metadata write. Another
+  // domain may have a still-unapplied newer version in `domainStates`; using
+  // the top-level list here can repeatedly pull an unrelated domain and starve
+  // the task that is actually being uploaded.
+  const remoteChangedDomains = await getRemoteNewerDomains(
+    store,
+    remoteMeta,
+    pendingDomains,
+    decision.currentDeviceId,
+  )
+  if (remoteChangedDomains.length === 0) {
+    remoteChangedDomains.push(domain)
+  }
   const conflictingDomains = pendingDomains.filter(item => remoteChangedDomains.includes(item))
   const remoteApplyDecision = conflictingDomains.length > 0
     ? await canApplyRemoteDomainsWithoutConflict(store, provider, conflictingDomains)
@@ -1969,6 +2078,10 @@ async function hasUntrackedRemoteDomainBeforeUpload(
     return Boolean(remoteSettingsContent)
   }
 
+  if (domain === 'conversations') {
+    return hasRemoteConversationSyncData()
+  }
+
   const [{ getAllMarks }, remoteMarksContent] = await Promise.all([
     import('@/db/marks'),
     downloadAutoDataSyncRemoteFileContent(store, provider, AUTO_DATA_SYNC_MARKS_PATH),
@@ -2111,6 +2224,16 @@ async function getAutoDataSyncContentFingerprints(
     }
   }
 
+  if (domain === 'conversations') {
+    const remoteIndexContent = await downloadAutoDataSyncRemoteFileContent(
+      store,
+      provider,
+      CONVERSATION_SYNC_INDEX_PATH,
+    )
+    const remote = getRemoteConversationSyncFingerprint(remoteIndexContent)
+    return remote ? { local, remote } : null
+  }
+
   const remoteSettingsContent = await downloadAutoDataSyncRemoteFileContent(
     store,
     provider,
@@ -2148,6 +2271,10 @@ async function getLocalAutoDataSyncDomainFingerprint(
       marks: marks.map(getMarkSyncKey).sort(),
       canvases: canvases.map(project => [project.id, project.updatedAt, project.deletedAt, project.pinnedAt, project.title]),
     })
+  }
+
+  if (domain === 'conversations') {
+    return getLocalConversationSyncFingerprint()
   }
 
   const localSettings = Object.fromEntries(await store.entries()) as Record<string, unknown>
@@ -2460,7 +2587,7 @@ function normalizeAutoDataSyncDomains(value: unknown): AutoDataSyncDomain[] {
 }
 
 function isAutoDataSyncDomain(value: unknown): value is AutoDataSyncDomain {
-  return value === 'records' || value === 'settings'
+  return value === 'records' || value === 'settings' || value === 'conversations'
 }
 
 async function getAutoDataSyncProvider(store: Store): Promise<AutoDataSyncProvider> {
@@ -2542,17 +2669,28 @@ async function getAutoDataSyncDirtyDomains(store: Store) {
   return normalizeAutoDataSyncDomains(value)
 }
 
-async function markAutoDataSyncDirty(domain: AutoDataSyncDomain) {
-  try {
+async function markAutoDataSyncDomainsDirty(domains: AutoDataSyncDomain[]) {
+  const normalizedDomains = Array.from(new Set(domains))
+  if (normalizedDomains.length === 0) return
+
+  const update = async () => {
     const store = await Store.load('store.json')
     const dirtyDomains = await getAutoDataSyncDirtyDomains(store)
-    if (dirtyDomains.includes(domain)) {
-      return
-    }
+    const nextDirtyDomains = Array.from(new Set([...dirtyDomains, ...normalizedDomains]))
+    if (nextDirtyDomains.length === dirtyDomains.length) return
 
-    await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY), [...dirtyDomains, domain])
+    await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY), nextDirtyDomains)
     await store.save()
-    debugAutoDataSync('dirty domain marked', { domain })
+    debugAutoDataSync('dirty domains marked', { domains: normalizedDomains })
+  }
+
+  dirtyWriteQueue = dirtyWriteQueue.then(update, update)
+  await dirtyWriteQueue
+}
+
+async function markAutoDataSyncDirty(domain: AutoDataSyncDomain) {
+  try {
+    await markAutoDataSyncDomainsDirty([domain])
   } catch (error) {
     debugAutoDataSync('failed to mark dirty domain', {
       domain,
@@ -2562,16 +2700,21 @@ async function markAutoDataSyncDirty(domain: AutoDataSyncDomain) {
 }
 
 async function clearAutoDataSyncDirtyDomain(domain: AutoDataSyncDomain) {
-  const store = await Store.load('store.json')
-  const dirtyDomains = await getAutoDataSyncDirtyDomains(store)
-  const nextDirtyDomains = dirtyDomains.filter(item => item !== domain)
-  await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY), nextDirtyDomains)
-  await store.save()
-  debugAutoDataSync('dirty domain cleared', {
-    domain,
-    previousDirtyDomains: dirtyDomains,
-    dirtyDomains: nextDirtyDomains,
-  })
+  const update = async () => {
+    const store = await Store.load('store.json')
+    const dirtyDomains = await getAutoDataSyncDirtyDomains(store)
+    const nextDirtyDomains = dirtyDomains.filter(item => item !== domain)
+    await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_DIRTY_DOMAINS_KEY), nextDirtyDomains)
+    await store.save()
+    debugAutoDataSync('dirty domain cleared', {
+      domain,
+      previousDirtyDomains: dirtyDomains,
+      dirtyDomains: nextDirtyDomains,
+    })
+  }
+
+  dirtyWriteQueue = dirtyWriteQueue.then(update, update)
+  await dirtyWriteQueue
 }
 
 async function markAutoDataSyncRemoteMetaApplied(

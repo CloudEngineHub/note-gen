@@ -53,6 +53,7 @@ export function MobileChatHeader() {
   } = useChatStore()
   const { language } = useSettingStore()
   const autoRecordSyncEnabled = useSettingStore(state => state.autoRecordSyncEnabled)
+  const autoConversationSyncEnabled = useSettingStore(state => state.autoConversationSyncEnabled)
   const hasMobileUpdate = useUpdateStore(state => Boolean(state.mobileUpdate))
   const tEmpty = useTranslations("record.chat.empty")
   const tInput = useTranslations("record.chat.input")
@@ -79,6 +80,14 @@ export function MobileChatHeader() {
             || autoDataSyncState.phase === "conflict"
           )
         )
+      )
+    )
+    || (
+      autoConversationSyncEnabled
+      && autoDataSyncState.affectedDomains.includes("conversations")
+      && (
+        autoDataSyncState.phase === "failed"
+        || autoDataSyncState.phase === "conflict"
       )
     )
 

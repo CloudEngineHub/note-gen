@@ -1,6 +1,6 @@
 'use client'
 
-import { Database, Settings2, ShieldCheck } from 'lucide-react'
+import { Database, MessageSquare, Settings2, ShieldCheck } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import {
@@ -24,18 +24,22 @@ import { Switch } from '@/components/ui/switch'
 interface DataSyncOverviewProps {
   autoRecordSyncEnabled: boolean
   autoSettingsSyncEnabled: boolean
+  autoConversationSyncEnabled: boolean
   excludeSensitiveConfig: boolean
   onRecordSyncChange: (checked: boolean) => void
   onSettingsSyncChange: (checked: boolean) => void
+  onConversationSyncChange: (checked: boolean) => void
   onSensitiveConfigChange: (checked: boolean) => void
 }
 
 export function DataSyncOverview({
   autoRecordSyncEnabled,
   autoSettingsSyncEnabled,
+  autoConversationSyncEnabled,
   excludeSensitiveConfig,
   onRecordSyncChange,
   onSettingsSyncChange,
+  onConversationSyncChange,
   onSensitiveConfigChange,
 }: DataSyncOverviewProps) {
   const t = useTranslations()
@@ -74,6 +78,21 @@ export function DataSyncOverview({
                 checked={autoSettingsSyncEnabled}
                 onCheckedChange={onSettingsSyncChange}
                 aria-label={t('settings.sync.autoSettingsSync')}
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemMedia variant="icon"><MessageSquare /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('settings.sync.autoConversationSync')}</ItemTitle>
+              <ItemDescription>{t('settings.sync.autoConversationSyncDesc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                checked={autoConversationSyncEnabled}
+                onCheckedChange={onConversationSyncChange}
+                aria-label={t('settings.sync.autoConversationSync')}
               />
             </ItemActions>
           </Item>

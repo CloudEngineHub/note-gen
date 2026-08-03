@@ -1,11 +1,11 @@
 "use client"
-import Image from "next/image"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useTranslations } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { RotateCcw } from "lucide-react"
 import type { PersistedChatImageAnalysis } from "@/lib/chat-image-context"
+import { LocalImage } from '@/components/local-image'
 
 interface ChatImagesProps {
   images: string[]
@@ -35,7 +35,7 @@ export function ChatImages({ images, analyses = [], onRetry }: ChatImagesProps) 
                 style={{ width: '120px', height: '120px' }}
                 onClick={() => setSelectedImage(imageUrl)}
               >
-                <Image
+                <LocalImage
                   src={imageUrl}
                   alt={`Image ${index + 1}`}
                   fill
@@ -65,7 +65,7 @@ export function ChatImages({ images, analyses = [], onRetry }: ChatImagesProps) 
           <DialogContent className="max-w-4xl max-h-[90vh] p-0">
             <DialogTitle className="sr-only">{previewT('image')}</DialogTitle>
             <div className="relative w-full h-full flex items-center justify-center p-4">
-              <Image
+              <LocalImage
                 src={selectedImage}
                 alt={previewT('image')}
                 width={1200}

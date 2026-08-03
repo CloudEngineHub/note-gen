@@ -22,12 +22,14 @@ export async function initAllDatabases() {
   const { initActivityDb } = await import('./activity');
   const { initCanvasesDb } = await import('./canvases');
   const { initConversationCompactionsDb } = await import('./conversation-compactions');
+  const { initConversationSyncStateDb } = await import('./conversation-sync-state');
   const { initImageAnalysisCacheDb } = await import('./image-analysis-cache');
 
   // 执行初始化：先确保基础表存在，再做 conversations 对 chats 的迁移/补列。
   await initChatsDb();
   await initConversationsDb();
   await initConversationCompactionsDb();
+  await initConversationSyncStateDb();
   await initImageAnalysisCacheDb();
   await initMarksDb();
   await initNotesDb();
@@ -36,4 +38,13 @@ export async function initAllDatabases() {
   await initMemoriesDb();
   await initActivityDb();
   await initCanvasesDb();
+
+  const { Store } = await import('@tauri-apps/plugin-store')
+  const store = await Store.load('store.json')
+  if (await store.get<boolean>('conversationSyncInitialized') === undefined) {
+    await store.set('conversationSyncInitialized', true)
+    await store.save()
+    const { enqueueAutoDataSync } = await import('@/lib/sync/auto-data-sync-queue')
+    enqueueAutoDataSync('conversations', 'conversations-sync-initialized')
+  }
 }

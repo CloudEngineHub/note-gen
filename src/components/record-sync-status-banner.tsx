@@ -95,7 +95,7 @@ function isRecordTransferState(syncState: AutoDataSyncState) {
     return false
   }
 
-  return syncState.currentDomain !== 'settings'
+  return syncState.currentDomain === 'records'
 }
 
 function getBannerTitle(

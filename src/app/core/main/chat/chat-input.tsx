@@ -22,8 +22,7 @@ import { AgentApprovalPanel } from "./agent-approval-panel"
 import { cancelPendingAgentAction, confirmPendingAgentAction } from "./agent-approval-actions"
 import { AgentPermissionModeSelect } from "./agent-permission-mode"
 import { ContextUsageIndicator } from "./context-usage-indicator"
-import { convertFileSrc } from "@tauri-apps/api/core"
-import { readTextFile, writeFile, BaseDirectory, exists, mkdir, stat } from "@tauri-apps/plugin-fs"
+import { readFile, readTextFile, writeFile, BaseDirectory, exists, mkdir, stat } from "@tauri-apps/plugin-fs"
 import { ShineBorder } from "@/components/ui/shine-border"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -56,7 +55,7 @@ import type { SkillMetadata } from '@/lib/skills/types'
 
 const MAX_IMAGE_ATTACHMENTS = 6
 const MAX_IMAGE_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
-const IMAGE_ATTACHMENT_DIR = 'screenshot'
+const IMAGE_ATTACHMENT_DIR = 'conversation-assets'
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'])
 const MIME_EXTENSION_MAP: Record<string, string> = {
   'image/png': 'png',
@@ -584,26 +583,23 @@ export const ChatInput = React.memo(function ChatInput() {
     }
   }
 
-  async function resolveAppDataFilePath(filePath: string) {
-    const { appDataDir, join } = await import('@tauri-apps/api/path')
-    const appData = await appDataDir()
-    return await join(appData, filePath)
-  }
-
   async function createAttachmentFromBlob(blob: Blob, name: string, source: 'file' | 'paste') {
     const extension = getImageExtension(name, blob.type)
-    const fileName = `${source}-${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
-    const filePath = `${IMAGE_ATTACHMENT_DIR}/${fileName}`
     const arrayBuffer = await blob.arrayBuffer()
     const uint8Array = new Uint8Array(arrayBuffer)
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', uint8Array))
+    const hash = Array.from(digest).map(byte => byte.toString(16).padStart(2, '0')).join('')
+    const fileName = `${hash}.${extension}`
+    const filePath = `${IMAGE_ATTACHMENT_DIR}/${fileName}`
 
     await ensureImageAttachmentDir()
-    await writeFile(filePath, uint8Array, { baseDir: BaseDirectory.AppData })
+    if (!await exists(filePath, { baseDir: BaseDirectory.AppData })) {
+      await writeFile(filePath, uint8Array, { baseDir: BaseDirectory.AppData })
+    }
 
-    const fullPath = await resolveAppDataFilePath(filePath)
     return {
       id: createImageAttachmentId(source),
-      url: convertFileSrc(fullPath),
+      url: filePath,
       name: fileName,
       source
     } satisfies ImageAttachment
@@ -671,12 +667,16 @@ export const ChatInput = React.memo(function ChatInput() {
           continue
         }
 
-        newImages.push({
-          id: createImageAttachmentId('local'),
-          url: convertFileSrc(path),
-          name: fileName,
-          source: 'file' as const
-        })
+        const bytes = await readFile(path)
+        const extension = getExtension(fileName)
+        const mimeType = extension === 'jpg' || extension === 'jpeg'
+          ? 'image/jpeg'
+          : `image/${extension}`
+        newImages.push(await createAttachmentFromBlob(
+          new Blob([bytes], { type: mimeType }),
+          fileName,
+          'file',
+        ))
       } catch (error) {
         console.error('Failed to read selected image:', error)
         skipped.failed += 1
