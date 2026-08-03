@@ -191,7 +191,7 @@ const ChatContent = React.memo(function ChatContent() {
                 )}
               </React.Fragment>
             )) : (
-              <MessageScrollerItem className="flex w-full flex-1">
+              <MessageScrollerItem className="flex min-h-full w-full flex-1">
                 <ChatEmpty />
               </MessageScrollerItem>
             )}

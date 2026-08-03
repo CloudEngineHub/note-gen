@@ -70,7 +70,7 @@ export default function ChatEmpty() {
 
   if (isTemporaryConversation) {
     return (
-      <Empty className="absolute inset-0 rounded-none">
+      <Empty className="h-full rounded-none">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <MessageSquareDashed />
@@ -83,7 +83,7 @@ export default function ChatEmpty() {
   }
 
   return (
-    <div className="absolute top-0 right-0 w-full flex flex-col items-center justify-center h-full overflow-hidden">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden">
       {/* Dashed background pattern - only visible when empty */}
       <div
         className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none"
