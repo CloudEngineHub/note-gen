@@ -32,6 +32,7 @@ import RecordSettingPage from '../record/page'
 import ShortcutsPage from '../shortcuts/page'
 import SkillsSettingPage from '../skills/page'
 import SyncPage from '../sync/page'
+import BackupPage from '../backup/page'
 import TemplatePage from '../template/page'
 import WebSearchSettingPage from '../webSearch/page'
 import { SettingTab } from './setting-tab'
@@ -43,6 +44,7 @@ const settingPages: Record<SettingSection, ComponentType> = {
   editor: EditorSettingPage,
   canvas: CanvasSettingPage,
   sync: SyncPage,
+  backup: BackupPage,
   imageHosting: ImageHostingPage,
   ai: AiPage,
   webSearch: WebSearchSettingPage,

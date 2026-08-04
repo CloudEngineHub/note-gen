@@ -35,6 +35,17 @@ input, textarea, select, [contenteditable] {
   min-height: 2.75rem;
 }
 
+.mobile-app-active [data-slot="tabs-list"][data-orientation="horizontal"] {
+  height: auto !important;
+  min-height: 3.125rem;
+  overflow: visible !important;
+}
+
+.mobile-app-active [data-slot="tabs-trigger"][data-orientation="horizontal"] {
+  height: 2.75rem !important;
+  min-height: 2.75rem;
+}
+
 .mobile-app-active [data-slot="button"][data-size^="icon"] {
   min-width: 2.75rem;
 }
@@ -237,6 +248,32 @@ select,
   justify-content: flex-end;
 }
 
+/*
+ * Tailwind 4 的透明色会被部分旧版 Android WebView 错误显示为实色。
+ * 移动端危险操作统一使用实色背景和前景色，避免红底红字导致内容不可见。
+ */
+.mobile-app-active button[data-variant="destructive"],
+.mobile-app-active [role="button"][data-variant="destructive"] {
+  background-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive-foreground)) !important;
+  opacity: 1;
+}
+
+.mobile-app-active button[data-variant="destructive"]:hover,
+.mobile-app-active [role="button"][data-variant="destructive"]:hover {
+  background-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive-foreground)) !important;
+}
+
+.mobile-app-active button[data-variant="destructive"] > svg,
+.mobile-app-active button[data-variant="destructive"] > span,
+.mobile-app-active [role="button"][data-variant="destructive"] > svg,
+.mobile-app-active [role="button"][data-variant="destructive"] > span {
+  color: inherit !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 .mobile-setting-screen button[data-variant="destructive"],
 .mobile-setting-screen [role="button"][data-variant="destructive"] {
   background-color: hsl(var(--destructive)) !important;
@@ -275,6 +312,10 @@ select,
  * generated Tailwind values.
  */
 @supports not (color: color-mix(in srgb, red, blue)) {
+  .mobile-setting-screen [data-slot="card"] {
+    box-shadow: 0 0 0 1px hsl(var(--border)) !important;
+  }
+
   .mobile-setting-screen [class~="bg-muted/10"] {
     background-color: hsl(var(--muted) / 0.1) !important;
   }

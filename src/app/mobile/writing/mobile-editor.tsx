@@ -6,7 +6,7 @@ import { TipTapEditor } from '@/app/core/main/editor/markdown/tiptap-editor'
 import type { Editor } from '@tiptap/react'
 import { Loader2 } from 'lucide-react'
 import useArticleStore from '@/stores/article'
-import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { exists, readTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 
 interface MobileEditorProps {
@@ -15,7 +15,7 @@ interface MobileEditorProps {
 
 export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   const tEditor = useTranslations('editor')
-  const { setCurrentArticle, activeFilePath } = useArticleStore()
+  const { setCurrentArticle, saveCurrentArticle, activeFilePath } = useArticleStore()
 
   const [content, setContent] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -85,20 +85,11 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
 
     isSavingRef.current = true
     try {
-      const workspace = await getWorkspacePath()
-      const pathOptions = await getFilePathOptions(path)
-
-      if (workspace.isCustom) {
-        await writeTextFile(pathOptions.path, newContent)
-      } else {
-        await writeTextFile(pathOptions.path, newContent, { baseDir: pathOptions.baseDir })
-      }
-
-      setCurrentArticle(newContent)
+      await saveCurrentArticle(newContent, path)
     } finally {
       isSavingRef.current = false
     }
-  }, [setCurrentArticle, isEditorReady])
+  }, [isEditorReady, saveCurrentArticle])
 
   // 处理内容变化
   const handleContentChange = useCallback((newContent: string) => {

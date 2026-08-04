@@ -3,11 +3,12 @@
 import { UserRound } from "lucide-react"
 import { animate, motion, useMotionValue, useReducedMotion, type PanInfo } from "framer-motion"
 import { useTranslations } from "next-intl"
-import { useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import { MobileMePage } from "@/app/mobile/setting/components/mobile-me-page"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ShineBorder } from "@/components/ui/shine-border"
 import {
   Sheet,
   SheetContent,
@@ -17,15 +18,27 @@ import {
 } from "@/components/ui/sheet"
 import useSyncStore from "@/stores/sync"
 import { cn } from "@/lib/utils"
+import emitter from "@/lib/emitter"
+import {
+  getAutoDataSyncState,
+  subscribeAutoDataSyncState,
+  type AutoDataSyncState,
+} from "@/lib/sync/auto-data-sync-queue"
 
 const MOBILE_ME_RESTORE_OPEN_KEY = "mobile-me-restore-open"
 const MOBILE_ME_RESTORE_INSTANT_KEY = "mobile-me-restore-open-instant"
+const SYNC_INDICATOR_HIDE_DELAY = 500
 
 export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
   const reduceMotion = useReducedMotion()
   const tNavigation = useTranslations("navigation")
   const [open, setOpen] = useState(false)
   const [instantRestore, setInstantRestore] = useState(false)
+  const [autoDataSyncState, setAutoDataSyncState] = useState<AutoDataSyncState>(
+    getAutoDataSyncState()
+  )
+  const [syncingFiles, setSyncingFiles] = useState<Set<string>>(() => new Set())
+  const [showSyncIndicator, setShowSyncIndicator] = useState(false)
   const swipeSurfaceRef = useRef<HTMLDivElement>(null)
   const surfaceX = useMotionValue(0)
   const avatarUrl = useSyncStore(state =>
@@ -35,6 +48,52 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
     || state.giteaUserInfo?.avatar_url
     || ""
   )
+
+  useEffect(() => subscribeAutoDataSyncState(setAutoDataSyncState), [])
+
+  useEffect(() => {
+    const handlePushStarted = (event: { path: string }) => {
+      setSyncingFiles(current => {
+        const next = new Set(current)
+        next.add(event.path)
+        return next
+      })
+    }
+    const handlePushCompleted = (event: { path: string }) => {
+      setSyncingFiles(current => {
+        if (!current.has(event.path)) return current
+        const next = new Set(current)
+        next.delete(event.path)
+        return next
+      })
+    }
+
+    emitter.on('sync-push-started', handlePushStarted)
+    emitter.on('sync-push-completed', handlePushCompleted)
+    return () => {
+      emitter.off('sync-push-started', handlePushStarted)
+      emitter.off('sync-push-completed', handlePushCompleted)
+    }
+  }, [])
+
+  const syncing = useMemo(() => (
+    syncingFiles.size > 0
+    || autoDataSyncState.phase === 'uploading'
+    || autoDataSyncState.phase === 'downloading'
+  ), [autoDataSyncState.phase, syncingFiles])
+
+  useEffect(() => {
+    if (syncing) {
+      setShowSyncIndicator(true)
+      return
+    }
+
+    const timer = window.setTimeout(
+      () => setShowSyncIndicator(false),
+      SYNC_INDICATOR_HIDE_DELAY,
+    )
+    return () => window.clearTimeout(timer)
+  }, [syncing])
 
   useLayoutEffect(() => {
     if (window.sessionStorage.getItem(MOBILE_ME_RESTORE_OPEN_KEY) !== "true") {
@@ -92,6 +151,11 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
       setOpen(false)
       surfaceX.set(0)
     })
+  }
+
+  function closeSheetBeforeNavigation() {
+    setOpen(false)
+    surfaceX.set(0)
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -153,14 +217,28 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
             variant="ghost"
             size="icon"
             aria-label={tNavigation("me")}
+            aria-busy={syncing}
             className="relative rounded-full transition-transform duration-300 active:scale-90 data-[state=open]:scale-90"
           >
-            <Avatar className="size-7">
-              <AvatarImage src={avatarUrl} alt="" />
-              <AvatarFallback>
-                <UserRound />
-              </AvatarFallback>
-            </Avatar>
+            <span className="relative flex size-8 items-center justify-center rounded-full">
+              <ShineBorder
+                borderWidth={2}
+                duration={5}
+                shineColor={["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A"]}
+                className={cn(
+                  "rounded-full transition-opacity duration-200",
+                  showSyncIndicator
+                    ? "opacity-100 [animation-play-state:running]"
+                    : "opacity-0 [animation-play-state:paused]"
+                )}
+              />
+              <Avatar className="size-7">
+                <AvatarImage src={avatarUrl} alt="" />
+                <AvatarFallback>
+                  <UserRound />
+                </AvatarFallback>
+              </Avatar>
+            </span>
             <span
               aria-hidden
               className={cn(
@@ -200,6 +278,7 @@ export function MobileMeSheet({ indicator = false }: { indicator?: boolean }) {
                 embedded
                 animateEntrance={!instantRestore}
                 refreshOnMount={!instantRestore}
+                onNavigate={closeSheetBeforeNavigation}
               />
             </div>
           </motion.div>

@@ -1,6 +1,7 @@
 import { Store } from '@tauri-apps/plugin-store'
 
 import { getOptionalSyncRepoName } from './repo-utils'
+import type { CloudFolderConfig } from '@/types/sync'
 
 const GIT_SYNC_PROVIDERS = ['github', 'gitee', 'gitlab', 'gitea'] as const
 type GitSyncProvider = typeof GIT_SYNC_PROVIDERS[number]
@@ -17,7 +18,11 @@ export async function getCurrentSyncContext() {
   const store = await Store.load('store.json')
   const workspacePath = normalizeWorkspacePath(await store.get<string>('workspacePath') || '')
   const provider = await store.get<string>('primaryBackupMethod') || 'github'
-  const repo = isGitSyncProvider(provider) ? await getOptionalSyncRepoName(provider) : ''
+  const repo = isGitSyncProvider(provider)
+    ? await getOptionalSyncRepoName(provider)
+    : provider === 'cloudFolder'
+      ? (await store.get<CloudFolderConfig>('cloudFolderSyncConfig'))?.path || ''
+      : ''
 
   return {
     workspacePath,

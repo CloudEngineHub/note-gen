@@ -52,11 +52,11 @@ export function MobileActionDrawer({
               {item.separatorBefore ? <Separator className="my-1" /> : null}
               <Button
                 type="button"
-                variant="ghost"
+                variant={item.destructive ? 'destructive' : 'ghost'}
                 disabled={item.disabled || pendingKey !== null}
                 className={cn(
                   'h-12 w-full justify-start px-3',
-                  item.destructive && 'mt-2 border border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive/10 hover:text-destructive',
+                  item.destructive && 'mt-2',
                 )}
                 onClick={async () => {
                   setPendingKey(item.key)

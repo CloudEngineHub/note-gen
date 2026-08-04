@@ -161,7 +161,7 @@ export function RecordSyncStatusBanner({
       return false
     }
 
-    if (phase === 'queued' || phase === 'checking_remote' || phase === 'waiting_provider') {
+    if (phase === 'waiting_provider') {
       return false
     }
 

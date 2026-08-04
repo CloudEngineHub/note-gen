@@ -1,4 +1,5 @@
 import { exists, readDir, readFile, writeFile } from '@tauri-apps/plugin-fs'
+import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { Store } from '@tauri-apps/plugin-store'
 import { deleteFile as deleteGithubFile, getFiles as getGithubFiles, uploadFile as uploadGithubFile } from './github'
 import { deleteFile as deleteGiteeFile, getFiles as getGiteeFiles, uploadFile as uploadGiteeFile } from './gitee'
@@ -6,11 +7,22 @@ import { deleteFile as deleteGitlabFile, getFileContent as getGitlabFileContent,
 import { deleteFile as deleteGiteaFile, getFileContent as getGiteaFileContent, getFiles as getGiteaFiles, uploadFile as uploadGiteaFile } from './gitea'
 import { s3Delete, s3DownloadBytes, s3HeadObject, s3ListObjects, s3Upload } from './s3'
 import { webdavDelete, webdavDownloadBytes, webdavHeadObject, webdavListObjects, webdavUpload } from './webdav'
+import {
+  androidCloudFolderWorkspaceDelete,
+  androidCloudFolderWorkspaceDownloadBytes,
+  androidCloudFolderWorkspaceHead,
+  androidCloudFolderWorkspaceList,
+  androidCloudFolderWorkspaceUpload,
+  cloudFolderDelete,
+  cloudFolderDownloadBytes,
+  cloudFolderHeadObject,
+  cloudFolderUpload,
+} from './cloud-folder'
 import { ensureDirectoryExists, pullRemoteFile } from './auto-sync'
 import { getDataSyncRepoName, getSyncRepoName } from './repo-utils'
 import { getFilePathOptions } from '@/lib/workspace'
 import { decodeBase64ToBytes, getRemoteFileContent } from './remote-file'
-import type { S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
 
 const MARKDOWN_FILE_PATTERN = /\.md$/i
 
@@ -81,7 +93,7 @@ async function getPlatform(store: Store): Promise<SyncPlatform> {
 }
 
 async function getGitRepository(
-  platform: Exclude<SyncPlatform, 's3' | 'webdav'>,
+  platform: Exclude<SyncPlatform, 's3' | 'webdav' | 'cloudFolder'>,
   scope: RemoteRepositoryScope,
 ) {
   return scope === 'data'
@@ -106,7 +118,7 @@ function normalizeGitEntries(value: unknown): GitRemoteEntry[] {
 }
 
 async function listGitRemoteFiles(
-  platform: Exclude<SyncPlatform, 's3' | 'webdav'>,
+  platform: Exclude<SyncPlatform, 's3' | 'webdav' | 'cloudFolder'>,
   options: RemoteLibraryOptions
 ): Promise<RemoteLibraryFile[]> {
   const repo = await getSyncRepoName(platform)
@@ -213,6 +225,20 @@ async function listObjectStorageFiles(
 export async function listRemoteLibraryFiles(options: RemoteLibraryOptions = {}): Promise<RemoteLibraryFile[]> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
+  if (platform === 'cloudFolder') {
+    if (getRuntimePlatform() !== 'android') return []
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (!config?.path) return []
+    return (await androidCloudFolderWorkspaceList(config))
+      .filter(object => isLibraryPath(object.key, options))
+      .map(object => ({
+        path: object.key,
+        sha: object.etag,
+        size: object.size,
+        modifiedAt: new Date(object.modifiedAt).toISOString(),
+      }))
+      .sort((left, right) => left.path.localeCompare(right.path))
+  }
   const files = platform === 's3' || platform === 'webdav'
     ? await listObjectStorageFiles(store, platform, options)
     : await listGitRemoteFiles(platform, options)
@@ -402,6 +428,19 @@ export async function downloadRemoteBytes(
     return file.content
   }
 
+  if (platform === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    const file = config?.path
+      ? scope === 'workspace' && getRuntimePlatform() === 'android'
+        ? await androidCloudFolderWorkspaceDownloadBytes(config, path)
+        : scope === 'data'
+          ? await cloudFolderDownloadBytes(config, path)
+          : null
+      : null
+    if (!file) throw new Error('云盘文件夹下载失败')
+    return file.content
+  }
+
   const repo = await getGitRepository(platform, scope)
   let file: unknown
   switch (platform) {
@@ -422,7 +461,7 @@ export async function downloadRemoteBytes(
   return decodeBase64ToBytes(getRemoteFileContent(file, path))
 }
 
-async function getExistingRemoteSha(platform: Exclude<SyncPlatform, 's3' | 'webdav'>, path: string, repo: string) {
+async function getExistingRemoteSha(platform: Exclude<SyncPlatform, 's3' | 'webdav' | 'cloudFolder'>, path: string, repo: string) {
   let entry: unknown
   switch (platform) {
     case 'github':
@@ -490,6 +529,19 @@ async function uploadRemoteContent(
     return result.etag || `uploaded:${path}`
   }
 
+  if (platform === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    const result = config?.path
+      ? scope === 'workspace' && getRuntimePlatform() === 'android'
+        ? await androidCloudFolderWorkspaceUpload(config, path, content)
+        : scope === 'data'
+          ? await cloudFolderUpload(config, path, content)
+          : null
+      : null
+    if (!result) throw new Error('云盘文件夹上传失败')
+    return result.etag
+  }
+
   const repo = await getGitRepository(platform, scope)
   const sha = await getExistingRemoteSha(platform, path, repo)
   const filename = path.split('/').pop() || path
@@ -549,6 +601,15 @@ export async function remoteFileExists(
     return config ? Boolean(await webdavHeadObject(config, path)) : false
   }
 
+  if (platform === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (!config?.path) return false
+    if (scope === 'workspace' && getRuntimePlatform() === 'android') {
+      return Boolean(await androidCloudFolderWorkspaceHead(config, path))
+    }
+    return scope === 'data' ? Boolean(await cloudFolderHeadObject(config, path)) : false
+  }
+
   const repo = await getGitRepository(platform, scope)
   return Boolean(await getExistingRemoteSha(platform, path, repo))
 }
@@ -572,6 +633,17 @@ export async function deleteRemoteFile(
     const config = await store.get<WebDAVConfig>('webdavSyncConfig')
     if (config && await webdavHeadObject(config, path)) {
       await webdavDelete(config, path)
+    }
+    return
+  }
+
+  if (platform === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (!config?.path) return
+    if (scope === 'workspace' && getRuntimePlatform() === 'android') {
+      await androidCloudFolderWorkspaceDelete(config, path)
+    } else if (scope === 'data') {
+      await cloudFolderDelete(config, path)
     }
     return
   }

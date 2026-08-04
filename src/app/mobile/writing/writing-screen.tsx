@@ -3,12 +3,10 @@
 import { MobileEditor } from './mobile-editor'
 import { WritingHeader } from './custom-header'
 import useArticleStore from '@/stores/article'
-import { useEffect, useState } from 'react'
-import type { Editor } from '@tiptap/react'
+import { useEffect } from 'react'
 
 export function WritingScreen() {
   const { initCollapsibleList } = useArticleStore()
-  const [editor, setEditor] = useState<Editor | null>(null)
 
   useEffect(() => {
     const activeElement = document.activeElement
@@ -23,9 +21,9 @@ export function WritingScreen() {
 
   return (
     <div id="mobile-writing" className='w-full h-full flex flex-col'>
-      <WritingHeader editor={editor} />
+      <WritingHeader />
       <div className='flex-1 overflow-hidden'>
-        <MobileEditor onEditorReady={setEditor} />
+        <MobileEditor />
       </div>
     </div>
   )

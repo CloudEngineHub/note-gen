@@ -1,8 +1,12 @@
 mod ai;
 mod analytics;
 #[cfg(target_os = "android")]
+mod android_cloud_folder;
+#[cfg(target_os = "android")]
 mod android_ocr;
 mod backup;
+mod backup_manager;
+mod cloud_folder_sync;
 mod database_recovery;
 mod device;
 mod fonts;
@@ -26,6 +30,12 @@ use ai::{
     cancel_ai_request, AiRequestManager,
 };
 use backup::{export_app_data, import_app_data, import_app_data_from_file};
+use backup_manager::{create_managed_backup, list_managed_backups, restore_managed_backup};
+use cloud_folder_sync::{
+    delete_cloud_folder_sync_file, get_icloud_sync_folder, list_cloud_folder_sync_files,
+    migrate_workspace_to_cloud_folder, read_cloud_folder_sync_file, test_cloud_folder_sync,
+    write_cloud_folder_sync_file,
+};
 use device::get_device_id;
 use fonts::list_system_fonts;
 use mcp::{
@@ -59,6 +69,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
         .manage(McpServerManager::new())
         .manage(RuntimeInstallManager::new())
@@ -68,6 +80,8 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder.manage(SkillProcessManager::default());
 
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(android_cloud_folder::init());
     #[cfg(target_os = "android")]
     let builder = builder.plugin(android_ocr::init());
     #[cfg(target_os = "android")]
@@ -90,6 +104,16 @@ pub fn run() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            create_managed_backup,
+            list_managed_backups,
+            restore_managed_backup,
+            get_icloud_sync_folder,
+            test_cloud_folder_sync,
+            write_cloud_folder_sync_file,
+            read_cloud_folder_sync_file,
+            delete_cloud_folder_sync_file,
+            list_cloud_folder_sync_files,
+            migrate_workspace_to_cloud_folder,
             database_recovery::delete_local_database,
             import_skill,
             import_skill_zip,
@@ -116,6 +140,34 @@ pub fn run() {
             cancel_ai_request,
             list_ocr_providers,
             run_ocr_provider,
+            #[cfg(target_os = "ios")]
+            ios_ocr::pick_ios_sync_folder,
+            #[cfg(target_os = "ios")]
+            ios_ocr::restore_ios_sync_folder,
+            #[cfg(target_os = "ios")]
+            ios_ocr::release_ios_sync_folder,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::set_android_secure_value,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::get_android_secure_value,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::delete_android_secure_value,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::microsoft_oauth_request,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::pick_android_sync_folder,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::release_android_sync_folder,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::test_android_cloud_folder,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::write_android_cloud_folder_file,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::read_android_cloud_folder_file,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::delete_android_cloud_folder_file,
+            #[cfg(target_os = "android")]
+            android_cloud_folder::list_android_cloud_folder_files,
             storefront::get_app_storefront_country_code,
             printing::print_webview,
             mobile_system_bars::set_mobile_system_bars,

@@ -112,6 +112,15 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   // Development builds may have written this local-only diagnostic key.
   'autoConversationSyncDiagnostic',
   'lastRecordTagId',
+  // 云盘文件夹备份由各设备独立配置，不能覆盖另一台设备的本地路径和执行状态。
+  'managedBackupDirectory',
+  'managedBackupSchedule',
+  'managedBackupRetention',
+  'managedBackupLastSuccessAt',
+  'managedBackupLastError',
+  'cloudFolderSyncConfig',
+  'oneDriveAuthTokens',
+  'iosWorkspaceFolderAccess',
   // 工作区和资源目录是设备本地状态，任何隐私设置下都不能跨设备覆盖。
   'workspacePath',
   'workspaceHistory',

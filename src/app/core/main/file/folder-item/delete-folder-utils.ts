@@ -1,7 +1,7 @@
 import { exists, remove } from "@tauri-apps/plugin-fs";
 import { Store } from "@tauri-apps/plugin-store";
 import type { DirTree } from "@/stores/article";
-import type { S3Config, SyncPlatform, WebDAVConfig } from "@/types/sync";
+import type { CloudFolderConfig, S3Config, SyncPlatform, WebDAVConfig } from "@/types/sync";
 import { computedParentPath, getCurrentFolder, joinRelativePath } from "@/lib/path";
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace";
 import { getSyncRepoName } from "@/lib/sync/repo-utils";
@@ -11,6 +11,7 @@ import { deleteFile as deleteGitlabFile, getFiles as getGitlabFiles } from "@/li
 import { deleteFile as deleteGiteaFile, getFiles as getGiteaFiles } from "@/lib/sync/gitea";
 import { s3Delete, s3ListObjects } from "@/lib/sync/s3";
 import { webdavDelete } from "@/lib/sync/webdav";
+import { androidCloudFolderWorkspaceDelete } from "@/lib/sync/cloud-folder";
 
 type GitSyncPlatform = Extract<SyncPlatform, "github" | "gitee" | "gitlab" | "gitea">;
 
@@ -223,6 +224,40 @@ export function clearFolderRemoteState(tree: DirTree[], folderPath: string) {
   }
 }
 
+export function clearFolderLocalState(tree: DirTree[], folderPath: string) {
+  const currentFolder = getCurrentFolder(folderPath, tree)
+  if (!currentFolder) return
+
+  function clearNode(node: DirTree): DirTree | null {
+    if (node.isFile) {
+      if (!node.sha && node.isLocale) return null
+      node.isLocale = false
+      node.loading = undefined
+      node.syncDirty = false
+      node.syncError = undefined
+      return node
+    }
+
+    node.children = (node.children ?? [])
+      .map(clearNode)
+      .filter((child): child is DirTree => child !== null)
+    node.children.forEach(child => {
+      child.parent = node
+    })
+
+    if (node.isLocale && node.children.length === 0) return null
+    node.isLocale = false
+    node.loading = undefined
+    node.syncDirty = false
+    node.syncError = undefined
+    return node
+  }
+
+  if (!clearNode(currentFolder)) {
+    removeFolderFromTree(tree, folderPath)
+  }
+}
+
 async function getGitRemoteEntries(platform: GitSyncPlatform, path: string, repo: string): Promise<unknown> {
   switch (platform) {
     case "github":
@@ -396,6 +431,24 @@ export async function deleteRemoteFolder(item: DirTree, localDeleted: boolean) {
     }
 
     return deleteS3RemoteFolder(config, folderPath, loadedFilePaths);
+  }
+
+  if (platform === "cloudFolder") {
+    const config = await store.get<CloudFolderConfig>("cloudFolderSyncConfig");
+    if (config?.provider !== "oneDrive" || !config.path) {
+      return {
+        attempted: false,
+        deletedPaths: [],
+        failedPaths: [],
+      } satisfies DeleteRemoteFolderResult;
+    }
+
+    const deleted = await androidCloudFolderWorkspaceDelete(config, folderPath);
+    return {
+      attempted: true,
+      deletedPaths: deleted ? [folderPath] : [],
+      failedPaths: deleted ? [] : [folderPath],
+    } satisfies DeleteRemoteFolderResult;
   }
 
   const config = await store.get<WebDAVConfig>("webdavSyncConfig");

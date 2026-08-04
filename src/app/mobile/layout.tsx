@@ -22,6 +22,7 @@ import { MobileViewport } from "@/components/mobile-viewport"
 import useArticleStore from "@/stores/article"
 import { MobileModeProvider } from "@/hooks/use-mobile"
 import { Skeleton } from "@/components/ui/skeleton"
+import AppStatus from "@/components/app-status"
 
 const WritingScreen = dynamic(
   () => import('./writing/writing-screen').then(module => module.WritingScreen),
@@ -114,12 +115,24 @@ export default function RootLayout({
           { initAllDatabases },
           { initAutoDataSyncRuntime },
           { initMcp },
+          { getSyncPushQueue },
         ] = await Promise.all([
           import('@/db'),
           import('@/lib/sync/auto-data-sync-queue'),
           import('@/lib/mcp/init'),
+          import('@/lib/sync/sync-push-queue'),
         ])
+        const { platform } = await import('@tauri-apps/plugin-os')
+        if (platform() === 'ios') {
+          try {
+            const { restoreSavedIOSFolderAccess } = await import('@/lib/sync/cloud-folder')
+            await restoreSavedIOSFolderAccess()
+          } catch (error) {
+            console.error('Failed to restore the iOS cloud folder authorization:', error)
+          }
+        }
         await initSettingData()
+        getSyncPushQueue()
         initMainHosting()
         await initAllDatabases()
         if (cancelled) return
@@ -191,6 +204,7 @@ export default function RootLayout({
         <TextSizeProvider>
           <MobileViewport />
           <MobileStatusBar />
+          <AppStatus />
           <TooltipProvider>
             <div className="mobile-app-shell flex flex-col">
               <main className="mobile-app-main flex flex-1 w-full overflow-hidden">

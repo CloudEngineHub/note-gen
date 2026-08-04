@@ -9,7 +9,12 @@ import { uploadFile as uploadToGitlab, getFileContent as getGitlabFile, deleteFi
 import { uploadFile as uploadToGitea, getFileContent as getGiteaFile, deleteFile as deleteGiteaFile } from './gitea'
 import { s3Upload, s3Download, s3Delete } from './s3'
 import { webdavUpload, webdavDownload, webdavDelete } from './webdav'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import {
+  androidCloudFolderWorkspaceDelete,
+  androidCloudFolderWorkspaceDownloadBytes,
+  androidCloudFolderWorkspaceUpload,
+} from './cloud-folder'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import useSyncStore from '@/stores/sync'
 import { toast } from '@/hooks/use-toast'
 import { readTextFile } from '@tauri-apps/plugin-fs'
@@ -54,6 +59,12 @@ async function getWebDAVConfig(): Promise<WebDAVConfig | null> {
     return config
   }
   return null
+}
+
+async function getAndroidCloudFolderConfig(): Promise<CloudFolderConfig | null> {
+  const store = await Store.load('store.json')
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  return config && (config.provider === 'oneDrive' || config.path.startsWith('content://')) ? config : null
 }
 
 // 同步配置
@@ -215,10 +226,10 @@ export class SyncManager {
     }
 
     try {
-      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
       // S3 不需要 repo，直接设为空字符串
-      const repo = (platform === 's3' || platform === 'webdav') ? '' : await getSyncRepoName(platform)
-      const sha = (platform === 's3' || platform === 'webdav') ? undefined : await this.getRemoteSha(path) || undefined
+      const repo = (platform === 's3' || platform === 'webdav' || platform === 'cloudFolder') ? '' : await getSyncRepoName(platform)
+      const sha = (platform === 's3' || platform === 'webdav' || platform === 'cloudFolder') ? undefined : await this.getRemoteSha(path) || undefined
       const message = `Sync: ${path} - ${new Date().toLocaleString('zh-CN')}`
       const filename = path.split('/').pop() || path
 
@@ -272,6 +283,14 @@ export class SyncManager {
           }
           break
         }
+        case 'cloudFolder': {
+          const config = await getAndroidCloudFolderConfig()
+          if (!config) {
+            return { success: false, action: 'push', error: '网盘文件夹未配置' }
+          }
+          uploadSuccess = Boolean(await androidCloudFolderWorkspaceUpload(config, path, content))
+          break
+        }
       }
 
       if (uploadSuccess) {
@@ -299,9 +318,9 @@ export class SyncManager {
    */
   async pullFile(path: string): Promise<SyncResult> {
     try {
-      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
       // S3 不需要 repo
-      const repo = (platform === 's3' || platform === 'webdav') ? '' : await getSyncRepoName(platform)
+      const repo = (platform === 's3' || platform === 'webdav' || platform === 'cloudFolder') ? '' : await getSyncRepoName(platform)
 
       let content: string | undefined
 
@@ -353,12 +372,21 @@ export class SyncManager {
           }
           break
         }
+        case 'cloudFolder': {
+          const config = await getAndroidCloudFolderConfig()
+          if (!config) {
+            return { success: false, action: 'pull', error: '网盘文件夹未配置' }
+          }
+          const cloudFile = await androidCloudFolderWorkspaceDownloadBytes(config, path)
+          if (cloudFile) content = new TextDecoder().decode(cloudFile.content)
+          break
+        }
       }
 
       if (content) {
         // S3 和 WebDAV 不需要 base64 解码，其他平台需要
         let decodedContent = content
-        if (platform !== 's3' && platform !== 'webdav') {
+        if (platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder') {
           decodedContent = decodeBase64ToString(content)
         }
         await saveLocalFile(path, decodedContent)
@@ -389,13 +417,13 @@ export class SyncManager {
    */
   async deleteRemoteFile(path: string): Promise<SyncResult> {
     try {
-      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+      const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
       // S3 不需要 repo
-      const repo = (platform === 's3' || platform === 'webdav') ? '' : await getSyncRepoName(platform)
-      const sha = (platform === 's3' || platform === 'webdav') ? undefined : await this.getRemoteSha(path)
+      const repo = (platform === 's3' || platform === 'webdav' || platform === 'cloudFolder') ? '' : await getSyncRepoName(platform)
+      const sha = (platform === 's3' || platform === 'webdav' || platform === 'cloudFolder') ? undefined : await this.getRemoteSha(path)
 
       // S3 和 WebDAV 不需要 SHA，但其他平台需要
-      if ((platform !== 's3' && platform !== 'webdav') && !sha) {
+      if ((platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder') && !sha) {
         return { success: true, action: 'none', message: '远程文件不存在，无需删除' }
       }
 
@@ -437,6 +465,14 @@ export class SyncManager {
             // 移除 ETag 记录
             useSyncStore.getState().removeWebDAVFileEtag(path)
           }
+          break
+        }
+        case 'cloudFolder': {
+          const config = await getAndroidCloudFolderConfig()
+          if (!config) {
+            return { success: false, action: 'delete', error: '网盘文件夹未配置' }
+          }
+          success = await androidCloudFolderWorkspaceDelete(config, path)
           break
         }
       }
@@ -882,6 +918,10 @@ export async function isSyncConfigured(): Promise<boolean> {
           hasConfiguredText(webdavConfig?.url) &&
           hasConfiguredText(webdavConfig?.username) &&
           hasConfiguredText(webdavConfig?.password)
+      }
+      case 'cloudFolder': {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        return Boolean(config && (config.provider === 'oneDrive' || config.path.startsWith('content://')))
       }
       default:
         return false

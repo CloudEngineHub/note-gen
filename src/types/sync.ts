@@ -1,4 +1,4 @@
-export type SyncPlatform = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+export type SyncPlatform = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
 
 export type SyncPlatformType = {
   platform: SyncPlatform
@@ -6,7 +6,7 @@ export type SyncPlatformType = {
   icon: string
 }
 
-export const SYNC_PLATFORMS: SyncPlatform[] = ['github', 'gitee', 'gitlab', 'gitea', 's3', 'webdav']
+export const SYNC_PLATFORMS: SyncPlatform[] = ['github', 'gitee', 'gitlab', 'gitea', 's3', 'webdav', 'cloudFolder']
 
 export const SYNC_PLATFORM_INFO: Record<SyncPlatform, SyncPlatformType> = {
   github: { platform: 'github', name: 'Github', icon: 'github' },
@@ -15,6 +15,7 @@ export const SYNC_PLATFORM_INFO: Record<SyncPlatform, SyncPlatformType> = {
   gitea: { platform: 'gitea', name: 'Gitea', icon: 'gitea' },
   s3: { platform: 's3', name: 'S3', icon: 's3' },
   webdav: { platform: 'webdav', name: 'WebDAV', icon: 'webdav' },
+  cloudFolder: { platform: 'cloudFolder', name: 'OneDrive / iCloud', icon: 'cloudFolder' },
 }
 
 export interface S3Config {
@@ -32,4 +33,14 @@ export interface WebDAVConfig {
   username: string
   password: string
   pathPrefix: string
+}
+
+export interface CloudFolderConfig {
+  path: string
+  provider?: 'folder' | 'oneDrive'
+  bookmarkBase64?: string
+  displayName?: string
+  oneDriveClientId?: string
+  oneDriveRootId?: string
+  oneDriveRootWebUrl?: string
 }

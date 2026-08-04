@@ -6,6 +6,7 @@ import { deleteFile as deleteGitlabFile, getFileContent as gitlabGetFileContent,
 import { deleteFile as deleteGiteaFile, getFileContent as giteaGetFileContent, getFiles as giteaGetFiles, uploadFile as uploadGiteaFile } from './gitea'
 import { s3Delete, s3Download, s3Upload } from './s3'
 import { webdavDelete, webdavDownload, webdavUpload } from './webdav'
+import { cloudFolderDelete, cloudFolderDownload, cloudFolderUpload } from './cloud-folder'
 import { decodeBase64ToString, getRemoteFileContent, hasEmptyRemoteFileContent } from './remote-file'
 import { getDataSyncRepoName } from './repo-utils'
 import {
@@ -14,7 +15,7 @@ import {
   remoteFileExists,
   uploadRemoteBytes,
 } from './remote-library'
-import type { S3Config, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import type { Chat, ChatType, Role } from '@/db/chats'
 import type { ConversationCompaction } from '@/db/conversation-compactions'
 import type { ConversationSyncTombstone } from '@/db/conversation-sync-state'
@@ -121,6 +122,9 @@ async function getConversationSyncVersionsKey(store: Store) {
   } else if (provider === 'webdav') {
     const config = await store.get<WebDAVConfig>('webdavSyncConfig')
     target = config && [config.url, config.pathPrefix, config.username]
+  } else if (provider === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    target = config?.path
   } else {
     target = await getDataSyncRepoName(provider as 'github' | 'gitee' | 'gitlab' | 'gitea')
   }
@@ -279,6 +283,20 @@ async function createConversationRemoteStorage(store: Store): Promise<Conversati
         return Boolean(await webdavUpload(config, path, content))
       },
       remove: async path => webdavDelete(config, path),
+    }
+  }
+
+  if (provider === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (!config?.path) return null
+    return {
+      read: async path => (await cloudFolderDownload(config, path))?.content || null,
+      write: async (path, content, expectedContent) => {
+        if (expectedContent !== undefined
+          && ((await cloudFolderDownload(config, path))?.content || null) !== expectedContent) return false
+        return Boolean(await cloudFolderUpload(config, path, content))
+      },
+      remove: async path => cloudFolderDelete(config, path),
     }
   }
 

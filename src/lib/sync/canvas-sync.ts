@@ -5,10 +5,11 @@ import { deleteFile as deleteGitlabFile, uploadFile as uploadGitlabFile, getFile
 import { deleteFile as deleteGiteaFile, uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileContent as giteaGetFileContent } from '@/lib/sync/gitea'
 import { s3Delete, s3Download, s3Upload } from '@/lib/sync/s3'
 import { webdavDelete, webdavDownload, webdavUpload } from '@/lib/sync/webdav'
+import { cloudFolderDelete, cloudFolderDownload, cloudFolderUpload } from '@/lib/sync/cloud-folder'
 import { decodeBase64ToString, getRemoteFileContent, hasEmptyRemoteFileContent } from '@/lib/sync/remote-file'
 import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
 import { normalizeCanvasDocument, type CanvasProject, type CanvasProjectType } from '@/types/canvas'
-import type { S3Config, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 
 export const LEGACY_CANVAS_SYNC_PATH = '.data/canvases.json'
 export const CANVAS_SYNC_DIRECTORY = '.data/canvases'
@@ -347,6 +348,16 @@ async function createCanvasRemoteStorage(store: Store): Promise<CanvasRemoteStor
       read: async path => (await webdavDownload(config, path))?.content || null,
       write: async (path, content) => Boolean(await webdavUpload(config, path, content)),
       remove: async path => webdavDelete(config, path),
+    }
+  }
+
+  if (provider === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (!config?.path) return null
+    return {
+      read: async path => (await cloudFolderDownload(config, path))?.content || null,
+      write: async (path, content) => Boolean(await cloudFolderUpload(config, path, content)),
+      remove: async path => cloudFolderDelete(config, path),
     }
   }
 

@@ -5,11 +5,12 @@ import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileCont
 import { uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileContent as giteaGetFileContent } from '@/lib/sync/gitea'
 import { s3Upload, s3Delete, s3HeadObject, s3Download } from '@/lib/sync/s3'
 import { webdavUpload, webdavDelete, webdavHeadObject, webdavDownload } from '@/lib/sync/webdav'
+import { cloudFolderDownload, cloudFolderUpload } from '@/lib/sync/cloud-folder'
 import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
 import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileError } from '@/lib/sync/remote-file'
 import { Store } from '@tauri-apps/plugin-store'
 import { create } from 'zustand'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
 
 interface RecordDataDownloadOptions {
@@ -186,6 +187,11 @@ const useTagStore = create<TagState>((set, get) => ({
         }
         break;
       }
+      case 'cloudFolder': {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (config?.path) res = await cloudFolderUpload(config, fullPath, JSON.stringify(tags))
+        break
+      }
     }
     if (res) {
       result = true
@@ -242,6 +248,15 @@ const useTagStore = create<TagState>((set, get) => ({
           }
         }
         break;
+      }
+      case 'cloudFolder': {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        const cloudResult = config?.path ? await cloudFolderDownload(config, `${path}/${filename}`) : null
+        if (cloudResult) {
+          result = JSON.parse(cloudResult.content)
+          hasRemoteData = true
+        }
+        break
       }
     }
     // S3 已经直接解析到 result 了，这里处理 Git 平台

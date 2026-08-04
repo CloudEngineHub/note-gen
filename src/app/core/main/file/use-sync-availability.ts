@@ -38,6 +38,7 @@ export function useSyncAvailability() {
     gitea: state.giteaSyncRepoState,
     s3: state.s3Connected,
     webdav: state.webdavConnected,
+    cloudFolder: state.cloudFolderConnected,
   })))
   const [state, setState] = useState<{ configured: boolean; platform: SyncPlatform }>({
     configured: false,
@@ -52,7 +53,7 @@ export function useSyncAvailability() {
     setConfigurationChecking(true)
     try {
       const next = await getSyncConfiguration()
-      if (next.configured && (next.platform === 's3' || next.platform === 'webdav')) {
+      if (next.configured && (next.platform === 's3' || next.platform === 'webdav' || next.platform === 'cloudFolder')) {
         await checkSyncProviderStatus(next.platform)
       }
       if (configurationRequestRef.current === requestId) setState(next)
@@ -74,7 +75,7 @@ export function useSyncAvailability() {
     status = 'checking'
   } else if (!state.configured) {
     status = 'not-configured'
-  } else if (state.platform === 's3' || state.platform === 'webdav') {
+  } else if (state.platform === 's3' || state.platform === 'webdav' || state.platform === 'cloudFolder') {
     status = providerStates[state.platform] ? 'available' : 'unavailable'
   } else {
     const providerState = providerStates[state.platform]

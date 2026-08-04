@@ -23,6 +23,32 @@ struct RecognizeResponse {
     text: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderBookmarkPayload {
+    bookmark_base64: String,
+}
+
+#[derive(Serialize)]
+struct EmptyPayload {}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FolderPickerResponse {
+    cancelled: bool,
+    path: Option<String>,
+    bookmark_base64: Option<String>,
+    display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IosFolderAccess {
+    path: String,
+    bookmark_base64: String,
+    display_name: String,
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new(PLUGIN_NAME)
         .setup(|app, api| {
@@ -69,4 +95,104 @@ pub fn recognize_image(
         .map_err(|e| format!("iOS OCR failed: {}", e))?;
 
     Ok(response.text)
+}
+
+fn folder_access_from_response(
+    response: FolderPickerResponse,
+) -> Result<Option<IosFolderAccess>, String> {
+    if response.cancelled {
+        return Ok(None);
+    }
+
+    Ok(Some(IosFolderAccess {
+        path: response
+            .path
+            .ok_or_else(|| "The selected folder has no local path.".to_string())?,
+        bookmark_base64: response
+            .bookmark_base64
+            .ok_or_else(|| "The selected folder has no persistent authorization.".to_string())?,
+        display_name: response
+            .display_name
+            .ok_or_else(|| "The selected folder has no display name.".to_string())?,
+    }))
+}
+
+fn pick_ios_sync_folder_blocking(
+    app_handle: AppHandle,
+) -> Result<Option<IosFolderAccess>, String> {
+    let plugin = app_handle
+        .try_state::<IosOcrPlugin<Wry>>()
+        .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
+    let response: FolderPickerResponse = plugin
+        .0
+        .run_mobile_plugin("pickFolder", EmptyPayload {})
+        .map_err(|error| format!("Failed to select a folder: {error}"))?;
+    folder_access_from_response(response)
+}
+
+#[tauri::command]
+pub async fn pick_ios_sync_folder(
+    app_handle: AppHandle,
+) -> Result<Option<IosFolderAccess>, String> {
+    tauri::async_runtime::spawn_blocking(move || pick_ios_sync_folder_blocking(app_handle))
+        .await
+        .map_err(|error| format!("The iOS folder picker task failed: {error}"))?
+}
+
+fn restore_ios_sync_folder_blocking(
+    app_handle: AppHandle,
+    bookmark_base64: String,
+) -> Result<IosFolderAccess, String> {
+    let plugin = app_handle
+        .try_state::<IosOcrPlugin<Wry>>()
+        .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
+    let response: FolderPickerResponse = plugin
+        .0
+        .run_mobile_plugin(
+            "restoreFolder",
+            FolderBookmarkPayload { bookmark_base64 },
+        )
+        .map_err(|error| format!("Failed to restore folder access: {error}"))?;
+    folder_access_from_response(response)?
+        .ok_or_else(|| "The saved folder authorization was cancelled.".to_string())
+}
+
+#[tauri::command]
+pub async fn restore_ios_sync_folder(
+    app_handle: AppHandle,
+    bookmark_base64: String,
+) -> Result<IosFolderAccess, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        restore_ios_sync_folder_blocking(app_handle, bookmark_base64)
+    })
+    .await
+    .map_err(|error| format!("The folder authorization task failed: {error}"))?
+}
+
+fn release_ios_sync_folder_blocking(
+    app_handle: AppHandle,
+    bookmark_base64: String,
+) -> Result<(), String> {
+    let plugin = app_handle
+        .try_state::<IosOcrPlugin<Wry>>()
+        .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
+    plugin
+        .0
+        .run_mobile_plugin::<()>(
+            "releaseFolder",
+            FolderBookmarkPayload { bookmark_base64 },
+        )
+        .map_err(|error| format!("Failed to release folder access: {error}"))
+}
+
+#[tauri::command]
+pub async fn release_ios_sync_folder(
+    app_handle: AppHandle,
+    bookmark_base64: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        release_ios_sync_folder_blocking(app_handle, bookmark_base64)
+    })
+    .await
+    .map_err(|error| format!("The folder release task failed: {error}"))?
 }

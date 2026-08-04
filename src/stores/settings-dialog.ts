@@ -7,6 +7,7 @@ export type SettingSection =
   | 'editor'
   | 'canvas'
   | 'sync'
+  | 'backup'
   | 'imageHosting'
   | 'ai'
   | 'webSearch'
@@ -39,6 +40,7 @@ export const settingSections: SettingSection[] = [
   'skills',
   'template',
   'sync',
+  'backup',
   'imageHosting',
   'file',
 ]

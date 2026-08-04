@@ -9,11 +9,12 @@ import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileErr
 import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
 import { s3Download, s3Upload } from '@/lib/sync/s3'
 import { webdavDownload, webdavUpload } from '@/lib/sync/webdav'
+import { cloudFolderDownload, cloudFolderUpload } from '@/lib/sync/cloud-folder'
 import { setAutoDataSyncApplyingRemote } from '@/lib/sync/auto-data-sync-queue'
-import type { S3Config, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 
-type SettingsSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
-type GitSettingsSyncProvider = Exclude<SettingsSyncProvider, 's3' | 'webdav'>
+type SettingsSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
+type GitSettingsSyncProvider = Exclude<SettingsSyncProvider, 's3' | 'webdav' | 'cloudFolder'>
 type RemoteFileEntry = {
   name?: string
   path?: string
@@ -128,6 +129,17 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
           return true
         }
 
+        return false
+      }
+
+      if (primaryBackupMethod === 'cloudFolder') {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (!config?.path) return false
+        const result = await cloudFolderUpload(config, '.data/settings.json', content)
+        if (result) {
+          set({ lastSyncTime: new Date().toISOString() })
+          return true
+        }
         return false
       }
 
@@ -247,10 +259,16 @@ const useSettingsSyncStore = create<SettingsSyncState>((set) => ({
         }
 
         remoteSettings = JSON.parse(file.content)
+      } else if (primaryBackupMethod === 'cloudFolder') {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (!config?.path) return false
+        const file = await cloudFolderDownload(config, '.data/settings.json')
+        if (!file) return Boolean(options.allowMissingRemote)
+        remoteSettings = JSON.parse(file.content)
       }
 
       // 获取仓库名称
-      const repoName = primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav'
+      const repoName = primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav' || primaryBackupMethod === 'cloudFolder'
         ? ''
         : await getDataSyncRepoName(primaryBackupMethod as GitSettingsSyncProvider)
 

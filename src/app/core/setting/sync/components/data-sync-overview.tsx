@@ -22,6 +22,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 
 interface DataSyncOverviewProps {
+  mobile?: boolean
   autoRecordSyncEnabled: boolean
   autoSettingsSyncEnabled: boolean
   autoConversationSyncEnabled: boolean
@@ -33,6 +34,7 @@ interface DataSyncOverviewProps {
 }
 
 export function DataSyncOverview({
+  mobile = false,
   autoRecordSyncEnabled,
   autoSettingsSyncEnabled,
   autoConversationSyncEnabled,
@@ -44,6 +46,86 @@ export function DataSyncOverview({
 }: DataSyncOverviewProps) {
   const t = useTranslations()
 
+  const items = (
+    <ItemGroup className="gap-2">
+      <Item variant="outline" size="sm" className="mobile-setting-inline-item">
+        <ItemMedia variant="icon"><Database /></ItemMedia>
+        <ItemContent>
+          <ItemTitle>{t('settings.sync.autoRecordSync')}</ItemTitle>
+          <ItemDescription>{t('settings.sync.autoRecordSyncDesc')}</ItemDescription>
+        </ItemContent>
+        <ItemActions className="mobile-setting-inline-action">
+          <Switch
+            checked={autoRecordSyncEnabled}
+            onCheckedChange={onRecordSyncChange}
+            aria-label={t('settings.sync.autoRecordSync')}
+          />
+        </ItemActions>
+      </Item>
+
+      <Item variant="outline" size="sm" className="mobile-setting-inline-item">
+        <ItemMedia variant="icon"><Settings2 /></ItemMedia>
+        <ItemContent>
+          <ItemTitle>{t('settings.sync.autoSettingsSync')}</ItemTitle>
+          <ItemDescription>{t('settings.sync.autoSettingsSyncDesc')}</ItemDescription>
+        </ItemContent>
+        <ItemActions className="mobile-setting-inline-action">
+          <Switch
+            checked={autoSettingsSyncEnabled}
+            onCheckedChange={onSettingsSyncChange}
+            aria-label={t('settings.sync.autoSettingsSync')}
+          />
+        </ItemActions>
+      </Item>
+
+      <Item variant="outline" size="sm" className="mobile-setting-inline-item">
+        <ItemMedia variant="icon"><MessageSquare /></ItemMedia>
+        <ItemContent>
+          <ItemTitle>{t('settings.sync.autoConversationSync')}</ItemTitle>
+          <ItemDescription>{t('settings.sync.autoConversationSyncDesc')}</ItemDescription>
+        </ItemContent>
+        <ItemActions className="mobile-setting-inline-action">
+          <Switch
+            checked={autoConversationSyncEnabled}
+            onCheckedChange={onConversationSyncChange}
+            aria-label={t('settings.sync.autoConversationSync')}
+          />
+        </ItemActions>
+      </Item>
+
+      <Item
+        variant={excludeSensitiveConfig ? 'muted' : 'warning'}
+        size="sm"
+        className="mobile-setting-inline-item"
+      >
+        <ItemMedia variant="icon"><ShieldCheck /></ItemMedia>
+        <ItemContent>
+          <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
+          <ItemDescription>{t('settings.sync.autoDataSyncPrivacyDesc')}</ItemDescription>
+        </ItemContent>
+        <ItemActions className="mobile-setting-inline-action">
+          <Switch
+            checked={excludeSensitiveConfig}
+            onCheckedChange={onSensitiveConfigChange}
+            aria-label={t('settings.sync.autoDataSyncPrivacyTitle')}
+          />
+        </ItemActions>
+      </Item>
+    </ItemGroup>
+  )
+
+  if (mobile) {
+    return (
+      <section className="flex flex-col gap-3">
+        <header className="flex flex-col gap-1">
+          <h2 className="text-sm font-semibold">{t('settings.sync.recordConfigSettings')}</h2>
+          <p className="text-sm text-muted-foreground">{t('settings.sync.recordConfigSettingsDesc')}</p>
+        </header>
+        {items}
+      </section>
+    )
+  }
+
   return (
     <Card size="sm">
       <CardHeader>
@@ -51,67 +133,7 @@ export function DataSyncOverview({
         <CardDescription>{t('settings.sync.recordConfigSettingsDesc')}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <ItemGroup className="gap-2">
-          <Item variant="outline" size="sm">
-            <ItemMedia variant="icon"><Database /></ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('settings.sync.autoRecordSync')}</ItemTitle>
-              <ItemDescription>{t('settings.sync.autoRecordSyncDesc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                checked={autoRecordSyncEnabled}
-                onCheckedChange={onRecordSyncChange}
-                aria-label={t('settings.sync.autoRecordSync')}
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemMedia variant="icon"><Settings2 /></ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('settings.sync.autoSettingsSync')}</ItemTitle>
-              <ItemDescription>{t('settings.sync.autoSettingsSyncDesc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                checked={autoSettingsSyncEnabled}
-                onCheckedChange={onSettingsSyncChange}
-                aria-label={t('settings.sync.autoSettingsSync')}
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemMedia variant="icon"><MessageSquare /></ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('settings.sync.autoConversationSync')}</ItemTitle>
-              <ItemDescription>{t('settings.sync.autoConversationSyncDesc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                checked={autoConversationSyncEnabled}
-                onCheckedChange={onConversationSyncChange}
-                aria-label={t('settings.sync.autoConversationSync')}
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="muted" size="sm">
-            <ItemMedia variant="icon"><ShieldCheck /></ItemMedia>
-            <ItemContent>
-              <ItemTitle>{t('settings.sync.autoDataSyncPrivacyTitle')}</ItemTitle>
-              <ItemDescription>{t('settings.sync.autoDataSyncPrivacyDesc')}</ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                checked={excludeSensitiveConfig}
-                onCheckedChange={onSensitiveConfigChange}
-                aria-label={t('settings.sync.autoDataSyncPrivacyTitle')}
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
+        {items}
       </CardContent>
     </Card>
   )

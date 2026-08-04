@@ -41,6 +41,7 @@ const itemVariants = cva(
         default: "border-transparent",
         outline: "border-border",
         muted: "border-transparent bg-muted/50",
+        warning: "border-warning/40 bg-warning/10 text-warning-foreground [&_[data-slot=item-description]]:text-warning-foreground/80",
       },
       size: {
         default: "gap-2.5 px-3 py-2.5",

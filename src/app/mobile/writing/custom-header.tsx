@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BaseDirectory, copyFile, exists, mkdir, readDir, remove, rename as fsRename, stat, writeTextFile } from '@tauri-apps/plugin-fs'
 import { confirm } from '@tauri-apps/plugin-dialog'
+import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import type { Editor } from '@tiptap/react'
-import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, Folder, FolderDown, FolderInput, FolderPlus, FolderUp, List, Pencil, Redo2, RefreshCw, Scissors, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
+import { cloneDeep } from 'lodash-es'
+import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, Folder, FolderDown, FolderInput, FolderPlus, FolderUp, List, Pencil, RefreshCw, Scissors, Search, SearchCode, Trash2, Unplug } from 'lucide-react'
+import { MobileMeSheet } from '@/app/mobile/components/mobile-me-sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -30,24 +32,30 @@ import { deleteFile as deleteGitlabFile } from '@/lib/sync/gitlab'
 import { deleteFile as deleteGiteaFile } from '@/lib/sync/gitea'
 import { s3Delete } from '@/lib/sync/s3'
 import { webdavDelete } from '@/lib/sync/webdav'
+import { androidCloudFolderWorkspaceDelete } from '@/lib/sync/cloud-folder'
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { RepoNames } from '@/lib/sync/github.types'
 import { Store } from '@tauri-apps/plugin-store'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { buildMoveTargetPath, getPathAfterMove, isInvalidFolderMoveTarget, moveFileManagerEntry } from '@/app/core/main/file/file-dnd'
 import { cn } from '@/lib/utils'
 import { CloudLibraryMenu } from '@/app/core/main/file/cloud-library-menu'
 import { pullRemoteLibraryFolder, uploadLocalLibraryFile, uploadLocalLibraryFolder } from '@/lib/sync/remote-library'
 import useClipboardStore from '@/stores/clipboard'
 import { generateCopyFilename, generateCopyFoldername } from '@/lib/default-filename'
-import { getSyncConfiguration } from '@/app/core/main/file/file-tree-action-policy'
-
-interface WritingHeaderProps {
-  editor: Editor | null
-}
+import { getFileTreeSyncStatus, getSyncConfiguration } from '@/app/core/main/file/file-tree-action-policy'
+import { clearFolderLocalState, deleteRemoteFolder, hasRemoteFolderData } from '@/app/core/main/file/folder-item/delete-folder-utils'
 
 function shouldLoadRemoteOnTreeRefresh(options?: { isCreateFlow?: boolean }) {
   return options?.isCreateFlow !== true
+}
+
+async function isAndroidOneDriveSyncEnabled() {
+  if (getRuntimePlatform() !== 'android') return false
+  const store = await Store.load('store.json')
+  if (await store.get<string>('primaryBackupMethod') !== 'cloudFolder') return false
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  return config?.provider === 'oneDrive' && Boolean(config.path)
 }
 
 type DragPoint = {
@@ -55,16 +63,16 @@ type DragPoint = {
   y: number
 }
 
-export function WritingHeader({ editor }: WritingHeaderProps) {
+export function WritingHeader() {
   const router = useRouter()
   const t = useTranslations('record.chat.input.fileLink')
   const tFile = useTranslations('article.file')
   const tContext = useTranslations('article.file.context')
   const tMobile = useTranslations('article.file.mobile')
+  const tSyncStatus = useTranslations('article.file.syncStatus')
   const tToolbar = useTranslations('article.file.toolbar')
   const tEditor = useTranslations('article.editor')
   const tOutline = useTranslations('editor.outline')
-  const tEditorCommands = useTranslations('settings.shortcuts.editorShortcuts.commands')
   const tSync = useTranslations('settings.sync')
   const {
     activeFilePath,
@@ -76,6 +84,8 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     loadRemoteSyncFiles,
     loadCollapsibleFiles,
     loadFolderRemoteFiles,
+    setFileTree,
+    reconcileLocalFile,
     setCollapsibleList,
     moveLocalEntry,
     syncOpenTabsForPathChange,
@@ -109,6 +119,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [entryMetaMap, setEntryMetaMap] = useState<Record<string, { modifiedAt?: string; size?: number }>>({})
   const hasInitializedDrawerRef = useRef(false)
+  const remoteRefreshInFlightRef = useRef(false)
 
   const [createType, setCreateType] = useState<'file' | 'folder' | null>(null)
   const [createName, setCreateName] = useState('')
@@ -118,7 +129,6 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const [renameTarget, setRenameTarget] = useState<BrowserEntry | null>(null)
   const [renameName, setRenameName] = useState('')
   const [renaming, setRenaming] = useState(false)
-  const [undoRedoState, setUndoRedoState] = useState({ undo: false, redo: false })
   const [dragEntry, setDragEntry] = useState<BrowserEntry | null>(null)
   const [dragStartPoint, setDragStartPoint] = useState<DragPoint | null>(null)
   const [dragPoint, setDragPoint] = useState<DragPoint | null>(null)
@@ -127,30 +137,6 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const parentDropTargetRef = useRef<HTMLElement | null>(null)
 
   const normalizedActivePath = normalizePath(activeFilePath)
-
-  const canUndo = editor ? undoRedoState.undo : false
-  const canRedo = editor ? undoRedoState.redo : false
-
-  useEffect(() => {
-    if (!editor) {
-      setUndoRedoState({ undo: false, redo: false })
-      return
-    }
-
-    setUndoRedoState({
-      undo: editor.can().undo(),
-      redo: editor.can().redo(),
-    })
-
-    const handleUndoRedoChanged = (state: { undo: boolean; redo: boolean }) => {
-      setUndoRedoState(state)
-    }
-
-    emitter.on('editor-undo-redo-changed', handleUndoRedoChanged)
-    return () => {
-      emitter.off('editor-undo-redo-changed', handleUndoRedoChanged)
-    }
-  }, [editor])
 
   const currentDirLabel = useMemo(() => {
     if (!currentDir) return tMobile('root')
@@ -189,6 +175,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
         size: (node as any).size,
         fileCount,
         folderCount,
+        syncStatus: getFileTreeSyncStatus(node),
       }
     })
 
@@ -291,6 +278,9 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
 
     if (entry.type === 'file') {
       const parts = [formatDateTime(modifiedAt), formatSize(size)].filter(Boolean)
+      if (entry.syncStatus === 'local-only') {
+        return [tSyncStatus('local-only'), ...parts].join(' · ')
+      }
       return parts.length > 0 ? parts.join(' · ') : tMobile('file')
     }
 
@@ -301,11 +291,15 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       ? tMobile('folderChildren', { files: entry.fileCount, folders: entry.folderCount })
       : tMobile('folder')
 
-    const modifiedLabel = formatDateTime(modifiedAt)
-    return modifiedLabel ? `${folderSummary} · ${modifiedLabel}` : folderSummary
-  }, [entryMetaMap, formatDateTime, formatSize, tMobile])
+    const parts = [folderSummary, formatDateTime(modifiedAt)].filter(Boolean)
+    if (entry.syncStatus === 'local-only') {
+      parts.unshift(tSyncStatus('local-only'))
+    }
+    return parts.join(' · ')
+  }, [entryMetaMap, formatDateTime, formatSize, tMobile, tSyncStatus])
 
-  const isBrowserLoading = fileTreeLoading || folderLoading || isRefreshing || !!currentFolderNode?.loading
+  const isBrowserRefreshing = fileTreeLoading || folderLoading || isRefreshing || !!currentFolderNode?.loading
+  const showBrowserLoading = isBrowserRefreshing && visibleEntries.length === 0
 
   const getValidDropTargetPath = useCallback((entry: BrowserEntry, point: DragPoint) => {
     if (!entry.isLocale) return null
@@ -380,7 +374,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       }
 
       for (const path of pathsToExpand) {
-        await loadCollapsibleFiles(path)
+        await loadCollapsibleFiles(path, { skipRemoteSync: !includeRemote })
         if (includeRemote) {
           await loadFolderRemoteFiles(path)
         }
@@ -389,6 +383,18 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       setIsRefreshing(false)
     }
   }, [loadFileTree, loadRemoteSyncFiles, loadCollapsibleFiles, loadFolderRemoteFiles, setCollapsibleList])
+
+  const refreshRemoteInBackground = useCallback(async () => {
+    if (document.visibilityState !== 'visible' || remoteRefreshInFlightRef.current) return
+    remoteRefreshInFlightRef.current = true
+    try {
+      await loadRemoteSyncFiles()
+    } catch (error) {
+      console.error('Background remote file tree refresh failed:', error)
+    } finally {
+      remoteRefreshInFlightRef.current = false
+    }
+  }, [loadRemoteSyncFiles])
 
   const handleDragStart = useCallback((entry: BrowserEntry, point: DragPoint) => {
     if (!entry.isLocale) {
@@ -492,17 +498,36 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     setSearchQuery('')
 
     const init = async () => {
-      if (fileTree.length === 0) {
-        await loadFileTree()
-      }
-      if (initialDir) {
-        await setCollapsibleList(initialDir, true)
-        await loadCollapsibleFiles(initialDir)
-      }
+      await refreshTree(initialDir, { includeRemote: false })
+      void refreshRemoteInBackground()
     }
 
     init()
-  }, [drawerOpen, normalizedActivePath, loadFileTree, loadCollapsibleFiles, resetDragState, setCollapsibleList, fileTree.length])
+  }, [drawerOpen, normalizedActivePath, refreshRemoteInBackground, refreshTree, resetDragState])
+
+  useEffect(() => {
+    if (!drawerOpen) return
+
+    let active = true
+    let timer: number | undefined
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshRemoteInBackground()
+    }
+
+    const startOneDriveRefresh = async () => {
+      if (!await isAndroidOneDriveSyncEnabled() || !active) return
+      timer = window.setInterval(() => void refreshRemoteInBackground(), 15_000)
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
+
+    void startOneDriveRefresh()
+    return () => {
+      active = false
+      if (timer !== undefined) window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [drawerOpen, refreshRemoteInBackground])
 
   const ensureLocalFolder = useCallback(async (dir: string) => {
     if (!dir) return
@@ -801,6 +826,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
           } else {
             await writeTextFile(pathOptions.path, '')
           }
+          emitter.emit('article-saved', { path: relativePath, content: '' })
           await refreshTree(targetDir, {
             includeRemote: shouldLoadRemoteOnTreeRefresh({ isCreateFlow: true })
           })
@@ -923,8 +949,14 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       if (normalizedActivePath.startsWith(`${entry.relativePath}/`)) {
         await setActiveFilePath('')
       }
-      const { deleteVectorDocumentsByPrefix } = await import('@/db/vector')
-      await deleteVectorDocumentsByPrefix(entry.relativePath)
+      const nextTree = cloneDeep(fileTree)
+      clearFolderLocalState(nextTree, entry.relativePath)
+      setFileTree(nextTree)
+      void import('@/db/vector').then(({ deleteVectorDocumentsByPrefix }) => (
+        deleteVectorDocumentsByPrefix(entry.relativePath)
+      )).catch(error => {
+        console.error('Failed to clear deleted folder vectors:', error)
+      })
     } else {
       if (pathOptions.baseDir) {
         await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
@@ -934,64 +966,109 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       if (normalizedActivePath === entry.relativePath) {
         await setActiveFilePath('')
       }
-      const { deleteVectorDocumentsByFilename } = await import('@/db/vector')
-      await deleteVectorDocumentsByFilename(entry.relativePath)
+      reconcileLocalFile(entry.relativePath, false)
+      void import('@/db/vector').then(({ deleteVectorDocumentsByFilename }) => (
+        deleteVectorDocumentsByFilename(entry.relativePath)
+      )).catch(error => {
+        console.error('Failed to clear deleted file vectors:', error)
+      })
     }
-    await refreshTree(currentDir)
   }
 
-  const handleDeleteSyncFile = async (entry: BrowserEntry) => {
-    if (entry.type !== 'file' || !entry.sha) return
+  const canDeleteRemoteEntry = (entry: BrowserEntry) => {
+    if (entry.type === 'file') return Boolean(entry.sha)
+    const node = getNodeByPath(fileTree, entry.relativePath)
+    return Boolean(node && hasRemoteFolderData(node))
+  }
+
+  const handleDeleteRemoteEntry = async (entry: BrowserEntry) => {
+    if (!canDeleteRemoteEntry(entry)) return
     if (!await ensureSyncConfigured()) return
 
-    const ok = await confirm(`${tContext('deleteSyncFile')}?`, {
+    const ok = await confirm(
+      entry.type === 'folder'
+        ? tContext('confirmDeleteRemoteFolder', { name: entry.name })
+        : `${tContext('deleteSyncFile')}?`, {
       title: entry.name,
       kind: 'warning',
-    })
+      }
+    )
     if (!ok) return
 
     const store = await Store.load('store.json')
-    const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'>('primaryBackupMethod') || 'github'
+    const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'>('primaryBackupMethod') || 'github'
+
+    if (entry.type === 'folder') {
+      const node = getNodeByPath(fileTree, entry.relativePath)
+      if (!node) return
+      try {
+        const result = await deleteRemoteFolder(node, false)
+        if (!result.attempted || result.failedPaths.length > 0) {
+          throw new Error(result.failedPaths.join(', ') || 'Remote folder was not deleted')
+        }
+        await refreshTree(currentDir)
+        toast({ title: tContext('deleteRemoteSuccess') })
+      } catch (error) {
+        console.error('Delete remote folder failed:', error)
+        toast({ title: tContext('deleteFailed'), variant: 'destructive' })
+      }
+      return
+    }
+    if (!entry.sha) return
+
     const repoName = backupMethod === 's3' || backupMethod === 'webdav'
       ? RepoNames.sync
-      : await getSyncRepoName(backupMethod)
+      : backupMethod === 'cloudFolder'
+        ? ''
+        : await getSyncRepoName(backupMethod)
 
     let success = false
-    switch (backupMethod) {
-      case 'github': {
-        const result = await deleteFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
-        success = !!result
-        break
-      }
-      case 'gitee': {
-        const result = await deleteGiteeFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
-        success = result !== false
-        break
-      }
-      case 'gitlab': {
-        const result = await deleteGitlabFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
-        success = !!result
-        break
-      }
-      case 'gitea': {
-        const result = await deleteGiteaFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
-        success = !!result
-        break
-      }
-      case 's3': {
-        const s3Config = await store.get<S3Config>('s3SyncConfig')
-        if (s3Config) {
-          success = await s3Delete(s3Config, entry.relativePath)
+    try {
+      switch (backupMethod) {
+        case 'github': {
+          const result = await deleteFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
+          success = !!result
+          break
         }
-        break
-      }
-      case 'webdav': {
-        const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
-        if (webdavConfig) {
-          success = await webdavDelete(webdavConfig, entry.relativePath)
+        case 'gitee': {
+          const result = await deleteGiteeFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
+          success = result !== false
+          break
         }
-        break
+        case 'gitlab': {
+          const result = await deleteGitlabFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
+          success = !!result
+          break
+        }
+        case 'gitea': {
+          const result = await deleteGiteaFile({ path: entry.relativePath, sha: entry.sha, repo: repoName })
+          success = !!result
+          break
+        }
+        case 's3': {
+          const s3Config = await store.get<S3Config>('s3SyncConfig')
+          if (s3Config) {
+            success = await s3Delete(s3Config, entry.relativePath)
+          }
+          break
+        }
+        case 'webdav': {
+          const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
+          if (webdavConfig) {
+            success = await webdavDelete(webdavConfig, entry.relativePath)
+          }
+          break
+        }
+        case 'cloudFolder': {
+          const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+          if (cloudFolderConfig?.provider === 'oneDrive' && cloudFolderConfig.path) {
+            success = await androidCloudFolderWorkspaceDelete(cloudFolderConfig, entry.relativePath)
+          }
+          break
+        }
       }
+    } catch (error) {
+      console.error('Delete remote file failed:', error)
     }
 
     if (!success) {
@@ -1010,14 +1087,6 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     })
   }
 
-  const handleUndo = useCallback(() => {
-    emitter.emit('editor-undo')
-  }, [])
-
-  const handleRedo = useCallback(() => {
-    emitter.emit('editor-redo')
-  }, [])
-
   const handleToggleOutline = useCallback(() => {
     emitter.emit('mobile-editor-toggle-outline' as any)
   }, [])
@@ -1029,24 +1098,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   return (
     <header className="mobile-page-header flex w-full items-center justify-between gap-2 border-b bg-background px-2 text-sm">
       <div className="flex shrink-0 items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleUndo}
-          disabled={!canUndo}
-          aria-label={tEditorCommands('undo.title')}
-        >
-          <Undo2 />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleRedo}
-          disabled={!canRedo}
-          aria-label={tEditorCommands('redo.title')}
-        >
-          <Redo2 />
-        </Button>
+        <MobileMeSheet />
       </div>
 
       <div className="flex shrink-0 items-center">
@@ -1129,9 +1181,9 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                   onClick={() => refreshTree(currentDir)}
                   title={tToolbar('refresh')}
                   aria-label={tToolbar('refresh')}
-                  disabled={isBrowserLoading}
+                  disabled={isBrowserRefreshing}
                 >
-                  <RefreshCw className={`size-4 ${isBrowserLoading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`size-4 ${isBrowserRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
                 <CloudLibraryMenu className="size-9 shrink-0" />
               </div>
@@ -1169,7 +1221,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                 )}
                 data-vaul-no-drag
               >
-                {isBrowserLoading ? (
+                {showBrowserLoading ? (
                   <div className="text-sm text-muted-foreground py-8 text-center">{t('loading')}</div>
                 ) : visibleEntries.length === 0 ? (
                   <div className="text-sm text-muted-foreground py-8 text-center">
@@ -1183,7 +1235,7 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                         entry={entry}
                         isActive={entry.type === 'file' && normalizedActivePath === entry.relativePath}
                         onOpen={openEntry}
-                        remoteLabel={tMobile('remote')}
+                        syncStatusLabel={tSyncStatus(entry.syncStatus)}
                         subtitle={getEntrySubtitle(entry)}
                         dragDisabled={!entry.isLocale}
                         isDragging={dragEntry?.relativePath === entry.relativePath}
@@ -1290,17 +1342,20 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
                             variant: 'outline',
                             separatorBefore: true,
                           },
-                          ...(entry.type === 'file' && entry.sha ? [{
+                          ...(canDeleteRemoteEntry(entry) ? [{
                             key: 'delete-sync',
-                            label: tContext('deleteSyncFile'),
+                            label: entry.type === 'folder'
+                              ? tContext('deleteRemoteFolder')
+                              : tContext('deleteSyncFile'),
                             icon: <Unplug className="size-4" />,
-                            onClick: () => handleDeleteSyncFile(entry),
-                            disabled: !entry.sha,
-                            variant: 'outline' as const,
+                            onClick: () => handleDeleteRemoteEntry(entry),
+                            variant: 'destructive' as const,
                           }] : []),
                           {
                             key: 'delete',
-                            label: entry.type === 'file' ? tContext('deleteLocalFile') : tContext('delete'),
+                            label: entry.type === 'file'
+                              ? tContext('deleteLocalFile')
+                              : tContext('deleteLocalFolder'),
                             icon: <Trash2 className="size-4" />,
                             onClick: () => handleDelete(entry),
                             disabled: !entry.isLocale,

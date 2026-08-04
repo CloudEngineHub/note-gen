@@ -1,4 +1,5 @@
 import { Store } from '@tauri-apps/plugin-store'
+import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
 import { decodeBase64ToString, getFiles as getGithubFiles, getFileCommits as getGithubFileCommits } from '@/lib/sync/github'
 import { getFiles as getGiteeFiles, getFileCommits as getGiteeFileCommits } from '@/lib/sync/gitee'
@@ -6,7 +7,11 @@ import { getFileContent as getGitlabFileContent, getFileCommits as getGitlabFile
 import { getFileContent as getGiteaFileContent, getFileCommits as getGiteaFileCommits, getGiteaApiBaseUrl } from '@/lib/sync/gitea'
 import { s3HeadObject, s3Download } from './s3'
 import { webdavHeadObject, webdavDownload } from './webdav'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
+import {
+  androidCloudFolderWorkspaceDownloadBytes,
+  androidCloudFolderWorkspaceHead,
+} from './cloud-folder'
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { getCurrentSyncContext, getSyncMetadataKey } from '@/lib/sync/sync-context'
 import { toast } from '@/hooks/use-toast'
@@ -242,6 +247,19 @@ export async function getRemoteFileInfo(path: string): Promise<{ sha?: string; l
         }
         break
       }
+
+      case 'cloudFolder': {
+        if (getRuntimePlatform() !== 'android') break
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        const object = config?.path ? await androidCloudFolderWorkspaceHead(config, path) : null
+        if (object) {
+          return {
+            sha: object.etag,
+            lastModified: object.modifiedAt,
+          }
+        }
+        break
+      }
     }
   } catch {
     // 静默处理错误
@@ -460,6 +478,18 @@ export async function pullRemoteFile(path: string): Promise<string> {
           if (webdavFile) {
             return webdavFile.content
           }
+        }
+        break
+      }
+
+      case 'cloudFolder': {
+        if (getRuntimePlatform() !== 'android') break
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        const cloudFile = config?.path
+          ? await androidCloudFolderWorkspaceDownloadBytes(config, path)
+          : null
+        if (cloudFile) {
+          return new TextDecoder().decode(cloudFile.content)
         }
         break
       }
@@ -843,6 +873,12 @@ export async function hasNetworkConnection(): Promise<boolean> {
           proxy = { all: giteaProxyUrl }
         }
         break
+      case 'cloudFolder': {
+        clearTimeout(timeoutId)
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        return getRuntimePlatform() === 'android'
+          && Boolean(config && (config.provider === 'oneDrive' || config.path.startsWith('content://')))
+      }
       default:
         clearTimeout(timeoutId)
         return false

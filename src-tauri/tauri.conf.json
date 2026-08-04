@@ -56,7 +56,8 @@
     ],
     "iOS": {
       "bundleVersion": "0.33.0",
-      "developmentTeam": "RGZC4ZTJMU"
+      "developmentTeam": "RGZC4ZTJMU",
+      "template": "ios-project.yml"
     },
     "macOS": {
       "minimumSystemVersion": "10.13",

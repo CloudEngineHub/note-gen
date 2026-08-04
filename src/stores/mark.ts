@@ -5,7 +5,8 @@ import { uploadFile as uploadGitlabFile, getFiles as gitlabGetFiles, getFileCont
 import { uploadFile as uploadGiteaFile, getFiles as giteaGetFiles, getFileContent as giteaGetFileContent } from '@/lib/sync/gitea';
 import { s3Upload, s3Delete, s3HeadObject, s3Download } from '@/lib/sync/s3'
 import { webdavUpload, webdavDelete, webdavHeadObject, webdavDownload } from '@/lib/sync/webdav'
-import { WebDAVConfig } from '@/types/sync'
+import { cloudFolderDownload, cloudFolderUpload } from '@/lib/sync/cloud-folder'
+import { CloudFolderConfig, WebDAVConfig } from '@/types/sync'
 import { getDataSyncRepoName } from '@/lib/sync/repo-utils';
 import { getRemoteFileContent, hasEmptyRemoteFileContent, isMissingRemoteFileError } from '@/lib/sync/remote-file';
 import { Store } from '@tauri-apps/plugin-store';
@@ -487,6 +488,11 @@ const useMarkStore = create<MarkState>((set, get) => ({
         }
         break;
       }
+      case 'cloudFolder': {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (config?.path) res = await cloudFolderUpload(config, fullPath, JSON.stringify(marks))
+        break
+      }
     }
     } catch (error) {
       console.error('[mark store] uploadMarks error:', error)
@@ -546,6 +552,15 @@ const useMarkStore = create<MarkState>((set, get) => ({
           }
         }
         break;
+      }
+      case 'cloudFolder': {
+        const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        const cloudResult = config?.path ? await cloudFolderDownload(config, `${path}/${filename}`) : null
+        if (cloudResult) {
+          result = JSON.parse(cloudResult.content)
+          hasRemoteData = true
+        }
+        break
       }
     }
     // S3 已经直接解析到 result 了，这里处理 Git 平台

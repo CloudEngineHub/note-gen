@@ -4,6 +4,7 @@ import { FileDown, Loader2, RefreshCcw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { confirm } from '@tauri-apps/plugin-dialog'
+import { platform } from '@tauri-apps/plugin-os'
 import { Store } from '@tauri-apps/plugin-store'
 import { GithubSync } from '@/app/core/setting/sync/github-sync'
 import { GiteeSync } from '@/app/core/setting/sync/gitee-sync'
@@ -15,16 +16,24 @@ import { UsePlatformButton } from '@/app/core/setting/sync/components/use-platfo
 import { WorkspaceRepoMapping } from '@/app/core/setting/sync/components/workspace-repo-mapping'
 import { DataSyncOverview } from '@/app/core/setting/sync/components/data-sync-overview'
 import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
+import { AndroidCloudFolderSync } from '@/app/mobile/setting/pages/sync/android-cloud-folder-sync'
+import { IOSCloudFolderSync } from '@/app/mobile/setting/pages/sync/ios-cloud-folder-sync'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
 import type { SyncRepoPlatform, WorkspaceSyncRepos } from '@/lib/sync/workspace-repos'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
-import { SYNC_PLATFORMS, SyncPlatform } from '@/types/sync'
+import { SYNC_PLATFORMS, SYNC_PLATFORM_INFO, SyncPlatform } from '@/types/sync'
 
 export default function SyncPage() {
   const t = useTranslations()
+  const currentPlatform = platform()
+  const isIOS = currentPlatform === 'ios'
+  const isAndroid = currentPlatform === 'android'
+  const availablePlatforms = isIOS || isAndroid
+    ? SYNC_PLATFORMS
+    : SYNC_PLATFORMS.filter(platformName => platformName !== 'cloudFolder')
   const {
     primaryBackupMethod,
     setPrimaryBackupMethod,
@@ -54,6 +63,7 @@ export default function SyncPage() {
     giteaSyncRepoState,
     s3Connected,
     webdavConnected,
+    cloudFolderConnected,
   } = useSyncStore()
 
   const [tab, setTab] = useState<SyncPlatform>(primaryBackupMethod)
@@ -106,8 +116,9 @@ export default function SyncPage() {
         const store = await Store.load('store.json')
         const savedMethod = await store.get<SyncPlatform>('primaryBackupMethod')
         if (savedMethod) {
-          await setPrimaryBackupMethod(savedMethod)
-          setTab(savedMethod)
+          const nextMethod = savedMethod === 'cloudFolder' && !isIOS && !isAndroid ? 'github' : savedMethod
+          await setPrimaryBackupMethod(nextMethod)
+          setTab(nextMethod)
         }
       } catch (error) {
         console.error('Failed to load primary backup method:', error)
@@ -117,7 +128,7 @@ export default function SyncPage() {
     }
 
     void loadPrimaryBackupMethod()
-  }, [setPrimaryBackupMethod])
+  }, [isAndroid, isIOS, setPrimaryBackupMethod])
 
   const currentSyncState = getCurrentSyncState(tab)
   const isFileAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
@@ -136,13 +147,20 @@ export default function SyncPage() {
         return s3Connected ? SyncStateEnum.success : SyncStateEnum.fail
       case 'webdav':
         return webdavConnected ? SyncStateEnum.success : SyncStateEnum.fail
+      case 'cloudFolder':
+        return cloudFolderConnected ? SyncStateEnum.success : SyncStateEnum.fail
       default:
         return syncRepoState
     }
   }
 
   function getProviderLabel(platform: SyncPlatform) {
-    return platform.charAt(0).toUpperCase() + platform.slice(1)
+    if (platform === 'cloudFolder') {
+      return isIOS
+        ? t('settings.sync.iCloud.title')
+        : t('settings.sync.oneDrive.title')
+    }
+    return SYNC_PLATFORM_INFO[platform].name
   }
 
   function handleTabChange(value: string) {
@@ -176,6 +194,8 @@ export default function SyncPage() {
         return <S3Sync />
       case 'webdav':
         return <WebDAVSync />
+      case 'cloudFolder':
+        return isIOS ? <IOSCloudFolderSync /> : isAndroid ? <AndroidCloudFolderSync /> : <GithubSync />
       default:
         return <GithubSync />
     }
@@ -205,9 +225,9 @@ export default function SyncPage() {
               onValueChange={handleTabChange}
               placeholder={t('settings.sync.selectPlatform')}
               className="h-11"
-              options={SYNC_PLATFORMS.map(platform => ({
-                value: platform,
-                label: getProviderLabel(platform),
+              options={availablePlatforms.map(platformName => ({
+                value: platformName,
+                label: getProviderLabel(platformName),
               }))}
             />
           </div>
@@ -219,7 +239,7 @@ export default function SyncPage() {
           </div>
         </div>
         {renderSyncContent()}
-        {tab !== 's3' && tab !== 'webdav' ? (
+        {tab !== 's3' && tab !== 'webdav' && tab !== 'cloudFolder' ? (
           <WorkspaceRepoMapping
             platform={tab}
             workspaceOptions={workspaceOptions}
@@ -245,7 +265,7 @@ export default function SyncPage() {
               title={t('settings.sync.autoSync')}
               value={autoSync}
               onValueChange={(value) => setAutoSync(value)}
-              disabled={isFileAutoSyncDisabled}
+              disabled={isFileAutoSyncDisabled || (tab === 'cloudFolder' && !isAndroid)}
               className="min-w-32"
               placeholder={t('settings.sync.autoSyncOptions.placeholder')}
               options={[
@@ -273,7 +293,7 @@ export default function SyncPage() {
             <Switch
               checked={autoPullOnOpen}
               onCheckedChange={setAutoPullOnOpen}
-              disabled={isFileAutoSyncDisabled}
+              disabled={isFileAutoSyncDisabled || (tab === 'cloudFolder' && !isAndroid)}
             />
           </ItemActions>
         </Item>
@@ -281,6 +301,7 @@ export default function SyncPage() {
       </section>
 
       <DataSyncOverview
+        mobile
         autoRecordSyncEnabled={autoRecordSyncEnabled}
         autoSettingsSyncEnabled={autoSettingsSyncEnabled}
         autoConversationSyncEnabled={autoConversationSyncEnabled}

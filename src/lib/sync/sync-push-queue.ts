@@ -10,12 +10,18 @@ import { getRemoteFileInfo } from './auto-sync'
 import { isSyncConfigured } from './sync-manager'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { debugSyncPerf } from './remote-file'
 import { generateGitSyncCommitMessage } from './commit-message'
 import { getSyncMetadataKey } from './sync-context'
 
-type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
+
+async function getAndroidCloudFolderConfig(): Promise<CloudFolderConfig | null> {
+  const store = await Store.load('store.json')
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  return config && (config.provider === 'oneDrive' || config.path.startsWith('content://')) ? config : null
+}
 
 /**
  * 获取 S3 配置
@@ -318,7 +324,9 @@ class SyncPushQueue {
         const store = await Store.load('store.json')
         const provider = (await store.get<string>('primaryBackupMethod') || 'github') as SyncProvider
         providerForLog = provider
-        const repo = (provider !== 's3' && provider !== 'webdav') ? await getSyncRepoName(provider) : undefined
+        const repo = (provider !== 's3' && provider !== 'webdav' && provider !== 'cloudFolder')
+          ? await getSyncRepoName(provider)
+          : undefined
         logPerf('loadConfig', {
           attempt,
           hasRepo: Boolean(repo),
@@ -379,7 +387,7 @@ class SyncPushQueue {
           })
         }
 
-        const needsCommitMessage = provider !== 's3' && provider !== 'webdav'
+        const needsCommitMessage = provider !== 's3' && provider !== 'webdav' && provider !== 'cloudFolder'
         const commitMessage = needsCommitMessage
           ? await generateGitSyncCommitMessage(path, content)
           : ''
@@ -663,6 +671,18 @@ class SyncPushQueue {
             }
             break
           }
+          case 'cloudFolder': {
+            const config = await getAndroidCloudFolderConfig()
+            if (!config) {
+              emitter.emit('sync-push-completed', { path, success: false })
+              return { success: false }
+            }
+            const { androidCloudFolderWorkspaceUpload } = await import('@/lib/sync/cloud-folder')
+            const result = await androidCloudFolderWorkspaceUpload(config, path, content)
+            success = true
+            uploadedSha = result.etag
+            break
+          }
         }
 
         if (success) {
@@ -814,8 +834,10 @@ class SyncPushQueue {
       }
 
       const store = await Store.load('store.json')
-      const provider = (await store.get<string>('primaryBackupMethod') || 'github') as 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
-      const repo = (provider !== 's3' && provider !== 'webdav') ? await getSyncRepoName(provider) : undefined
+      const provider = (await store.get<string>('primaryBackupMethod') || 'github') as SyncProvider
+      const repo = (provider !== 's3' && provider !== 'webdav' && provider !== 'cloudFolder')
+        ? await getSyncRepoName(provider)
+        : undefined
 
       // 从磁盘读取最新内容
       const workspace = await getWorkspacePath()
@@ -824,7 +846,7 @@ class SyncPushQueue {
         ? await readTextFile(pathOptions.path)
         : await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
 
-      const needsCommitMessage = provider !== 's3' && provider !== 'webdav'
+      const needsCommitMessage = provider !== 's3' && provider !== 'webdav' && provider !== 'cloudFolder'
       const commitMessage = needsCommitMessage
         ? await generateGitSyncCommitMessage(path, content)
         : ''
@@ -939,6 +961,18 @@ class SyncPushQueue {
             // 更新本地记录的 ETag
             useSyncStore.getState().updateWebDAVFileEtag(path, result.etag)
           }
+          break
+        }
+        case 'cloudFolder': {
+          const config = await getAndroidCloudFolderConfig()
+          if (!config) {
+            emitter.emit('sync-push-completed', { path, success: false })
+            return { success: false }
+          }
+          const { androidCloudFolderWorkspaceUpload } = await import('@/lib/sync/cloud-folder')
+          const result = await androidCloudFolderWorkspaceUpload(config, path, content)
+          success = true
+          uploadedSha = result.etag
           break
         }
       }

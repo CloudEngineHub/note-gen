@@ -51,14 +51,16 @@ function collectSearchTerms(value: unknown): string[] {
 
 export function SettingTab({
   restoreSheetOnNavigate = false,
+  onNavigate,
 }: {
   restoreSheetOnNavigate?: boolean
+  onNavigate?: () => void
 }) {
   const router = useRouter()
   const t = useTranslations('settings')
   const messages = useMessages()
   const [query, setQuery] = useState(() => mobileSettingQueryCache)
-  const notMobilePages = ['about', 'shortcuts']
+  const notMobilePages = ['about', 'backup', 'shortcuts']
   
   const config = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -104,6 +106,7 @@ export function SettingTab({
     if (restoreSheetOnNavigate) {
       window.sessionStorage.setItem('mobile-me-restore-open', 'true')
     }
+    onNavigate?.()
     router.push(`/mobile/setting/pages/${anchor}`)
   }
 

@@ -6,6 +6,7 @@ import {
   Drama,
   FolderOpen,
   DatabaseBackup,
+  ArchiveRestore,
   ImageUp,
   FileCog,
   Book,
@@ -113,6 +114,10 @@ const baseConfig: SettingNavigationItem[] = [
   {
     icon: <DatabaseBackup className="size-4" />,
     anchor: 'sync',
+  },
+  {
+    icon: <ArchiveRestore className="size-4" />,
+    anchor: 'backup',
   },
   {
     icon: <ImageUp className="size-4" />,

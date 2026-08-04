@@ -140,7 +140,7 @@ export function FileItem({
     clearFileRemoteState: state.clearFileRemoteState,
   })))
   const { setClipboardItem, clipboardItem, clipboardItems, clipboardOperation } = useClipboardStore()
-  const { fileManagerTextSize } = useSettingStore()
+  const { fileManagerTextSize, primaryBackupMethod } = useSettingStore()
   const t = useTranslations('article.file')
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
@@ -345,7 +345,11 @@ export function FileItem({
       try {
         // 获取当前主要备份方式
         const store = await Store.load('store.json');
-        const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'>('primaryBackupMethod') || 'github';
+        const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'>('primaryBackupMethod') || 'github';
+        if (backupMethod === 'cloudFolder') {
+          setEntryLoading(currentPath, false)
+          return
+        }
         const repoName = backupMethod === 's3' || backupMethod === 'webdav'
           ? RepoNames.sync
           : await getSyncRepoName(backupMethod)
@@ -920,9 +924,11 @@ export function FileItem({
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
                       {t('context.rename')}
                     </MobileMenuItem>
-                    <MobileMenuItem disabled={!item.sha} className="text-red-600" onClick={handleDeleteSyncFile}>
-                      {t('context.deleteSyncFile')}
-                    </MobileMenuItem>
+                    {primaryBackupMethod !== 'cloudFolder' ? (
+                      <MobileMenuItem disabled={!item.sha} className="text-red-600" onClick={handleDeleteSyncFile}>
+                        {t('context.deleteSyncFile')}
+                      </MobileMenuItem>
+                    ) : null}
                     <MobileMenuItem disabled={!item.isLocale || item.name === ''} className="text-red-600" onClick={handleDeleteFile}>
                       {t('context.deleteLocalFile')}
                     </MobileMenuItem>
@@ -970,9 +976,11 @@ export function FileItem({
                     <MobileMenuItem disabled={!item.isLocale} onClick={handleStartRename}>
                       {t('context.rename')}
                     </MobileMenuItem>
-                    <MobileMenuItem disabled={!item.sha} className="text-red-600" onClick={handleDeleteSyncFile}>
-                      {t('context.deleteSyncFile')}
-                    </MobileMenuItem>
+                    {primaryBackupMethod !== 'cloudFolder' ? (
+                      <MobileMenuItem disabled={!item.sha} className="text-red-600" onClick={handleDeleteSyncFile}>
+                        {t('context.deleteSyncFile')}
+                      </MobileMenuItem>
+                    ) : null}
                     <MobileMenuItem disabled={!item.isLocale || item.name === ''} className="text-red-600" onClick={handleDeleteFile}>
                       {t('context.deleteLocalFile')}
                     </MobileMenuItem>
@@ -1083,10 +1091,12 @@ export function FileItem({
                   <Kbd>{renameKey}</Kbd>
                 </ContextMenuShortcut>
               </ContextMenuItem>
-              <ContextMenuItem disabled={!item.sha} inset className="text-red-900" onClick={handleDeleteSyncFile} menuType="file">
-                <RefreshCwOff className="mr-2 h-4 w-4" />
-                {t('context.deleteSyncFile')}
-              </ContextMenuItem>
+              {primaryBackupMethod !== 'cloudFolder' ? (
+                <ContextMenuItem disabled={!item.sha} inset className="text-red-900" onClick={handleDeleteSyncFile} menuType="file">
+                  <RefreshCwOff className="mr-2 h-4 w-4" />
+                  {t('context.deleteSyncFile')}
+                </ContextMenuItem>
+              ) : null}
               <ContextMenuItem disabled={!item.isLocale || item.name === ''} inset className="text-red-900" onClick={handleDeleteFile} menuType="file">
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('context.deleteLocalFile')}

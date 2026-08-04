@@ -4,8 +4,9 @@ import { SyncStateEnum } from '@/lib/sync/github.types'
 import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import { testS3Connection } from '@/lib/sync/s3'
 import { testWebDAVConnection } from '@/lib/sync/webdav'
+import { testCloudFolderConnection } from '@/lib/sync/cloud-folder'
 import useSyncStore from '@/stores/sync'
-import type { S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
 
 type GitSyncPlatform = 'github' | 'gitee' | 'gitlab' | 'gitea'
 
@@ -193,6 +194,18 @@ async function checkWebDAVStatus(store: Store) {
   }
 }
 
+async function checkCloudFolderStatus(store: Store) {
+  const syncStore = useSyncStore.getState()
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  const connected = config?.path
+    ? await testCloudFolderConnection(config).catch(() => false)
+    : false
+  const currentConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  if (JSON.stringify(currentConfig) === JSON.stringify(config)) {
+    syncStore.setCloudFolderConnected(connected)
+  }
+}
+
 export async function checkSyncProviderStatus(platform: SyncPlatform) {
   const store = await Store.load('store.json')
 
@@ -209,5 +222,7 @@ export async function checkSyncProviderStatus(platform: SyncPlatform) {
       return checkS3Status(store)
     case 'webdav':
       return checkWebDAVStatus(store)
+    case 'cloudFolder':
+      return checkCloudFolderStatus(store)
   }
 }

@@ -1,4 +1,6 @@
 import Foundation
+import UniformTypeIdentifiers
+import UIKit
 import Vision
 import Tauri
 
@@ -15,6 +17,22 @@ struct RecognizeArgs: Decodable {
 
 struct RecognizeResponse: Encodable {
     let text: String
+}
+
+struct FolderBookmarkArgs: Decodable {
+    let bookmarkBase64: String
+}
+
+struct FolderPickerResponse: Encodable {
+    let cancelled: Bool
+    let path: String?
+    let bookmarkBase64: String?
+    let displayName: String?
+}
+
+struct ActiveFolderAccess {
+    let url: URL
+    let bookmarkData: Data
 }
 
 struct OcrFailure: Error, LocalizedError {
@@ -132,7 +150,185 @@ func recognizeText(imagePath: String, languages: [String]) throws -> String {
     return sortedRecognizedLines(from: request.results ?? []).joined(separator: "\n")
 }
 
-class OcrPlugin: Plugin {
+class OcrPlugin: Plugin, UIDocumentPickerDelegate {
+    private var pendingFolderInvoke: Invoke?
+    private var activeFolders: [String: ActiveFolderAccess] = [:]
+
+    deinit {
+        var releasedURLs = Set<URL>()
+        for active in activeFolders.values where releasedURLs.insert(active.url).inserted {
+            active.url.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    private func folderResponse(url: URL, bookmarkData: Data) -> FolderPickerResponse {
+        FolderPickerResponse(
+            cancelled: false,
+            path: url.path,
+            bookmarkBase64: bookmarkData.base64EncodedString(),
+            displayName: url.lastPathComponent
+        )
+    }
+
+    private func createBookmark(for url: URL) throws -> Data {
+        try url.bookmarkData(
+            options: [],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+    }
+
+    private func registerActiveFolder(url: URL, bookmarkData: Data) {
+        let encodedBookmark = bookmarkData.base64EncodedString()
+        if let existing = activeFolders.values.first(where: { $0.url == url }) {
+            url.stopAccessingSecurityScopedResource()
+            let active = ActiveFolderAccess(url: existing.url, bookmarkData: bookmarkData)
+            let matchingKeys = activeFolders.compactMap { key, value in
+                value.url == url ? key : nil
+            }
+            for key in matchingKeys {
+                activeFolders[key] = active
+            }
+            activeFolders[encodedBookmark] = active
+            return
+        }
+
+        activeFolders[encodedBookmark] = ActiveFolderAccess(url: url, bookmarkData: bookmarkData)
+    }
+
+    private func resolveBookmark(_ encodedBookmark: String) throws -> (URL, Data) {
+        if let active = activeFolders[encodedBookmark] {
+            return (active.url, active.bookmarkData)
+        }
+
+        guard let bookmarkData = Data(base64Encoded: encodedBookmark) else {
+            throw OcrFailure(message: "The folder authorization is invalid.")
+        }
+
+        var isStale = false
+        let resolutionOptions: URL.BookmarkResolutionOptions
+        if #available(iOS 14.2, *) {
+            resolutionOptions = [.withoutImplicitStartAccessing]
+        } else {
+            resolutionOptions = []
+        }
+        let url = try URL(
+            resolvingBookmarkData: bookmarkData,
+            options: resolutionOptions,
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        )
+
+        if #available(iOS 14.2, *) {
+            guard url.startAccessingSecurityScopedResource() else {
+                throw OcrFailure(message: "NoteGen could not restore access to the selected folder.")
+            }
+        }
+
+        let currentBookmark = isStale ? try createBookmark(for: url) : bookmarkData
+        let currentEncodedBookmark = currentBookmark.base64EncodedString()
+        registerActiveFolder(url: url, bookmarkData: currentBookmark)
+        if let active = activeFolders[currentEncodedBookmark] {
+            activeFolders[encodedBookmark] = active
+        }
+        return (url, currentBookmark)
+    }
+
+    @objc public func pickFolder(_ invoke: Invoke) {
+        DispatchQueue.main.async {
+            guard self.pendingFolderInvoke == nil else {
+                invoke.reject("Another folder picker is already open.")
+                return
+            }
+            guard let rootViewController = self.manager.viewController else {
+                invoke.reject("The folder picker is unavailable.")
+                return
+            }
+
+            let picker: UIDocumentPickerViewController
+            if #available(iOS 14.0, *) {
+                picker = UIDocumentPickerViewController(
+                    forOpeningContentTypes: [.folder],
+                    asCopy: false
+                )
+            } else {
+                picker = UIDocumentPickerViewController(
+                    documentTypes: ["public.folder"],
+                    in: .open
+                )
+            }
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            UIUtils.centerPopover(rootViewController: rootViewController, popoverController: picker)
+            self.pendingFolderInvoke = invoke
+
+            var presenter = rootViewController
+            while let presented = presenter.presentedViewController {
+                presenter = presented
+            }
+            presenter.present(picker, animated: true)
+        }
+    }
+
+    @objc public func restoreFolder(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(FolderBookmarkArgs.self)
+        DispatchQueue.main.async {
+            do {
+                let (url, bookmarkData) = try self.resolveBookmark(args.bookmarkBase64)
+                invoke.resolve(self.folderResponse(url: url, bookmarkData: bookmarkData))
+            } catch {
+                invoke.reject(error.localizedDescription)
+            }
+        }
+    }
+
+    @objc public func releaseFolder(_ invoke: Invoke) throws {
+        let args = try invoke.parseArgs(FolderBookmarkArgs.self)
+        DispatchQueue.main.async {
+            if let active = self.activeFolders[args.bookmarkBase64] {
+                self.activeFolders = self.activeFolders.filter { $0.value.url != active.url }
+                active.url.stopAccessingSecurityScopedResource()
+            }
+            invoke.resolve()
+        }
+    }
+
+    public func documentPicker(
+        _ controller: UIDocumentPickerViewController,
+        didPickDocumentsAt urls: [URL]
+    ) {
+        guard let invoke = pendingFolderInvoke else {
+            return
+        }
+        pendingFolderInvoke = nil
+
+        guard let url = urls.first else {
+            invoke.resolve(FolderPickerResponse(cancelled: true, path: nil, bookmarkBase64: nil, displayName: nil))
+            return
+        }
+        guard url.startAccessingSecurityScopedResource() else {
+            invoke.reject("NoteGen could not access the selected folder.")
+            return
+        }
+
+        do {
+            let bookmarkData = try createBookmark(for: url)
+            registerActiveFolder(url: url, bookmarkData: bookmarkData)
+            invoke.resolve(folderResponse(url: url, bookmarkData: bookmarkData))
+        } catch {
+            url.stopAccessingSecurityScopedResource()
+            invoke.reject(error.localizedDescription)
+        }
+    }
+
+    public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        guard let invoke = pendingFolderInvoke else {
+            return
+        }
+        pendingFolderInvoke = nil
+        invoke.resolve(FolderPickerResponse(cancelled: true, path: nil, bookmarkBase64: nil, displayName: nil))
+    }
+
     @objc public func recognize(_ invoke: Invoke) throws {
         do {
             let args = try invoke.parseArgs(RecognizeArgs.self)

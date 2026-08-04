@@ -1,11 +1,12 @@
 'use client'
 
 import { ReactNode, useRef, useState } from 'react'
-import { Cloud, FileText, Folder, LoaderCircle, MoreVertical } from 'lucide-react'
+import { FileText, Folder, LoaderCircle, MoreVertical } from 'lucide-react'
 import { BrowserEntry } from './types'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { FileTreeDecorations } from '@/app/core/main/file/file-tree-decorations'
 
 type EntryAction = {
   key: string
@@ -22,7 +23,7 @@ interface EntryListItemProps {
   isActive: boolean
   onOpen: (entry: BrowserEntry) => void
   actions: EntryAction[]
-  remoteLabel: string
+  syncStatusLabel: string
   subtitle?: string
   dragDisabled?: boolean
   isDragging?: boolean
@@ -40,7 +41,7 @@ export function EntryListItem({
   isActive,
   onOpen,
   actions,
-  remoteLabel,
+  syncStatusLabel,
   subtitle,
   dragDisabled = false,
   isDragging = false,
@@ -230,15 +231,12 @@ export function EntryListItem({
                 <FileText className="size-4 shrink-0 text-muted-foreground" />
               )}
               <p className="min-w-0 flex-1 truncate text-sm font-medium">{entry.name}</p>
-              {!entry.isLocale && (
-                <span
-                  className="inline-flex shrink-0 items-center text-muted-foreground"
-                  title={remoteLabel}
-                  aria-label={remoteLabel}
-                >
-                  <Cloud className="size-4 stroke-[2.25]" />
-                </span>
-              )}
+              <FileTreeDecorations
+                iconSize="size-4"
+                syncStatus={entry.syncStatus}
+                syncTitle={syncStatusLabel}
+                alwaysShowSynced
+              />
             </div>
             {subtitle && (
               <p className="mt-1 truncate text-xs text-muted-foreground">{subtitle}</p>

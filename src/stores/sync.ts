@@ -54,6 +54,9 @@ interface SyncState {
   webdavConnected: boolean
   setWebDAVConnected: (connected: boolean) => void
 
+  cloudFolderConnected: boolean
+  setCloudFolderConnected: (connected: boolean) => void
+
   webdavFileEtags: Record<string, string>
   setWebDAVFileEtags: (etags: Record<string, string>) => void
   updateWebDAVFileEtag: (path: string, etag: string) => void
@@ -148,6 +151,11 @@ const useSyncStore = create<SyncState>((set) => ({
   webdavConnected: false,
   setWebDAVConnected: (connected) => {
     set({ webdavConnected: connected })
+  },
+
+  cloudFolderConnected: false,
+  setCloudFolderConnected: (connected) => {
+    set({ cloudFolderConnected: connected })
   },
 
   webdavFileEtags: {},

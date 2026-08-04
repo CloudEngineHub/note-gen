@@ -16,10 +16,11 @@ import emitter from '@/lib/emitter'
 import { setLocalRecordedSha } from '@/lib/sync/auto-sync'
 import { debugSyncPerf } from '@/lib/sync/remote-file'
 import { generateGitSyncCommitMessage } from '@/lib/sync/commit-message'
+import { uploadRemoteText } from '@/lib/sync/remote-library'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
 import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
-type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -173,14 +174,15 @@ export function SyncButton() {
       const store = await Store.load('store.json')
       const provider = (await store.get<string>('primaryBackupMethod') || 'github') as SyncProvider
       providerForLog = provider
-      // S3 和 WebDAV 不需要 repo
-      const repo = (provider === 's3' || provider === 'webdav') ? '' : await getOptionalSyncRepoName(provider)
-      if (provider !== 's3' && provider !== 'webdav' && !repo) {
+      const needsRepo = provider !== 's3' && provider !== 'webdav' && provider !== 'cloudFolder'
+      const repo = needsRepo ? await getOptionalSyncRepoName(provider) : ''
+      if (needsRepo && !repo) {
         toast({ description: t('settings.sync.repositoryRequired'), variant: 'destructive' })
         useSettingsDialogStore.getState().openSettings('sync')
         setIsLoading(false)
         return
       }
+      emitter.emit('sync-push-started', { path: activeFilePath })
       logPerf('loadConfig', {
         hasRepo: Boolean(repo),
       })
@@ -196,7 +198,7 @@ export function SyncButton() {
         contentLength: content.length,
       })
 
-      const needsCommitMessage = provider !== 's3' && provider !== 'webdav'
+      const needsCommitMessage = needsRepo
       const commitMessage = needsCommitMessage
         ? await generateGitSyncCommitMessage(activeFilePath, content)
         : ''
@@ -215,6 +217,18 @@ export function SyncButton() {
       let uploadedSha: string | undefined
 
       switch (provider) {
+        case 'cloudFolder': {
+          uploadedSha = await uploadRemoteText(
+            activeFilePath,
+            content,
+            `Upload file: ${activeFilePath}`,
+          )
+          logPerf('uploadFile', {
+            hasResult: Boolean(uploadedSha),
+          })
+          success = Boolean(uploadedSha)
+          break
+        }
         case 's3': {
           const s3Module = await import('@/lib/sync/s3')
           const s3Config = await store.get<S3Config>('s3SyncConfig')

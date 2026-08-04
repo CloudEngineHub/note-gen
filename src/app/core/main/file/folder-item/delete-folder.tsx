@@ -13,6 +13,7 @@ import {
   hasRemoteFolderData,
 } from "./delete-folder-utils";
 import { moveEntryToSystemTrash } from '../system-trash'
+import useSettingStore from '@/stores/setting'
 
 interface DeleteFolderProps {
   item: DirTree;
@@ -21,6 +22,7 @@ interface DeleteFolderProps {
 
 export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
   const t = useTranslations('article.file');
+  const primaryBackupMethod = useSettingStore(state => state.primaryBackupMethod)
   const {
     fileTree,
     setFileTree,
@@ -109,16 +111,18 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
           </ContextMenuShortcut>
         )}
       </ContextMenuItem>
-      <ContextMenuItem
-        inset
-        disabled={!hasRemoteFolderData(item)}
-        className="text-destructive"
-        onClick={handleDeleteRemoteFolder}
-        menuType="file"
-      >
-        <Trash2 className="mr-2 h-4 w-4" />
-        {t('context.deleteRemoteFolder')}
-      </ContextMenuItem>
+      {primaryBackupMethod !== 'cloudFolder' ? (
+        <ContextMenuItem
+          inset
+          disabled={!hasRemoteFolderData(item)}
+          className="text-destructive"
+          onClick={handleDeleteRemoteFolder}
+          menuType="file"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          {t('context.deleteRemoteFolder')}
+        </ContextMenuItem>
+      ) : null}
     </>
   );
 }

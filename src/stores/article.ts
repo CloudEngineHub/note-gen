@@ -8,13 +8,15 @@ import { GiteaDirectoryItem } from '@/lib/sync/gitea.types'
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { s3ListObjects } from '@/lib/sync/s3'
 import { webdavListObjects } from '@/lib/sync/webdav'
-import { S3Config, WebDAVConfig } from '@/types/sync'
+import { androidCloudFolderWorkspaceList, type CloudFolderObject } from '@/lib/sync/cloud-folder'
+import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { hasNetworkConnection, ensureDirectoryExists, pullRemoteFile, saveLocalFile } from '@/lib/sync/auto-sync'
 import { isSyncConfigured, syncOnOpen } from '@/lib/sync/sync-manager'
 import { sanitizeFilePath, hasInvalidFileNameChars } from '@/lib/sync/filename-utils'
 import { getCurrentFolder, computedParentPath } from '@/lib/path'
 import useVectorStore from './vector'
 import { join, appDataDir } from '@tauri-apps/api/path'
+import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { BaseDirectory, DirEntry, exists, mkdir, readDir, readTextFile, writeTextFile, stat } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
 import { cloneDeep, uniq } from 'lodash-es'
@@ -29,6 +31,11 @@ import { debugSyncPath } from '@/lib/sync/remote-file'
 import type { Mark } from '@/db/marks'
 import { getRecordTabName } from '@/app/core/main/mark/mark-record-tab'
 import { getCurrentSyncContext } from '@/lib/sync/sync-context'
+import {
+  getCloudFolderTreeCacheTargetKey,
+  readCloudFolderTreeCache,
+  writeCloudFolderTreeCache,
+} from '@/lib/sync/cloud-folder-tree-cache'
 
 type SyncPushCompletedEvent = Events['sync-push-completed']
 type SyncPushCompletedListener = (event: SyncPushCompletedEvent) => void
@@ -48,6 +55,7 @@ let pendingVectorCalculation: { path: string; content: string } | null = null
 let vectorIndexedFilesInitPromise: Promise<void> | null = null
 const remoteFolderLoadPromises = new Map<string, Promise<void>>()
 const REMOTE_FOLDER_TIMEOUT_MS = 20_000
+const cloudFolderRemoteLoadPromises = new Map<string, Promise<CloudFolderObject[]>>()
 let fileTreeWorkspaceKey: string | null = null
 let fileTreeLoadGeneration = 0
 
@@ -116,6 +124,37 @@ async function getStore(): Promise<Store> {
   return storeInstance
 }
 
+async function loadCloudFolderRemoteSnapshot(
+  cacheTargetKey: string,
+  config: CloudFolderConfig,
+  forceRefresh: boolean,
+): Promise<CloudFolderObject[]> {
+  if (!forceRefresh) {
+    const cached = await readCloudFolderTreeCache(cacheTargetKey)
+    if (cached) return cached
+  }
+
+  const pending = cloudFolderRemoteLoadPromises.get(cacheTargetKey)
+  if (pending) return pending
+
+  const task = (async () => {
+    const files = await withRemoteTimeout(
+      androidCloudFolderWorkspaceList(config),
+      '',
+    )
+    await writeCloudFolderTreeCache(cacheTargetKey, files)
+    return files
+  })()
+  cloudFolderRemoteLoadPromises.set(cacheTargetKey, task)
+  try {
+    return await task
+  } finally {
+    if (cloudFolderRemoteLoadPromises.get(cacheTargetKey) === task) {
+      cloudFolderRemoteLoadPromises.delete(cacheTargetKey)
+    }
+  }
+}
+
 async function getCollapsibleStoreKey(): Promise<string> {
   const workspace = await getWorkspacePath()
   return `collapsibleList:${workspace.isCustom ? workspace.path : '__default__'}`
@@ -143,6 +182,96 @@ export interface DirTree extends DirEntry {
   syncDirty?: boolean
   syncError?: string
   vectorCalcStatus?: 'idle' | 'calculating' | 'completed'  // 向量计算状态
+}
+
+function mergeCloudFolderRemoteEntries(
+  files: CloudFolderObject[],
+  currentPath: string,
+  entries: DirTree[],
+  parent?: DirTree,
+) {
+  const normalizedPath = currentPath.replace(/^\/+|\/+$/g, '')
+  const remoteEntries = new Map<string, DirTree>()
+
+  for (const file of files) {
+    const key = file.key.replace(/^\/+|\/+$/g, '')
+    const relativePath = normalizedPath
+      ? key.startsWith(`${normalizedPath}/`)
+        ? key.slice(normalizedPath.length + 1)
+        : ''
+      : key
+    if (!relativePath) continue
+
+    const [name, ...remainingSegments] = relativePath.split('/')
+    if (!name || name.startsWith('.')) continue
+
+    const isDirectory = remainingSegments.length > 0
+    const entryKey = `${isDirectory ? 'directory' : 'file'}:${name}`
+    if (remoteEntries.has(entryKey)) continue
+    remoteEntries.set(entryKey, {
+      name,
+      isFile: !isDirectory,
+      isSymlink: false,
+      parent,
+      isEditing: false,
+      isDirectory,
+      sha: isDirectory ? '' : file.etag,
+      size: isDirectory ? undefined : file.size,
+      isLocale: false,
+      modifiedAt: isDirectory ? undefined : new Date(file.modifiedAt).toISOString(),
+      children: isDirectory ? [] : undefined,
+      childrenLoaded: isDirectory ? false : undefined,
+    })
+  }
+
+  const remoteEntryKeys = new Set(remoteEntries.keys())
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index]
+    const entryKey = `${entry.isDirectory ? 'directory' : 'file'}:${entry.name}`
+    if (remoteEntryKeys.has(entryKey)) continue
+
+    if (!entry.isLocale) {
+      entries.splice(index, 1)
+    } else if (entry.isFile) {
+      entry.sha = ''
+    }
+  }
+
+  for (const [entryKey, remoteEntry] of remoteEntries) {
+    const existing = entries.find(entry => (
+      `${entry.isDirectory ? 'directory' : 'file'}:${entry.name}` === entryKey
+    ))
+    if (!existing) {
+      entries.push(remoteEntry)
+      continue
+    }
+
+    existing.sha = remoteEntry.sha
+    existing.size = remoteEntry.size
+    existing.modifiedAt = remoteEntry.modifiedAt
+  }
+}
+
+function mergeCloudFolderSnapshotIntoTree(
+  files: CloudFolderObject[],
+  paths: string[],
+  tree: DirTree[],
+) {
+  for (const path of paths) {
+    if (!path) {
+      mergeCloudFolderRemoteEntries(files, '', tree)
+      continue
+    }
+
+    const folder = getCurrentFolder(path, tree)
+    if (!folder?.isDirectory) continue
+    mergeCloudFolderRemoteEntries(
+      files,
+      path,
+      folder.children ?? (folder.children = []),
+      folder,
+    )
+  }
 }
 
 function copyCachedEntry(entry: DirTree, parent?: DirTree): DirTree {
@@ -1439,6 +1568,29 @@ const useArticleStore = create<NoteState>((set, get) => ({
     )
     if (!await canApplyFileTreeRequest(requestContext)) return
 
+    // Android OneDrive 先恢复上次成功获取的远程清单，让文件树无需等待网络即可展示。
+    // 随后的后台刷新会用最新结果覆盖缓存，并清理已经从远端移除的纯远程节点。
+    if (getRuntimePlatform() === 'android') {
+      const syncContext = await getCurrentSyncContext()
+      if (syncContext.provider === 'cloudFolder') {
+        const syncTargetKey = getRemoteSyncTargetKey(syncContext)
+        const store = await getStore()
+        const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (cloudFolderConfig?.provider === 'oneDrive' && cloudFolderConfig.path) {
+          const cacheTargetKey = getCloudFolderTreeCacheTargetKey(syncTargetKey, cloudFolderConfig)
+          const cachedRemoteFiles = await readCloudFolderTreeCache(cacheTargetKey)
+          if (cachedRemoteFiles && await canApplyFileTreeRequest(requestContext)) {
+            mergeCloudFolderSnapshotIntoTree(
+              cachedRemoteFiles,
+              buildRemotePathsToLoad(collapsibleList),
+              sortedDirs,
+            )
+          }
+        }
+      }
+    }
+    if (!await canApplyFileTreeRequest(requestContext)) return
+
     set({
       fileTree: sortedDirs,
       fileTreeInitialized: true,
@@ -1501,6 +1653,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
         if (!webdavConfig || !webdavConfig.url || !webdavConfig.username || !webdavConfig.password) {
           return
         }
+      } else if (primaryBackupMethod === 'cloudFolder') {
+        if (getRuntimePlatform() !== 'android') return
+        const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        if (!cloudFolderConfig?.path) return
       }
 
     // 为根目录和已展开的目录加载远程文件。
@@ -1508,6 +1664,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
     const collapsibleList = get().collapsibleList
     const pathsToLoad = buildRemotePathsToLoad(collapsibleList)
     let firstRemoteLoadError: unknown
+    let cloudFolderSnapshot: CloudFolderObject[] | undefined
     
     // 目录树会在加载过程中逐步插入父级节点，因此这里必须按层级顺序加载。
     // 如果并发请求深层路径，远端子目录可能会在父目录节点尚未写入树时被跳过。
@@ -1546,6 +1703,18 @@ const useArticleStore = create<NoteState>((set, get) => ({
             }
             break;
           }
+          case 'cloudFolder': {
+            const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+            if (cloudFolderConfig) {
+              cloudFolderSnapshot ??= await loadCloudFolderRemoteSnapshot(
+                getCloudFolderTreeCacheTargetKey(requestContext.syncTargetKey, cloudFolderConfig),
+                cloudFolderConfig,
+                true,
+              )
+              files = cloudFolderSnapshot
+            }
+            break
+          }
         }
 
         if (!await canApplyRemoteFileTreeRequest(requestContext)) return
@@ -1553,7 +1722,21 @@ const useArticleStore = create<NoteState>((set, get) => ({
           const dirs = get().fileTree
 
           // S3 或 WebDAV 文件处理
-          if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') {
+          if (primaryBackupMethod === 'cloudFolder') {
+            if (path) {
+              const currentFolder = getCurrentFolder(path, dirs)
+              if (currentFolder) {
+                mergeCloudFolderRemoteEntries(
+                  files as CloudFolderObject[],
+                  path,
+                  currentFolder.children ?? (currentFolder.children = []),
+                  currentFolder,
+                )
+              }
+            } else {
+              mergeCloudFolderRemoteEntries(files as CloudFolderObject[], path, dirs)
+            }
+          } else if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') {
             const s3Files = files as Array<{ key: string; etag: string; lastModified: string; size: number }>
             let prefix = ''
             if (primaryBackupMethod === 's3') {
@@ -1870,6 +2053,10 @@ const useArticleStore = create<NoteState>((set, get) => ({
     } else if (primaryBackupMethod === 'webdav') {
       const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
       if (!webdavConfig || !webdavConfig.url || !webdavConfig.username || !webdavConfig.password) return
+    } else if (primaryBackupMethod === 'cloudFolder') {
+      if (getRuntimePlatform() !== 'android') return
+      const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+      if (!cloudFolderConfig?.path) return
     }
 
     // loading 只表示真实的远程目录请求。本地目录扫描（包括搜索第一阶段）
@@ -1927,6 +2114,17 @@ const useArticleStore = create<NoteState>((set, get) => ({
           }
           break;
         }
+        case 'cloudFolder': {
+          const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+          if (cloudFolderConfig) {
+            files = await loadCloudFolderRemoteSnapshot(
+              getCloudFolderTreeCacheTargetKey(requestContext.syncTargetKey, cloudFolderConfig),
+              cloudFolderConfig,
+              false,
+            )
+          }
+          break
+        }
       }
 
       if (!await canApplyRemoteFileTreeRequest(requestContext)) return
@@ -1936,7 +2134,14 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
         if (currentFolder) {
           // S3 和 WebDAV 返回的文件格式相同，需要特殊处理
-          if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') {
+          if (primaryBackupMethod === 'cloudFolder') {
+            mergeCloudFolderRemoteEntries(
+              files as CloudFolderObject[],
+              fullpath,
+              currentFolder.children ?? (currentFolder.children = []),
+              currentFolder,
+            )
+          } else if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') {
             const s3Files = files as Array<{ key: string; etag: string; lastModified: string; size: number }>
             let prefix = ''
             if (primaryBackupMethod === 's3') {

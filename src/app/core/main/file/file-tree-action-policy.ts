@@ -2,7 +2,7 @@ import { Store } from '@tauri-apps/plugin-store'
 
 import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import type { DirTree } from '@/stores/article'
-import type { S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
 
 export type FileTreeSyncStatus = 'loading' | 'error' | 'dirty' | 'synced' | 'local-only' | 'remote-only'
 
@@ -14,13 +14,17 @@ export function validateFileTreeName(name: string): 'empty' | 'invalid' | null {
 }
 
 export function getFileTreeSyncStatus(item: DirTree): FileTreeSyncStatus {
+  const childStatuses = item.children?.map(getFileTreeSyncStatus) ?? []
   if (item.loading) return 'loading'
-  if (item.syncError || item.children?.some(child => getFileTreeSyncStatus(child) === 'error')) return 'error'
+  if (item.syncError || childStatuses.includes('error')) return 'error'
   if (
     (item.isLocale && item.sha && item.syncDirty)
-    || item.children?.some(child => getFileTreeSyncStatus(child) === 'dirty')
+    || childStatuses.includes('dirty')
   ) return 'dirty'
-  if (item.isLocale && item.sha) return 'synced'
+  if (
+    item.isLocale
+    && (Boolean(item.sha) || childStatuses.some(status => status === 'synced' || status === 'remote-only'))
+  ) return 'synced'
   if (item.isLocale) return 'local-only'
   return 'remote-only'
 }
@@ -39,7 +43,12 @@ export function buildFileTreeSyncStatusMap(tree: DirTree[]) {
       (item.isLocale && item.sha && item.syncDirty)
       || childStatuses.includes('dirty')
     ) status = 'dirty'
-    else if (item.isLocale && item.sha) status = 'synced'
+    else if (
+      item.isLocale
+      && (Boolean(item.sha) || childStatuses.some(childStatus => (
+        childStatus === 'synced' || childStatus === 'remote-only'
+      )))
+    ) status = 'synced'
     else if (item.isLocale) status = 'local-only'
     else status = 'remote-only'
 
@@ -75,7 +84,12 @@ export async function getSyncConfiguration(): Promise<{
     }
   }
 
-  const credentials: Record<Exclude<SyncPlatform, 's3' | 'webdav'>, [string, string]> = {
+  if (platform === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    return { platform, configured: Boolean(config?.path) }
+  }
+
+  const credentials: Record<Exclude<SyncPlatform, 's3' | 'webdav' | 'cloudFolder'>, [string, string]> = {
     github: ['accessToken', 'githubUsername'],
     gitee: ['giteeAccessToken', 'giteeUsername'],
     gitlab: ['gitlabAccessToken', 'gitlabUsername'],

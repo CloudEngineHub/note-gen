@@ -24,6 +24,7 @@ import {
 import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
+import { MobileMeSheet } from '@/app/mobile/components/mobile-me-sheet'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import {
   ResponsiveDialog,
@@ -170,9 +171,7 @@ export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-background">
       <header className="mobile-page-header flex w-full shrink-0 items-center gap-2 border-b bg-background px-2">
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold">{t('manager.title')}</h1>
-        </div>
+        <MobileMeSheet />
         <div className="ml-auto flex shrink-0 items-center">
           <Drawer open={templateOpen} onOpenChange={setTemplateOpen}>
             <DrawerTrigger asChild>

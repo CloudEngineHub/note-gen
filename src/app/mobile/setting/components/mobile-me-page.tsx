@@ -5,6 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { motion, useReducedMotion, type Variants } from 'framer-motion'
 import { useTranslations } from 'next-intl'
 import { Store } from '@tauri-apps/plugin-store'
+import { platform } from '@tauri-apps/plugin-os'
 
 import { ActivityHeatmap } from '@/components/activity/activity-heatmap'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,8 @@ import { SyncStateEnum, type UserInfo } from '@/lib/sync/github.types'
 import { getOptionalSyncRepoName } from '@/lib/sync/repo-utils'
 import { testS3Connection } from '@/lib/sync/s3'
 import { testWebDAVConnection } from '@/lib/sync/webdav'
-import type { S3Config, WebDAVConfig } from '@/types/sync'
+import { testCloudFolderConnection } from '@/lib/sync/cloud-folder'
+import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
 import { cn } from '@/lib/utils'
@@ -65,13 +67,16 @@ export function MobileMePage({
   embedded = false,
   animateEntrance = true,
   refreshOnMount = true,
+  onNavigate,
 }: {
   embedded?: boolean
   animateEntrance?: boolean
   refreshOnMount?: boolean
+  onNavigate?: () => void
 }) {
   const tActivity = useTranslations('activity')
   const tMe = useTranslations('mobile.me')
+  const tSync = useTranslations('settings.sync')
   const reduceMotion = useReducedMotion()
 
   const [activityData, setActivityData] = useState<ActivityCalendarData | null>(
@@ -105,6 +110,7 @@ export function MobileMePage({
     giteaSyncRepoState,
     s3Connected,
     webdavConnected,
+    cloudFolderConnected,
   } = useSyncStore()
 
   async function refreshActivity() {
@@ -305,6 +311,13 @@ export function MobileMePage({
             }
             return
           }
+          case 'cloudFolder': {
+            const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+            if (!config?.path) return
+            const connected = await testCloudFolderConnection(config).catch(() => false)
+            if (!cancelled) syncState.setCloudFolderConnected(connected)
+            return
+          }
           default:
             return
         }
@@ -330,6 +343,9 @@ export function MobileMePage({
             break
           case 'webdav':
             syncState.setWebDAVConnected(false)
+            break
+          case 'cloudFolder':
+            syncState.setCloudFolderConnected(false)
             break
           default:
             break
@@ -397,6 +413,7 @@ export function MobileMePage({
     giteaSyncRepoState,
     s3Connected,
     webdavConnected,
+    cloudFolderConnected,
     configuredLabel: tMe('sync.configured'),
     unavailableLabel: tMe('sync.unconfigured'),
   }), [
@@ -407,13 +424,14 @@ export function MobileMePage({
     giteaSyncRepoState,
     s3Connected,
     webdavConnected,
+    cloudFolderConnected,
     tMe,
   ])
 
   const profileProviderType = useMemo<'git' | 'storage' | 'unconfigured'>(() => {
     const hasGitIdentity = Boolean(profile.avatarUrl)
     if (hasGitIdentity) return 'git'
-    if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') return 'storage'
+    if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav' || primaryBackupMethod === 'cloudFolder') return 'storage'
     if (syncStatus === tMe('sync.unconfigured')) return 'unconfigured'
     return 'git'
   }, [profile.avatarUrl, primaryBackupMethod, syncStatus, tMe])
@@ -423,8 +441,11 @@ export function MobileMePage({
       return tMe('sync.localOnly')
     }
 
-    return getBackupProviderName(primaryBackupMethod)
-  }, [primaryBackupMethod, syncStatus, tMe])
+    const cloudFolderName = platform() === 'ios'
+      ? tSync('iCloud.title')
+      : tSync('oneDrive.title')
+    return getBackupProviderName(primaryBackupMethod, cloudFolderName)
+  }, [primaryBackupMethod, syncStatus, tMe, tSync])
 
   const profileCardName = useMemo(() => {
     if (profileProviderType === 'git') {
@@ -526,7 +547,10 @@ export function MobileMePage({
               {tMe('settings.description')}
             </p>
           </div>
-          <SettingTab restoreSheetOnNavigate={embedded} />
+          <SettingTab
+            restoreSheetOnNavigate={embedded}
+            onNavigate={onNavigate}
+          />
         </motion.section>
       </motion.div>
 

@@ -3,7 +3,7 @@
 import { Store } from '@tauri-apps/plugin-store'
 import emitter from '@/lib/emitter'
 import { decodeBase64ToString, getRemoteFileContent } from '@/lib/sync/remote-file'
-import type { S3Config, WebDAVConfig } from '@/types/sync'
+import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import type { Mark } from '@/db/marks'
 import type { Tag } from '@/db/tags'
 import { downloadRecordAssets, uploadRecordAssets } from '@/lib/sync/record-assets'
@@ -29,7 +29,7 @@ import {
 } from '@/lib/sync/conversation-sync'
 
 export type AutoDataSyncDomain = 'records' | 'settings' | 'conversations'
-type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav'
+type AutoDataSyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
 export type AutoDataSyncPhase =
   | 'idle'
   | 'checking_remote'
@@ -172,9 +172,11 @@ const listeners = new Set<AutoDataSyncListener>()
 async function getAutoDataSyncStateKey(baseKey: string) {
   const store = await Store.load('store.json')
   const provider = await getAutoDataSyncProvider(store)
-  const repo = provider === 's3' || provider === 'webdav'
-    ? ''
-    : await getDataSyncRepoName(provider)
+  const repo = provider === 'cloudFolder'
+    ? (await store.get<CloudFolderConfig>('cloudFolderSyncConfig'))?.path || ''
+    : provider === 's3' || provider === 'webdav'
+      ? ''
+      : await getDataSyncRepoName(provider)
   return `${baseKey}:${JSON.stringify([provider, repo])}`
 }
 
@@ -1164,6 +1166,10 @@ export async function isAutoDataSyncProviderConfigured(): Promise<boolean> {
       const config = await store.get<WebDAVConfig>('webdavSyncConfig')
       return Boolean(config?.url && config.username && config.password)
     }
+    case 'cloudFolder': {
+      const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+      return Boolean(config?.path)
+    }
     default:
       return false
   }
@@ -1295,9 +1301,19 @@ async function processQueue() {
   debugAutoDataSync('queue processing started', { pendingCount: queue.length })
 
   while (queue.length > 0) {
-    const task = queue.shift()
+    let task = queue.shift()
     if (!task) {
       continue
+    }
+
+    // A streaming reply can keep conversation data unstable for tens of
+    // seconds. Do not make independent record/settings uploads wait behind it.
+    if (task.domain === 'conversations' && await isConversationSyncBusy()) {
+      const readyTaskIndex = queue.findIndex(item => item.domain !== 'conversations')
+      if (readyTaskIndex >= 0) {
+        queue.push(task)
+        task = queue.splice(readyTaskIndex, 1)[0]
+      }
     }
 
     debugAutoDataSync('task started', {
@@ -1591,6 +1607,9 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
       break
     case 'webdav':
       await uploadWebDAVMetaFile(store, content)
+      break
+    case 'cloudFolder':
+      await uploadCloudFolderMetaFile(store, content)
       break
     default:
       throw new Error('Sync provider is not configured')
@@ -2424,6 +2443,12 @@ async function downloadAutoDataSyncRemoteFileContent(
       const file = await webdavDownload(config, path)
       return file?.content || null
     }
+    case 'cloudFolder': {
+      const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+      if (!config) return null
+      const { cloudFolderDownload } = await import('@/lib/sync/cloud-folder')
+      return (await cloudFolderDownload(config, path))?.content || null
+    }
   }
 }
 
@@ -2480,6 +2505,13 @@ async function downloadAutoDataSyncMeta(
       const { webdavDownload } = await import('@/lib/sync/webdav')
       const file = await webdavDownload(config, AUTO_DATA_SYNC_META_PATH)
       content = file?.content || null
+      break
+    }
+    case 'cloudFolder': {
+      const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+      if (!config) return null
+      const { cloudFolderDownload } = await import('@/lib/sync/cloud-folder')
+      content = (await cloudFolderDownload(config, AUTO_DATA_SYNC_META_PATH))?.content || null
       break
     }
   }
@@ -2599,7 +2631,8 @@ async function getAutoDataSyncProvider(store: Store): Promise<AutoDataSyncProvid
     provider === 'gitlab' ||
     provider === 'gitea' ||
     provider === 's3' ||
-    provider === 'webdav'
+    provider === 'webdav' ||
+    provider === 'cloudFolder'
   ) {
     return provider
   }
@@ -2891,6 +2924,20 @@ async function uploadWebDAVMetaFile(store: Store, content: string) {
   }
   debugAutoDataSync('meta upload completed', {
     provider: 'webdav',
+    path: AUTO_DATA_SYNC_META_PATH,
+  })
+}
+
+async function uploadCloudFolderMetaFile(store: Store, content: string) {
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  if (!config) {
+    throw new Error('Cloud folder sync config is not configured')
+  }
+  const { cloudFolderUpload } = await import('@/lib/sync/cloud-folder')
+  const result = await cloudFolderUpload(config, AUTO_DATA_SYNC_META_PATH, content)
+  if (!result) throw new Error('Failed to write auto data sync metadata')
+  debugAutoDataSync('meta upload completed', {
+    provider: 'cloudFolder',
     path: AUTO_DATA_SYNC_META_PATH,
   })
 }

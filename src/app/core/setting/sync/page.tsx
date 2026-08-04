@@ -8,6 +8,7 @@ import {
   Database,
   FileDown,
   FileUp,
+  FolderSync,
   GitBranch,
   GitFork,
   Loader2,
@@ -27,6 +28,7 @@ import { GithubSync } from './github-sync'
 import { GitlabSync } from './gitlab-sync'
 import { S3Sync } from './s3-sync'
 import { WebDAVSync } from './webdav-sync'
+import { CloudFolderSync } from './cloud-folder-sync'
 import { UsePlatformButton } from './components/use-platform-button'
 import { WorkspaceRepoMapping } from './components/workspace-repo-mapping'
 import { DataSyncOverview } from './components/data-sync-overview'
@@ -74,6 +76,7 @@ const PLATFORM_ICONS: Record<SyncPlatform, LucideIcon> = {
   gitea: Server,
   s3: Database,
   webdav: Cloud,
+  cloudFolder: FolderSync,
 }
 
 const PLATFORM_LOGOS: Partial<Record<SyncPlatform, string>> = {
@@ -114,6 +117,7 @@ export default function SyncPage() {
     giteaSyncRepoState,
     s3Connected,
     webdavConnected,
+    cloudFolderConnected,
   } = useSyncStore()
 
   const [platform, setPlatform] = useState<SyncPlatform>(primaryBackupMethod)
@@ -216,12 +220,17 @@ export default function SyncPage() {
         return s3Connected ? SyncStateEnum.success : SyncStateEnum.fail
       case 'webdav':
         return webdavConnected ? SyncStateEnum.success : SyncStateEnum.fail
+      case 'cloudFolder':
+        return cloudFolderConnected ? SyncStateEnum.success : SyncStateEnum.fail
     }
   }
 
   const currentSyncState = getSyncState(platform)
   const isAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
   const currentPlatformInfo = SYNC_PLATFORM_INFO[platform]
+  const currentPlatformName = platform === 'cloudFolder'
+    ? t('settings.sync.cloudFolder.title')
+    : currentPlatformInfo.name
 
   function handlePlatformChange(nextPlatform: SyncPlatform) {
     setPlatform(nextPlatform)
@@ -254,6 +263,8 @@ export default function SyncPage() {
         return <S3Sync />
       case 'webdav':
         return <WebDAVSync />
+      case 'cloudFolder':
+        return <CloudFolderSync />
     }
   }
 
@@ -323,7 +334,11 @@ export default function SyncPage() {
                         <SyncPlatformIcon platform={itemPlatform} small />
                       </ItemMedia>
                       <ItemContent>
-                        <ItemTitle>{platformInfo.name}</ItemTitle>
+                        <ItemTitle>
+                          {itemPlatform === 'cloudFolder'
+                            ? t('settings.sync.cloudFolder.title')
+                            : platformInfo.name}
+                        </ItemTitle>
                       </ItemContent>
                       {isCurrentPlatform ? (
                         <ItemActions>
@@ -344,7 +359,7 @@ export default function SyncPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <SyncPlatformIcon platform={platform} />
                 <div className="min-w-0 flex-1">
-                  <CardTitle>{currentPlatformInfo.name}</CardTitle>
+                  <CardTitle>{currentPlatformName}</CardTitle>
                   <CardDescription>{t('settings.sync.platformDesc')}</CardDescription>
                 </div>
               </div>
@@ -374,7 +389,7 @@ export default function SyncPage() {
 
             <TabsContent value="connection" className="flex flex-col gap-4">
               {renderSyncContent()}
-              {platform !== 's3' && platform !== 'webdav' ? (
+              {platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder' ? (
                 <WorkspaceRepoMapping
                   platform={platform}
                   workspaceOptions={workspaceOptions}
@@ -404,7 +419,7 @@ export default function SyncPage() {
                         <Select
                           value={autoSync}
                           onValueChange={setAutoSync}
-                          disabled={isAutoSyncDisabled}
+                          disabled={isAutoSyncDisabled || platform === 'cloudFolder'}
                         >
                           <SelectTrigger className="w-45">
                             <SelectValue placeholder={t('settings.sync.autoSyncOptions.placeholder')} />
@@ -436,7 +451,7 @@ export default function SyncPage() {
                         <Switch
                           checked={autoPullOnOpen}
                           onCheckedChange={setAutoPullOnOpen}
-                          disabled={isAutoSyncDisabled}
+                          disabled={isAutoSyncDisabled || platform === 'cloudFolder'}
                         />
                       </ItemActions>
                     </Item>

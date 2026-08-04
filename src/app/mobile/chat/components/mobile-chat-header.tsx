@@ -25,7 +25,7 @@ import {
   type AutoDataSyncState,
 } from "@/lib/sync/auto-data-sync-queue"
 import useUpdateStore from "@/stores/update"
-import { MobileMeSheet } from "./mobile-me-sheet"
+import { MobileMeSheet } from "@/app/mobile/components/mobile-me-sheet"
 
 const SearchDialog = dynamic(
   () => import('@/components/search-dialog').then(module => module.SearchDialog),

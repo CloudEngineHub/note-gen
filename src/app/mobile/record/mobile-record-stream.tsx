@@ -12,6 +12,7 @@ import { LocalImage } from '@/components/local-image'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
+import { MobileMeSheet } from '@/app/mobile/components/mobile-me-sheet'
 import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle, ImageIcon } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
@@ -20,7 +21,6 @@ import useTagStore from '@/stores/tag'
 import { clearTrash, delMark, deleteMarks, delMarkForever, Mark, restoreMark, restoreMarks, updateMarkTag } from '@/db/marks'
 import { insertTag } from '@/db/tags'
 import { cn, isHttpUrl } from '@/lib/utils'
-import { RecordSyncStatusBanner } from '@/components/record-sync-status-banner'
 import { Spinner } from '@/components/ui/spinner'
 import { refreshRemoteRecordsNow } from '@/lib/sync/auto-data-sync-queue'
 
@@ -510,42 +510,45 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="mobile-page-header sticky top-0 z-10 flex items-center justify-between gap-2 border-b bg-background px-2">
-        {trashState ? (
-          <div className="px-2 text-sm font-medium">{t('record.trash.title')}</div>
-        ) : multiMode ? (
-          <div className="px-2 text-sm font-medium">{t('record.mark.toolbar.multiSelectMode')}</div>
-        ) : (
-          <Drawer open={tagDrawerOpen} onOpenChange={setTagDrawerOpen}>
-            <Button variant="ghost" className="h-11 px-2 text-sm font-medium" onClick={() => setTagDrawerOpen(true)}>
-              <span className="truncate">{currentTagLabel}</span>
-              <ChevronDown className="ml-1 size-4 text-muted-foreground" />
-            </Button>
-            <DrawerContent className="max-h-[80vh] rounded-t-[24px]">
-              <DrawerHeader>
-                <DrawerTitle>{t('record.mark.toolbar.filter.tag')}</DrawerTitle>
-              </DrawerHeader>
-              <div className="flex flex-col gap-2 px-4 pb-4">
-                {tags.map((tag) => (
-                  <Button
-                    key={tag.id}
-                    variant={currentTagId === tag.id ? 'default' : 'outline'}
-                    className="h-10 w-full justify-start"
-                    onClick={async () => {
-                      await setCurrentTagId(tag.id)
-                      setTagDrawerOpen(false)
-                    }}
-                  >
-                    {tag.name}
+        <div className="flex min-w-0 items-center">
+          <MobileMeSheet />
+          {trashState ? (
+            <div className="truncate px-2 text-sm font-medium">{t('record.trash.title')}</div>
+          ) : multiMode ? (
+            <div className="truncate px-2 text-sm font-medium">{t('record.mark.toolbar.multiSelectMode')}</div>
+          ) : (
+            <Drawer open={tagDrawerOpen} onOpenChange={setTagDrawerOpen}>
+              <Button variant="ghost" className="h-11 min-w-0 px-2 text-sm font-medium" onClick={() => setTagDrawerOpen(true)}>
+                <span className="truncate">{currentTagLabel}</span>
+                <ChevronDown className="ml-1 size-4 shrink-0 text-muted-foreground" />
+              </Button>
+              <DrawerContent className="max-h-[80vh] rounded-t-[24px]">
+                <DrawerHeader>
+                  <DrawerTitle>{t('record.mark.toolbar.filter.tag')}</DrawerTitle>
+                </DrawerHeader>
+                <div className="flex flex-col gap-2 px-4 pb-4">
+                  {tags.map((tag) => (
+                    <Button
+                      key={tag.id}
+                      variant={currentTagId === tag.id ? 'default' : 'outline'}
+                      className="h-10 w-full justify-start"
+                      onClick={async () => {
+                        await setCurrentTagId(tag.id)
+                        setTagDrawerOpen(false)
+                      }}
+                    >
+                      {tag.name}
+                    </Button>
+                  ))}
+                  <Button variant="outline" className="mt-3 h-10 w-full justify-start gap-2" onClick={() => setCreateTagOpen(true)}>
+                    <Plus className="size-4" />
+                    {t('record.mark.tag.newTag')}
                   </Button>
-                ))}
-                <Button variant="outline" className="mt-3 h-10 w-full justify-start gap-2" onClick={() => setCreateTagOpen(true)}>
-                  <Plus className="size-4" />
-                  {t('record.mark.tag.newTag')}
-                </Button>
-              </div>
-            </DrawerContent>
-          </Drawer>
-        )}
+                </div>
+              </DrawerContent>
+            </Drawer>
+          )}
+        </div>
 
         <div className="flex items-center">
           {trashState ? (
@@ -613,8 +616,6 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
           )}
         </div>
       </header>
-
-      <RecordSyncStatusBanner settingsHref="/mobile/setting/pages/sync" compact />
 
       <div
         ref={scrollContainerRef}

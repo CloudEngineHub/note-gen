@@ -35,6 +35,7 @@ import useArticleStore from "@/stores/article"
 import { resolveOpenedMarkdownPath } from "@/lib/opened-files"
 import { useToast } from "@/hooks/use-toast"
 import { initAutoDataSyncRuntime } from "@/lib/sync/auto-data-sync-queue"
+import { initManagedBackupRuntime } from "@/lib/backup/managed-backup"
 import { useSidebarStore } from "@/stores/sidebar"
 import { useTranslations } from "next-intl"
 import { SettingsDialog } from "./setting/components/settings-dialog"
@@ -312,6 +313,7 @@ export default function RootLayout({
 
   useEffect(() => {
     let cancelled = false
+    let stopManagedBackup: (() => void) | undefined
 
     void reportAppStart()
 
@@ -333,6 +335,7 @@ export default function RootLayout({
         void reindexPendingMemories()
         await initAutoDataSyncRuntime()
         if (cancelled) return
+        stopManagedBackup = initManagedBackupRuntime()
 
         initShortcut()
         initEditorShortcuts()
@@ -357,6 +360,7 @@ export default function RootLayout({
 
     return () => {
       cancelled = true
+      stopManagedBackup?.()
     }
   }, [])
 

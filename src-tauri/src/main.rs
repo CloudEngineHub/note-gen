@@ -7,6 +7,8 @@ mod analytics;
 mod android_ocr;
 mod app_setup;
 mod backup;
+mod backup_manager;
+mod cloud_folder_sync;
 mod database_recovery;
 mod device;
 mod file_open;
@@ -32,6 +34,12 @@ use ai::{
     cancel_ai_request, AiRequestManager,
 };
 use backup::{export_app_data, import_app_data, import_app_data_from_file};
+use backup_manager::{create_managed_backup, list_managed_backups, restore_managed_backup};
+use cloud_folder_sync::{
+    delete_cloud_folder_sync_file, get_icloud_sync_folder, list_cloud_folder_sync_files,
+    migrate_workspace_to_cloud_folder, read_cloud_folder_sync_file, test_cloud_folder_sync,
+    write_cloud_folder_sync_file,
+};
 use device::get_device_id;
 use fonts::list_system_fonts;
 use fuzzy_search::{fuzzy_search, fuzzy_search_parallel};
@@ -99,6 +107,16 @@ fn main() {
             export_app_data,
             import_app_data,
             import_app_data_from_file,
+            create_managed_backup,
+            list_managed_backups,
+            restore_managed_backup,
+            get_icloud_sync_folder,
+            test_cloud_folder_sync,
+            write_cloud_folder_sync_file,
+            read_cloud_folder_sync_file,
+            delete_cloud_folder_sync_file,
+            list_cloud_folder_sync_files,
+            migrate_workspace_to_cloud_folder,
             database_recovery::delete_local_database,
             import_skill,
             import_skill_zip,
