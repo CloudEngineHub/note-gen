@@ -1745,7 +1745,7 @@
       "endpointMissing": "Endpoint não configurado",
       "noProviderResults": "Nenhum provedor correspondente",
       "noProvidersTitle": "Nenhuma plataforma de modelos",
-      "noProvidersDesc": "Comece com um template ou adicione uma plataforma personalizada compatível com OpenAI.",
+      "noProvidersDesc": "Comece com um modelo de plataforma ou adicione um serviço de IA personalizado.",
       "providerReady": "Pronto",
       "providerIncomplete": "Requer configuração",
       "modelCount": "{count} modelos",
@@ -1782,7 +1782,7 @@
       "providerInfo": "Informações da plataforma",
       "providerInfoDesc": "Esta plataforma foi adicionada por um template, com nome e URL predefinidos.",
       "create": "Adicionar plataforma personalizada",
-      "createDesc": "Adicione uma plataforma de modelos personalizada compatível com OpenAI.",
+      "createDesc": "Adicione uma plataforma de modelos de IA personalizada.",
       "createSection": {
         "title": "Configuração de Modelo Personalizado",
         "descWithoutModels": "Adicione configurações de modelo de IA personalizadas para usar serviços de modelo mais poderosos."
@@ -1794,7 +1794,7 @@
       "deleteCustomModelConfirm": "Tem certeza de que deseja excluir esta plataforma de modelos?",
       "copyConfig": "Duplicar plataforma",
       "builtin": "Embutido",
-      "modelSupport": "Suporta apenas modelos de IA com protocolo OpenAI",
+      "modelSupport": "Suporta APIs padrão de conversa com IA",
       "apiKeyUrl": "Criar Chave de API",
       "modelType": {
         "title": "Tipo de Modelo",
@@ -1814,9 +1814,9 @@
         }
       },
       "selectModel": "Por favor, selecione um modelo",
-      "modelProviderDesc": "Modelos personalizados suportam apenas modelos de IA com protocolo OpenAI.",
+      "modelProviderDesc": "Insira os dados de conexão fornecidos pelo seu serviço de IA.",
       "modelTitleDesc": "Nome personalizado, usado para identificar modelos de IA, por favor, não repita.",
-      "modelBaseUrlDesc": "Você só precisa configurar o número da versão, por exemplo: https://api.openai.com/v1, o sufixo será adicionado automaticamente.",
+      "modelBaseUrlDesc": "Inclua o caminho de versão exigido pelo provedor, por exemplo: https://api.example.com/v1.",
       "modelDesc": "Alguns modelos suportam a obtenção da lista de modelos, se não for suportado, por favor, configure manualmente.",
       "temperatureDesc": "Controla a aleatoriedade da saída. Valores mais baixos tornam o conteúdo gerado mais determinístico.",
       "topPDesc": "Um método de amostragem nucleus, onde o modelo considera os resultados dos tokens com massa de probabilidade top_p. Então, 0.1 significa considerar apenas os 10% superiores da massa de probabilidade. Geralmente, sugerimos alterar este ou a temperatura, mas não ambos.",

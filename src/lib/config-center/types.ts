@@ -1,4 +1,4 @@
-export type ConfigCenterConfigKey = 'providerTemplates' | 'noteGenDefaultModels'
+export type ConfigCenterConfigKey = 'providerTemplates' | 'providerTemplatesChina' | 'noteGenDefaultModels'
 
 export interface ConfigCenterEntry {
   versionCode: number

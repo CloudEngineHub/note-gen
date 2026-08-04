@@ -10,6 +10,7 @@ import {
   isManagedAgentSystemPrompt,
 } from './system-prompt';
 import { loadWebSearchSettings } from '@/lib/web-search/settings';
+import { isBuiltInOpenAIProvider, isMainlandChinaAppStore } from './storefront-policy';
 
 /**
  * 获取当前的prompt内容
@@ -66,9 +67,14 @@ export async function getAISettings(modelType?: string): Promise<AiConfig | unde
     return undefined
   }
   const webSearchSettings = await loadWebSearchSettings(store, { aiConfigs, modelId })
+  const hideBuiltInOpenAI = await isMainlandChinaAppStore()
 
   // 在新的数据结构中，需要找到包含指定模型ID的配置
   for (const config of aiConfigs) {
+    if (hideBuiltInOpenAI && isBuiltInOpenAIProvider(config)) {
+      continue
+    }
+
     // 检查新的 models 数组结构
     if (config.models && config.models.length > 0) {
       // 首先尝试直接匹配模型ID

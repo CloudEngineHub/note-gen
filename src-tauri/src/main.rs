@@ -22,6 +22,7 @@ mod remote_skills;
 mod screenshot;
 mod skill_runtime;
 mod skills;
+mod storefront;
 mod system_trash;
 mod tray;
 mod window;
@@ -131,6 +132,7 @@ fn main() {
             update_tray_record_toolbar_config,
             list_ocr_providers,
             run_ocr_provider,
+            storefront::get_app_storefront_country_code,
             printing::print_webview,
             file_open::drain_pending_open_files,
             system_trash::move_paths_to_trash,

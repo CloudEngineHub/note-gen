@@ -18,6 +18,7 @@ mod remote_skills;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod skill_runtime;
 mod skills;
+mod storefront;
 mod system_trash;
 
 use ai::{
@@ -115,6 +116,7 @@ pub fn run() {
             cancel_ai_request,
             list_ocr_providers,
             run_ocr_provider,
+            storefront::get_app_storefront_country_code,
             printing::print_webview,
             mobile_system_bars::set_mobile_system_bars,
             system_trash::move_paths_to_trash,

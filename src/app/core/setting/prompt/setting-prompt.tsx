@@ -369,7 +369,7 @@ ${newContent}`
           )}
           <OpenBroswer
             title={t('prompt.promptLibrary')}
-            url="https://github.com/f/awesome-chatgpt-prompts"
+            url="https://github.com/topics/prompt-engineering"
             className="text-sm"
           />
         </div>

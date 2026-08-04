@@ -19,6 +19,7 @@ import ModelCard from "./model-card";
 import CreateConfig from "./create";
 import { getCachedProviderTemplates, getProviderTemplateMatch, loadProviderTemplates } from "@/lib/ai/provider-templates-runtime";
 import { isValidProxyURL } from "@/lib/ai/tauri-client";
+import { excludeBuiltInOpenAIProviders, isMainlandChinaAppStore } from "@/lib/ai/storefront-policy";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,9 +57,13 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
     aiModelList,
     setAiModelList
   } = useSettingStore()
+  const [hideBuiltInOpenAI, setHideBuiltInOpenAI] = useState<boolean | null>(null)
 
   // 过滤掉默认模型，只显示用户自定义模型
-  const userCustomModels = aiModelList.filter(model => !noteGenModelKeys.includes(model.key) && model.title !== 'NoteGen Limited')
+  const visibleAiModelList = hideBuiltInOpenAI !== false
+    ? excludeBuiltInOpenAIProviders(aiModelList)
+    : aiModelList
+  const userCustomModels = visibleAiModelList.filter(model => !noteGenModelKeys.includes(model.key) && model.title !== 'NoteGen Limited')
   const [apiKeyVisible, setApiKeyVisible] = useState<boolean>(false)
   const [headerPairs, setHeaderPairs] = useState<Array<{key: string, value: string, id: string}>>([])
   const [expandedModels, setExpandedModels] = useState<string[]>([])
@@ -314,15 +319,22 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
   useEffect(() => {
     async function init() {
       const store = await Store.load('store.json')
+      const shouldHideBuiltInOpenAI = await isMainlandChinaAppStore()
+      setHideBuiltInOpenAI(shouldHideBuiltInOpenAI)
       let templates: AiConfig[] = []
       try {
         const cachedTemplates = await getCachedProviderTemplates()
         if (cachedTemplates.length > 0) {
-          setProviderTemplates(cachedTemplates)
+          setProviderTemplates(shouldHideBuiltInOpenAI
+            ? excludeBuiltInOpenAIProviders(cachedTemplates)
+            : cachedTemplates)
           setLoadingTemplates(false)
         }
 
         templates = await loadProviderTemplates(builtinProviderTemplates)
+        if (shouldHideBuiltInOpenAI) {
+          templates = excludeBuiltInOpenAIProviders(templates)
+        }
         setProviderTemplates(templates)
       } finally {
         setLoadingTemplates(false)

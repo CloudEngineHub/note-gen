@@ -61,6 +61,7 @@ function normalizeManifest(payload: unknown): ConfigCenterManifest | null {
     updatedAt: isNonEmptyString(payload.updatedAt) ? payload.updatedAt.trim() : undefined,
     configs: {
       providerTemplates: normalizeManifestEntry(payload.configs.providerTemplates) ?? undefined,
+      providerTemplatesChina: normalizeManifestEntry(payload.configs.providerTemplatesChina) ?? undefined,
       noteGenDefaultModels: normalizeManifestEntry(payload.configs.noteGenDefaultModels) ?? undefined,
     },
   }

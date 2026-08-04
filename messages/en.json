@@ -1835,7 +1835,7 @@
       "endpointMissing": "Service endpoint not configured",
       "noProviderResults": "No matching model platforms",
       "noProvidersTitle": "No model platforms yet",
-      "noProvidersDesc": "Start from a platform template or add a custom OpenAI-compatible platform.",
+      "noProvidersDesc": "Start from a platform template or add a custom AI service.",
       "providerReady": "Ready",
       "providerIncomplete": "Needs setup",
       "modelCount": "{count} models",
@@ -1872,7 +1872,7 @@
       "providerInfo": "Platform information",
       "providerInfoDesc": "This platform was added from a template, so its name and endpoint are preset.",
       "create": "Add custom platform",
-      "createDesc": "Add a custom OpenAI-compatible model platform.",
+      "createDesc": "Add a custom AI model platform.",
       "createSection": {
         "title": "Custom platform",
         "descWithoutModels": "Add a custom model platform to use more model services."
@@ -1884,7 +1884,7 @@
       "deleteCustomModelConfirm": "Are you sure you want to delete this model platform?",
       "copyConfig": "Duplicate platform",
       "builtin": "Built-in",
-      "modelSupport": "Only supports AI models with OpenAI protocol",
+      "modelSupport": "Supports standard AI chat completion APIs",
       "apiKeyUrl": "Create API Key",
       "modelType": {
         "title": "Model Type",
@@ -1904,9 +1904,9 @@
         }
       },
       "selectModel": "Please select a model",
-      "modelProviderDesc": "Custom models only support AI models with OpenAI protocol.",
+      "modelProviderDesc": "Enter the connection details supplied by your AI service provider.",
       "modelTitleDesc": "Custom name, used to identify AI models, please do not repeat.",
-      "modelBaseUrlDesc": "You only need to configure the version number, for example: https://api.openai.com/v1, the suffix will be automatically added.",
+      "modelBaseUrlDesc": "Include the version path required by your provider, for example: https://api.example.com/v1.",
       "modelDesc": "Some models support getting model list, if not supported please manually configure.",
       "temperatureDesc": "Controls randomness of output. Lower values make generated content more deterministic.",
       "topPDesc": "A nucleus sampling method, where the model considers the results of tokens with top_p probability mass. So 0.1 means only consider the top 10% probability mass. Usually we suggest to change this or temperature but not both.",

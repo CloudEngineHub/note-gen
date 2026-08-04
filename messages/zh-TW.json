@@ -1697,7 +1697,7 @@
       "endpointMissing": "尚未配置服務位址",
       "noProviderResults": "沒有符合的供應商",
       "noProvidersTitle": "還沒有模型平台",
-      "noProvidersDesc": "可以從平台範本開始，也可以新增相容 OpenAI 協議的自訂平台。",
+      "noProvidersDesc": "可以從平台範本開始，也可以新增自訂 AI 服務。",
       "providerReady": "已就緒",
       "providerIncomplete": "待完善",
       "modelCount": "{count} 個模型",
@@ -1734,7 +1734,7 @@
       "providerInfo": "平台資訊",
       "providerInfoDesc": "此平台透過範本新增，名稱和地址已預設，無需修改。",
       "create": "新增自訂平台",
-      "createDesc": "新增相容 OpenAI 協議的自訂模型平台。",
+      "createDesc": "新增自訂 AI 模型平台。",
       "createSection": {
         "title": "自訂平台",
         "descWithoutModels": "新增自訂模型平台來使用更多模型服務。"
@@ -1746,7 +1746,7 @@
       "deleteCustomModelConfirm": "確認刪除此模型平台嗎?",
       "copyConfig": "複製平台",
       "builtin": "內建",
-      "modelSupport": "僅支持 openai 協議的 AI 模型",
+      "modelSupport": "支援通用的 AI 對話介面",
       "apiKeyUrl": "創建 API Key",
       "modelType": {
         "title": "模型類型",
@@ -1766,9 +1766,9 @@
         }
       },
       "selectModel": "請選擇模型",
-      "modelProviderDesc": "自訂模型僅支持 openai 協議的 AI 模型。",
+      "modelProviderDesc": "請填寫 AI 服務商提供的介面資訊。",
       "modelTitleDesc": "自訂名稱，用於標識 AI 模型，請勿重複。",
-      "modelBaseUrlDesc": "你只需要配置到版本號即可，例如：https://api.openai.com/v1，後綴會自動添加。",
+      "modelBaseUrlDesc": "配置到服務商要求的版本路徑即可，例如：https://api.example.com/v1。",
       "modelDesc": "部分模型支持獲取模型列表，如果不支持請手動配置。",
       "temperatureDesc": "使用什麼採樣溫度，介於 0 和 2 之間。較高的值（如 0.8）將使輸出更加隨機，而較低的值（如 0.2）將使輸出更加集中和確定。 我們通常建議改變這個或top_p但不是兩者。",
       "topPDesc": "一種替代溫度採樣的方法，稱為核採樣，其中模型考慮具有 top_p 機率質量的標記的結果。所以 0.1 意味著只考慮構成前 10% 機率質量的標記。 我們通常建議改變這個或temperature但不是兩者。",

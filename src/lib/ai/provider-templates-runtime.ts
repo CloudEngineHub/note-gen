@@ -2,10 +2,16 @@ import { Store } from '@tauri-apps/plugin-store'
 
 import type { AiConfig } from '@/app/core/setting/config'
 import { fetchConfigCenterConfig } from '@/lib/config-center/client'
+import type { ConfigCenterConfigKey } from '@/lib/config-center/types'
+import {
+  excludeBuiltInOpenAIProviders,
+  isMainlandChinaAppStore,
+} from '@/lib/ai/storefront-policy'
 
 export const PROVIDER_TEMPLATE_CACHE_KEY = 'providerTemplatesCache'
 
 export interface ProviderTemplateCache {
+  configKey?: ConfigCenterConfigKey
   versionCode?: number
   versionName?: string
   fetchedAt: string
@@ -120,29 +126,52 @@ function mapRemoteTemplates(content: ProviderTemplateCache['content'] | undefine
   }))
 }
 
+function enforceStorefrontPolicy(
+  templates: AiConfig[],
+  configKey: ConfigCenterConfigKey,
+): AiConfig[] {
+  return configKey === 'providerTemplatesChina'
+    ? excludeBuiltInOpenAIProviders(templates)
+    : templates
+}
+
 export async function getCachedProviderTemplates(): Promise<AiConfig[]> {
   const store = await Store.load('store.json')
   const cached = await store.get<ProviderTemplateCache>(PROVIDER_TEMPLATE_CACHE_KEY)
+  const configKey = await getProviderTemplateConfigKey()
 
-  if (!cached?.content?.providers?.length) {
+  if (!cached || cached.configKey !== configKey || !cached.content?.providers?.length) {
     return []
   }
 
-  return mapRemoteTemplates(cached.content)
+  return enforceStorefrontPolicy(mapRemoteTemplates(cached.content), configKey)
 }
 
-async function fetchProviderTemplatesFromConfigCenter(versionCode?: number | null): Promise<ProviderTemplateCache | null> {
-  const result = await fetchConfigCenterConfig('providerTemplates', versionCode)
+async function getProviderTemplateConfigKey(): Promise<ConfigCenterConfigKey> {
+  return await isMainlandChinaAppStore()
+    ? 'providerTemplatesChina'
+    : 'providerTemplates'
+}
+
+async function fetchProviderTemplatesFromConfigCenter(
+  configKey: ConfigCenterConfigKey,
+  versionCode?: number | null,
+): Promise<ProviderTemplateCache | null> {
+  const result = await fetchConfigCenterConfig(configKey, versionCode)
   if (result.status === 'not-modified') {
     return null
   }
 
-  const templates = normalizeProviderTemplatesPayload(result.payload)
+  const templates = enforceStorefrontPolicy(
+    normalizeProviderTemplatesPayload(result.payload),
+    configKey,
+  )
   if (templates.length === 0) {
     throw new Error('Config center provider templates payload is empty')
   }
 
   return {
+    configKey,
     versionCode: result.versionCode,
     versionName: result.versionName,
     fetchedAt: new Date().toISOString(),
@@ -155,27 +184,29 @@ async function fetchProviderTemplatesFromConfigCenter(versionCode?: number | nul
 export async function loadProviderTemplates(builtinTemplates: AiConfig[]): Promise<AiConfig[]> {
   const store = await Store.load('store.json')
   const cached = await store.get<ProviderTemplateCache>(PROVIDER_TEMPLATE_CACHE_KEY)
+  const configKey = await getProviderTemplateConfigKey()
+  const matchingCache = cached?.configKey === configKey ? cached : undefined
 
   try {
-    const latest = await fetchProviderTemplatesFromConfigCenter(cached?.versionCode)
+    const latest = await fetchProviderTemplatesFromConfigCenter(configKey, matchingCache?.versionCode)
     if (latest) {
       await store.set(PROVIDER_TEMPLATE_CACHE_KEY, latest)
       await store.save()
-      return mapRemoteTemplates(latest.content)
+      return enforceStorefrontPolicy(mapRemoteTemplates(latest.content), configKey)
     }
 
-    if (cached?.content?.providers?.length) {
-      return mapRemoteTemplates(cached.content)
+    if (matchingCache?.content?.providers?.length) {
+      return enforceStorefrontPolicy(mapRemoteTemplates(matchingCache.content), configKey)
     }
   } catch (error) {
     console.error('[provider-templates] failed to fetch config center templates', error)
   }
 
-  if (cached?.content?.providers?.length) {
-    return mapRemoteTemplates(cached.content)
+  if (matchingCache?.content?.providers?.length) {
+    return enforceStorefrontPolicy(mapRemoteTemplates(matchingCache.content), configKey)
   }
 
-  return mapBuiltinTemplates(builtinTemplates)
+  return enforceStorefrontPolicy(mapBuiltinTemplates(builtinTemplates), configKey)
 }
 
 export function getProviderTemplateMatch(currentConfig: AiConfig | undefined, templates: AiConfig[]) {

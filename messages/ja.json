@@ -1720,7 +1720,7 @@
       "endpointMissing": "サービス URL が未設定です",
       "noProviderResults": "一致するプロバイダーがありません",
       "noProvidersTitle": "モデルプラットフォームがありません",
-      "noProvidersDesc": "テンプレートを使用するか、OpenAI 互換のカスタムプラットフォームを追加してください。",
+      "noProvidersDesc": "テンプレートを使用するか、カスタム AI サービスを追加してください。",
       "providerReady": "設定済み",
       "providerIncomplete": "設定が必要",
       "modelCount": "{count} モデル",
@@ -1757,7 +1757,7 @@
       "providerInfo": "プラットフォーム情報",
       "providerInfoDesc": "このプラットフォームはテンプレートから追加され、名前とURLが事前設定されています。",
       "create": "カスタムプラットフォームを追加",
-      "createDesc": "OpenAI 互換のカスタムモデルプラットフォームを追加します。",
+      "createDesc": "カスタム AI モデルプラットフォームを追加します。",
       "createSection": {
         "title": "カスタムモデル設定",
         "descWithoutModels": "カスタムAIモデル設定を追加して、より強力なモデルサービスを使用しましょう。"
@@ -1769,7 +1769,7 @@
       "deleteCustomModelConfirm": "このモデルプラットフォームを削除してもよろしいですか？",
       "copyConfig": "プラットフォームを複製",
       "builtin": "内蔵",
-      "modelSupport": "OpenAIプロトコル対応のAIモデルのみサポート",
+      "modelSupport": "標準的な AI チャット API に対応",
       "apiKeyUrl": "Create API Key",
       "modelType": {
         "title": "モデルタイプ",
@@ -1789,9 +1789,9 @@
         }
       },
       "selectModel": "モデルを選択してください",
-      "modelProviderDesc": "自定義モデルOpenAIプロトコル対応のAIモデルのみサポート。",
+      "modelProviderDesc": "AI サービスプロバイダーが提供する接続情報を入力してください。",
       "modelTitleDesc": "カスタム名、用于标识 AI 模型，请勿重复。",
-      "modelBaseUrlDesc": "バージョン番号まで設定すればOKです（例：https://api.openai.com/v1）。サフィックスは自動で追加されます。",
+      "modelBaseUrlDesc": "プロバイダーが必要とするバージョンパスまで設定してください（例：https://api.example.com/v1）。",
       "modelDesc": "一部モデルはリスト取得に対応しています。未対応の場合は手動で設定してください。",
       "temperatureDesc": "サンプリング温度は0から2の間で設定します。高い値（例:0.8）は出力をよりランダムに、低い値（例:0.2）はより決定的にします。通常、この値かtop_pのみを調整してください。",
       "topPDesc": "top_p（核サンプリング）は温度の代替手法です。top_p=0.1なら上位10%確率のトークンのみ考慮します。通常、この値かtemperatureのみを調整してください。",
