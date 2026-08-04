@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { locale as getSystemLocale } from '@tauri-apps/plugin-os'
+import { locale as getSystemLocale, platform as getPlatform } from '@tauri-apps/plugin-os'
 
 import type { AiConfig } from '@/app/core/setting/config'
 
@@ -63,6 +63,12 @@ export async function isMainlandChinaAppStore(): Promise<boolean> {
   const storefrontCountryCode = await getAppStorefrontCountryCode()
   if (storefrontCountryCode) {
     return storefrontCountryCode === CHINA_MAINLAND_STOREFRONT
+  }
+
+  // iOS must fail closed: if StoreKit is unavailable or has not returned a
+  // trustworthy storefront yet, built-in OpenAI providers stay hidden.
+  if (getPlatform() === 'ios') {
+    return true
   }
 
   // Development builds and very early app startup may not have an App Store
