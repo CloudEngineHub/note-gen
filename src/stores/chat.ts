@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { Chat, clearChatsByConversationId, clearChatsByTagId, deleteChat, initChatsDb, insertChat, updateChat, updateChatsInsertedById, getChatsByConversation } from '@/db/chats'
+import { Chat, clearChatsByConversationId, clearChatsByTagId, deleteChat, insertChat, updateChat, updateChatsInsertedById, getChatsByConversation } from '@/db/chats'
+import { initAllDatabases } from '@/db'
 import { Store } from '@tauri-apps/plugin-store';
 import { locales } from '@/lib/locales';
 import { AgentState, ToolCall } from '@/lib/agent/types'
@@ -279,7 +280,8 @@ const useChatStore = create<ChatState>((set, get) => ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   init: async (_tagId: number) => {
     set({ isTemporaryConversation: false })
-    await initChatsDb()
+    // 子组件的 effect 可能早于布局初始化执行，查询会话前必须等待所有表和迁移就绪。
+    await initAllDatabases()
     // 先初始化会话列表
     await get().initConversations()
 

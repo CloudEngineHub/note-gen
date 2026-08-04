@@ -9,8 +9,9 @@ export async function getDb() {
   return db;
 }
 
-// 初始化所有数据库
-export async function initAllDatabases() {
+let databaseInitialization: Promise<void> | null = null
+
+async function initializeAllDatabases() {
   // 引入各数据库初始化函数
   const { initChatsDb } = await import('./chats');
   const { initMarksDb } = await import('./marks');
@@ -51,4 +52,16 @@ export async function initAllDatabases() {
     const { enqueueAutoDataSync } = await import('@/lib/sync/auto-data-sync-queue')
     enqueueAutoDataSync('conversations', 'conversations-sync-initialized')
   }
+}
+
+// 初始化所有数据库。同一进程内复用初始化任务，避免多个页面入口并发执行迁移。
+export function initAllDatabases(): Promise<void> {
+  if (!databaseInitialization) {
+    databaseInitialization = initializeAllDatabases().catch((error) => {
+      databaseInitialization = null
+      throw error
+    })
+  }
+
+  return databaseInitialization
 }
