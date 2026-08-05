@@ -261,6 +261,36 @@ export async function getRemoteFileInfo(path: string): Promise<{ sha?: string; l
         }
         break
       }
+
+      case 's3': {
+        const config = await store.get<S3Config>('s3SyncConfig')
+        const proxyUrl = await store.get<string>('proxy')
+        const object = config
+          ? await s3HeadObject(config, path, proxyUrl ? { all: proxyUrl } : undefined)
+          : null
+        if (object) {
+          return {
+            sha: object.etag,
+            lastModified: new Date(object.lastModified).getTime(),
+          }
+        }
+        break
+      }
+
+      case 'webdav': {
+        const config = await store.get<WebDAVConfig>('webdavSyncConfig')
+        const proxyUrl = await store.get<string>('proxy')
+        const object = config
+          ? await webdavHeadObject(config, path, proxyUrl ? { all: proxyUrl } : undefined)
+          : null
+        if (object) {
+          return {
+            sha: object.etag,
+            lastModified: new Date(object.lastModified).getTime(),
+          }
+        }
+        break
+      }
     }
   } catch {
     // 静默处理错误
@@ -877,6 +907,25 @@ export async function hasNetworkConnection(): Promise<boolean> {
         clearTimeout(timeoutId)
         const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
         return Boolean(config && supportsCloudFolderWorkspace(config))
+      }
+      case 's3': {
+        clearTimeout(timeoutId)
+        const config = await store.get<S3Config>('s3SyncConfig')
+        return Boolean(
+          config?.accessKeyId.trim()
+          && config.secretAccessKey.trim()
+          && config.region.trim()
+          && config.bucket.trim()
+        )
+      }
+      case 'webdav': {
+        clearTimeout(timeoutId)
+        const config = await store.get<WebDAVConfig>('webdavSyncConfig')
+        return Boolean(
+          config?.url.trim()
+          && config.username.trim()
+          && config.password.trim()
+        )
       }
       default:
         clearTimeout(timeoutId)
