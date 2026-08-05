@@ -3964,6 +3964,11 @@
     }
   },
   "editor": {
+    "markdownParseFallback": {
+      "title": "Falha na análise visual; o modo de código-fonte foi ativado",
+      "description": "O Markdown original foi preservado. Continue editando ou corrija a sintaxe e tente novamente o modo visual.",
+      "retry": "Tentar modo visual"
+    },
     "smartFileLink": {
       "fileMatches": "Arquivos correspondentes",
       "pathMatches": "Caminhos correspondentes",

@@ -214,7 +214,7 @@ export const InlineMath = Node.create({
 
       return Math.min(dollarIndex, bracketIndex)
     },
-    tokenize: (src, tokens, lexer) => {
+    tokenize: (src) => {
       // Match $...$ (non-greedy, single line)
       const match = /^(?:\$([^\$\n]+?)\$|\\\(([^\n]+?)\\\))/.exec(src)
       if (!match) return undefined
@@ -225,7 +225,9 @@ export const InlineMath = Node.create({
         type: 'inline_math',
         raw: match[0],
         content,
-        tokens: lexer.inlineTokens(content),
+        // Math is an atom node. Recursively tokenizing its LaTeX can mistake
+        // commands such as `\\[10pt]` for nested Markdown block syntax.
+        tokens: [],
       }
     },
   },
@@ -316,7 +318,7 @@ export const BlockMath = Node.create({
 
       return Math.min(dollarIndex, bracketIndex)
     },
-    tokenize: (src, tokens, lexer) => {
+    tokenize: (src) => {
       // Match $$...$$ (can span multiple lines)
       const match = /^(?:\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\])/.exec(src)
       if (!match) return undefined
@@ -327,7 +329,9 @@ export const BlockMath = Node.create({
         type: 'block_math',
         raw: match[0],
         content,
-        tokens: lexer.blockTokens(content),
+        // Preserve the formula as opaque source. Tiptap reads `content`
+        // directly, so child Markdown tokens are neither needed nor safe here.
+        tokens: [],
       }
     },
   },

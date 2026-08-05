@@ -3975,6 +3975,11 @@
   },
   "editor": {
     "placeholder": "輸入 / 叫出選單，或直接開始寫作...",
+    "markdownParseFallback": {
+      "title": "視覺化解析失敗，已切換到原始碼模式",
+      "description": "原文已完整保留，你可以繼續編輯，或修正語法後重試視覺化模式。",
+      "retry": "重試視覺化模式"
+    },
     "smartFileLink": {
       "fileMatches": "檔案匹配",
       "pathMatches": "路徑匹配",

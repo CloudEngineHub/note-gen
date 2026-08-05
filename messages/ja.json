@@ -3985,6 +3985,11 @@
   },
   "editor": {
     "placeholder": "「/」を入力してメニューを開くか、直接書き始める...",
+    "markdownParseFallback": {
+      "title": "ビジュアル解析に失敗したため、ソースモードに切り替えました",
+      "description": "元の Markdown は保持されています。編集を続けるか、構文を修正してビジュアルモードを再試行できます。",
+      "retry": "ビジュアルモードを再試行"
+    },
     "smartFileLink": {
       "fileMatches": "ファイル候補",
       "pathMatches": "パス候補",

@@ -1229,6 +1229,7 @@ export function TipTapEditor({
   const isMobile = mobileMode ?? isMobileDevice()
   const [isRestoringMobileView, setIsRestoringMobileView] = useState(isMobile)
   const [sourceMarkdown, setSourceMarkdown] = useState(initialContent)
+  const [markdownParseError, setMarkdownParseError] = useState<string | null>(null)
 
   // Use ref for autoScroll to avoid infinite re-render loop
   const autoScrollRef = useRef(autoScroll)
@@ -1249,6 +1250,7 @@ export function TipTapEditor({
   const viewMode: EditorViewMode = applyLayoutPreferences
     ? editorViewMode
     : 'visual'
+  const effectiveViewMode: EditorViewMode = markdownParseError ? 'source' : viewMode
   const previousViewModeRef = useRef<EditorViewMode>(viewMode)
 
   // 编辑器容器 ref，用于应用字体缩放
@@ -1264,7 +1266,7 @@ export function TipTapEditor({
     : undefined
 
   useLayoutEffect(() => {
-    if (viewMode !== 'source') return
+    if (effectiveViewMode !== 'source') return
 
     const textarea = sourceTextareaRef.current
     const mirror = sourceMirrorRef.current
@@ -1303,7 +1305,7 @@ export function TipTapEditor({
       resizeObserver.disconnect()
       if (frameId !== null) cancelAnimationFrame(frameId)
     }
-  }, [editorLineHeight, editorSourceWrap, sourceLines, viewMode])
+  }, [editorLineHeight, editorSourceWrap, effectiveViewMode, sourceLines])
 
   // Math dialog state
   const [mathDialogOpen, setMathDialogOpen] = useState(false)
@@ -1733,7 +1735,9 @@ export function TipTapEditor({
       PasteMarkdown,
       BlurSelectionHighlight,
     ],
-    content: initialContent,
+    // Parse after initialization so malformed or unsupported Markdown cannot
+    // throw during React render and take down the entire editor tab.
+    content: '',
     contentType: 'markdown',
     editable,
     onUpdate: ({ editor }) => {
@@ -1753,31 +1757,67 @@ export function TipTapEditor({
     },
   })
 
+  const trySetMarkdownContent = useCallback((
+    targetEditor: CoreEditor,
+    content: string,
+    options: { emitUpdate?: boolean; resetHistory?: boolean } = {}
+  ): boolean => {
+    try {
+      if (options.resetHistory) {
+        setEditorContentWithoutUndo(targetEditor, content)
+      } else {
+        targetEditor.commands.setContent(content, {
+          contentType: 'markdown',
+          emitUpdate: options.emitUpdate,
+        })
+      }
+      setMarkdownParseError(null)
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Markdown 可视化解析失败，已切换到源码模式:', error)
+      setSourceMarkdown(content)
+      setMarkdownParseError(message)
+      return false
+    }
+  }, [])
+
   const handleSourceMarkdownChange = useCallback((value: string) => {
     setSourceMarkdown(value)
-    editor?.commands.setContent(value, {
-      contentType: 'markdown',
-      emitUpdate: false,
-    })
+    if (editor && !markdownParseError) {
+      trySetMarkdownContent(editor, value, { emitUpdate: false })
+    }
     onChangeRef.current?.(value)
-  }, [editor])
+  }, [editor, markdownParseError, trySetMarkdownContent])
+
+  const handleRetryVisualMode = useCallback(() => {
+    if (!editor) return
+
+    if (trySetMarkdownContent(editor, sourceMarkdown, { resetHistory: true }) && applyLayoutPreferences) {
+      void setEditorViewMode('visual')
+    }
+  }, [applyLayoutPreferences, editor, setEditorViewMode, sourceMarkdown, trySetMarkdownContent])
 
   useEffect(() => {
     if (!editor || previousViewModeRef.current === viewMode) return
 
     if (viewMode === 'visual') {
-      setEditorContentWithoutUndo(editor, sourceMarkdown)
-    } else {
+      trySetMarkdownContent(editor, sourceMarkdown, { resetHistory: true })
+    } else if (!markdownParseError) {
       flushMarkdownChange(editor)
       setSourceMarkdown(normalizeMarkdownPlaceholders(editor.getMarkdown()))
     }
 
     previousViewModeRef.current = viewMode
-  }, [editor, flushMarkdownChange, sourceMarkdown, viewMode])
+  }, [editor, flushMarkdownChange, markdownParseError, sourceMarkdown, trySetMarkdownContent, viewMode])
 
   const handleToggleViewMode = useCallback(() => {
+    if (markdownParseError) {
+      handleRetryVisualMode()
+      return
+    }
     void setEditorViewMode(viewMode === 'source' ? 'visual' : 'source')
-  }, [setEditorViewMode, viewMode])
+  }, [handleRetryVisualMode, markdownParseError, setEditorViewMode, viewMode])
 
   const handleSourceKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Tab') return
@@ -1797,14 +1837,16 @@ export function TipTapEditor({
   useEffect(() => {
     if (!editor) return
 
-    const handleBlur = () => flushMarkdownChange(editor)
+    const handleBlur = () => {
+      if (!markdownParseError) flushMarkdownChange(editor)
+    }
     editor.on('blur', handleBlur)
 
     return () => {
       editor.off('blur', handleBlur)
-      flushMarkdownChange(editor)
+      if (!markdownParseError) flushMarkdownChange(editor)
     }
-  }, [editor, flushMarkdownChange])
+  }, [editor, flushMarkdownChange, markdownParseError])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) {
@@ -3806,8 +3848,9 @@ export function TipTapEditor({
         // Check if the file path is still the same (handle race condition)
         if (activeFilePath !== currentPath) return
 
-        setEditorContentWithoutUndo(editor, initialContent || '')
-        setSourceMarkdown(initialContent || '')
+        const nextContent = initialContent || ''
+        setSourceMarkdown(nextContent)
+        trySetMarkdownContent(editor, nextContent, { resetHistory: true })
         // Mark as initialized to allow subsequent content updates
         isInitializedRef.current = true
         // Bug fix: Mark editor as ready AFTER content is set
@@ -3820,7 +3863,7 @@ export function TipTapEditor({
         restoreEditorViewState(currentPath)
       }, 0)
     }
-  }, [editor, initialContent, onReady, onEditorReady, activeFilePath, restoreEditorViewState])
+  }, [editor, initialContent, onReady, onEditorReady, activeFilePath, restoreEditorViewState, trySetMarkdownContent])
 
   // 处理编辑器中图片的相对路径，转换为 asset:// URL
   useEffect(() => {
@@ -4041,7 +4084,7 @@ export function TipTapEditor({
         isReadyRef.current = false
         externalUpdateCounterRef.current++
         setTimeout(() => {
-          editor.commands.setContent(newContent, { contentType: 'markdown' })
+          trySetMarkdownContent(editor, newContent)
           isReadyRef.current = true
           setTimeout(() => {
             externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
@@ -4054,7 +4097,7 @@ export function TipTapEditor({
     return () => {
       emitter.off('editor-content-from-remote', handleRemoteContentUpdate as any)
     }
-  }, [editor, activeFilePath])
+  }, [editor, activeFilePath, trySetMarkdownContent])
 
   // NOTE: Removed initialContent useEffect that caused cursor jump during local edits
   // Remote pull is now handled via 'editor-content-from-remote' event
@@ -4079,7 +4122,7 @@ export function TipTapEditor({
       externalUpdateCounterRef.current++
       // Use setTimeout to avoid flushSync conflict during React render
       setTimeout(() => {
-        editor.commands.setContent(event.content, { contentType: 'markdown' })
+        trySetMarkdownContent(editor, event.content)
         // Bug fix: Mark editor as ready after content is set
         isReadyRef.current = true
         // Reset the counter and pending update after a short delay
@@ -4097,7 +4140,7 @@ export function TipTapEditor({
     return () => {
       emitter.off('sync-content-updated', handleSyncContentUpdated as any)
     }
-  }, [editor, activeFilePath])
+  }, [editor, activeFilePath, trySetMarkdownContent])
 
   // Handle external content updates (e.g., from Agent tools)
   useEffect(() => {
@@ -4115,7 +4158,7 @@ export function TipTapEditor({
         // Use setTimeout to avoid flushSync conflict during React render
         setTimeout(() => {
           // Set content in editor with Markdown parsing
-          editor.commands.setContent(newContent, { contentType: 'markdown' })
+          trySetMarkdownContent(editor, newContent)
           // Bug fix: Mark editor as ready after content is set
           isReadyRef.current = true
           // Reset the counter after a short delay to handle rapid updates
@@ -5074,7 +5117,7 @@ export function TipTapEditor({
     }
 
     return cleanupListeners
-  }, [editor, activeFilePath])
+  }, [editor, activeFilePath, trySetMarkdownContent])
 
   if (!editor) {
     return null
@@ -5164,10 +5207,10 @@ export function TipTapEditor({
           )}
           onMouseDownCapture={handleEditorMouseDownCapture}
           onScroll={handleEditorScroll}
-          onDragEnter={viewMode === 'visual' ? handleEditorDragOver : undefined}
-          onDragOver={viewMode === 'visual' ? handleEditorDragOver : undefined}
-          onDragLeave={viewMode === 'visual' ? handleEditorDragLeave : undefined}
-          onDropCapture={viewMode === 'visual' ? handleEditorDrop : undefined}
+          onDragEnter={effectiveViewMode === 'visual' ? handleEditorDragOver : undefined}
+          onDragOver={effectiveViewMode === 'visual' ? handleEditorDragOver : undefined}
+          onDragLeave={effectiveViewMode === 'visual' ? handleEditorDragLeave : undefined}
+          onDropCapture={effectiveViewMode === 'visual' ? handleEditorDrop : undefined}
         >
         {(isCanvasDragOver || isCanvasDropPending) && (
           <div className={cn(
@@ -5191,8 +5234,8 @@ export function TipTapEditor({
               outlinePosition,
               contentInset,
             }),
-            scrollable && viewMode !== 'source' && 'h-full',
-            viewMode === 'source' && 'min-h-full'
+            scrollable && effectiveViewMode !== 'source' && 'h-full',
+            effectiveViewMode === 'source' && 'min-h-full'
           )}
           style={
             !isMobile && outlineOpen
@@ -5202,8 +5245,25 @@ export function TipTapEditor({
               : undefined
           }
         >
-        {viewMode === 'source' && applyLayoutPreferences ? (
-          <div className="relative flex min-h-full w-full">
+        {effectiveViewMode === 'source' ? (
+          <div className="flex min-h-full w-full flex-col">
+            {markdownParseError ? (
+              <div className="m-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-destructive">{t('markdownParseFallback.title')}</p>
+                  <p className="break-words text-xs text-muted-foreground">
+                    {t('markdownParseFallback.description')}
+                  </p>
+                  <p className="mt-1 max-h-12 overflow-auto break-words font-mono text-xs text-destructive">
+                    {markdownParseError}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleRetryVisualMode}>
+                  {t('markdownParseFallback.retry')}
+                </Button>
+              </div>
+            ) : null}
+            <div className="relative flex min-h-0 flex-1 w-full">
             {showSourceLineNumbers ? (
               <div
                 aria-hidden="true"
@@ -5266,6 +5326,7 @@ export function TipTapEditor({
               onChange={(event) => handleSourceMarkdownChange(event.target.value)}
               onKeyDown={handleSourceKeyDown}
             />
+            </div>
           </div>
         ) : (
           <>
@@ -5325,7 +5386,7 @@ export function TipTapEditor({
         </Button>
       )}
 
-      {isMobile && viewMode === 'visual' && showMobileEditorToolbar && !mobileContext && (
+      {isMobile && effectiveViewMode === 'visual' && showMobileEditorToolbar && !mobileContext && (
         <MobileWritingToolbar
           activeActions={mobileWritingActiveActions}
           showUndoRedo={showEditorUndoRedo}
@@ -5389,9 +5450,9 @@ export function TipTapEditor({
           editor={editor}
           outlineOpen={effectiveOutlineOpen}
           onToggleOutline={handleOutlineToggle}
-          viewMode={viewMode}
+          viewMode={effectiveViewMode}
           onToggleViewMode={applyLayoutPreferences ? handleToggleViewMode : undefined}
-          sourceMarkdown={viewMode === 'source' ? sourceMarkdown : undefined}
+          sourceMarkdown={effectiveViewMode === 'source' ? sourceMarkdown : undefined}
         />
       ) : null}
 

@@ -244,7 +244,7 @@ export const MermaidDiagram = Node.create({
       const match = src.match(/^```mermaid\r?\n/)
       return match ? (match.index ?? -1) : -1
     },
-    tokenize: (src, tokens, lexer) => {
+    tokenize: (src) => {
       const match = /^```mermaid\r?\n([\s\S]*?)\r?\n```/.exec(src)
       if (!match) return undefined
 
@@ -256,7 +256,8 @@ export const MermaidDiagram = Node.create({
         raw: match[0],
         content: code,
         attrs: { type },
-        tokens: lexer.blockTokens(match[1]),
+        // Mermaid source is opaque to Markdown and is parsed by Mermaid later.
+        tokens: [],
       }
     },
   },

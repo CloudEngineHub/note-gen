@@ -4165,6 +4165,11 @@
   },
   "editor": {
     "placeholder": "输入 / 唤起菜单，或直接开始写作...",
+    "markdownParseFallback": {
+      "title": "可视化解析失败，已切换到源码模式",
+      "description": "原文已完整保留，你可以继续编辑或修正语法后重试可视化模式。",
+      "retry": "重试可视化模式"
+    },
     "smartFileLink": {
       "fileMatches": "文件匹配",
       "pathMatches": "路径匹配",

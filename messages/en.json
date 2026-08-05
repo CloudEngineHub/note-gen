@@ -4145,6 +4145,11 @@
   },
   "editor": {
     "placeholder": "Type / to open menu, or start writing...",
+    "markdownParseFallback": {
+      "title": "Visual parsing failed; switched to source mode",
+      "description": "The original Markdown is preserved. Continue editing it or fix the syntax and retry visual mode.",
+      "retry": "Retry visual mode"
+    },
     "smartFileLink": {
       "fileMatches": "File matches",
       "pathMatches": "Path matches",
