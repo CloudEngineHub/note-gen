@@ -1,6 +1,7 @@
 import { BaseDirectory, exists, mkdir, readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
 import emitter from '@/lib/emitter'
+import { recordSyncTiming } from './sync-timing'
 import {
   deleteRemoteFile,
   downloadRemoteBytes,
@@ -100,16 +101,22 @@ async function flushPendingRecordAssetRemoteDeletions() {
 }
 
 export async function uploadRecordAssets(marks: RecordAssetMark[]) {
+  const startedAt = Date.now()
   await flushPendingRecordAssetRemoteDeletions()
 
   const localPaths = Array.from(new Set(
     marks.flatMap(getMarkLocalAssetPaths)
   ))
 
+  let uploaded = 0
+  let skipped = 0
   for (const localPath of localPaths) {
     if (!await exists(localPath, { baseDir: BaseDirectory.AppData })) continue
     const remotePath = getRemoteAssetPath(localPath)
-    if (await remoteFileExists(remotePath, 'data')) continue
+    if (await remoteFileExists(remotePath, 'data')) {
+      skipped += 1
+      continue
+    }
 
     const content = await readFile(localPath, { baseDir: BaseDirectory.AppData })
     await uploadRemoteBytes(
@@ -119,10 +126,17 @@ export async function uploadRecordAssets(marks: RecordAssetMark[]) {
       getRemoteContentType(localPath),
       'data',
     )
+    uploaded += 1
   }
+  recordSyncTiming('recordAssetsUpload', startedAt, {
+    total: localPaths.length,
+    uploaded,
+    skipped,
+  })
 }
 
 export async function downloadRecordAssets(marks: RecordAssetMark[]) {
+  const startedAt = Date.now()
   const localPaths = Array.from(new Set(
     marks.flatMap(getMarkLocalAssetPaths)
   ))
@@ -143,4 +157,8 @@ export async function downloadRecordAssets(marks: RecordAssetMark[]) {
   if (downloadedPaths.length > 0) {
     emitter.emit('record-assets-downloaded', { paths: downloadedPaths })
   }
+  recordSyncTiming('recordAssetsDownload', startedAt, {
+    total: localPaths.length,
+    downloaded: downloadedPaths.length,
+  })
 }

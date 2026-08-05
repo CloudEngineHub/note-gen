@@ -14,6 +14,8 @@ mod fonts;
 mod ios_ocr;
 mod mcp;
 mod mcp_runtime;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+mod microsoft_oauth;
 mod mobile_system_bars;
 mod notion_import;
 mod ocr_packages;
@@ -146,14 +148,20 @@ pub fn run() {
             ios_ocr::restore_ios_sync_folder,
             #[cfg(target_os = "ios")]
             ios_ocr::release_ios_sync_folder,
+            #[cfg(target_os = "ios")]
+            ios_ocr::set_ios_secure_value,
+            #[cfg(target_os = "ios")]
+            ios_ocr::get_ios_secure_value,
+            #[cfg(target_os = "ios")]
+            ios_ocr::delete_ios_secure_value,
             #[cfg(target_os = "android")]
             android_cloud_folder::set_android_secure_value,
             #[cfg(target_os = "android")]
             android_cloud_folder::get_android_secure_value,
             #[cfg(target_os = "android")]
             android_cloud_folder::delete_android_secure_value,
-            #[cfg(target_os = "android")]
-            android_cloud_folder::microsoft_oauth_request,
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            microsoft_oauth::microsoft_oauth_request,
             #[cfg(target_os = "android")]
             android_cloud_folder::pick_android_sync_folder,
             #[cfg(target_os = "android")]

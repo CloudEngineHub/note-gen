@@ -43,4 +43,5 @@ export interface CloudFolderConfig {
   oneDriveClientId?: string
   oneDriveRootId?: string
   oneDriveRootWebUrl?: string
+  oneDriveWorkspacePath?: string
 }

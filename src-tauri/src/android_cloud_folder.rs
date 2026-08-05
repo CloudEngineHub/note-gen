@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tauri::{
     plugin::{Builder, PluginHandle, TauriPlugin},
     AppHandle, Manager, Runtime, Wry,
@@ -8,7 +7,6 @@ use tauri::{
 const PLUGIN_NAME: &str = "android_cloud_folder";
 const ANDROID_PLUGIN_IDENTIFIER: &str = "com.codexu.NoteGen";
 const ANDROID_PLUGIN_CLASS: &str = "CloudFolderPlugin";
-const MICROSOFT_OAUTH_BASE_URL: &str = "https://login.microsoftonline.com/common/oauth2/v2.0";
 
 pub struct AndroidCloudFolderPlugin<R: Runtime>(PluginHandle<R>);
 
@@ -80,14 +78,6 @@ struct SecureValuePayload {
     value: String,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MicrosoftOAuthResponse {
-    status: u16,
-    body: String,
-    retry_after: Option<String>,
-}
-
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new(PLUGIN_NAME)
         .setup(|app, api| {
@@ -145,10 +135,7 @@ pub async fn get_android_secure_value(
 }
 
 #[tauri::command]
-pub async fn delete_android_secure_value(
-    app_handle: AppHandle,
-    key: String,
-) -> Result<(), String> {
+pub async fn delete_android_secure_value(app_handle: AppHandle, key: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _: serde_json::Value = plugin(&app_handle)?
             .0
@@ -158,39 +145,6 @@ pub async fn delete_android_secure_value(
     })
     .await
     .map_err(|error| format!("Android secure storage task failed: {error}"))?
-}
-
-#[tauri::command]
-pub async fn microsoft_oauth_request(
-    path: String,
-    form: HashMap<String, String>,
-) -> Result<MicrosoftOAuthResponse, String> {
-    if path != "devicecode" && path != "token" {
-        return Err("Unsupported Microsoft OAuth endpoint".to_string());
-    }
-
-    let response = reqwest::Client::new()
-        .post(format!("{MICROSOFT_OAUTH_BASE_URL}/{path}"))
-        .form(&form)
-        .send()
-        .await
-        .map_err(|error| format!("Microsoft OAuth request failed: {error}"))?;
-    let status = response.status().as_u16();
-    let retry_after = response
-        .headers()
-        .get(reqwest::header::RETRY_AFTER)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_string);
-    let body = response
-        .text()
-        .await
-        .map_err(|error| format!("Failed to read the Microsoft OAuth response: {error}"))?;
-
-    Ok(MicrosoftOAuthResponse {
-        status,
-        body,
-        retry_after,
-    })
 }
 
 #[tauri::command]

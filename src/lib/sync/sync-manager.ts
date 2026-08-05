@@ -13,6 +13,7 @@ import {
   androidCloudFolderWorkspaceDelete,
   androidCloudFolderWorkspaceDownloadBytes,
   androidCloudFolderWorkspaceUpload,
+  supportsCloudFolderWorkspace,
 } from './cloud-folder'
 import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import useSyncStore from '@/stores/sync'
@@ -61,10 +62,10 @@ async function getWebDAVConfig(): Promise<WebDAVConfig | null> {
   return null
 }
 
-async function getAndroidCloudFolderConfig(): Promise<CloudFolderConfig | null> {
+async function getCloudFolderWorkspaceConfig(): Promise<CloudFolderConfig | null> {
   const store = await Store.load('store.json')
   const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-  return config && (config.provider === 'oneDrive' || config.path.startsWith('content://')) ? config : null
+  return config && supportsCloudFolderWorkspace(config) ? config : null
 }
 
 // 同步配置
@@ -284,7 +285,7 @@ export class SyncManager {
           break
         }
         case 'cloudFolder': {
-          const config = await getAndroidCloudFolderConfig()
+          const config = await getCloudFolderWorkspaceConfig()
           if (!config) {
             return { success: false, action: 'push', error: '网盘文件夹未配置' }
           }
@@ -373,7 +374,7 @@ export class SyncManager {
           break
         }
         case 'cloudFolder': {
-          const config = await getAndroidCloudFolderConfig()
+          const config = await getCloudFolderWorkspaceConfig()
           if (!config) {
             return { success: false, action: 'pull', error: '网盘文件夹未配置' }
           }
@@ -468,7 +469,7 @@ export class SyncManager {
           break
         }
         case 'cloudFolder': {
-          const config = await getAndroidCloudFolderConfig()
+          const config = await getCloudFolderWorkspaceConfig()
           if (!config) {
             return { success: false, action: 'delete', error: '网盘文件夹未配置' }
           }
@@ -921,7 +922,7 @@ export async function isSyncConfigured(): Promise<boolean> {
       }
       case 'cloudFolder': {
         const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-        return Boolean(config && (config.provider === 'oneDrive' || config.path.startsWith('content://')))
+        return Boolean(config && supportsCloudFolderWorkspace(config))
       }
       default:
         return false

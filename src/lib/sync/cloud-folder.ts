@@ -73,6 +73,10 @@ function fromOneDriveSyncObject(object: CloudFolderObject): CloudFolderObject {
   }
 }
 
+export function supportsCloudFolderWorkspace(config: CloudFolderConfig): boolean {
+  return isOneDriveConfig(config) || (platform() === 'android' && config.path.startsWith('content://'))
+}
+
 export async function getICloudSyncFolder(): Promise<string> {
   return invoke<string>('get_icloud_sync_folder')
 }

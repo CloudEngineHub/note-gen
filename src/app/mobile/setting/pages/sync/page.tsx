@@ -16,24 +16,40 @@ import { UsePlatformButton } from '@/app/core/setting/sync/components/use-platfo
 import { WorkspaceRepoMapping } from '@/app/core/setting/sync/components/workspace-repo-mapping'
 import { DataSyncOverview } from '@/app/core/setting/sync/components/data-sync-overview'
 import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
-import { AndroidCloudFolderSync } from '@/app/mobile/setting/pages/sync/android-cloud-folder-sync'
-import { IOSCloudFolderSync } from '@/app/mobile/setting/pages/sync/ios-cloud-folder-sync'
+import { OneDriveCloudFolderSync } from '@/app/mobile/setting/pages/sync/android-cloud-folder-sync'
+import { ICloudFolderSync } from '@/app/mobile/setting/pages/sync/ios-cloud-folder-sync'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
 import type { SyncRepoPlatform, WorkspaceSyncRepos } from '@/lib/sync/workspace-repos'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
-import { SYNC_PLATFORMS, SYNC_PLATFORM_INFO, SyncPlatform } from '@/types/sync'
+import { SYNC_PLATFORMS, SYNC_PLATFORM_INFO, SyncPlatform, type CloudFolderConfig } from '@/types/sync'
+
+type MobileSyncPlatform = SyncPlatform | 'iCloud' | 'oneDrive'
+
+function toSyncPlatform(platformName: MobileSyncPlatform): SyncPlatform {
+  return platformName === 'iCloud' || platformName === 'oneDrive' ? 'cloudFolder' : platformName
+}
+
+function isRepoSyncPlatform(platformName: MobileSyncPlatform): platformName is SyncRepoPlatform {
+  return platformName === 'github'
+    || platformName === 'gitee'
+    || platformName === 'gitlab'
+    || platformName === 'gitea'
+}
 
 export default function SyncPage() {
   const t = useTranslations()
   const currentPlatform = platform()
   const isIOS = currentPlatform === 'ios'
   const isAndroid = currentPlatform === 'android'
-  const availablePlatforms = isIOS || isAndroid
-    ? SYNC_PLATFORMS
-    : SYNC_PLATFORMS.filter(platformName => platformName !== 'cloudFolder')
+  const standardPlatforms = SYNC_PLATFORMS.filter(platformName => platformName !== 'cloudFolder')
+  const availablePlatforms: MobileSyncPlatform[] = isIOS
+    ? [...standardPlatforms, 'iCloud', 'oneDrive']
+    : isAndroid
+      ? [...standardPlatforms, 'oneDrive']
+      : standardPlatforms
   const {
     primaryBackupMethod,
     setPrimaryBackupMethod,
@@ -66,8 +82,9 @@ export default function SyncPage() {
     cloudFolderConnected,
   } = useSyncStore()
 
-  const [tab, setTab] = useState<SyncPlatform>(primaryBackupMethod)
+  const [tab, setTab] = useState<MobileSyncPlatform>(primaryBackupMethod)
   const [isLoading, setIsLoading] = useState(true)
+  const [activeCloudFolderProvider, setActiveCloudFolderProvider] = useState<'folder' | 'oneDrive' | null>(null)
   const [workspaceRepos, setWorkspaceRepos] = useState<Record<string, WorkspaceSyncRepos>>({})
 
   const workspaceOptions = useMemo(
@@ -115,10 +132,22 @@ export default function SyncPage() {
       try {
         const store = await Store.load('store.json')
         const savedMethod = await store.get<SyncPlatform>('primaryBackupMethod')
+        const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+        setActiveCloudFolderProvider(
+          cloudFolderConfig?.path
+            ? cloudFolderConfig.provider === 'oneDrive' ? 'oneDrive' : 'folder'
+            : null,
+        )
         if (savedMethod) {
-          const nextMethod = savedMethod === 'cloudFolder' && !isIOS && !isAndroid ? 'github' : savedMethod
-          await setPrimaryBackupMethod(nextMethod)
-          setTab(nextMethod)
+          const nextTab: MobileSyncPlatform = savedMethod !== 'cloudFolder'
+            ? savedMethod
+            : isIOS
+              ? cloudFolderConfig?.provider === 'oneDrive' ? 'oneDrive' : 'iCloud'
+              : isAndroid
+                ? 'oneDrive'
+                : 'github'
+          await setPrimaryBackupMethod(toSyncPlatform(nextTab))
+          setTab(nextTab)
         }
       } catch (error) {
         console.error('Failed to load primary backup method:', error)
@@ -130,8 +159,11 @@ export default function SyncPage() {
     void loadPrimaryBackupMethod()
   }, [isAndroid, isIOS, setPrimaryBackupMethod])
 
-  const currentSyncState = getCurrentSyncState(tab)
+  const selectedSyncPlatform = toSyncPlatform(tab)
+  const currentSyncState = getCurrentSyncState(selectedSyncPlatform)
   const isFileAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
+  const isCloudFolderTab = selectedSyncPlatform === 'cloudFolder'
+  const supportsCloudFolderFileSync = tab === 'oneDrive'
 
   function getCurrentSyncState(platform: SyncPlatform) {
     switch (platform) {
@@ -148,23 +180,24 @@ export default function SyncPage() {
       case 'webdav':
         return webdavConnected ? SyncStateEnum.success : SyncStateEnum.fail
       case 'cloudFolder':
-        return cloudFolderConnected ? SyncStateEnum.success : SyncStateEnum.fail
+        return cloudFolderConnected
+          && ((tab === 'oneDrive' && activeCloudFolderProvider === 'oneDrive')
+            || (tab === 'iCloud' && activeCloudFolderProvider === 'folder'))
+          ? SyncStateEnum.success
+          : SyncStateEnum.fail
       default:
         return syncRepoState
     }
   }
 
-  function getProviderLabel(platform: SyncPlatform) {
-    if (platform === 'cloudFolder') {
-      return isIOS
-        ? t('settings.sync.iCloud.title')
-        : t('settings.sync.oneDrive.title')
-    }
+  function getProviderLabel(platform: MobileSyncPlatform) {
+    if (platform === 'iCloud') return t('settings.sync.iCloud.title')
+    if (platform === 'oneDrive' || platform === 'cloudFolder') return t('settings.sync.oneDrive.title')
     return SYNC_PLATFORM_INFO[platform].name
   }
 
   function handleTabChange(value: string) {
-    const nextTab = value as SyncPlatform
+    const nextTab = value as MobileSyncPlatform
     setTab(nextTab)
   }
 
@@ -194,8 +227,15 @@ export default function SyncPage() {
         return <S3Sync />
       case 'webdav':
         return <WebDAVSync />
+      case 'iCloud':
+        return isIOS
+          ? <ICloudFolderSync onActiveProviderChange={setActiveCloudFolderProvider} />
+          : <GithubSync />
+      case 'oneDrive':
       case 'cloudFolder':
-        return isIOS ? <IOSCloudFolderSync /> : isAndroid ? <AndroidCloudFolderSync /> : <GithubSync />
+        return isIOS || isAndroid
+          ? <OneDriveCloudFolderSync onActiveProviderChange={setActiveCloudFolderProvider} />
+          : <GithubSync />
       default:
         return <GithubSync />
     }
@@ -233,13 +273,13 @@ export default function SyncPage() {
           </div>
           <div className="shrink-0 [&>button]:h-11">
             <UsePlatformButton
-              platform={tab}
+              platform={selectedSyncPlatform}
               disabled={currentSyncState !== SyncStateEnum.success}
             />
           </div>
         </div>
         {renderSyncContent()}
-        {tab !== 's3' && tab !== 'webdav' && tab !== 'cloudFolder' ? (
+        {isRepoSyncPlatform(tab) ? (
           <WorkspaceRepoMapping
             platform={tab}
             workspaceOptions={workspaceOptions}
@@ -265,7 +305,7 @@ export default function SyncPage() {
               title={t('settings.sync.autoSync')}
               value={autoSync}
               onValueChange={(value) => setAutoSync(value)}
-              disabled={isFileAutoSyncDisabled || (tab === 'cloudFolder' && !isAndroid)}
+              disabled={isFileAutoSyncDisabled || (isCloudFolderTab && !supportsCloudFolderFileSync)}
               className="min-w-32"
               placeholder={t('settings.sync.autoSyncOptions.placeholder')}
               options={[
@@ -293,7 +333,7 @@ export default function SyncPage() {
             <Switch
               checked={autoPullOnOpen}
               onCheckedChange={setAutoPullOnOpen}
-              disabled={isFileAutoSyncDisabled || (tab === 'cloudFolder' && !isAndroid)}
+              disabled={isFileAutoSyncDisabled || (isCloudFolderTab && !supportsCloudFolderFileSync)}
             />
           </ItemActions>
         </Item>

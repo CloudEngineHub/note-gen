@@ -22,13 +22,18 @@ import {
   testCloudFolderConnection,
   type IOSFolderAccess,
 } from '@/lib/sync/cloud-folder'
+import { disconnectOneDrive } from '@/lib/sync/onedrive'
 import useArticleStore from '@/stores/article'
 import useSettingStore from '@/stores/setting'
 import { useSkillsStore } from '@/stores/skills'
 import useSyncStore from '@/stores/sync'
 import type { CloudFolderConfig } from '@/types/sync'
 
-export function IOSCloudFolderSync() {
+type ICloudFolderSyncProps = {
+  onActiveProviderChange?: (provider: 'folder') => void
+}
+
+export function ICloudFolderSync({ onActiveProviderChange }: ICloudFolderSyncProps) {
   const t = useTranslations('settings.sync.iCloud')
   const { workspacePath, setWorkspacePath } = useSettingStore()
   const setCloudFolderConnected = useSyncStore(state => state.setCloudFolderConnected)
@@ -61,7 +66,7 @@ export function IOSCloudFolderSync() {
       try {
         const store = await Store.load('store.json')
         const saved = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-        if (!saved?.path) return
+        if (!saved?.path || saved.provider === 'oneDrive') return
 
         let next = saved
         if (saved.bookmarkBase64) {
@@ -100,9 +105,11 @@ export function IOSCloudFolderSync() {
 
   async function saveConfig(next: CloudFolderConfig) {
     const store = await Store.load('store.json')
-    await store.set('cloudFolderSyncConfig', next)
+    const previous = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    if (previous?.provider === 'oneDrive') await disconnectOneDrive()
+    await store.set('cloudFolderSyncConfig', { ...next, provider: 'folder' } satisfies CloudFolderConfig)
     await store.save()
-    setConfig(next)
+    setConfig({ ...next, provider: 'folder' })
   }
 
   async function chooseFolder() {
@@ -115,6 +122,7 @@ export function IOSCloudFolderSync() {
       if (!selected) return
       selectedAccess = selected
       const next: CloudFolderConfig = {
+        provider: 'folder',
         path: selected.path,
         bookmarkBase64: selected.bookmarkBase64,
         displayName: selected.displayName,
@@ -126,6 +134,7 @@ export function IOSCloudFolderSync() {
       try {
         await saveConfig(next)
         setCloudFolderConnected(true)
+        onActiveProviderChange?.('folder')
       } finally {
         autoDataSyncQueue.finishAutoDataSyncRepositoryChange()
       }

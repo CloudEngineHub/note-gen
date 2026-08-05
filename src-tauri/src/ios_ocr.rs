@@ -32,6 +32,17 @@ struct FolderBookmarkPayload {
 #[derive(Serialize)]
 struct EmptyPayload {}
 
+#[derive(Serialize)]
+struct SecureKeyPayload {
+    key: String,
+}
+
+#[derive(Serialize)]
+struct SecureValuePayload {
+    key: String,
+    value: String,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FolderPickerResponse {
@@ -117,9 +128,7 @@ fn folder_access_from_response(
     }))
 }
 
-fn pick_ios_sync_folder_blocking(
-    app_handle: AppHandle,
-) -> Result<Option<IosFolderAccess>, String> {
+fn pick_ios_sync_folder_blocking(app_handle: AppHandle) -> Result<Option<IosFolderAccess>, String> {
     let plugin = app_handle
         .try_state::<IosOcrPlugin<Wry>>()
         .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
@@ -148,10 +157,7 @@ fn restore_ios_sync_folder_blocking(
         .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
     let response: FolderPickerResponse = plugin
         .0
-        .run_mobile_plugin(
-            "restoreFolder",
-            FolderBookmarkPayload { bookmark_base64 },
-        )
+        .run_mobile_plugin("restoreFolder", FolderBookmarkPayload { bookmark_base64 })
         .map_err(|error| format!("Failed to restore folder access: {error}"))?;
     folder_access_from_response(response)?
         .ok_or_else(|| "The saved folder authorization was cancelled.".to_string())
@@ -178,10 +184,7 @@ fn release_ios_sync_folder_blocking(
         .ok_or_else(|| "The iOS folder picker is unavailable.".to_string())?;
     plugin
         .0
-        .run_mobile_plugin::<()>(
-            "releaseFolder",
-            FolderBookmarkPayload { bookmark_base64 },
-        )
+        .run_mobile_plugin::<()>("releaseFolder", FolderBookmarkPayload { bookmark_base64 })
         .map_err(|error| format!("Failed to release folder access: {error}"))
 }
 
@@ -195,4 +198,53 @@ pub async fn release_ios_sync_folder(
     })
     .await
     .map_err(|error| format!("The folder release task failed: {error}"))?
+}
+
+fn ios_plugin(app_handle: &AppHandle) -> Result<tauri::State<'_, IosOcrPlugin<Wry>>, String> {
+    app_handle
+        .try_state::<IosOcrPlugin<Wry>>()
+        .ok_or_else(|| "The iOS native plugin is unavailable.".to_string())
+}
+
+#[tauri::command]
+pub async fn set_ios_secure_value(
+    app_handle: AppHandle,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ios_plugin(&app_handle)?
+            .0
+            .run_mobile_plugin::<()>("setSecureValue", SecureValuePayload { key, value })
+            .map_err(|error| format!("Failed to save the iOS secure value: {error}"))
+    })
+    .await
+    .map_err(|error| format!("The iOS secure storage task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn get_ios_secure_value(
+    app_handle: AppHandle,
+    key: String,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ios_plugin(&app_handle)?
+            .0
+            .run_mobile_plugin("getSecureValue", SecureKeyPayload { key })
+            .map_err(|error| format!("Failed to read the iOS secure value: {error}"))
+    })
+    .await
+    .map_err(|error| format!("The iOS secure storage task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn delete_ios_secure_value(app_handle: AppHandle, key: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ios_plugin(&app_handle)?
+            .0
+            .run_mobile_plugin::<()>("deleteSecureValue", SecureKeyPayload { key })
+            .map_err(|error| format!("Failed to delete the iOS secure value: {error}"))
+    })
+    .await
+    .map_err(|error| format!("The iOS secure storage task failed: {error}"))?
 }

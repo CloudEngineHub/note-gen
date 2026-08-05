@@ -1,5 +1,4 @@
 import { exists, readDir, readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { Store } from '@tauri-apps/plugin-store'
 import { deleteFile as deleteGithubFile, getFiles as getGithubFiles, uploadFile as uploadGithubFile } from './github'
 import { deleteFile as deleteGiteeFile, getFiles as getGiteeFiles, uploadFile as uploadGiteeFile } from './gitee'
@@ -17,14 +16,34 @@ import {
   cloudFolderDownloadBytes,
   cloudFolderHeadObject,
   cloudFolderUpload,
+  supportsCloudFolderWorkspace,
 } from './cloud-folder'
 import { ensureDirectoryExists, pullRemoteFile } from './auto-sync'
 import { getDataSyncRepoName, getSyncRepoName } from './repo-utils'
 import { getFilePathOptions } from '@/lib/workspace'
 import { decodeBase64ToBytes, getRemoteFileContent } from './remote-file'
 import type { CloudFolderConfig, S3Config, SyncPlatform, WebDAVConfig } from '@/types/sync'
+import { recordSyncTiming } from './sync-timing'
 
 const MARKDOWN_FILE_PATTERN = /\.md$/i
+const ONE_DRIVE_FILE_TRANSFER_CONCURRENCY = 3
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex
+      nextIndex += 1
+      await task(items[index], index)
+    }
+  }
+  const workerCount = Math.min(concurrency, items.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+}
 
 const STATIC_ASSET_CONTENT_TYPES: Record<string, string> = {
   css: 'text/css; charset=utf-8',
@@ -67,6 +86,11 @@ export type RemoteLibraryFile = {
   modifiedAt?: string
 }
 
+export type LocalLibraryFile = {
+  path: string
+  name: string
+}
+
 export type PullAllProgress = {
   phase: 'listing' | 'downloading' | 'uploading' | 'uploaded' | 'completed'
   current: number
@@ -90,6 +114,13 @@ export type UploadAllResult = {
 
 async function getPlatform(store: Store): Promise<SyncPlatform> {
   return await store.get<SyncPlatform>('primaryBackupMethod') || 'github'
+}
+
+async function getFileTransferConcurrency(): Promise<number> {
+  const store = await Store.load('store.json')
+  if (await getPlatform(store) !== 'cloudFolder') return 1
+  const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+  return config?.provider === 'oneDrive' ? ONE_DRIVE_FILE_TRANSFER_CONCURRENCY : 1
 }
 
 async function getGitRepository(
@@ -222,13 +253,12 @@ async function listObjectStorageFiles(
   return files
 }
 
-export async function listRemoteLibraryFiles(options: RemoteLibraryOptions = {}): Promise<RemoteLibraryFile[]> {
+async function listRemoteLibraryFilesRaw(options: RemoteLibraryOptions): Promise<RemoteLibraryFile[]> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
   if (platform === 'cloudFolder') {
-    if (getRuntimePlatform() !== 'android') return []
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-    if (!config?.path) return []
+    if (!config?.path || !supportsCloudFolderWorkspace(config)) return []
     return (await androidCloudFolderWorkspaceList(config))
       .filter(object => isLibraryPath(object.key, options))
       .map(object => ({
@@ -246,6 +276,18 @@ export async function listRemoteLibraryFiles(options: RemoteLibraryOptions = {})
   return files.sort((left, right) => left.path.localeCompare(right.path))
 }
 
+export async function listRemoteLibraryFiles(options: RemoteLibraryOptions = {}): Promise<RemoteLibraryFile[]> {
+  const startedAt = Date.now()
+  try {
+    const files = await listRemoteLibraryFilesRaw(options)
+    recordSyncTiming('workspaceList', startedAt, { files: files.length, success: true })
+    return files
+  } catch (error) {
+    recordSyncTiming('workspaceList', startedAt, { success: false })
+    throw error
+  }
+}
+
 export async function isLocalLibraryFile(path: string): Promise<boolean> {
   const pathOptions = await getFilePathOptions(path)
   return pathOptions.baseDir
@@ -257,9 +299,17 @@ export async function pullAllRemoteLibraryFiles(
   options: RemoteLibraryOptions = {},
   onProgress?: (progress: PullAllProgress) => void
 ): Promise<PullAllResult> {
+  const startedAt = Date.now()
   onProgress?.({ phase: 'listing', current: 0, total: 0 })
   const files = await listRemoteLibraryFiles(options)
-  return await pullRemoteLibraryFiles(files, onProgress)
+  const result = await pullRemoteLibraryFiles(files, onProgress)
+  recordSyncTiming('workspacePullAll', startedAt, {
+    total: result.total,
+    downloaded: result.downloaded,
+    skipped: result.skipped,
+    failed: result.failed.length,
+  })
+  return result
 }
 
 export async function pullRemoteLibraryFolder(
@@ -281,15 +331,17 @@ async function pullRemoteLibraryFiles(
   options: { overwriteExisting?: boolean } = {}
 ): Promise<PullAllResult> {
   const result: PullAllResult = { total: files.length, downloaded: 0, skipped: 0, failed: [] }
+  const concurrency = await getFileTransferConcurrency()
+  let started = 0
 
-  for (let index = 0; index < files.length; index++) {
-    const file = files[index]
-    onProgress?.({ phase: 'downloading', current: index + 1, total: files.length, path: file.path })
+  await runWithConcurrency(files, concurrency, async file => {
+    started += 1
+    onProgress?.({ phase: 'downloading', current: started, total: files.length, path: file.path })
 
     try {
       if (!options.overwriteExisting && await isLocalLibraryFile(file.path)) {
         result.skipped += 1
-        continue
+        return
       }
 
       const content = await downloadRemoteBytes(file.path)
@@ -301,7 +353,7 @@ async function pullRemoteLibraryFiles(
         message: error instanceof Error ? error.message : String(error),
       })
     }
-  }
+  })
 
   onProgress?.({ phase: 'completed', current: files.length, total: files.length })
   return result
@@ -316,9 +368,16 @@ export async function uploadAllLocalLibraryFiles(
   options: RemoteLibraryOptions = {},
   onProgress?: (progress: PullAllProgress) => void
 ): Promise<UploadAllResult> {
+  const startedAt = Date.now()
   onProgress?.({ phase: 'listing', current: 0, total: 0 })
   const files = await collectLocalLibraryFiles('', options)
-  return await uploadLocalLibraryFiles(files, onProgress)
+  const result = await uploadLocalLibraryFiles(files, onProgress)
+  recordSyncTiming('workspaceUploadAll', startedAt, {
+    total: result.total,
+    uploaded: result.uploaded,
+    failed: result.failed.length,
+  })
+  return result
 }
 
 export async function uploadLocalLibraryFolder(
@@ -344,28 +403,36 @@ async function uploadLocalLibraryFiles(
   onProgress?: (progress: PullAllProgress) => void
 ): Promise<UploadAllResult> {
   const result: UploadAllResult = { total: files.length, uploaded: 0, failed: [] }
+  const concurrency = await getFileTransferConcurrency()
+  let started = 0
+  let completed = 0
 
-  for (let index = 0; index < files.length; index++) {
-    const file = files[index]
-    onProgress?.({ phase: 'uploading', current: index + 1, total: files.length, path: file.path })
+  await runWithConcurrency(files, concurrency, async file => {
+    started += 1
+    onProgress?.({ phase: 'uploading', current: started, total: files.length, path: file.path })
 
+    let sha = ''
     try {
-      const sha = await uploadLocalLibraryFile(file.path)
+      sha = await uploadLocalLibraryFile(file.path)
       result.uploaded += 1
-      onProgress?.({
-        phase: 'uploaded',
-        current: index + 1,
-        total: files.length,
-        path: file.path,
-        sha,
-      })
     } catch (error) {
       result.failed.push({
         path: file.path,
         message: error instanceof Error ? error.message : String(error),
       })
+    } finally {
+      completed += 1
+      if (sha) {
+        onProgress?.({
+          phase: 'uploaded',
+          current: completed,
+          total: files.length,
+          path: file.path,
+          sha,
+        })
+      }
     }
-  }
+  })
 
   onProgress?.({ phase: 'completed', current: files.length, total: files.length })
   return result
@@ -397,6 +464,12 @@ async function collectLocalLibraryFiles(
   return files
 }
 
+export async function listLocalLibraryFiles(
+  options: RemoteLibraryOptions = {},
+): Promise<LocalLibraryFile[]> {
+  return await collectLocalLibraryFiles('', options)
+}
+
 async function saveLocalBytes(path: string, content: Uint8Array): Promise<void> {
   await ensureDirectoryExists(path)
   const pathOptions = await getFilePathOptions(path)
@@ -407,7 +480,7 @@ async function saveLocalBytes(path: string, content: Uint8Array): Promise<void> 
   }
 }
 
-export async function downloadRemoteBytes(
+async function downloadRemoteBytesRaw(
   path: string,
   scope: RemoteRepositoryScope = 'workspace',
 ): Promise<Uint8Array> {
@@ -431,7 +504,7 @@ export async function downloadRemoteBytes(
   if (platform === 'cloudFolder') {
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
     const file = config?.path
-      ? scope === 'workspace' && getRuntimePlatform() === 'android'
+      ? scope === 'workspace' && supportsCloudFolderWorkspace(config)
         ? await androidCloudFolderWorkspaceDownloadBytes(config, path)
         : scope === 'data'
           ? await cloudFolderDownloadBytes(config, path)
@@ -459,6 +532,31 @@ export async function downloadRemoteBytes(
   }
 
   return decodeBase64ToBytes(getRemoteFileContent(file, path))
+}
+
+export async function downloadRemoteBytes(
+  path: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<Uint8Array> {
+  const startedAt = Date.now()
+  try {
+    const content = await downloadRemoteBytesRaw(path, scope)
+    recordSyncTiming('fileDownload', startedAt, {
+      path,
+      scope,
+      bytes: content.byteLength,
+      success: true,
+    })
+    return content
+  } catch (error) {
+    recordSyncTiming('fileDownload', startedAt, {
+      path,
+      scope,
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    throw error
+  }
 }
 
 async function getExistingRemoteSha(platform: Exclude<SyncPlatform, 's3' | 'webdav' | 'cloudFolder'>, path: string, repo: string) {
@@ -505,7 +603,7 @@ function getUploadedRemoteVersion(response: unknown): string {
   return ''
 }
 
-async function uploadRemoteContent(
+async function uploadRemoteContentRaw(
   path: string,
   content: string | Uint8Array,
   message: string,
@@ -532,7 +630,7 @@ async function uploadRemoteContent(
   if (platform === 'cloudFolder') {
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
     const result = config?.path
-      ? scope === 'workspace' && getRuntimePlatform() === 'android'
+      ? scope === 'workspace' && supportsCloudFolderWorkspace(config)
         ? await androidCloudFolderWorkspaceUpload(config, path, content)
         : scope === 'data'
           ? await cloudFolderUpload(config, path, content)
@@ -566,6 +664,27 @@ async function uploadRemoteContent(
   return getUploadedRemoteVersion(response) || sha || `uploaded:${path}`
 }
 
+async function uploadRemoteContent(
+  path: string,
+  content: string | Uint8Array,
+  message: string,
+  contentType?: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<string> {
+  const startedAt = Date.now()
+  const bytes = typeof content === 'string'
+    ? new TextEncoder().encode(content).byteLength
+    : content.byteLength
+  try {
+    const version = await uploadRemoteContentRaw(path, content, message, contentType, scope)
+    recordSyncTiming('fileUpload', startedAt, { path, scope, bytes, success: true })
+    return version
+  } catch (error) {
+    recordSyncTiming('fileUpload', startedAt, { path, scope, bytes, success: false })
+    throw error
+  }
+}
+
 export async function uploadRemoteText(path: string, content: string, message: string): Promise<string> {
   return await uploadRemoteContent(path, content, message)
 }
@@ -584,7 +703,7 @@ export async function downloadRemoteText(path: string): Promise<string> {
   return await pullRemoteFile(path)
 }
 
-export async function remoteFileExists(
+async function remoteFileExistsRaw(
   path: string,
   scope: RemoteRepositoryScope = 'workspace',
 ): Promise<boolean> {
@@ -604,7 +723,7 @@ export async function remoteFileExists(
   if (platform === 'cloudFolder') {
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
     if (!config?.path) return false
-    if (scope === 'workspace' && getRuntimePlatform() === 'android') {
+    if (scope === 'workspace' && supportsCloudFolderWorkspace(config)) {
       return Boolean(await androidCloudFolderWorkspaceHead(config, path))
     }
     return scope === 'data' ? Boolean(await cloudFolderHeadObject(config, path)) : false
@@ -612,6 +731,21 @@ export async function remoteFileExists(
 
   const repo = await getGitRepository(platform, scope)
   return Boolean(await getExistingRemoteSha(platform, path, repo))
+}
+
+export async function remoteFileExists(
+  path: string,
+  scope: RemoteRepositoryScope = 'workspace',
+): Promise<boolean> {
+  const startedAt = Date.now()
+  try {
+    const found = await remoteFileExistsRaw(path, scope)
+    recordSyncTiming('fileExists', startedAt, { path, scope, found, success: true })
+    return found
+  } catch (error) {
+    recordSyncTiming('fileExists', startedAt, { path, scope, success: false })
+    throw error
+  }
 }
 
 export async function deleteRemoteFile(
@@ -640,7 +774,7 @@ export async function deleteRemoteFile(
   if (platform === 'cloudFolder') {
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
     if (!config?.path) return
-    if (scope === 'workspace' && getRuntimePlatform() === 'android') {
+    if (scope === 'workspace' && supportsCloudFolderWorkspace(config)) {
       await androidCloudFolderWorkspaceDelete(config, path)
     } else if (scope === 'data') {
       await cloudFolderDelete(config, path)

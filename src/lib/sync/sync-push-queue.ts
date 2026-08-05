@@ -14,13 +14,14 @@ import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { debugSyncPerf } from './remote-file'
 import { generateGitSyncCommitMessage } from './commit-message'
 import { getSyncMetadataKey } from './sync-context'
+import { supportsCloudFolderWorkspace } from './cloud-folder'
 
 type SyncProvider = 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
 
-async function getAndroidCloudFolderConfig(): Promise<CloudFolderConfig | null> {
+async function getCloudFolderWorkspaceConfig(): Promise<CloudFolderConfig | null> {
   const store = await Store.load('store.json')
   const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-  return config && (config.provider === 'oneDrive' || config.path.startsWith('content://')) ? config : null
+  return config && supportsCloudFolderWorkspace(config) ? config : null
 }
 
 /**
@@ -672,7 +673,7 @@ class SyncPushQueue {
             break
           }
           case 'cloudFolder': {
-            const config = await getAndroidCloudFolderConfig()
+            const config = await getCloudFolderWorkspaceConfig()
             if (!config) {
               emitter.emit('sync-push-completed', { path, success: false })
               return { success: false }
@@ -964,7 +965,7 @@ class SyncPushQueue {
           break
         }
         case 'cloudFolder': {
-          const config = await getAndroidCloudFolderConfig()
+          const config = await getCloudFolderWorkspaceConfig()
           if (!config) {
             emitter.emit('sync-push-completed', { path, success: false })
             return { success: false }

@@ -20,6 +20,7 @@ import type { Chat, ChatType, Role } from '@/db/chats'
 import type { ConversationCompaction } from '@/db/conversation-compactions'
 import type { ConversationSyncTombstone } from '@/db/conversation-sync-state'
 import { v5 as uuidv5 } from 'uuid'
+import { recordSyncTiming } from './sync-timing'
 
 export const CONVERSATION_SYNC_DIRECTORY = '.data/conversations'
 export const CONVERSATION_SYNC_INDEX_PATH = `${CONVERSATION_SYNC_DIRECTORY}/index.json`
@@ -799,9 +800,11 @@ function getMessageImageReferences(message: ConversationSyncMessage) {
 }
 
 async function downloadConversationAssets(items: ConversationSyncItem[]) {
+  const startedAt = Date.now()
   const references = Array.from(new Set(
     items.flatMap(item => item.messages.flatMap(getMessageImageReferences))
   ))
+  let downloaded = 0
   for (const localPath of references) {
     if (await exists(localPath, { baseDir: BaseDirectory.AppData })) continue
     const fileName = localPath.split('/').pop()
@@ -812,7 +815,12 @@ async function downloadConversationAssets(items: ConversationSyncItem[]) {
     }
     const bytes = await downloadRemoteBytes(remotePath, 'data')
     await ensureLocalConversationAsset(localPath, bytes)
+    downloaded += 1
   }
+  recordSyncTiming('conversationAssetsDownload', startedAt, {
+    total: references.length,
+    downloaded,
+  })
 }
 
 async function persistNormalizedMessageAssets(messages: ConversationSyncMessage[]) {
@@ -1338,6 +1346,7 @@ async function readRemoteConversationItems(
 }
 
 export async function uploadConversations() {
+  const startedAt = Date.now()
   const store = await Store.load('store.json')
   const storage = await createConversationRemoteStorage(store)
   if (!storage) return false
@@ -1360,6 +1369,7 @@ export async function uploadConversations() {
   let appliedRemoteDuringUpload = false
 
   for (const item of activeItems) {
+    const itemStartedAt = Date.now()
     const remoteEntry = remoteEntries.get(item.syncId)
     let expectedRemoteItemContent: string | null = null
     let parsedRemoteItem: ConversationSyncItem | null = null
@@ -1371,6 +1381,10 @@ export async function uploadConversations() {
       if (!parsedRemoteItem || parsedRemoteItem.syncId !== item.syncId) return false
       if (stableSerialize(parsedRemoteItem) === stableSerialize(item)) {
         publishedItems.push(item)
+        recordSyncTiming('conversationItemUpload', itemStartedAt, {
+          messages: item.messages.length,
+          mode: 'unchanged',
+        })
         continue
       }
     }
@@ -1419,6 +1433,10 @@ export async function uploadConversations() {
       return false
     }
     publishedItems.push(normalizedItem)
+    recordSyncTiming('conversationItemUpload', itemStartedAt, {
+      messages: normalizedItem.messages.length,
+      mode: 'uploaded',
+    })
   }
 
   const index: ConversationSyncIndex = {
@@ -1464,10 +1482,16 @@ export async function uploadConversations() {
   ))
   await store.save()
   if (appliedRemoteDuringUpload) await refreshConversationStoreAfterSync()
+  recordSyncTiming('conversationsUpload', startedAt, {
+    total: activeItems.length,
+    published: publishedItems.length,
+    deleted: deletedIds.size,
+  })
   return true
 }
 
 export async function downloadConversations(options: { allowMissingRemote?: boolean } = {}) {
+  const startedAt = Date.now()
   const store = await Store.load('store.json')
   const storage = await createConversationRemoteStorage(store)
   if (!storage) return false
@@ -1531,6 +1555,11 @@ export async function downloadConversations(options: { allowMissingRemote?: bool
     if ((migratedLegacy || localNeedsUpload) && !await uploadConversations()) {
       throw new Error('Failed to upload merged conversation data')
     }
+    recordSyncTiming('conversationsDownload', startedAt, {
+      remote: remoteItems.length,
+      merged: merged.length,
+      tombstones: tombstones.length,
+    })
     return true
   } catch (error) {
     if (options.allowMissingRemote) {

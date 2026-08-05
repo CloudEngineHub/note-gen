@@ -7,6 +7,7 @@ import type { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import type { Mark } from '@/db/marks'
 import type { Tag } from '@/db/tags'
 import { downloadRecordAssets, uploadRecordAssets } from '@/lib/sync/record-assets'
+import { recordSyncTiming } from '@/lib/sync/sync-timing'
 import { filterSyncData } from '@/config/sync-exclusions'
 import type { CanvasProject } from '@/types/canvas'
 import { getDataSyncRepoName } from '@/lib/sync/repo-utils'
@@ -114,14 +115,15 @@ export interface AutoDataSyncUploadOptions {
 }
 interface AutoDataSyncGlobalRuntimeState {
   ownerId: string | null
-  remoteMetaCheckTimer: ReturnType<typeof setInterval> | null
+  remoteMetaCheckTimer: ReturnType<typeof setTimeout> | null
 }
 type AutoDataSyncGlobalScope = typeof globalThis & {
   __noteGenAutoDataSyncRuntimeState?: AutoDataSyncGlobalRuntimeState
 }
 
 const DEFAULT_AUTO_DATA_SYNC_DELAY = 1_000
-const DEFAULT_AUTO_DATA_SYNC_META_CHECK_INTERVAL = 10_000
+const AUTO_DATA_SYNC_META_CHECK_INTERVALS = [10_000, 30_000, 60_000, 5 * 60_000] as const
+const AUTO_DATA_SYNC_META_CACHE_TTL = 5_000
 const CONVERSATION_SYNC_BUSY_WAIT_TIMEOUT = 30_000
 const MAX_RETRY_COUNT = 3
 const AUTO_DATA_SYNC_META_PATH = '.data/meta.json'
@@ -144,7 +146,14 @@ let seq = 0
 let queue: AutoDataSyncTask[] = []
 let processing = false
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
-let remoteMetaCheckTimer: ReturnType<typeof setInterval> | null = null
+let remoteMetaCheckTimer: ReturnType<typeof setTimeout> | null = null
+let remoteMetaCheckIntervalIndex = 0
+let remoteMetaVisibilityListenerAttached = false
+const remoteMetaCache = new Map<string, {
+  value: AutoDataSyncRemoteMeta | null
+  cachedAt: number
+}>()
+const remoteMetaRequests = new Map<string, Promise<AutoDataSyncRemoteMeta | null>>()
 let applyingRemote = false
 let applyingRemoteDepth = 0
 let repositoryChangePauseDepth = 0
@@ -379,8 +388,7 @@ function mergeMarksById(
 }
 
 function debugAutoDataSync(message: string, details?: Record<string, unknown>) {
-  void message
-  void details
+  console.info('[AutoDataSync]', JSON.stringify({ message, ...details }))
 }
 
 function updateState(next: Partial<AutoDataSyncState>) {
@@ -668,6 +676,7 @@ export async function downloadAutoDataSyncNow(
   knownRemoteMeta: AutoDataSyncRemoteMeta | null = null,
   options: AutoDataSyncDownloadOptions = {}
 ): Promise<boolean> {
+  const downloadStartedAt = Date.now()
   if (!await isAutoDataSyncProviderConfigured()) {
     debugAutoDataSync('download blocked because provider is not configured')
     updateState({
@@ -740,6 +749,7 @@ export async function downloadAutoDataSyncNow(
     let conversationResult = true
 
     if (shouldDownloadRecords) {
+      const domainStartedAt = Date.now()
       tagResult = await useTagStore.getState().downloadTags({ allowMissingRemote: true })
       markResult = await useMarkStore.getState().downloadMarks({
         allowMissingRemote: true,
@@ -753,13 +763,28 @@ export async function downloadAutoDataSyncNow(
         useMarkStore.getState().fetchMarks(),
         useMarkStore.getState().fetchAllMarks(),
       ])
+      recordSyncTiming('domainDownload', domainStartedAt, {
+        domain: 'records',
+        tags: tagResult.length,
+        marks: markResult.length,
+      })
     }
 
     if (shouldDownloadSettings) {
+      const domainStartedAt = Date.now()
       settingsResult = await useSettingsSyncStore.getState().downloadSettings({ allowMissingRemote: true })
+      recordSyncTiming('domainDownload', domainStartedAt, {
+        domain: 'settings',
+        success: settingsResult,
+      })
     }
     if (shouldDownloadConversations) {
+      const domainStartedAt = Date.now()
       conversationResult = await downloadConversations({ allowMissingRemote: true })
+      recordSyncTiming('domainDownload', domainStartedAt, {
+        domain: 'conversations',
+        success: conversationResult,
+      })
     }
     debugAutoDataSync('download domain results', {
       domains: domainsToDownload,
@@ -817,6 +842,11 @@ export async function downloadAutoDataSyncNow(
     return false
   } finally {
     setAutoDataSyncApplyingRemote(false)
+    recordSyncTiming('autoDataDownload', downloadStartedAt, {
+      mode,
+      domains: domainsToDownload,
+      status: state.status,
+    })
   }
 }
 
@@ -1195,53 +1225,82 @@ async function scheduleProcess() {
   }, delay)
 }
 
-async function getAutoDataSyncMetaCheckInterval(): Promise<number> {
-  return DEFAULT_AUTO_DATA_SYNC_META_CHECK_INTERVAL
+function clearPeriodicAutoDataSyncMetaCheck(): void {
+  if (remoteMetaCheckTimer) {
+    clearTimeout(remoteMetaCheckTimer)
+    remoteMetaCheckTimer = null
+  }
+  const globalRuntimeState = getGlobalAutoDataSyncRuntimeState()
+  if (globalRuntimeState.ownerId === AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID) {
+    if (globalRuntimeState.remoteMetaCheckTimer) {
+      clearTimeout(globalRuntimeState.remoteMetaCheckTimer)
+    }
+    globalRuntimeState.remoteMetaCheckTimer = null
+  }
 }
 
-function startPeriodicAutoDataSyncMetaCheck() {
-  if (remoteMetaCheckTimer) {
-    return
-  }
+function schedulePeriodicAutoDataSyncMetaCheck(delayMs: number): void {
+  clearPeriodicAutoDataSyncMetaCheck()
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+
+  const globalRuntimeState = getGlobalAutoDataSyncRuntimeState()
+  if (globalRuntimeState.ownerId !== AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID) return
+
+  debugAutoDataSync('periodic remote meta check scheduled', {
+    intervalMs: delayMs,
+    intervalIndex: remoteMetaCheckIntervalIndex,
+    runtimeId: AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID,
+  })
+  remoteMetaCheckTimer = setTimeout(() => {
+    remoteMetaCheckTimer = null
+    globalRuntimeState.remoteMetaCheckTimer = null
+    void (async () => {
+      const latestGlobalRuntimeState = getGlobalAutoDataSyncRuntimeState()
+      if (latestGlobalRuntimeState.ownerId !== AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID) return
+
+      const wasBusy = processing || applyingRemote || queue.length > 0
+      const lastCompletedAt = state.lastCompletedAt
+      await checkRemoteAutoDataSync('periodic', { uploadDirtyDomains: true })
+      const completedWork = state.lastCompletedAt !== lastCompletedAt
+      remoteMetaCheckIntervalIndex = wasBusy || completedWork
+        ? 0
+        : Math.min(
+          remoteMetaCheckIntervalIndex + 1,
+          AUTO_DATA_SYNC_META_CHECK_INTERVALS.length - 1,
+        )
+      schedulePeriodicAutoDataSyncMetaCheck(
+        AUTO_DATA_SYNC_META_CHECK_INTERVALS[remoteMetaCheckIntervalIndex],
+      )
+    })()
+  }, delayMs)
+  globalRuntimeState.remoteMetaCheckTimer = remoteMetaCheckTimer
+}
+
+function startPeriodicAutoDataSyncMetaCheck(): void {
+  if (remoteMetaCheckTimer) return
 
   const globalRuntimeState = getGlobalAutoDataSyncRuntimeState()
   if (globalRuntimeState.remoteMetaCheckTimer) {
-    clearInterval(globalRuntimeState.remoteMetaCheckTimer)
+    clearTimeout(globalRuntimeState.remoteMetaCheckTimer)
   }
   globalRuntimeState.ownerId = AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID
   globalRuntimeState.remoteMetaCheckTimer = null
 
-  void getAutoDataSyncMetaCheckInterval().then((interval) => {
-    if (remoteMetaCheckTimer) {
-      return
-    }
-
-    const currentGlobalRuntimeState = getGlobalAutoDataSyncRuntimeState()
-    if (currentGlobalRuntimeState.ownerId !== AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID) {
-      return
-    }
-
-    debugAutoDataSync('periodic remote meta check scheduled', {
-      intervalMs: interval,
-      runtimeId: AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID,
-    })
-    remoteMetaCheckTimer = setInterval(() => {
-      const latestGlobalRuntimeState = getGlobalAutoDataSyncRuntimeState()
-      if (latestGlobalRuntimeState.ownerId !== AUTO_DATA_SYNC_RUNTIME_INSTANCE_ID) {
-        if (remoteMetaCheckTimer) {
-          clearInterval(remoteMetaCheckTimer)
-          remoteMetaCheckTimer = null
-        }
+  if (!remoteMetaVisibilityListenerAttached && typeof document !== 'undefined') {
+    remoteMetaVisibilityListenerAttached = true
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        clearPeriodicAutoDataSyncMetaCheck()
         return
       }
+      remoteMetaCheckIntervalIndex = 0
+      schedulePeriodicAutoDataSyncMetaCheck(0)
+    })
+  }
 
-      // Dirty state is persisted independently from the in-memory queue. Always
-      // resume it here so a reload, a busy chat, or a transient queue failure
-      // cannot leave local changes pending forever.
-      void checkRemoteAutoDataSync('periodic', { uploadDirtyDomains: true })
-    }, interval)
-    currentGlobalRuntimeState.remoteMetaCheckTimer = remoteMetaCheckTimer
-  })
+  schedulePeriodicAutoDataSyncMetaCheck(
+    AUTO_DATA_SYNC_META_CHECK_INTERVALS[remoteMetaCheckIntervalIndex],
+  )
 }
 
 async function processQueue() {
@@ -1416,8 +1475,22 @@ async function processQueue() {
       if (!queue.some(item => item.domain === task.domain)) {
         await clearAutoDataSyncDirtyDomain(task.domain)
       }
+      recordSyncTiming('syncTask', taskStartedAt, {
+        domain: task.domain,
+        mode: task.mode,
+        reason: task.reason,
+        retryCount: task.retryCount,
+        success: true,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Auto data sync failed'
+      recordSyncTiming('syncTask', taskStartedAt, {
+        domain: task.domain,
+        mode: task.mode,
+        reason: task.reason,
+        retryCount: task.retryCount,
+        success: false,
+      })
 
       if (task.retryCount < MAX_RETRY_COUNT) {
         task.retryCount += 1
@@ -1495,6 +1568,7 @@ function dropRedundantFrontTasks(domain: AutoDataSyncDomain, taskStartedAt: numb
 }
 
 async function uploadDomain(domain: AutoDataSyncDomain) {
+  const startedAt = Date.now()
   debugAutoDataSync('upload domain started', { domain })
   await ensureAutoDataSyncRemoteDataPath()
 
@@ -1520,6 +1594,7 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
       throw new Error('Failed to upload records')
     }
 
+    recordSyncTiming('domainUpload', startedAt, { domain, success: true })
     return
   }
 
@@ -1528,6 +1603,7 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
     const result = await uploadConversations()
     debugAutoDataSync('conversations upload result', { conversations: result })
     if (!result) throw new Error('Failed to upload conversations')
+    recordSyncTiming('domainUpload', startedAt, { domain, success: true })
     return
   }
 
@@ -1538,9 +1614,11 @@ async function uploadDomain(domain: AutoDataSyncDomain) {
   if (!result) {
     throw new Error('Failed to upload settings')
   }
+  recordSyncTiming('domainUpload', startedAt, { domain, success: true })
 }
 
 async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
+  const startedAt = Date.now()
   const store = await Store.load('store.json')
   const provider = await getAutoDataSyncProvider(store)
   const now = Date.now()
@@ -1615,6 +1693,11 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
       throw new Error('Sync provider is not configured')
   }
 
+  const parsedMetadata = parseAutoDataSyncMeta(content)
+  if (parsedMetadata) {
+    await cacheAutoDataSyncMeta(store, provider, parsedMetadata)
+  }
+
   await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_LAST_LOCAL_UPLOAD_META_MS_KEY), now)
   await store.set(await getAutoDataSyncStateKey(AUTO_DATA_SYNC_LAST_LOCAL_UPLOAD_META_KEY), metadata)
   for (const domain of uploadedDomains) {
@@ -1630,6 +1713,11 @@ async function uploadAutoDataSyncMeta(uploadedDomains: AutoDataSyncDomain[]) {
     provider: metadata.provider,
     deviceId: metadata.deviceId,
     lastUploadedDomains: metadata.lastUploadedDomains,
+  })
+  recordSyncTiming('metaUpload', startedAt, {
+    provider,
+    domains: uploadedDomains,
+    bytes: new TextEncoder().encode(content).byteLength,
   })
 }
 
@@ -1704,6 +1792,7 @@ async function checkRemoteAutoDataSync(
   reason: 'startup' | 'periodic',
   options: { uploadDirtyDomains?: boolean; force?: boolean } = {}
 ) {
+  const startedAt = Date.now()
   let enabledDomains: AutoDataSyncDomain[] = []
 
   try {
@@ -1896,6 +1985,13 @@ async function checkRemoteAutoDataSync(
       lastError: error instanceof Error ? error.message : 'Failed to check remote sync metadata',
       lastFailedAt: Date.now(),
       affectedDomains: enabledDomains,
+    })
+  } finally {
+    recordSyncTiming('metaCheck', startedAt, {
+      reason,
+      phase: state.phase,
+      status: state.status,
+      enabledDomains,
     })
   }
 }
@@ -2452,10 +2548,82 @@ async function downloadAutoDataSyncRemoteFileContent(
   }
 }
 
+async function getAutoDataSyncMetaCacheKey(
+  store: Store,
+  provider: AutoDataSyncProvider,
+): Promise<string> {
+  if (provider === 'cloudFolder') {
+    const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+    return JSON.stringify([
+      provider,
+      config?.provider || 'folder',
+      config?.path || '',
+      config?.oneDriveClientId || '',
+      config?.oneDriveRootId || '',
+    ])
+  }
+  if (provider === 's3') {
+    const config = await store.get<S3Config>('s3SyncConfig')
+    return JSON.stringify([
+      provider,
+      config?.endpoint || '',
+      config?.region || '',
+      config?.bucket || '',
+      config?.pathPrefix || '',
+    ])
+  }
+  if (provider === 'webdav') {
+    const config = await store.get<WebDAVConfig>('webdavSyncConfig')
+    return JSON.stringify([provider, config?.url || '', config?.pathPrefix || ''])
+  }
+  return JSON.stringify([provider, await getDataSyncRepoName(provider)])
+}
+
+async function cacheAutoDataSyncMeta(
+  store: Store,
+  provider: AutoDataSyncProvider,
+  value: AutoDataSyncRemoteMeta | null,
+): Promise<void> {
+  remoteMetaCache.set(await getAutoDataSyncMetaCacheKey(store, provider), {
+    value,
+    cachedAt: Date.now(),
+  })
+}
+
 async function downloadAutoDataSyncMeta(
+  store: Store,
+  provider: AutoDataSyncProvider,
+): Promise<AutoDataSyncRemoteMeta | null> {
+  const cacheKey = await getAutoDataSyncMetaCacheKey(store, provider)
+  const cached = remoteMetaCache.get(cacheKey)
+  if (cached && Date.now() - cached.cachedAt < AUTO_DATA_SYNC_META_CACHE_TTL) {
+    debugAutoDataSync('remote meta cache hit', { provider })
+    return cached.value
+  }
+
+  const pending = remoteMetaRequests.get(cacheKey)
+  if (pending) {
+    debugAutoDataSync('remote meta request joined', { provider })
+    return pending
+  }
+
+  const request = downloadAutoDataSyncMetaUncached(store, provider)
+    .then((value) => {
+      remoteMetaCache.set(cacheKey, { value, cachedAt: Date.now() })
+      return value
+    })
+    .finally(() => {
+      remoteMetaRequests.delete(cacheKey)
+    })
+  remoteMetaRequests.set(cacheKey, request)
+  return request
+}
+
+async function downloadAutoDataSyncMetaUncached(
   store: Store,
   provider: AutoDataSyncProvider
 ): Promise<AutoDataSyncRemoteMeta | null> {
+  const startedAt = Date.now()
   let content: string | null = null
 
   switch (provider) {
@@ -2516,7 +2684,13 @@ async function downloadAutoDataSyncMeta(
     }
   }
 
-  return parseAutoDataSyncMeta(content)
+  const metadata = parseAutoDataSyncMeta(content)
+  recordSyncTiming('metaDownload', startedAt, {
+    provider,
+    found: Boolean(metadata),
+    bytes: content ? new TextEncoder().encode(content).byteLength : 0,
+  })
+  return metadata
 }
 
 function decodeRemoteGitFileContent(file: unknown, path: string): string | null {

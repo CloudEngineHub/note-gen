@@ -57,7 +57,7 @@
     "iOS": {
       "bundleVersion": "0.33.0",
       "developmentTeam": "RGZC4ZTJMU",
-      "template": "ios-project.yml"
+      "template": "src-tauri/ios-project.yml"
     },
     "macOS": {
       "minimumSystemVersion": "10.13",

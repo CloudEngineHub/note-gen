@@ -8,7 +8,7 @@ import { GiteaDirectoryItem } from '@/lib/sync/gitea.types'
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { s3ListObjects } from '@/lib/sync/s3'
 import { webdavListObjects } from '@/lib/sync/webdav'
-import { androidCloudFolderWorkspaceList, type CloudFolderObject } from '@/lib/sync/cloud-folder'
+import { androidCloudFolderWorkspaceList, supportsCloudFolderWorkspace, type CloudFolderObject } from '@/lib/sync/cloud-folder'
 import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import { hasNetworkConnection, ensureDirectoryExists, pullRemoteFile, saveLocalFile } from '@/lib/sync/auto-sync'
 import { isSyncConfigured, syncOnOpen } from '@/lib/sync/sync-manager'
@@ -16,7 +16,6 @@ import { sanitizeFilePath, hasInvalidFileNameChars } from '@/lib/sync/filename-u
 import { getCurrentFolder, computedParentPath } from '@/lib/path'
 import useVectorStore from './vector'
 import { join, appDataDir } from '@tauri-apps/api/path'
-import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { BaseDirectory, DirEntry, exists, mkdir, readDir, readTextFile, writeTextFile, stat } from '@tauri-apps/plugin-fs'
 import { Store } from '@tauri-apps/plugin-store'
 import { cloneDeep, uniq } from 'lodash-es'
@@ -1568,24 +1567,22 @@ const useArticleStore = create<NoteState>((set, get) => ({
     )
     if (!await canApplyFileTreeRequest(requestContext)) return
 
-    // Android OneDrive 先恢复上次成功获取的远程清单，让文件树无需等待网络即可展示。
+    // OneDrive 先恢复上次成功获取的远程清单，让文件树无需等待网络即可展示。
     // 随后的后台刷新会用最新结果覆盖缓存，并清理已经从远端移除的纯远程节点。
-    if (getRuntimePlatform() === 'android') {
-      const syncContext = await getCurrentSyncContext()
-      if (syncContext.provider === 'cloudFolder') {
-        const syncTargetKey = getRemoteSyncTargetKey(syncContext)
-        const store = await getStore()
-        const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-        if (cloudFolderConfig?.provider === 'oneDrive' && cloudFolderConfig.path) {
-          const cacheTargetKey = getCloudFolderTreeCacheTargetKey(syncTargetKey, cloudFolderConfig)
-          const cachedRemoteFiles = await readCloudFolderTreeCache(cacheTargetKey)
-          if (cachedRemoteFiles && await canApplyFileTreeRequest(requestContext)) {
-            mergeCloudFolderSnapshotIntoTree(
-              cachedRemoteFiles,
-              buildRemotePathsToLoad(collapsibleList),
-              sortedDirs,
-            )
-          }
+    const syncContext = await getCurrentSyncContext()
+    if (syncContext.provider === 'cloudFolder') {
+      const syncTargetKey = getRemoteSyncTargetKey(syncContext)
+      const store = await getStore()
+      const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
+      if (cloudFolderConfig?.provider === 'oneDrive' && cloudFolderConfig.path) {
+        const cacheTargetKey = getCloudFolderTreeCacheTargetKey(syncTargetKey, cloudFolderConfig)
+        const cachedRemoteFiles = await readCloudFolderTreeCache(cacheTargetKey)
+        if (cachedRemoteFiles && await canApplyFileTreeRequest(requestContext)) {
+          mergeCloudFolderSnapshotIntoTree(
+            cachedRemoteFiles,
+            buildRemotePathsToLoad(collapsibleList),
+            sortedDirs,
+          )
         }
       }
     }
@@ -1654,9 +1651,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
           return
         }
       } else if (primaryBackupMethod === 'cloudFolder') {
-        if (getRuntimePlatform() !== 'android') return
         const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-        if (!cloudFolderConfig?.path) return
+        if (!cloudFolderConfig?.path || !supportsCloudFolderWorkspace(cloudFolderConfig)) return
       }
 
     // 为根目录和已展开的目录加载远程文件。
@@ -2054,9 +2050,8 @@ const useArticleStore = create<NoteState>((set, get) => ({
       const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
       if (!webdavConfig || !webdavConfig.url || !webdavConfig.username || !webdavConfig.password) return
     } else if (primaryBackupMethod === 'cloudFolder') {
-      if (getRuntimePlatform() !== 'android') return
       const cloudFolderConfig = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-      if (!cloudFolderConfig?.path) return
+      if (!cloudFolderConfig?.path || !supportsCloudFolderWorkspace(cloudFolderConfig)) return
     }
 
     // loading 只表示真实的远程目录请求。本地目录扫描（包括搜索第一阶段）

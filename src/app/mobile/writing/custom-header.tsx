@@ -50,8 +50,8 @@ function shouldLoadRemoteOnTreeRefresh(options?: { isCreateFlow?: boolean }) {
   return options?.isCreateFlow !== true
 }
 
-async function isAndroidOneDriveSyncEnabled() {
-  if (getRuntimePlatform() !== 'android') return false
+async function isMobileOneDriveSyncEnabled() {
+  if (getRuntimePlatform() !== 'android' && getRuntimePlatform() !== 'ios') return false
   const store = await Store.load('store.json')
   if (await store.get<string>('primaryBackupMethod') !== 'cloudFolder') return false
   const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
@@ -516,7 +516,7 @@ export function WritingHeader() {
     }
 
     const startOneDriveRefresh = async () => {
-      if (!await isAndroidOneDriveSyncEnabled() || !active) return
+      if (!await isMobileOneDriveSyncEnabled() || !active) return
       timer = window.setInterval(() => void refreshRemoteInBackground(), 15_000)
       document.addEventListener('visibilitychange', handleVisibilityChange)
     }
