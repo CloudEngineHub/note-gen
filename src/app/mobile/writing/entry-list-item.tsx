@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useRef, useState } from 'react'
+import { ReactNode, useRef } from 'react'
 import { FileText, Folder, LoaderCircle, MoreVertical } from 'lucide-react'
 import { BrowserEntry } from './types'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
@@ -55,18 +55,13 @@ export function EntryListItem({
 }: EntryListItemProps) {
   const touchStartXRef = useRef(0)
   const touchStartYRef = useRef(0)
-  const isSwipingRef = useRef(false)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDraggingRef = useRef(false)
   const suppressClickRef = useRef(false)
-  const [translateX, setTranslateX] = useState(0)
-  const [opened, setOpened] = useState(false)
 
-  const quickActions = actions.filter((action) => action.key === 'rename' || action.key === 'delete')
-  const actionWidth = quickActions.length * 60
   const itemTransform = isDragging && dragOffset
     ? `translate(${dragOffset.x}px, ${dragOffset.y}px)`
-    : `translateX(${translateX}px)`
+    : undefined
 
   function clearLongPressTimer() {
     if (!longPressTimerRef.current) return
@@ -78,15 +73,12 @@ export function EntryListItem({
     const touch = e.touches[0]
     touchStartXRef.current = touch.clientX
     touchStartYRef.current = touch.clientY
-    isSwipingRef.current = false
 
-    if (!dragDisabled && !opened) {
+    if (!dragDisabled) {
       clearLongPressTimer()
       longPressTimerRef.current = setTimeout(() => {
         isDraggingRef.current = true
         suppressClickRef.current = true
-        setOpened(false)
-        setTranslateX(0)
         onDragStart?.(entry, { x: touch.clientX, y: touch.clientY })
       }, 350)
     }
@@ -106,20 +98,6 @@ export function EntryListItem({
     if (Math.hypot(deltaX, deltaY) > 10) {
       clearLongPressTimer()
     }
-
-    if (quickActions.length === 0) return
-
-    if (!isSwipingRef.current) {
-      if (Math.abs(deltaX) < 8) return
-      if (Math.abs(deltaX) <= Math.abs(deltaY)) return
-      isSwipingRef.current = true
-    }
-
-    e.preventDefault()
-    const maxLeft = -actionWidth
-    const base = opened ? maxLeft : 0
-    const next = Math.max(maxLeft, Math.min(0, base + deltaX))
-    setTranslateX(next)
   }
 
   function handleTouchEnd(e: React.TouchEvent<HTMLDivElement>) {
@@ -131,15 +109,7 @@ export function EntryListItem({
       window.setTimeout(() => {
         suppressClickRef.current = false
       }, 0)
-      return
     }
-
-    if (quickActions.length === 0) return
-    const maxLeft = -actionWidth
-    const shouldOpen = translateX < maxLeft / 2
-    setOpened(shouldOpen)
-    setTranslateX(shouldOpen ? maxLeft : 0)
-    isSwipingRef.current = false
   }
 
   function handleTouchCancel() {
@@ -148,7 +118,6 @@ export function EntryListItem({
       onDragCancel?.()
     }
     isDraggingRef.current = false
-    isSwipingRef.current = false
     window.setTimeout(() => {
       suppressClickRef.current = false
     }, 0)
@@ -163,35 +132,6 @@ export function EntryListItem({
         isDropTarget && "outline-2 outline-primary outline-offset-2"
       )}
     >
-      {quickActions.length > 0 && (
-        <div
-          className={cn(
-            "absolute inset-y-0 right-0 z-0 flex items-center gap-2 bg-background px-2",
-            isDragging && "hidden"
-          )}
-        >
-          {quickActions.map((action) => (
-            <Button
-              key={action.key}
-              type="button"
-              variant={action.variant || 'outline'}
-              disabled={action.disabled}
-              size="icon"
-              className="size-11 rounded-xl shadow-sm"
-              onClick={async () => {
-                setOpened(false)
-                setTranslateX(0)
-                await action.onClick()
-              }}
-              aria-label={action.label}
-              title={action.label}
-            >
-              {action.icon}
-              <span className="sr-only">{action.label}</span>
-            </Button>
-          ))}
-        </div>
-      )}
       <div
         className={cn(
           "relative z-10 min-h-11 w-full rounded-md bg-background px-2 py-1.5 text-left transition-transform duration-200 ease-out hover:bg-accent active:bg-accent",
@@ -211,11 +151,6 @@ export function EntryListItem({
             onClick={() => {
               if (suppressClickRef.current) {
                 suppressClickRef.current = false
-                return
-              }
-              if (opened) {
-                setOpened(false)
-                setTranslateX(0)
                 return
               }
               onOpen(entry)

@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { MobileActionDrawer } from '@/app/mobile/components/mobile-action-drawer'
 import { MobileMeSheet } from '@/app/mobile/components/mobile-me-sheet'
-import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle, ImageIcon } from 'lucide-react'
+import { ArrowDown, Trash2, MoveRight, CheckSquare, Filter, Plus, ListChecks, RotateCcw, Search, ChevronDown, XCircle, ImageIcon, MoreVertical } from 'lucide-react'
 import { filterMarks, getTrashRecordFilters } from '@/app/core/main/mark/mark-filters'
 import { getMarkTypeChipClasses, getMarkTypeListBadgeClasses, MARK_TYPE_OPTIONS } from '@/app/core/main/mark/mark-type-meta'
 import useMarkStore, { RecordTimePreset } from '@/stores/mark'
@@ -84,12 +84,6 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
   const [typeFilterOpen, setTypeFilterOpen] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [moveTargetMark, setMoveTargetMark] = useState<Mark | null>(null)
-  const touchStartXRef = useRef(0)
-  const touchStartYRef = useRef(0)
-  const isSwipingRef = useRef(false)
-  const swipingMarkIdRef = useRef<number | null>(null)
-  const [swipedMarkId, setSwipedMarkId] = useState<number | null>(null)
-  const [swipeDeltaX, setSwipeDeltaX] = useState(0)
   const [pullDistance, setPullDistance] = useState(0)
   const [isPullRefreshing, setIsPullRefreshing] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -394,56 +388,10 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
     await refreshRecords()
   }
 
-  function getActionWidth() {
-    return 120
-  }
-
-  function handleItemTouchStart(e: React.TouchEvent, markId: number) {
-    if (multiMode) return
-    const touch = e.touches[0]
-    touchStartXRef.current = touch.clientX
-    touchStartYRef.current = touch.clientY
-    isSwipingRef.current = false
-    swipingMarkIdRef.current = markId
-    if (swipedMarkId !== markId) {
-      setSwipedMarkId(null)
-    }
-  }
-
-  function handleItemTouchMove(e: React.TouchEvent) {
-    if (multiMode || swipingMarkIdRef.current === null) return
-    const touch = e.touches[0]
-    const deltaX = touch.clientX - touchStartXRef.current
-    const deltaY = touch.clientY - touchStartYRef.current
-
-    if (!isSwipingRef.current) {
-      if (Math.abs(deltaX) < 8) return
-      if (Math.abs(deltaX) <= Math.abs(deltaY)) return
-      isSwipingRef.current = true
-    }
-
-    e.preventDefault()
-    const maxLeft = -getActionWidth()
-    const next = Math.max(maxLeft, Math.min(0, deltaX))
-    setSwipeDeltaX(next)
-  }
-
-  function handleItemTouchEnd() {
-    if (multiMode || swipingMarkIdRef.current === null) return
-    const id = swipingMarkIdRef.current
-    const maxLeft = -getActionWidth()
-    const shouldOpen = swipeDeltaX < maxLeft / 2
-    setSwipedMarkId(shouldOpen ? id : null)
-    setSwipeDeltaX(0)
-    isSwipingRef.current = false
-    swipingMarkIdRef.current = null
-  }
-
   async function handleMoveTargetTag(targetTagId: number) {
     if (!moveTargetMark) return
     await handleMove(moveTargetMark, targetTagId)
     setMoveTargetMark(null)
-    setSwipedMarkId(null)
   }
 
   async function handleDeleteSelected() {
@@ -686,102 +634,20 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
             <div key={group.day} className="mb-4">
               <div className="mb-2 text-xs font-medium text-muted-foreground">{getDayLabel(group.day)}</div>
               <div className="space-y-2">
-                {group.list.map((mark) => {
-                  const actionWidth = getActionWidth()
-                  const isCurrentSwiping = swipingMarkIdRef.current === mark.id
-                  const translateX = isCurrentSwiping
-                    ? swipeDeltaX
-                    : swipedMarkId === mark.id
-                      ? -actionWidth
-                      : 0
-
-                  return (
+                {group.list.map((mark) => (
                     <div
                       key={mark.id}
                       data-mobile-mark-id={mark.id}
                       className={cn(
-                        "relative overflow-hidden rounded-xl bg-background transition-colors",
+                        "rounded-xl bg-background transition-colors",
                         highlightedMarkId === mark.id && "record-search-highlight"
                       )}
                     >
-                      {!multiMode && (
-                        <div className="absolute inset-y-0 right-0 z-0 flex items-center gap-2 bg-background px-2">
-                          {trashState ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="size-11 rounded-xl shadow-sm"
-                                onClick={() => {
-                                  handleRestore(mark)
-                                  setSwipedMarkId(null)
-                                }}
-                                title={t('record.mark.toolbar.restore')}
-                                aria-label={t('record.mark.toolbar.restore')}
-                              >
-                                <RotateCcw className="size-4" />
-                                <span className="sr-only">{t('record.mark.toolbar.restore')}</span>
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="size-11 rounded-xl shadow-sm"
-                                onClick={() => {
-                                  handleDelete(mark)
-                                  setSwipedMarkId(null)
-                                }}
-                                title={t('record.mark.toolbar.deleteForever')}
-                                aria-label={t('record.mark.toolbar.deleteForever')}
-                              >
-                                <Trash2 className="size-4" />
-                                <span className="sr-only">{t('record.mark.toolbar.deleteForever')}</span>
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="size-11 rounded-xl shadow-sm"
-                                disabled={!canMoveBetweenTags}
-                                onClick={() => {
-                                  setMoveTargetMark(mark)
-                                  setSwipedMarkId(null)
-                                }}
-                                title={t('record.mark.toolbar.moveTag')}
-                                aria-label={t('record.mark.toolbar.moveTag')}
-                              >
-                                <MoveRight className="size-4" />
-                                <span className="sr-only">{t('record.mark.toolbar.moveTag')}</span>
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="size-11 rounded-xl shadow-sm"
-                                onClick={() => {
-                                  handleDelete(mark)
-                                  setSwipedMarkId(null)
-                                }}
-                                title={t('record.mark.toolbar.delete')}
-                                aria-label={t('record.mark.toolbar.delete')}
-                              >
-                                <Trash2 className="size-4" />
-                                <span className="sr-only">{t('record.mark.toolbar.delete')}</span>
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
                       <div
                         className={cn(
-                          "relative z-10 rounded-xl border bg-background px-3 py-3 transition-transform duration-200 ease-out",
+                          "rounded-xl border bg-background px-3 py-3",
                           highlightedMarkId === mark.id && "border-primary/30 shadow-sm"
                         )}
-                        style={{ transform: `translateX(${translateX}px)` }}
-                        onTouchStart={(e) => handleItemTouchStart(e, mark.id)}
-                        onTouchMove={handleItemTouchMove}
-                        onTouchEnd={handleItemTouchEnd}
                       >
                         <div className="flex items-start gap-2">
                           {multiMode ? (
@@ -793,13 +659,7 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
                           <button
                             type="button"
                             className="min-w-0 flex-1 text-left"
-                            onClick={() => {
-                              if (swipedMarkId === mark.id) {
-                                setSwipedMarkId(null)
-                                return
-                              }
-                              router.push(`/mobile/record/detail?id=${mark.id}`)
-                            }}
+                            onClick={() => router.push(`/mobile/record/detail?id=${mark.id}`)}
                           >
                             <div className="flex items-center gap-2">
                               <span className={cn(getMarkTypeListBadgeClasses(mark.type), 'shrink-0 text-[10px]')}>
@@ -826,10 +686,60 @@ export function MobileRecordStream({ preview = false }: MobileRecordStreamProps 
                               <p className="mt-2 line-clamp-2 text-sm">{getMarkPreview(mark) || '-'}</p>
                             )}
                           </button>
+                          {!multiMode ? (
+                            <MobileActionDrawer
+                              title={getMarkPreview(mark) || t(`record.mark.type.${mark.type}`)}
+                              trigger={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="size-9 shrink-0"
+                                  aria-label={t('record.mark.toolbar.more')}
+                                  title={t('record.mark.toolbar.more')}
+                                  data-vaul-no-drag
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              }
+                              items={trashState ? [
+                                {
+                                  key: 'restore',
+                                  label: t('record.mark.toolbar.restore'),
+                                  icon: <RotateCcw data-icon="inline-start" />,
+                                  onSelect: () => handleRestore(mark),
+                                },
+                                {
+                                  key: 'delete-forever',
+                                  label: t('record.mark.toolbar.deleteForever'),
+                                  icon: <Trash2 data-icon="inline-start" />,
+                                  onSelect: () => handleDelete(mark),
+                                  destructive: true,
+                                  separatorBefore: true,
+                                },
+                              ] : [
+                                {
+                                  key: 'move-tag',
+                                  label: t('record.mark.toolbar.moveTag'),
+                                  icon: <MoveRight data-icon="inline-start" />,
+                                  onSelect: () => setMoveTargetMark(mark),
+                                  disabled: !canMoveBetweenTags,
+                                },
+                                {
+                                  key: 'delete',
+                                  label: t('record.mark.toolbar.delete'),
+                                  icon: <Trash2 data-icon="inline-start" />,
+                                  onSelect: () => handleDelete(mark),
+                                  destructive: true,
+                                  separatorBefore: true,
+                                },
+                              ]}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     </div>
-                  )})}
+                  ))}
               </div>
             </div>
           ))
