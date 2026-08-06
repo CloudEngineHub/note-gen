@@ -28,6 +28,13 @@ export interface LocalizedCaptureImages {
   failedCount: number
 }
 
+export interface CachedRecordImage {
+  bytes: Uint8Array
+  extension: string
+  filename: string
+  imagePath: string
+}
+
 interface DownloadedImage {
   bytes: Uint8Array
   extension: string
@@ -168,6 +175,24 @@ export async function removeLinkAssetGroup(assetGroupId: string) {
     })
   } catch {
     // The directory may not have been created if every image download failed.
+  }
+}
+
+export async function cacheCapturedRecordImage(
+  sourceUrl: string,
+  referer: string,
+  recordId: string
+): Promise<CachedRecordImage> {
+  const safeRecordId = assertAssetGroupId(recordId)
+  const image = await downloadImage(sourceUrl, referer)
+  const filename = `${safeRecordId}.${image.extension}`
+  const imagePath = `image/${filename}`
+  await mkdir('image', { baseDir: BaseDirectory.AppData, recursive: true })
+  await writeFile(imagePath, image.bytes, { baseDir: BaseDirectory.AppData })
+  return {
+    ...image,
+    filename,
+    imagePath,
   }
 }
 

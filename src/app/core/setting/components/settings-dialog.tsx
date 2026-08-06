@@ -81,12 +81,14 @@ export function SettingsDialog() {
     const storedSection =
       lastSettingPage === 'dev' || lastSettingPage === 'chat'
         ? 'general'
-        : lastSettingPage
+        : lastSettingPage === 'webClipper'
+          ? 'record'
+          : lastSettingPage
     if (settingSections.includes(storedSection as SettingSection)) {
       setActiveSection(storedSection as SettingSection)
     }
-    if (lastSettingPage === 'dev' || lastSettingPage === 'chat') {
-      setLastSettingPage('general')
+    if (lastSettingPage === 'dev' || lastSettingPage === 'chat' || lastSettingPage === 'webClipper') {
+      setLastSettingPage(lastSettingPage === 'webClipper' ? 'record' : 'general')
     }
   }, [lastSettingPage, open, setActiveSection, setLastSettingPage])
 

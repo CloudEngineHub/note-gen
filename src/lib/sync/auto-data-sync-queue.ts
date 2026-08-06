@@ -277,7 +277,8 @@ function mergeTags(localTags: Tag[], remoteTags: Tag[]): TagMergeResult {
 }
 
 function marksShareCoreIdentity(left: Mark, right: Mark): boolean {
-  return left.tagId === right.tagId &&
+  return (left.sourceId || '') === (right.sourceId || '') &&
+    left.tagId === right.tagId &&
     left.type === right.type &&
     (left.content || '') === (right.content || '') &&
     (left.desc || '') === (right.desc || '') &&
@@ -291,6 +292,7 @@ function getMarkExactKey(mark: Mark): string {
     mark.content || '',
     mark.desc || '',
     mark.url || '',
+    mark.sourceId || '',
     mark.deleted,
     mark.createdAt,
   ])
@@ -304,6 +306,7 @@ function getMarkSyncKey(mark: Mark): string {
     mark.content || '',
     mark.desc || '',
     mark.url || '',
+    mark.sourceId || '',
     Number(mark.deleted) || 0,
     mark.createdAt,
   ])
@@ -342,17 +345,33 @@ function mergeMarksById(
 ): Mark[] {
   const merged = new Map<number, Mark>()
   const exactKeyToId = new Map<string, number>()
+  const sourceIdToId = new Map<string, number>()
   let maxId = Math.max(0, ...localMarks.map(mark => mark.id))
 
   for (const mark of localMarks) {
     merged.set(mark.id, mark)
     exactKeyToId.set(getMarkExactKey(mark), mark.id)
+    if (mark.sourceId) sourceIdToId.set(mark.sourceId, mark.id)
   }
 
   for (const remoteMark of remoteMarks) {
     const normalizedRemoteMark = {
       ...remoteMark,
       tagId: remoteTagIdMap.get(remoteMark.tagId) ?? remoteMark.tagId,
+    }
+    const sourceDuplicateId = normalizedRemoteMark.sourceId
+      ? sourceIdToId.get(normalizedRemoteMark.sourceId)
+      : undefined
+    if (sourceDuplicateId !== undefined) {
+      const existingSourceMark = merged.get(sourceDuplicateId)
+      if (existingSourceMark) {
+        const nextMark = normalizedRemoteMark.createdAt >= existingSourceMark.createdAt
+          ? { ...normalizedRemoteMark, id: sourceDuplicateId }
+          : existingSourceMark
+        merged.set(sourceDuplicateId, nextMark)
+        exactKeyToId.set(getMarkExactKey(nextMark), sourceDuplicateId)
+        continue
+      }
     }
     const exactDuplicateId = exactKeyToId.get(getMarkExactKey(normalizedRemoteMark))
     if (exactDuplicateId !== undefined) {
@@ -364,6 +383,7 @@ function mergeMarksById(
     if (!localMark) {
       merged.set(normalizedRemoteMark.id, normalizedRemoteMark)
       exactKeyToId.set(getMarkExactKey(normalizedRemoteMark), normalizedRemoteMark.id)
+      if (normalizedRemoteMark.sourceId) sourceIdToId.set(normalizedRemoteMark.sourceId, normalizedRemoteMark.id)
       maxId = Math.max(maxId, normalizedRemoteMark.id)
       continue
     }
@@ -382,6 +402,7 @@ function mergeMarksById(
     }
     merged.set(maxId, remappedRemoteMark)
     exactKeyToId.set(getMarkExactKey(remappedRemoteMark), maxId)
+    if (remappedRemoteMark.sourceId) sourceIdToId.set(remappedRemoteMark.sourceId, maxId)
   }
 
   return Array.from(merged.values())

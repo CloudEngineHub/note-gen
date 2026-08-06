@@ -7,9 +7,11 @@ import { DefaultModelsSettings } from '../components/default-models-settings'
 import { ToolbarSettings } from './toolbar-settings'
 import { DisplaySettings } from './display-settings'
 import { SaveSettings } from './save-settings'
+import { WebClipperSettings } from './web-clipper-settings'
 
 export default function RecordSettingPage() {
   const t = useTranslations('settings.record')
+  const webClipperT = useTranslations('settings.webClipper')
 
   return (
     <SettingType
@@ -25,6 +27,9 @@ export default function RecordSettingPage() {
         </SettingSection>
         <SettingSection title={t('save.title')} desc={t('save.desc')}>
           <SaveSettings />
+        </SettingSection>
+        <SettingSection title={webClipperT('title')} desc={webClipperT('desc')}>
+          <WebClipperSettings />
         </SettingSection>
         <ToolbarSettings />
       </div>

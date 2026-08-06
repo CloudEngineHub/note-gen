@@ -27,6 +27,7 @@ mod skills;
 mod storefront;
 mod system_trash;
 mod tray;
+mod web_clipper;
 mod window;
 
 use ai::{
@@ -66,6 +67,11 @@ use skills::{
     import_skill, import_skill_zip, install_skill_package, uninstall_skill, validate_skill_package,
 };
 use tray::update_tray_record_toolbar_config;
+use web_clipper::{
+    approve_web_clipper_pairing, get_web_clipper_status, list_web_clipper_connections,
+    reject_web_clipper_pairing, resolve_web_clipper_request, revoke_web_clipper_connection,
+    set_web_clipper_enabled, set_web_clipper_ready, WebClipperState,
+};
 
 fn main() {
     tauri::Builder::default()
@@ -73,6 +79,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(
             window::handle_single_instance,
         ))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
         // 核心插件
         .plugin(tauri_plugin_fs::init())
@@ -85,6 +92,7 @@ fn main() {
         .manage(AiRequestManager::new())
         .manage(SkillProcessManager::default())
         .manage(RemoteSkillManager::default())
+        .manage(WebClipperState::new())
         // 系统级插件
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
@@ -154,6 +162,14 @@ fn main() {
             printing::print_webview,
             file_open::drain_pending_open_files,
             system_trash::move_paths_to_trash,
+            approve_web_clipper_pairing,
+            reject_web_clipper_pairing,
+            get_web_clipper_status,
+            list_web_clipper_connections,
+            revoke_web_clipper_connection,
+            set_web_clipper_enabled,
+            set_web_clipper_ready,
+            resolve_web_clipper_request,
         ])
         // 应用设置 - 在所有插件和命令注册后
         .setup(app_setup::setup_app)

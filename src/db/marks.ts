@@ -21,7 +21,10 @@ export interface Mark {
   url: string
   deleted: 0 | 1
   createdAt: number
+  sourceId?: string | null
 }
+
+const MARK_COLUMNS = 'id, tagId, type, content, url, desc, deleted, createdAt, sourceId'
 
 async function deleteMarkLocalAsset(assetPath: string) {
   const fileExists = await exists(assetPath, { baseDir: BaseDirectory.AppData })
@@ -96,25 +99,12 @@ export async function initMarksDb() {
   if (isTempScreenshotDirExist) {
     await remove('temp_screenshot', { baseDir: BaseDirectory.AppData, recursive: true })
   }
-  const db = await getDb()
-  await db.execute(`
-    create table if not exists marks (
-      id integer primary key autoincrement,
-      tagId integer not null,
-      type text not null,
-      content text default null,
-      url text default null,
-      desc text default null,
-      deleted integer default 0,
-      createdAt integer
-    )
-  `)
 }
 
 export async function getMarks(id: number) {
   const db = await getDb();
   // 根据 tagId 获取 marks，根据 createdAt 倒序
-  return await db.select<Mark[]>("select * from marks where tagId = $1 order by createdAt desc", [id])
+  return await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where tagId = $1 order by createdAt desc`, [id])
 }
 
 export async function getMarkPreviews(id: number) {
@@ -155,7 +145,7 @@ export async function getTrashMarkPreviews() {
 
 export async function getMarkById(id: number) {
   const db = await getDb()
-  const marks = await db.select<Mark[]>("select * from marks where id = $1", [id])
+  const marks = await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where id = $1`, [id])
   return marks[0]
 }
 
@@ -172,8 +162,8 @@ export async function insertMark(mark: Partial<Mark>) {
   const db = await getDb();
   const createdAt = Date.now();
   const result = await db.execute(
-    "insert into marks (tagId, type, content, url, desc, createdAt, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
-    [mark.tagId, mark.type,  mark.content, mark.url, mark.desc, createdAt, 0]
+    "insert into marks (tagId, type, content, url, desc, createdAt, deleted, sourceId) values ($1, $2, $3, $4, $5, $6, $7, $8)",
+    [mark.tagId, mark.type, mark.content, mark.url, mark.desc, createdAt, 0, mark.sourceId ?? null]
   )
 
   const localImagePath = mark.type && mark.url
@@ -200,9 +190,32 @@ export async function insertMark(mark: Partial<Mark>) {
   return result
 }
 
+export async function insertExternalMark(mark: Partial<Mark> & { sourceId: string }) {
+  const db = await getDb()
+  const existing = await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where sourceId = $1 limit 1`, [mark.sourceId])
+  if (existing[0]) {
+    return { mark: existing[0], duplicate: true }
+  }
+
+  try {
+    const result = await insertMark(mark)
+    const inserted = result.lastInsertId ? await getMarkById(result.lastInsertId) : undefined
+    if (!inserted) {
+      throw new Error('Failed to load the saved external record')
+    }
+    return { mark: inserted, duplicate: false }
+  } catch (error) {
+    const duplicate = await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where sourceId = $1 limit 1`, [mark.sourceId])
+    if (duplicate[0]) {
+      return { mark: duplicate[0], duplicate: true }
+    }
+    throw error
+  }
+}
+
 export async function getAllMarks() {
   const db = await getDb();
-  return await db.select<Mark[]>("select * from marks order by createdAt desc")
+  return await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks order by createdAt desc`)
 }
 
 export async function updateMark(mark: Mark) {
@@ -241,7 +254,7 @@ export async function restoreMark(id: number) {
 export async function delMark(id: number) {
   const db = await getDb();
   // 判断有没有 deleted 列，没有就添加
-  const res = await db.select<Mark[]>("select * from marks where id = $1", [id])
+  const res = await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where id = $1`, [id])
   if (res[0].deleted === undefined) {
     await db.execute("alter table marks add column deleted integer default 0")
   }
@@ -268,25 +281,25 @@ export async function insertMarks(marks: Partial<Mark>[]) {
   try {
     for (const mark of marks) {
       if (mark.id) {
-        const exists = await db.select<Mark[]>("select * from marks where id = $1", [mark.id])
+        const exists = await db.select<Mark[]>(`select ${MARK_COLUMNS} from marks where id = $1`, [mark.id])
         if (exists.length > 0) {
           await db.execute(
-            "update marks set tagId = $1, type = $2, content = $3, url = $4, desc = $5, createdAt = $6, deleted = $7 where id = $8",
-            [mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted, mark.id]
+            "update marks set tagId = $1, type = $2, content = $3, url = $4, desc = $5, createdAt = $6, deleted = $7, sourceId = $8 where id = $9",
+            [mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted, mark.sourceId ?? null, mark.id]
           );
           continue
         }
 
         await db.execute(
-          "insert into marks (id, tagId, type, content, url, desc, createdAt, deleted) values ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [mark.id, mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted]
+          "insert into marks (id, tagId, type, content, url, desc, createdAt, deleted, sourceId) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          [mark.id, mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted, mark.sourceId ?? null]
         );
         continue
       }
 
       await db.execute(
-        "insert into marks (tagId, type, content, url, desc, createdAt, deleted) values ($1, $2, $3, $4, $5, $6, $7)",
-        [mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted]
+        "insert into marks (tagId, type, content, url, desc, createdAt, deleted, sourceId) values ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [mark.tagId, mark.type, mark.content, mark.url, mark.desc, mark.createdAt, mark.deleted, mark.sourceId ?? null]
       );
     }
     enqueueRecordsAutoSync('mark:bulk-insert')

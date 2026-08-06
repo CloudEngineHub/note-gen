@@ -1,6 +1,7 @@
 use crate::file_open;
 use crate::screenshot::cleanup_temp_screenshot_dir;
 use crate::tray::create_tray;
+use crate::web_clipper;
 use crate::window;
 use tauri::App;
 #[cfg(target_os = "windows")]
@@ -27,6 +28,8 @@ pub fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let _tray = create_tray(&app_handle)?;
 
     file_open::handle_initial_open_files(&app_handle);
+
+    web_clipper::start_server(&app_handle);
 
     Ok(())
 }

@@ -4,6 +4,29 @@ import Database from '@tauri-apps/plugin-sql';
 // 导出数据库实例
 export const db = await Database.load('sqlite:note.db');
 
+// Core schema migrations must finish before this module exports. The desktop layout
+// renders children while its initialization effect is still running, so altering a
+// table later can invalidate SQLx's cached `select *` metadata on another query.
+await db.execute(`
+  create table if not exists marks (
+    id integer primary key autoincrement,
+    tagId integer not null,
+    type text not null,
+    content text default null,
+    url text default null,
+    desc text default null,
+    deleted integer default 0,
+    createdAt integer,
+    sourceId text default null
+  )
+`)
+try {
+  await db.select('select sourceId from marks limit 1')
+} catch {
+  await db.execute('alter table marks add column sourceId text default null')
+}
+await db.execute('create unique index if not exists idx_marks_source_id on marks(sourceId) where sourceId is not null')
+
 // 获取数据库实例(兼容旧代码)
 export async function getDb() {
   return db;
