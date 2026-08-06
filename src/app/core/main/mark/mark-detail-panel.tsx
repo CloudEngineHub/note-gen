@@ -56,7 +56,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn, isHttpUrl } from "@/lib/utils"
 import { fetchAiDesc } from "@/lib/ai/description"
 import useMarkStore from "@/stores/mark"
@@ -984,11 +983,11 @@ function MarkDetailView({ mark, onClose }: { mark: Mark; onClose: () => void }) 
     <PhotoPreviewProvider>
       <div className="flex h-full w-full min-w-0 max-w-full flex-col overflow-hidden bg-background">
         <MarkDetailToolbar mark={mark} onClose={onClose} />
-        <ScrollArea className="min-h-0 w-full min-w-0 flex-1">
+        <div className="app-panel-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="min-w-full max-w-full overflow-hidden">
             <MarkDetailBody mark={mark} />
           </div>
-        </ScrollArea>
+        </div>
       </div>
     </PhotoPreviewProvider>
   )
