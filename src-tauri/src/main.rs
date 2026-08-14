@@ -11,6 +11,7 @@ mod backup_manager;
 mod cloud_folder_sync;
 mod database_recovery;
 mod device;
+mod document_parser;
 mod file_open;
 mod fonts;
 mod fuzzy_search;
@@ -148,6 +149,7 @@ fn main() {
             install_mcp_runtime,
             cancel_mcp_runtime_install,
             get_device_id,
+            document_parser::parse_document,
             list_system_fonts,
             analytics::track_analytics_event,
             ai_json_request,

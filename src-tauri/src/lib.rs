@@ -9,6 +9,7 @@ mod backup_manager;
 mod cloud_folder_sync;
 mod database_recovery;
 mod device;
+mod document_parser;
 mod fonts;
 #[cfg(target_os = "ios")]
 mod ios_ocr;
@@ -101,6 +102,7 @@ pub fn run() {
             install_mcp_runtime,
             cancel_mcp_runtime_install,
             get_device_id,
+            document_parser::parse_document,
             list_system_fonts,
             analytics::track_analytics_event,
             export_app_data,

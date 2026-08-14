@@ -1,10 +1,9 @@
-import { readDir, readTextFile } from '@tauri-apps/plugin-fs'
-import { extractTextFromPDF } from '@/lib/pdf'
+import { readDir } from '@tauri-apps/plugin-fs'
 import {
-  getAttachmentExtension,
   isReadableAttachmentName,
   resolveAttachmentChildPath,
 } from '@/lib/chat-attachments'
+import { parseLocalDocument } from '@/lib/document-parser'
 import type { AgentTool } from '../types'
 
 const MAX_BATCH_ATTACHMENT_CONTENT_CHARS = 8000
@@ -59,7 +58,7 @@ export const listAttachmentsTool: AgentTool = {
 export const readAttachmentTool: AgentTool = {
   name: 'attachment_read',
   title: '读取附件',
-  description: 'Read user-selected text, code, CSV, Markdown, or PDF attachments. For a folder summary, pass every relevant readable path together in relativePaths; use relativePath only when one file is sufficient. Use relative paths only.',
+  description: 'Read user-selected text, code, Markdown, PDF, Word, PowerPoint, Excel, OpenDocument, RTF, EPUB, or CSV attachments. For a folder summary, pass every relevant readable path together in relativePaths; use relativePath only when one file is sufficient. Use relative paths only.',
   category: 'attachment',
   risk: 'read',
   inputSchema: {
@@ -120,10 +119,7 @@ export const readAttachmentTool: AgentTool = {
 
       try {
         const targetPath = await resolveAttachmentChildPath(attachment, path)
-        const extension = getAttachmentExtension(displayName)
-        const content = extension === 'pdf'
-          ? await extractTextFromPDF(targetPath)
-          : await readTextFile(targetPath)
+        const content = (await parseLocalDocument(targetPath, displayName)).markdown
         const lines = content.replace(/\r\n/g, '\n').split('\n')
         const startLine = Number.isInteger(input.startLine) ? Math.max(1, Number(input.startLine)) : 1
         const endLine = Number.isInteger(input.endLine)

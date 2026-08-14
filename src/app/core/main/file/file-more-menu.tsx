@@ -14,6 +14,7 @@ import {
   EllipsisVertical,
   Eye,
   FileArchive,
+  FileOutput,
   FolderInput,
   LoaderCircle,
   PackageOpen,
@@ -45,10 +46,16 @@ import { useSettingsDialogStore } from '@/stores/settings-dialog'
 type FileMoreMenuProps = {
   isImporting: boolean
   onImportMarkdown: () => void
+  onConvertDocuments: () => void
   onImportNotion: () => void
 }
 
-export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: FileMoreMenuProps) {
+export function FileMoreMenu({
+  isImporting,
+  onImportMarkdown,
+  onConvertDocuments,
+  onImportNotion,
+}: FileMoreMenuProps) {
   const t = useTranslations('article.file.cloudLibrary')
   const tToolbar = useTranslations('article.file.toolbar')
   const tSync = useTranslations('settings.sync')
@@ -391,6 +398,10 @@ export function FileMoreMenu({ isImporting, onImportMarkdown, onImportNotion }: 
         <DropdownMenuItem onSelect={onImportMarkdown}>
           <FolderInput className="mr-2 size-4" />
           {isImporting ? tToolbar('importing') : tToolbar('importMarkdown')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onConvertDocuments}>
+          <FileOutput className="mr-2" />
+          {tToolbar('convertDocuments')}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onImportNotion}>
           <FileArchive className="mr-2 size-4" />

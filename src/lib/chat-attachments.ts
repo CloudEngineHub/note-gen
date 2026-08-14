@@ -1,5 +1,6 @@
 import { readDir, stat } from '@tauri-apps/plugin-fs'
 import { basename, join, normalize } from '@tauri-apps/api/path'
+import { getDocumentExtension, isReadableDocumentName } from '@/lib/document-parser'
 
 export type ChatAttachmentKind = 'file' | 'folder'
 
@@ -19,25 +20,15 @@ export interface RuntimeChatAttachment extends PersistedChatAttachment {
   preview?: string
 }
 
-const TEXT_EXTENSIONS = new Set([
-  'txt', 'md', 'markdown', 'csv', 'tsv', 'json', 'jsonl', 'xml', 'yaml', 'yml', 'toml', 'ini', 'conf', 'cfg',
-  'js', 'jsx', 'ts', 'tsx', 'mjs', 'mts', 'css', 'scss', 'sass', 'less', 'html', 'htm', 'vue', 'svelte',
-  'py', 'java', 'kt', 'kts', 'swift', 'c', 'h', 'cpp', 'cc', 'hpp', 'cs', 'go', 'rs', 'rb', 'php', 'lua',
-  'r', 'sql', 'graphql', 'sh', 'bash', 'zsh', 'fish', 'ps1', 'dockerfile', 'gitignore', 'env', 'log',
-])
-
 export const FOLDER_PREVIEW_MAX_ENTRIES = 100
 export const FOLDER_PREVIEW_MAX_DEPTH = 2
 
 export function getAttachmentExtension(name: string) {
-  const lowerName = name.toLowerCase()
-  if (!lowerName.includes('.')) return lowerName
-  return lowerName.split('.').pop() || ''
+  return getDocumentExtension(name)
 }
 
 export function isReadableAttachmentName(name: string) {
-  const extension = getAttachmentExtension(name)
-  return extension === 'pdf' || TEXT_EXTENSIONS.has(extension)
+  return isReadableDocumentName(name)
 }
 
 export function toPersistedChatAttachment(

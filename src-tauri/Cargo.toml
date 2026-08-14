@@ -47,6 +47,7 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "sqlite"] }
 base64 = "0.22"
+anydoc = "=0.1.8"
 
 [dependencies.tauri-plugin-sql]
 features = ["sqlite"]

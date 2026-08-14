@@ -47,6 +47,11 @@ import { createRecordTab } from "./mark-record-tab";
 import { getImageRecordDisplayText, getImageRecordStatus, type ImageRecordStatusLabels, isImageRecord } from "./image-record-status";
 import { useSettingsDialogStore } from "@/stores/settings-dialog";
 import { CANVAS_MARK_DRAG_TYPE } from "@/lib/canvas/drag-data";
+import {
+  getDocumentParseMessageKey,
+  normalizeDocumentParseError,
+  parseLocalDocument,
+} from "@/lib/document-parser";
 
 dayjs.extend(relativeTime)
 
@@ -254,6 +259,7 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
   const router = useRouter();
   const isMobile = useIsMobile();
   const [isRetryingTranscription, setIsRetryingTranscription] = useState(false);
+  const [isReparsingFile, setIsReparsingFile] = useState(false);
   const imageStatusLabels: ImageRecordStatusLabels = useMemo(() => ({
     pending: captureT('screenshotRecognitionPending'),
     failed: captureT('screenshotRecognitionFailed'),
@@ -372,6 +378,26 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
     }
   }, [fetchMarks, isMobile, isRetryingTranscription, mark, recordingT, router, sttModel])
 
+  const handleFileReparse = useCallback(async () => {
+    if (mark.type !== 'file' || !mark.url || isReparsingFile) return
+    try {
+      setIsReparsingFile(true)
+      const parsed = await parseLocalDocument(mark.url, mark.desc || mark.url)
+      await updateMark({ ...mark, content: parsed.markdown })
+      await fetchMarks()
+      toast({ title: captureT('fileReparseSuccess') })
+    } catch (error) {
+      const normalized = normalizeDocumentParseError(error)
+      toast({
+        title: captureT('fileUnsupportedSaved'),
+        description: captureT(getDocumentParseMessageKey(normalized.code)),
+        variant: 'destructive',
+      })
+    } finally {
+      setIsReparsingFile(false)
+    }
+  }, [captureT, fetchMarks, isReparsingFile, mark])
+
   const renderListTextBlock = (title: string, preview?: string) => {
     const displayTitle = compactRecordText(title) || imageStatusText || t(mark.type)
     const displayPreview = compactRecordText(preview)
@@ -461,6 +487,19 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
           <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
             {t(mark.type)}
           </span>
+          {interactive && !isMobile && mark.type === 'file' && mark.url ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="shrink-0 text-muted-foreground"
+              onClick={handleFileReparse}
+              disabled={isReparsingFile}
+              title={isReparsingFile ? captureT('reparsingFile') : captureT('reparseFile')}
+            >
+              <RefreshCw className={isReparsingFile ? 'animate-spin' : undefined} />
+            </Button>
+          ) : null}
           {mark.type === 'todo' && itemContent.todo ? (
             <span className={`size-2 shrink-0 rounded-full ${todoPriorityDotClass}`} />
           ) : null}
@@ -683,6 +722,19 @@ export const MarkWrapper = React.memo(({mark, variant = 'list', interactive = tr
               <span className={cn(getMarkTypeListBadgeClasses(mark.type, 'xs'), 'shrink-0')}>
                 {t(mark.type)}
               </span>
+              {interactive && !isMobile && mark.url ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="shrink-0 text-muted-foreground"
+                  onClick={handleFileReparse}
+                  disabled={isReparsingFile}
+                  title={isReparsingFile ? captureT('reparsingFile') : captureT('reparseFile')}
+                >
+                  <RefreshCw className={isReparsingFile ? 'animate-spin' : undefined} />
+                </Button>
+              ) : null}
               <span className={`ml-auto shrink-0 text-${recordTextSize}`}>{dayjs(mark.createdAt).fromNow()}</span>
             </div>
             {renderListTextBlock(itemContent.title || t(mark.type))}
