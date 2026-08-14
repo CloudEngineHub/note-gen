@@ -202,7 +202,7 @@ export function FileFooter() {
         >
           <Command>
             <CommandInput placeholder={tFile('workspace.searchPlaceholder')} />
-            <CommandList className="[scrollbar-gutter:auto]">
+            <CommandList>
               <CommandEmpty>{tFile('workspace.noResults')}</CommandEmpty>
               <CommandGroup heading={tFile('workspace.actions')}>
                 <CommandItem

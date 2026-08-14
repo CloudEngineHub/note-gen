@@ -118,7 +118,7 @@ export function SettingTab() {
       ) : (
         <TabsList
           variant="sidebar"
-          className="!h-auto min-h-0 w-full flex-1 items-stretch justify-start overflow-y-auto rounded-none bg-transparent px-3 py-0 [scrollbar-gutter:stable]"
+          className="!h-auto min-h-0 w-full flex-1 items-stretch justify-start overflow-y-auto rounded-none bg-transparent px-3 py-0"
           aria-label={t('title')}
         >
           {filteredConfig.map((item) => {

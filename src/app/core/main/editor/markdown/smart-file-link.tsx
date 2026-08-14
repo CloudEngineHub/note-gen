@@ -305,7 +305,7 @@ export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
       onMouseDown={event => event.preventDefault()}
     >
       <Command value={entries[selectedIndex]?.id} shouldFilter={false} className="border shadow-lg">
-        <CommandList className="max-h-72 overflow-y-scroll [scrollbar-gutter:stable]">
+        <CommandList className="max-h-72 overflow-y-auto">
           {enhancedSuggestions.length > 0 && (
             <CommandGroup heading={t('enhancedResults')}>
               {enhancedSuggestions.map((suggestion, index) => (

@@ -182,7 +182,7 @@
     --component-inactive-color: var(--muted-foreground);
     --component-bg: var(--card);
     --component-shadow: var(--border);
-    --scrollbar-size: 12px;
+    --scrollbar-size: 8px;
     --scrollbar-thumb: hsl(var(--muted-foreground) / 0.34);
     --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.58);
     --scrollbar-thumb-active: hsl(var(--foreground) / 0.7);
@@ -515,7 +515,7 @@ html, body {
 :not(table)::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background-color: var(--scrollbar-thumb);
-  border-width: 4px;
+  border-width: 1px;
   border-style: solid;
   border-color: transparent;
   background-clip: padding-box;
@@ -532,10 +532,9 @@ html, body {
   background-color: var(--scrollbar-thumb-active);
 }
 
-/* Main side panels keep the same visible scrollbar and a stable hit gutter. */
+/* Main side panels contain overscroll without reserving permanent scrollbar space. */
 .app-panel-scrollbar {
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .setting-anchor {
