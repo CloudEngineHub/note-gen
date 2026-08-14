@@ -15,6 +15,7 @@ import {
 import { Store } from '@tauri-apps/plugin-store'
 import { useShallow } from 'zustand/react/shallow'
 import useSettingStore from '@/stores/setting'
+import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
 interface MdEditorProps {
   tabContentsRef: RefObject<Record<string, string>>
@@ -26,17 +27,17 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   const {
     saveCurrentArticle,
     isPulling,
-    setCurrentArticle,
     activeFilePath,
     currentArticle,
-    justPulledFile
+    justPulledFile,
+    articleLoading,
   } = useArticleStore(useShallow((state) => ({
     saveCurrentArticle: state.saveCurrentArticle,
     isPulling: state.isPulling,
-    setCurrentArticle: state.setCurrentArticle,
     activeFilePath: state.activeFilePath,
     currentArticle: state.currentArticle,
     justPulledFile: state.justPulledFile,
+    articleLoading: state.loading,
   })))
   const {
     enableOutline,
@@ -51,7 +52,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   const t = useTranslations('article.file.sync')
   const tEditor = useTranslations('editor')
   const [initialContent, setInitialContent] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const isCreatingFileRef = useRef(false)
   // Track loaded state per file path - Bug fix: make this cleanup possible
   const loadedPathsRef = useRef<Set<string>>(new Set())
@@ -59,8 +59,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   const currentArticlePathRef = useRef<string | null>(null)
   // Bug fix: Track if editor content has been initialized to prevent saving empty content
   const contentInitializedRef = useRef(false)
-  // Bug fix: Use ref to track loading state since state might be stale in callbacks
-  const isLoadingRef = useRef(true)
   // Bug fix: Track expected content to detect if editor is behind
   const expectedContentRef = useRef<string | null>(null)
   // Outline panel state
@@ -165,7 +163,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     await store.set(OUTLINE_WIDTH_STORE_KEY, normalizedWidth)
   }, [])
 
-  // Load content from cache or disk - only on first mount per file
+  // Resolve initial content from the tab cache or the store's single file read.
   useEffect(() => {
     if (!filePath || loadedPathsRef.current.has(filePath)) return
 
@@ -173,67 +171,20 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     if (tabContentsRef.current && tabContentsRef.current[filePath] !== undefined) {
       setInitialContent(tabContentsRef.current[filePath])
       loadedPathsRef.current.add(filePath)
-      setIsLoading(false)
-      isLoadingRef.current = false
+      contentInitializedRef.current = true
       return
     }
 
-    // Bug fix: Also check if currentArticle belongs to this file (for store initialization)
-    // This handles the case where app restarts and currentArticle is already set
-    if (currentArticle && currentArticle.length > 0) {
-      // Check if the current active file path matches
-      const { activeFilePath: storeActivePath } = useArticleStore.getState()
-      if (storeActivePath === filePath) {
-        setInitialContent(currentArticle)
-        loadedPathsRef.current.add(filePath)
-        setIsLoading(false)
-        isLoadingRef.current = false
-        return
-      }
+    const { activeFilePath: storeActivePath } = useArticleStore.getState()
+    if (storeActivePath !== filePath || articleLoading) return
+
+    setInitialContent(currentArticle)
+    if (tabContentsRef.current) {
+      tabContentsRef.current[filePath] = currentArticle
     }
-
-    // Load from disk directly (avoid using global currentArticle)
-    const loadContent = async () => {
-      setIsLoading(true)
-      try {
-        const { readTextFile } = await import('@tauri-apps/plugin-fs')
-        const { getFilePathOptions } = await import('@/lib/workspace')
-
-        const pathOptions = await getFilePathOptions(filePath)
-
-        let content = ''
-        if (!pathOptions.baseDir) {
-          content = await readTextFile(pathOptions.path)
-        } else {
-          content = await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
-        }
-
-        // Bug fix: Only set isLoading(false) if we have actual content
-        // This prevents flickering when isLoading=false with empty content
-        setInitialContent(content)
-        // Update cache
-        if (tabContentsRef.current) {
-          tabContentsRef.current[filePath] = content
-        }
-        if (content) {
-          setIsLoading(false)
-          isLoadingRef.current = false
-          // Mark content as initialized since we have actual content from disk
-          // This is safe because the content came from disk, not an empty initialization
-          contentInitializedRef.current = true
-        }
-        // If empty, wait for subscription
-      } catch {
-        // File doesn't exist
-        setInitialContent('')
-        // Don't set isLoading(false) here - wait for subscription
-        // This prevents showing empty content briefly before subscription updates
-      }
-    }
-
-    loadContent()
     loadedPathsRef.current.add(filePath)
-  }, [filePath, tabContentsRef, currentArticle])
+    contentInitializedRef.current = true
+  }, [articleLoading, currentArticle, filePath, tabContentsRef])
 
   // Subscribe to currentArticle changes (for remote file pull results)
   // Bug fix: Only update if currentArticle belongs to this file
@@ -252,11 +203,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
       if (tabContentsRef.current) {
         tabContentsRef.current[filePath] = currentArticle
       }
-      // Bug fix: Don't set isLoadingRef.current = false here!
-      // The editor needs to initialize first, and handleContentChange will
-      // only save if content matches expectedContentRef
-      // We'll set isLoading(false) but isLoadingRef remains true until editor confirms
-      setIsLoading(false)
       // Mark as initialized so that subsequent saves are allowed
       contentInitializedRef.current = true
 
@@ -269,8 +215,6 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
       // Genuinely empty file - hide loading and mark as initialized
       // Bug fix: Set expected content for empty file
       expectedContentRef.current = ''
-      setIsLoading(false)
-      isLoadingRef.current = false
       // Mark as initialized for empty files so user can start typing
       contentInitializedRef.current = true
     }
@@ -310,8 +254,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     } else if (!filePath && !isCreatingFileRef.current) {
       // Auto-create untitled file
       isCreatingFileRef.current = true
-      createUntitledFile(content)
-      isCreatingFileRef.current = false
+      void createUntitledFile(content).finally(() => {
+        isCreatingFileRef.current = false
+      })
     }
   }, [saveCurrentArticle, filePath, tabContentsRef, activeFilePath])
 
@@ -330,6 +275,10 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   // Auto-create untitled.md file
   async function createUntitledFile(content: string) {
     try {
+      const articleState = useArticleStore.getState()
+      if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+        return
+      }
       const { exists, writeTextFile } = await import('@tauri-apps/plugin-fs')
       const workspace = await import('@/lib/workspace').then(m => m.getWorkspacePath())
       const { getFilePathOptions } = await import('@/lib/workspace')
@@ -359,9 +308,13 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
       }
 
-      setCurrentArticle(content)
-      useArticleStore.getState().setActiveFilePath(path)
-      useArticleStore.getState().loadFileTree()
+      await articleState.setActiveFilePath(
+        path,
+        true,
+        { deactivationAlreadyPrepared: true },
+      )
+      articleState.setCurrentArticle(content)
+      await articleState.loadFileTree()
     } catch {
     }
   }
@@ -385,9 +338,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     )
   }
 
-  // 如果 currentArticle 已经有内容，直接显示（拉取完成）
-  const showContent = (currentArticle && currentArticle.length > 0) || initialContent !== null
-  if (isLoading && !showContent) {
+  // Never mount the editor against a temporary empty string.
+  const showContent = initialContent !== null
+  if (!showContent) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
@@ -415,7 +368,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
 
       {/* Editor - initialContent only set once on mount */}
       <TipTapEditor
-        initialContent={initialContent || ''}
+        initialContent={initialContent ?? ''}
         onChange={handleContentChange}
         placeholder={tEditor('placeholder')}
         activeFilePath={filePath}
@@ -425,6 +378,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         outlineWidth={outlineWidth}
         onToggleOutline={handleToggleOutline}
         applyLayoutPreferences
+        isActive={isActive}
         editable={!isPulling && !aiStreaming}
         autoScroll={aiStreaming}
         showOverlay={aiStreaming}

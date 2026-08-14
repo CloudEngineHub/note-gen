@@ -121,7 +121,7 @@ export function AgentPanelWithRag({
   const pathname = usePathname()
   const [isRagExpanded, setIsRagExpanded] = useState(false)
   const [expandedFiles, setExpandedFiles] = useState<string[]>([])
-  const { setActiveFilePath, readArticle } = useArticleStore()
+  const { setActiveFilePath } = useArticleStore()
 
   const structuredHistory = React.useMemo<StructuredAgentHistory | null>(() => {
     if (!agentHistoryJson) {
@@ -190,8 +190,7 @@ export function AgentPanelWithRag({
     }
     const filepath = detail.locator?.filePath || detail.filepath
     if (!filepath) return
-    setActiveFilePath(filepath)
-    await readArticle(filepath)
+    await setActiveFilePath(filepath)
   }
 
   const sourceIcon = (sourceType?: RagSourceDetail['sourceType']) => {

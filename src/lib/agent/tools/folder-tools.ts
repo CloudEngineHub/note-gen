@@ -4,6 +4,14 @@ import { ensureSafeWorkspaceRelativePath, getWorkspacePath, getFilePathOptions }
 import { join } from '@tauri-apps/api/path'
 import useArticleStore from '@/stores/article'
 import { getVectorDocumentKey } from '@/lib/vector-document-key'
+import { prepareActiveEditorPathMutationDurably } from '@/lib/editor-deactivation'
+
+function activeEditorMutationBlockedResult(): ToolResult {
+  return {
+    success: false,
+    error: '当前编辑器正在处理异步内容，文件操作已取消',
+  }
+}
 
 async function getMarkdownFilesForFolder(folderPath: string): Promise<string[]> {
   const { collectMarkdownFiles } = await import('@/lib/files')
@@ -204,6 +212,13 @@ export const deleteFolderTool: Tool = {
       let folderExists = false
       let filePathsInFolder: string[] = []
 
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        [normalizedFolderPath],
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
+
       if (workspace.isCustom) {
         // 自定义工作区：使用绝对路径
         const fullPath = await join(workspace.path, normalizedFolderPath)
@@ -228,19 +243,14 @@ export const deleteFolderTool: Tool = {
         }
       }
 
+      await articleStore.cleanTabsByDeletedFolder(normalizedFolderPath)
+
       const removed = articleStore.removeLocalEntry(normalizedFolderPath)
       if (!removed) {
         await articleStore.loadFileTree()
       }
 
       await deleteVectorDocumentsForFiles(filePathsInFolder)
-
-      await articleStore.cleanTabsByDeletedFolder(normalizedFolderPath)
-
-      if (articleStore.activeFilePath && articleStore.activeFilePath.startsWith(`${normalizedFolderPath}/`)) {
-        await articleStore.setActiveFilePath('')
-        articleStore.setCurrentArticle('')
-      }
 
       return {
         success: true,
@@ -460,13 +470,21 @@ export const deleteFoldersBatchTool: Tool = {
 
       const workspace = await getWorkspacePath()
       const articleStore = useArticleStore.getState()
+      const normalizedFolderPaths = await Promise.all(
+        params.folderPaths.map(folderPath => ensureSafeWorkspaceRelativePath(folderPath))
+      )
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        normalizedFolderPaths,
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
       const results = []
       const errors = []
       const filePathsByFolder = new Map<string, string[]>()
 
-      for (const folderPath of params.folderPaths) {
+      for (const normalizedFolderPath of normalizedFolderPaths) {
         try {
-          const normalizedFolderPath = await ensureSafeWorkspaceRelativePath(folderPath)
           filePathsByFolder.set(normalizedFolderPath, await getMarkdownFilesForFolder(normalizedFolderPath))
 
           if (workspace.isCustom) {
@@ -486,20 +504,15 @@ export const deleteFoldersBatchTool: Tool = {
             }
             await remove(path, { baseDir, recursive: true })
           }
+          await articleStore.cleanTabsByDeletedFolder(normalizedFolderPath)
           results.push(normalizedFolderPath)
         } catch (error) {
-          errors.push({ path: folderPath, error: String(error) })
+          errors.push({ path: normalizedFolderPath, error: String(error) })
         }
       }
 
       for (const deletedFolderPath of results) {
         await deleteVectorDocumentsForFiles(filePathsByFolder.get(deletedFolderPath) || [])
-        await articleStore.cleanTabsByDeletedFolder(deletedFolderPath)
-
-        if (articleStore.activeFilePath && articleStore.activeFilePath.startsWith(`${deletedFolderPath}/`)) {
-          await articleStore.setActiveFilePath('')
-          articleStore.setCurrentArticle('')
-        }
       }
 
       await articleStore.loadFileTree()

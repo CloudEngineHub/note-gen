@@ -6,6 +6,7 @@ import { Check, Copy } from 'lucide-react'
 import { useCallback, useEffect, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { ResponsiveSelect } from '@/components/responsive-select'
+import { useViewportActivation } from './viewport-activation'
 
 const COPY_FEEDBACK_TIMEOUT_MS = 1200
 const AUTO_LANGUAGE_VALUE = '__auto__'
@@ -116,6 +117,7 @@ async function writeClipboardText(text: string) {
 
 export function CodeBlockView({ editor, node, updateAttributes, getPos }: ReactNodeViewProps) {
   const [copied, setCopied] = useState(false)
+  const { activate, elementRef, isActive } = useViewportActivation<HTMLPreElement>()
   const language = normalizeLanguage(node.attrs.language)
   const selectedLanguageValue = language ?? AUTO_LANGUAGE_VALUE
   const selectedLanguageOption = getLanguageOption(language)
@@ -202,40 +204,46 @@ export function CodeBlockView({ editor, node, updateAttributes, getPos }: ReactN
   }, [codeText, restoreEditorFocus])
 
   return (
-    <NodeViewWrapper className="code-block-wrapper" spellCheck={false}>
-      <div
-        className="code-block-toolbar"
-        contentEditable={false}
-        onKeyDown={handleToolbarKeyDown}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <ResponsiveSelect
-          title="选择代码块语言"
-          value={selectedLanguageValue}
-          onValueChange={handleLanguageChange}
-          className="code-block-language-trigger"
-          options={languageOptions.map(option => ({
-            value: option.value,
-            label: (
-              <span className="code-block-language-option">
-                <span className="code-block-language-option-code">{option.shortLabel}</span>
-                <span>{option.label}</span>
-              </span>
-            ),
-          }))}
-        />
-        <button
-          type="button"
-          className="code-block-copy-button"
-          title={copied ? '已复制' : '复制代码块'}
-          aria-label={copied ? '已复制代码块' : '复制代码块'}
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={handleCopy}
+    <NodeViewWrapper
+      className="code-block-wrapper"
+      spellCheck={false}
+      onFocusCapture={activate}
+    >
+      {isActive ? (
+        <div
+          className="code-block-toolbar"
+          contentEditable={false}
+          onKeyDown={handleToolbarKeyDown}
+          onPointerDown={(event) => event.stopPropagation()}
         >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-        </button>
-      </div>
-      <pre><NodeViewContent<'code'> as="code" /></pre>
+          <ResponsiveSelect
+            title="选择代码块语言"
+            value={selectedLanguageValue}
+            onValueChange={handleLanguageChange}
+            className="code-block-language-trigger"
+            options={languageOptions.map(option => ({
+              value: option.value,
+              label: (
+                <span className="code-block-language-option">
+                  <span className="code-block-language-option-code">{option.shortLabel}</span>
+                  <span>{option.label}</span>
+                </span>
+              ),
+            }))}
+          />
+          <button
+            type="button"
+            className="code-block-copy-button"
+            title={copied ? '已复制' : '复制代码块'}
+            aria-label={copied ? '已复制代码块' : '复制代码块'}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          </button>
+        </div>
+      ) : null}
+      <pre ref={elementRef}><NodeViewContent<'code'> as="code" /></pre>
     </NodeViewWrapper>
   )
 }

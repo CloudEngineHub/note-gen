@@ -370,8 +370,22 @@ async function executeEditorTransaction(input: Record<string, unknown>): Promise
       error: 'operations must be a non-empty array',
     }
   }
+  if (!targetsActiveEditor(transaction.filePath)) {
+    return {
+      ok: false,
+      message: '活动编辑器已切换，未执行事务。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
+  }
 
   const stateResult = await getEditorContentTool.execute({})
+  if (!targetsActiveEditor(transaction.filePath)) {
+    return {
+      ok: false,
+      message: '读取内容期间活动编辑器已切换，未执行事务。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
+  }
   if (!stateResult.success || !stateResult.data || typeof stateResult.data !== 'object') {
     return resultFromLegacy(stateResult)
   }
@@ -417,6 +431,7 @@ async function executeEditorTransaction(input: Record<string, unknown>): Promise
   }
 
   const replaceResult = await replaceEditorContentTool.execute({
+    filePath: transaction.filePath,
     startLine: 1,
     endLine: state.totalLines || before.split('\n').length,
     replaceContent: after,
@@ -424,6 +439,13 @@ async function executeEditorTransaction(input: Record<string, unknown>): Promise
   })
 
   const normalized = resultFromLegacy(replaceResult)
+  if (!targetsActiveEditor(transaction.filePath)) {
+    return {
+      ok: false,
+      message: '编辑期间活动编辑器已切换，无法安全验证事务结果。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
+  }
   if (!normalized.ok) {
     return normalized
   }
@@ -441,12 +463,37 @@ async function executeEditorTransaction(input: Record<string, unknown>): Promise
 }
 
 async function executeEditorLegacyWrite(input: Record<string, unknown>, legacy: Tool): Promise<AgentToolResult> {
+  const requestedFilePath = asString(input.filePath)
+  if (!requestedFilePath || !targetsActiveEditor(requestedFilePath)) {
+    return {
+      ok: false,
+      message: '活动编辑器已切换，未执行写入。请重新读取当前编辑器状态后再试。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
+  }
+
   const before = await readEditorMarkdown()
+  if (!targetsActiveEditor(requestedFilePath)) {
+    return {
+      ok: false,
+      message: '读取内容期间活动编辑器已切换，未执行写入。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
+  }
+
   const legacyResult = await legacy.execute(input as Record<string, any>)
   const normalized = resultFromLegacy(legacyResult)
 
   if (!normalized.ok) {
     return normalized
+  }
+
+  if (!targetsActiveEditor(requestedFilePath)) {
+    return {
+      ok: false,
+      message: '编辑期间活动编辑器已切换，无法安全验证结果。',
+      error: 'EDITOR_TARGET_CHANGED',
+    }
   }
 
   const after = await readEditorMarkdownAfterWrite(before)
@@ -471,7 +518,7 @@ async function executeEditorLegacyWrite(input: Record<string, unknown>, legacy: 
   return {
     ...normalized,
     changes: [
-      buildEditorChange(useArticleStore.getState().activeFilePath || 'current editor', before, after),
+      buildEditorChange(requestedFilePath, before, after),
     ],
   }
 }
@@ -1840,7 +1887,7 @@ function buildTools(): AgentTool[] {
     adaptLegacyTool({
       name: 'editor_insert_at_cursor',
       title: '在光标处插入',
-      description: 'Insert Markdown at the current editor cursor. Avoid this for quoted chat selections because chat focus can make cursor position unreliable.',
+      description: 'Insert Markdown at the current editor cursor. When a quoted selection has no canonical source offsets, set replaceSelection=true; the editor verifies that the live selection still matches the run-start selection.',
       category: 'editor',
       risk: 'editor-write',
       legacy: insertAtCursorTool,
@@ -1854,7 +1901,11 @@ function buildTools(): AgentTool[] {
         required: ['filePath', 'content'],
         additionalProperties: false,
       },
-      execute: (input) => executeEditorLegacyWrite(input, insertAtCursorTool),
+      execute: (input, executionContext) => executeEditorLegacyWrite({
+        ...input,
+        expectedSelection: executionContext.context.currentQuote?.fullContent,
+        expectedSelectionToken: executionContext.context.currentQuote?.selectionToken,
+      }, insertAtCursorTool),
     }),
     adaptLegacyTool({
       name: 'editor_replace_range',

@@ -432,10 +432,6 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       // 设置活动文件路径
       await setActiveFilePath(filePath)
       
-      // 读取文件内容
-      const { readArticle } = useArticleStore.getState()
-      await readArticle(filePath)
-      
       // 跳转到对应平台页面
       router.push(isMobileRoute ? '/mobile/writing' : '/core/main')
     }

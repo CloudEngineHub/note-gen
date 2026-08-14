@@ -2,6 +2,7 @@ import { exists, rename } from "@tauri-apps/plugin-fs"
 
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
+import useArticleStore from '@/stores/article'
 
 export const FILE_MANAGER_DRAG_MIME = "application/x-notegen-file-path"
 let activeFileManagerDragPaths: string[] = []
@@ -145,6 +146,7 @@ export async function moveFileManagerEntry(sourcePath: string, targetDirectoryPa
       oldPathBaseDir: oldPathOptions.baseDir,
     })
   }
+  await useArticleStore.getState().syncOpenTabsForPathChange(sourcePath, targetPath)
 
   const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
   await renameVectorDocumentsByPrefix(sourcePath, targetPath)

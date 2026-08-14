@@ -55,7 +55,7 @@ export function AgentContextTray({
   const [showRag, setShowRag] = React.useState(false)
   const [showSkills, setShowSkills] = React.useState(false)
   const [expandedSkillDescriptions, setExpandedSkillDescriptions] = React.useState<string[]>([])
-  const { setActiveFilePath, readArticle } = useArticleStore()
+  const { setActiveFilePath } = useArticleStore()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -112,8 +112,7 @@ export function AgentContextTray({
 
     const filepath = detail.locator?.filePath || detail.filepath
     if (!filepath) return
-    setActiveFilePath(filepath)
-    await readArticle(filepath)
+    await setActiveFilePath(filepath)
   }
 
   const sourceIcon = (sourceType?: RagSourceDetail['sourceType']) => {

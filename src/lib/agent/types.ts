@@ -106,11 +106,13 @@ export interface AgentEditorSelectionSnapshot {
 
 export interface AgentQuoteSnapshot {
   fileName: string
+  articlePath?: string
   startLine: number
   endLine: number
   from: number
   to: number
   fullContent?: string
+  selectionToken?: string
 }
 
 export interface AgentSkillSummary {

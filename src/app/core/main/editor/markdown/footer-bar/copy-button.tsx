@@ -4,6 +4,8 @@ import { Editor } from '@tiptap/react'
 import { Copy, FileCode, FileJson, FileText } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { toast } from '@/hooks/use-toast'
+import { markdownToPlainText } from '@/lib/editor-statistics'
+import { parseMarkdownToJson, renderMarkdownToHtml } from '../markdown-export'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,17 +16,24 @@ import {
 interface CopyButtonProps {
   editor: Editor
   markdown?: string
+  getMarkdown?: () => string
 }
 
 type CopyFormat = 'markdown' | 'html' | 'json' | 'text'
 
-export function CopyButton({ editor, markdown }: CopyButtonProps) {
+export function CopyButton({ editor, markdown, getMarkdown }: CopyButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [copying, setCopying] = useState<CopyFormat | null>(null)
 
-  const copyToClipboard = useCallback(async (content: string, format: CopyFormat) => {
+  const copyToClipboard = useCallback(async (
+    getContent: string | (() => string | Promise<string>),
+    format: CopyFormat
+  ) => {
     try {
       setCopying(format)
+      const content = typeof getContent === 'function'
+        ? await getContent()
+        : getContent
       await navigator.clipboard.writeText(content)
       toast({
         title: '复制成功',
@@ -42,21 +51,43 @@ export function CopyButton({ editor, markdown }: CopyButtonProps) {
     }
   }, [])
 
+  const getCurrentMarkdown = useCallback(
+    () => getMarkdown?.() ?? markdown ?? editor.getMarkdown(),
+    [editor, getMarkdown, markdown],
+  )
+
   const handleCopyMarkdown = useCallback(() => {
-    copyToClipboard(markdown ?? editor.getMarkdown(), 'markdown')
-  }, [editor, markdown, copyToClipboard])
+    void copyToClipboard(getCurrentMarkdown, 'markdown')
+  }, [copyToClipboard, getCurrentMarkdown])
 
   const handleCopyHtml = useCallback(() => {
-    copyToClipboard(editor.getHTML(), 'html')
-  }, [editor, copyToClipboard])
+    void copyToClipboard(
+      () => getMarkdown || markdown !== undefined
+        ? renderMarkdownToHtml(getCurrentMarkdown())
+        : editor.getHTML(),
+      'html'
+    )
+  }, [copyToClipboard, editor, getCurrentMarkdown, getMarkdown, markdown])
 
   const handleCopyJson = useCallback(() => {
-    copyToClipboard(JSON.stringify(editor.getJSON(), null, 2), 'json')
-  }, [editor, copyToClipboard])
+    void copyToClipboard(
+      () => JSON.stringify(
+        getMarkdown || markdown !== undefined ? parseMarkdownToJson(getCurrentMarkdown()) : editor.getJSON(),
+        null,
+        2
+      ),
+      'json'
+    )
+  }, [copyToClipboard, editor, getCurrentMarkdown, getMarkdown, markdown])
 
   const handleCopyText = useCallback(() => {
-    copyToClipboard(editor.getText(), 'text')
-  }, [editor, copyToClipboard])
+    void copyToClipboard(
+      () => getMarkdown || markdown !== undefined
+        ? markdownToPlainText(getCurrentMarkdown())
+        : editor.getText(),
+      'text'
+    )
+  }, [copyToClipboard, editor, getCurrentMarkdown, getMarkdown, markdown])
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>

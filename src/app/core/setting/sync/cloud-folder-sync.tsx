@@ -17,6 +17,7 @@ import useArticleStore from '@/stores/article'
 import { useSkillsStore } from '@/stores/skills'
 import type { CloudFolderConfig } from '@/types/sync'
 import { toast } from '@/hooks/use-toast'
+import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
 export function CloudFolderSync() {
   const t = useTranslations('settings.sync.cloudFolder')
@@ -26,7 +27,6 @@ export function CloudFolderSync() {
     loadWorkspaceCollapsibleList,
     loadFileTree,
     setActiveFilePath,
-    setCurrentArticle,
   } = useArticleStore()
   const refreshSkills = useSkillsStore(state => state.refreshSkills)
   const [config, setConfig] = useState<CloudFolderConfig>({ path: '' })
@@ -93,12 +93,23 @@ export function CloudFolderSync() {
     await saveConfig({ path: '' })
   }
 
+  async function prepareWorkspaceSwitch() {
+    const articleState = useArticleStore.getState()
+    if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+      return false
+    }
+    await articleState.flushAllPendingArticleSaves()
+    await articleState.settleAllVectorCalculations()
+    return true
+  }
+
   async function refreshWorkspaceContent() {
-    setActiveFilePath('')
-    setCurrentArticle('')
+    await setActiveFilePath('', true, { deactivationAlreadyPrepared: true })
     const lastActivePath = await loadWorkspaceCollapsibleList()
     await loadFileTree()
-    if (lastActivePath) await setActiveFilePath(lastActivePath)
+    if (lastActivePath) {
+      await setActiveFilePath(lastActivePath, true, { deactivationAlreadyPrepared: true })
+    }
     await refreshSkills()
   }
 
@@ -109,6 +120,7 @@ export function CloudFolderSync() {
       kind: 'warning',
     })
     if (!accepted) return
+    if (!await prepareWorkspaceSwitch()) return
 
     const previousWorkspacePath = workspacePath
     setMigrating(true)
@@ -118,6 +130,9 @@ export function CloudFolderSync() {
         await setWorkspacePath(result.targetPath)
         await refreshWorkspaceContent()
       } catch (error) {
+        if (!await prepareWorkspaceSwitch()) {
+          throw new Error('无法在回滚工作区前保存当前编辑内容')
+        }
         await setWorkspacePath(previousWorkspacePath)
         await refreshWorkspaceContent()
         throw error
@@ -140,6 +155,7 @@ export function CloudFolderSync() {
 
   async function switchToCloudWorkspace() {
     if (!config.path || migrating || switchingWorkspace) return
+    if (!await prepareWorkspaceSwitch()) return
 
     const previousWorkspacePath = workspacePath
     setSwitchingWorkspace(true)
@@ -149,6 +165,9 @@ export function CloudFolderSync() {
     } catch (error) {
       console.error('Cloud workspace switch failed:', error)
       try {
+        if (!await prepareWorkspaceSwitch()) {
+          throw new Error('无法在回滚工作区前保存当前编辑内容')
+        }
         await setWorkspacePath(previousWorkspacePath)
         await refreshWorkspaceContent()
       } catch (rollbackError) {

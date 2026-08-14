@@ -4,6 +4,8 @@ const PASSTHROUGH_IMAGE_SRC_PREFIXES = [
   'asset://',
   'tauri://',
   'data:',
+  'blob:',
+  'file:',
 ] as const
 
 export function shouldKeepImageSrcAsIs(src: string | null | undefined): boolean {

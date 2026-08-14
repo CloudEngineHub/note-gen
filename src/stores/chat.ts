@@ -15,6 +15,7 @@ export interface PendingQuote {
   endLine: number
   from: number
   to: number
+  selectionToken?: string
   articlePath: string
 }
 
@@ -27,6 +28,7 @@ function getPendingQuoteIdentity(quote: PendingQuote | null) {
     quote.articlePath,
     quote.from,
     quote.to,
+    quote.selectionToken || '',
     quote.startLine,
     quote.endLine,
     quote.fullContent,

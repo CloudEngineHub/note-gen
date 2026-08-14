@@ -41,6 +41,7 @@ import useSettingStore from '@/stores/setting'
 import { useSkillsStore } from '@/stores/skills'
 
 import { useSyncAvailability } from './use-sync-availability'
+import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
 export function FileFooter() {
   const {
@@ -54,7 +55,6 @@ export function FileFooter() {
     loadWorkspaceCollapsibleList,
     loadFileTree,
     setActiveFilePath,
-    setCurrentArticle,
   } = useArticleStore()
   const tFile = useTranslations('settings.file')
   const tContext = useTranslations('article.file.context')
@@ -85,12 +85,23 @@ export function FileFooter() {
       .catch((error) => console.error('获取默认工作区路径失败:', error))
   }, [])
 
+  async function prepareWorkspaceSwitch() {
+    const articleState = useArticleStore.getState()
+    if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+      return false
+    }
+    await articleState.flushAllPendingArticleSaves()
+    await articleState.settleAllVectorCalculations()
+    return true
+  }
+
   async function restoreWorkspaceContent() {
-    setActiveFilePath('')
-    setCurrentArticle('')
+    await setActiveFilePath('', true, { deactivationAlreadyPrepared: true })
     const lastActivePath = await loadWorkspaceCollapsibleList()
     await loadFileTree()
-    if (lastActivePath) await setActiveFilePath(lastActivePath)
+    if (lastActivePath) {
+      await setActiveFilePath(lastActivePath, true, { deactivationAlreadyPrepared: true })
+    }
   }
 
   async function switchWorkspace(path: string) {
@@ -99,6 +110,7 @@ export function FileFooter() {
       setOpen(false)
       return
     }
+    if (!await prepareWorkspaceSwitch()) return
 
     const previousWorkspacePath = workspacePath
     setSwitchingWorkspace(true)
@@ -112,6 +124,9 @@ export function FileFooter() {
       console.error('切换工作区失败:', error)
 
       try {
+        if (!await prepareWorkspaceSwitch()) {
+          throw new Error('无法在回滚工作区前保存当前编辑内容')
+        }
         await setWorkspacePath(previousWorkspacePath)
         await restoreWorkspaceContent()
         await refreshSkills()

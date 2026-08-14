@@ -45,6 +45,11 @@ import useClipboardStore from '@/stores/clipboard'
 import { generateCopyFilename, generateCopyFoldername } from '@/lib/default-filename'
 import { getFileTreeSyncStatus, getSyncConfiguration } from '@/app/core/main/file/file-tree-action-policy'
 import { clearFolderLocalState, deleteRemoteFolder, hasRemoteFolderData } from '@/app/core/main/file/folder-item/delete-folder-utils'
+import {
+  activeEditorPathIsAffected,
+  prepareActiveEditorDeactivationDurably,
+  prepareActiveEditorPathMutationDurably,
+} from '@/lib/editor-deactivation'
 
 function shouldLoadRemoteOnTreeRefresh(options?: { isCreateFlow?: boolean }) {
   return options?.isCreateFlow !== true
@@ -77,7 +82,6 @@ export function WritingHeader() {
   const {
     activeFilePath,
     setActiveFilePath,
-    readArticle,
     fileTree,
     fileTreeLoading,
     loadFileTree,
@@ -444,6 +448,12 @@ export function WritingHeader() {
       return
     }
 
+    const movesActiveFile = activeEditorPathIsAffected(
+      normalizedActivePath,
+      entry.relativePath,
+    )
+    if (!await prepareActiveEditorPathMutationDurably(normalizedActivePath, [entry.relativePath])) return
+
     try {
       const result = await moveFileManagerEntry(entry.relativePath, targetDirectoryPath)
       if (!result.moved) {
@@ -458,7 +468,11 @@ export function WritingHeader() {
 
       const nextActivePath = getPathAfterMove(normalizedActivePath, result.sourcePath, result.targetPath)
       if (nextActivePath !== normalizedActivePath) {
-        await setActiveFilePath(nextActivePath)
+        await setActiveFilePath(
+          nextActivePath,
+          true,
+          movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+        )
       }
 
       await refreshTree(currentDir, { includeRemote: false })
@@ -570,7 +584,6 @@ export function WritingHeader() {
     }
 
     await setActiveFilePath(entry.relativePath)
-    await readArticle(entry.relativePath)
     setDrawerOpen(false)
   }
 
@@ -735,7 +748,19 @@ export function WritingHeader() {
       return
     }
 
+    if (
+      clipboardOperation === 'cut'
+      && !await prepareActiveEditorPathMutationDurably(
+        normalizedActivePath,
+        sourceItems.map(sourceItem => sourceItem.path),
+      )
+    ) return
+
     const targetDir = entry.type === 'folder' ? entry.relativePath : parentPath(entry.relativePath)
+    const pathMoves: Array<{ sourcePath: string; targetPath: string }> = []
+    const movesActiveFile = clipboardOperation === 'cut' && sourceItems.some(
+      sourceItem => activeEditorPathIsAffected(normalizedActivePath, sourceItem.path)
+    )
     try {
       for (const sourceItem of sourceItems) {
         if (
@@ -748,22 +773,34 @@ export function WritingHeader() {
           ? await generateCopyFoldername(targetDir, sourceItem.name)
           : await generateCopyFilename(targetDir, sourceItem.name)
         const targetPath = targetDir ? `${targetDir}/${targetName}` : targetName
+        pathMoves.push({ sourcePath: sourceItem.path, targetPath })
         await copyLocalEntry(sourceItem.path, targetPath, sourceItem.isDirectory)
       }
 
       if (clipboardOperation === 'cut') {
-        for (const sourceItem of sourceItems) {
+        let nextActivePath = normalizedActivePath
+        for (const [index, sourceItem] of sourceItems.entries()) {
           const source = await getFilePathOptions(sourceItem.path)
           if (source.baseDir) {
             await remove(source.path, { baseDir: source.baseDir, recursive: sourceItem.isDirectory })
           } else {
             await remove(source.path, { recursive: sourceItem.isDirectory })
           }
-          if (sourceItem.isDirectory) {
-            await cleanTabsByDeletedFolder(sourceItem.path)
-          } else {
-            await cleanTabsByDeletedFile(sourceItem.path)
+          const pathMove = pathMoves[index]
+          await syncOpenTabsForPathChange(pathMove.sourcePath, pathMove.targetPath)
+          const movedActivePath = getPathAfterMove(
+            nextActivePath,
+            pathMove.sourcePath,
+            pathMove.targetPath,
+          )
+          if (movedActivePath !== nextActivePath) {
+            await setActiveFilePath(
+              movedActivePath,
+              true,
+              movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+            )
           }
+          nextActivePath = movedActivePath
         }
         setClipboardItem(null, 'none')
       }
@@ -821,6 +858,7 @@ export function WritingHeader() {
           : await exists(pathOptions.path)
 
         if (!fileExists) {
+          if (!await prepareActiveEditorDeactivationDurably(normalizedActivePath)) return
           if (pathOptions.baseDir) {
             await writeTextFile(pathOptions.path, '', { baseDir: pathOptions.baseDir })
           } else {
@@ -830,7 +868,11 @@ export function WritingHeader() {
           await refreshTree(targetDir, {
             includeRemote: shouldLoadRemoteOnTreeRefresh({ isCreateFlow: true })
           })
-          await setActiveFilePath(relativePath)
+          await setActiveFilePath(
+            relativePath,
+            true,
+            { deactivationAlreadyPrepared: true },
+          )
           setDrawerOpen(false)
         }
       } else {
@@ -900,6 +942,15 @@ export function WritingHeader() {
         return
       }
 
+      const movesActiveFile = activeEditorPathIsAffected(
+        normalizedActivePath,
+        renameTarget.relativePath,
+      )
+      if (!await prepareActiveEditorPathMutationDurably(
+        normalizedActivePath,
+        [renameTarget.relativePath],
+      )) return
+
       if (oldPathOptions.baseDir || newPathOptions.baseDir) {
         await fsRename(oldPathOptions.path, newPathOptions.path, {
           oldPathBaseDir: oldPathOptions.baseDir || BaseDirectory.AppData,
@@ -908,11 +959,21 @@ export function WritingHeader() {
       } else {
         await fsRename(oldPathOptions.path, newPathOptions.path)
       }
+      await syncOpenTabsForPathChange(renameTarget.relativePath, newRelativePath)
       const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
       await renameVectorDocumentsByPrefix(renameTarget.relativePath, newRelativePath)
 
-      if (normalizedActivePath === renameTarget.relativePath) {
-        await setActiveFilePath(newRelativePath)
+      const nextActivePath = getPathAfterMove(
+        normalizedActivePath,
+        renameTarget.relativePath,
+        newRelativePath,
+      )
+      if (nextActivePath !== normalizedActivePath) {
+        await setActiveFilePath(
+          nextActivePath,
+          true,
+          movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+        )
       }
       await refreshTree(currentDir)
       setRenameTarget(null)
@@ -939,6 +1000,8 @@ export function WritingHeader() {
     )
     if (!ok) return
 
+    if (!await prepareActiveEditorPathMutationDurably(normalizedActivePath, [entry.relativePath])) return
+
     const pathOptions = await getFilePathOptions(entry.relativePath)
     if (entry.type === 'folder') {
       if (pathOptions.baseDir) {
@@ -946,9 +1009,7 @@ export function WritingHeader() {
       } else {
         await remove(pathOptions.path, { recursive: true })
       }
-      if (normalizedActivePath.startsWith(`${entry.relativePath}/`)) {
-        await setActiveFilePath('')
-      }
+      await cleanTabsByDeletedFolder(entry.relativePath)
       const nextTree = cloneDeep(fileTree)
       clearFolderLocalState(nextTree, entry.relativePath)
       setFileTree(nextTree)
@@ -963,9 +1024,7 @@ export function WritingHeader() {
       } else {
         await remove(pathOptions.path)
       }
-      if (normalizedActivePath === entry.relativePath) {
-        await setActiveFilePath('')
-      }
+      await cleanTabsByDeletedFile(entry.relativePath)
       reconcileLocalFile(entry.relativePath, false)
       void import('@/db/vector').then(({ deleteVectorDocumentsByFilename }) => (
         deleteVectorDocumentsByFilename(entry.relativePath)

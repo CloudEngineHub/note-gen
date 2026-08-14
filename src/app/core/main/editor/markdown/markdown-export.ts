@@ -265,6 +265,10 @@ function getMarkdownManager() {
   return markdownManager
 }
 
+export function parseMarkdownToJson(markdown: string) {
+  return getMarkdownManager().parse(markdown)
+}
+
 async function getValue<T>(value: T | (() => T | Promise<T>)) {
   if (typeof value === 'function') {
     return await (value as () => T | Promise<T>)()
@@ -354,7 +358,7 @@ async function waitForDocumentResources(frameDocument: Document) {
   await frameDocument.fonts?.ready
 }
 
-async function renderMarkdownToHtml(markdown: string, sourcePath?: string) {
+export async function renderMarkdownToHtml(markdown: string, sourcePath?: string) {
   const container = document.createElement('div')
   container.style.position = 'fixed'
   container.style.left = '-10000px'

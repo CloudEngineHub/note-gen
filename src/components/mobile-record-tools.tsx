@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast'
 import { useTranslations } from 'next-intl'
 import { Separator } from '@/components/ui/separator'
 import useRecordingStore from '@/stores/recording'
+import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
 interface MobileRecordToolsProps {
   onClose?: () => void
@@ -58,9 +59,18 @@ export function MobileRecordTools({ onClose, onOrganize }: MobileRecordToolsProp
 
   const handleQuickWrite = async () => {
     try {
+      if (!await prepareActiveEditorDeactivationDurably(
+        useArticleStore.getState().activeFilePath,
+      )) {
+        return
+      }
       const fileName = await createQuickWriteFile()
       await loadFileTree()
-      await setActiveFilePath(fileName)
+      await setActiveFilePath(
+        fileName,
+        true,
+        { deactivationAlreadyPrepared: true },
+      )
       router.push('/mobile/writing')
       onClose?.()
     } catch {

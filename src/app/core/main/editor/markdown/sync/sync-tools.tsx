@@ -12,9 +12,13 @@ import { useShallow } from 'zustand/react/shallow'
 
 interface SyncToolsProps {
   editor: Editor
+  markdown?: string
+  getMarkdown?: () => string
+  prepareExternalAction?: () => boolean
+  onMarkdownChange?: (markdown: string) => void
 }
 
-export function SyncTools({ editor }: SyncToolsProps) {
+export function SyncTools({ editor, markdown, getMarkdown, prepareExternalAction, onMarkdownChange }: SyncToolsProps) {
   const t = useTranslations('common')
   const { openSettings } = useSettingsDialogStore()
   const [configured, setConfigured] = useState(false)
@@ -38,9 +42,15 @@ export function SyncTools({ editor }: SyncToolsProps) {
   if (configured) {
     return (
       <div className="flex items-center gap-1">
-        <HistorySheet editor={editor} />
-        <SyncButton />
-        <PullButton editor={editor} />
+        <HistorySheet editor={editor} prepareExternalAction={prepareExternalAction} onMarkdownChange={onMarkdownChange} />
+        <SyncButton getMarkdown={getMarkdown} prepareExternalAction={prepareExternalAction} />
+        <PullButton
+          editor={editor}
+          markdown={markdown}
+          getMarkdown={getMarkdown}
+          prepareExternalAction={prepareExternalAction}
+          onMarkdownChange={onMarkdownChange}
+        />
       </div>
     )
   }

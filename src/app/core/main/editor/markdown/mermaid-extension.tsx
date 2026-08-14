@@ -4,19 +4,54 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper, ReactNodeViewProps } from '@tiptap/react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import mermaid from 'mermaid'
 import { Code, Check } from 'lucide-react'
 import { ResponsiveSelect } from '@/components/responsive-select'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { useViewportActivation } from './viewport-activation'
 
-// Initialize mermaid
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'default',
-  securityLevel: 'loose',
-  fontFamily: 'inherit',
-})
+type MermaidApi = (typeof import('mermaid'))['default']
+
+let mermaidPromise: Promise<MermaidApi> | null = null
+let mermaidRenderId = 0
+let mermaidRenderQueue = Promise.resolve()
+
+async function getMermaid(): Promise<MermaidApi> {
+  if (!mermaidPromise) {
+    mermaidPromise = import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit',
+      })
+      return mermaid
+    })
+  }
+
+  return await mermaidPromise
+}
+
+async function renderMermaid(
+  code: string,
+  shouldRender: () => boolean
+): Promise<string | null> {
+  const render = async () => {
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+    if (!shouldRender()) return null
+
+    const mermaid = await getMermaid()
+    if (!shouldRender()) return null
+
+    const id = `mermaid-${++mermaidRenderId}`
+    return (await mermaid.render(id, code)).svg
+  }
+  const result = mermaidRenderQueue.then(render, render)
+
+  mermaidRenderQueue = result.then(() => undefined, () => undefined)
+  return await result
+}
 
 // Diagram type configuration with icons
 const DIAGRAM_TYPES = [
@@ -32,10 +67,13 @@ const DIAGRAM_TYPES = [
 
 // Detect diagram type from code
 function detectDiagramType(code: string): string {
-  const trimmed = code.trim()
+  const trimmed = code.trimStart()
+  const newlineIndex = trimmed.indexOf('\n')
+  const firstLine = (newlineIndex === -1 ? trimmed : trimmed.slice(0, newlineIndex))
+    .trimEnd()
+    .toLowerCase()
   for (const config of DIAGRAM_TYPES) {
     // Check first line for type specification
-    const firstLine = trimmed.split('\n')[0]?.toLowerCase() || ''
     if (config.alias?.some((alias: string) => firstLine.startsWith(alias) || firstLine === alias)) {
       return config.type
     }
@@ -52,32 +90,56 @@ function MermaidDiagramView({ node, updateAttributes }: ReactNodeViewProps) {
   const [diagramType, setDiagramType] = useState(node.attrs.type || 'flowchart')
   const [svg, setSvg] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [isRendering, setIsRendering] = useState(false)
+  const renderVersionRef = useRef(0)
+  const { elementRef, isActive, activate } = useViewportActivation<HTMLDivElement>()
 
   const renderDiagram = useCallback(async () => {
+    const renderVersion = ++renderVersionRef.current
     if (!code.trim()) {
       setSvg('')
       setError(null)
+      setIsRendering(false)
       return
     }
 
     setError(null)
+    setIsRendering(true)
 
     try {
-      mermaid.parse(code)
-      const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      const { svg: renderedSvg } = await mermaid.render(id, code)
+      const renderedSvg = await renderMermaid(
+        code,
+        () => renderVersionRef.current === renderVersion
+      )
+      if (renderedSvg === null || renderVersionRef.current !== renderVersion) return
       setSvg(renderedSvg)
     } catch (err) {
+      if (renderVersionRef.current !== renderVersion) return
       const message = err instanceof Error ? err.message : t('renderError')
       setError(message)
       setSvg('')
+    } finally {
+      if (renderVersionRef.current === renderVersion) {
+        setIsRendering(false)
+      }
     }
   }, [code, t])
 
   useEffect(() => {
-    renderDiagram()
-  }, [])
+    if (!isActive || isEditing) return
+
+    void renderDiagram()
+    return () => {
+      renderVersionRef.current++
+    }
+  }, [isActive, isEditing, renderDiagram])
+
+  useEffect(() => {
+    if (isEditing) return
+
+    setCode(node.attrs.code || '')
+    setDiagramType(node.attrs.type || 'flowchart')
+  }, [isEditing, node.attrs.code, node.attrs.type])
 
   useEffect(() => {
     const detected = detectDiagramType(code)
@@ -86,15 +148,9 @@ function MermaidDiagramView({ node, updateAttributes }: ReactNodeViewProps) {
     }
   }, [code, diagramType])
 
-  // 退出编辑模式后刷新预览
-  useEffect(() => {
-    if (!isEditing) {
-      renderDiagram()
-    }
-  }, [isEditing])
-
   const handleUpdate = () => {
     updateAttributes({ code, type: diagramType })
+    activate()
     setIsEditing(false)
   }
 
@@ -115,90 +171,107 @@ function MermaidDiagramView({ node, updateAttributes }: ReactNodeViewProps) {
 
   return (
     <NodeViewWrapper className="mermaid-diagram-wrapper my-4">
-      {/* Preview Mode */}
-      {!isEditing && (
-        <div
-          className="mermaid-preview rounded-lg border border-border bg-card overflow-x-auto cursor-pointer"
-          onClick={() => setIsEditing(true)}
-        >
-          {error ? (
-            <div className="p-4 text-red-500 text-sm">
-              <p className="font-medium">{t('renderError')}</p>
-              <p className="mt-1">{error}</p>
-              <p className="mt-2 text-muted-foreground">{t('clickToEdit')}</p>
-            </div>
-          ) : svg ? (
-            <div
-              ref={containerRef}
-              className="mermaid-svg p-4 flex justify-center"
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              <span>{t('clickToAdd')}</span>
-            </div>
-          )}
-
-          <div className="mermaid-overlay opacity-0 hover:opacity-100 transition-opacity absolute top-2 right-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsEditing(true)
-              }}
-            >
-              <Code className="size-4" />
-            </Button>
+      <div ref={elementRef}>
+        {!isEditing && !isActive ? (
+          <div
+            className="min-h-40 cursor-pointer rounded-lg border bg-card p-4"
+            onClick={() => {
+              activate()
+              setIsEditing(true)
+            }}
+          >
+            <Skeleton className="h-32 w-full" />
           </div>
-        </div>
-      )}
+        ) : null}
 
-      {/* Edit Mode */}
-      {isEditing && (
-        <div className="mermaid-editor rounded-lg border border-border bg-card">
-          <div className="flex items-center gap-2 p-2 border-b bg-muted/50">
-            <ResponsiveSelect
-              title={t('title')}
-              value={diagramType}
-              onValueChange={setDiagramType}
-              className="h-8 w-35 text-xs"
-              options={DIAGRAM_TYPES.map(item => ({
-                value: item.type,
-                label: getLabel(item.type),
-              }))}
+        {/* Preview Mode */}
+        {!isEditing && isActive && (
+          <div
+            className="mermaid-preview rounded-lg border border-border bg-card overflow-x-auto cursor-pointer"
+            onClick={() => setIsEditing(true)}
+          >
+            {error ? (
+              <div className="p-4 text-sm text-destructive">
+                <p className="font-medium">{t('renderError')}</p>
+                <p className="mt-1">{error}</p>
+                <p className="mt-2 text-muted-foreground">{t('clickToEdit')}</p>
+              </div>
+            ) : svg ? (
+              <div
+                className="mermaid-svg flex justify-center p-4"
+                dangerouslySetInnerHTML={{ __html: svg }}
+              />
+            ) : isRendering ? (
+              <div className="p-4">
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                <span>{t('clickToAdd')}</span>
+              </div>
+            )}
+
+            <div className="mermaid-overlay absolute right-2 top-2 opacity-0 transition-opacity hover:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEditing(true)
+                }}
+              >
+                <Code data-icon="inline-start" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Mode */}
+        {isEditing && (
+          <div className="mermaid-editor rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-2 border-b bg-muted/50 p-2">
+              <ResponsiveSelect
+                title={t('title')}
+                value={diagramType}
+                onValueChange={setDiagramType}
+                className="h-8 w-35 text-xs"
+                options={DIAGRAM_TYPES.map(item => ({
+                  value: item.type,
+                  label: getLabel(item.type),
+                }))}
+              />
+
+              <div className="flex-1" />
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleUpdate}
+                title={t('done')}
+              >
+                <Check data-icon="inline-start" />
+              </Button>
+            </div>
+
+            <Textarea
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={handleKeyDown}
+              rows={8}
+              maxRows={20}
+              className="min-h-48 rounded-none border-0 font-mono shadow-none focus-visible:ring-0"
+              placeholder={t('placeholder')}
+              spellCheck={false}
             />
 
-            <div className="flex-1" />
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleUpdate}
-              title={t('done')}
-            >
-              <Check className="size-4" />
-            </Button>
+            {error && (
+              <div className="border-t bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                {error}
+              </div>
+            )}
           </div>
-
-          <Textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={8}
-            maxRows={20}
-            className="min-h-48 rounded-none border-0 font-mono shadow-none focus-visible:ring-0"
-            placeholder={t('placeholder')}
-            spellCheck={false}
-          />
-
-          {error && (
-            <div className="px-3 py-2 text-xs text-red-500 bg-red-50 border-t">
-              {error}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </NodeViewWrapper>
   )
 }

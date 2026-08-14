@@ -1,13 +1,36 @@
-'use client'
-
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import CodeBlock, { type CodeBlockOptions } from '@tiptap/extension-code-block'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { TextSelection } from '@tiptap/pm/state'
 import { CodeBlockView } from './code-block-view'
+import { createViewportLowlightPlugin } from './viewport-lowlight-plugin'
 
-export const StableCodeBlockLowlight = CodeBlockLowlight.extend({
+interface ViewportCodeBlockOptions extends CodeBlockOptions {
+  shouldHighlight?: () => boolean
+}
+
+export const StableCodeBlockLowlight = CodeBlock.extend<ViewportCodeBlockOptions>({
+  addOptions() {
+    return {
+      ...this.parent?.(),
+      shouldHighlight: undefined,
+    }
+  },
+
   addNodeView() {
     return ReactNodeViewRenderer(CodeBlockView)
+  },
+
+  addProseMirrorPlugins() {
+    const parentPlugins = this.parent?.() ?? []
+
+    return [
+      ...parentPlugins,
+      createViewportLowlightPlugin({
+        name: this.name,
+        defaultLanguage: this.options.defaultLanguage,
+        shouldHighlight: this.options.shouldHighlight,
+      }),
+    ]
   },
 
   addKeyboardShortcuts() {

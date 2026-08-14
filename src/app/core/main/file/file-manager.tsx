@@ -41,6 +41,10 @@ import {
   moveFileManagerEntries,
 } from "./file-dnd"
 import {
+  activeEditorPathIsAffected,
+  prepareActiveEditorPathMutationDurably,
+} from '@/lib/editor-deactivation'
+import {
   Empty,
   EmptyContent,
   EmptyDescription,
@@ -379,9 +383,6 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   async function cleanDeletedLocalEntryTabs(entry: FileSelectionEntry) {
     if (entry.isDirectory) {
       await cleanTabsByDeletedFolder(entry.path)
-      if (activeFilePath === entry.path || activeFilePath.startsWith(`${entry.path}/`)) {
-        setActiveFilePath('')
-      }
       return
     }
     await cleanTabsByDeletedFile(entry.path)
@@ -402,6 +403,11 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     if (!confirmed) {
       return
     }
+
+    if (!await prepareActiveEditorPathMutationDurably(
+      activeFilePath,
+      entries.map(entry => entry.path),
+    )) return
 
     try {
       const trashedCount = await moveEntriesToSystemTrash(entries.map(entry => entry.path))
@@ -433,6 +439,11 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   }
 
   async function moveEntriesToRoot(sourcePaths: string[]) {
+    const movesActiveFile = sourcePaths.some(sourcePath => (
+      activeEditorPathIsAffected(activeFilePath, sourcePath)
+    ))
+    if (!await prepareActiveEditorPathMutationDurably(activeFilePath, sourcePaths)) return
+
     const batchResult = await moveFileManagerEntries(sourcePaths, '')
     if (batchResult.failed.length > 0) {
       if (batchResult.failed.some(failure => failure.reason === 'rollback-failed')) {
@@ -454,7 +465,13 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       await syncOpenTabsForPathChange(result.sourcePath, result.targetPath)
     }
     if (requiresReload) await loadFileTree({ skipRemoteSync: true })
-    if (nextActiveFilePath !== activeFilePath) setActiveFilePath(nextActiveFilePath)
+    if (nextActiveFilePath !== activeFilePath) {
+      setActiveFilePath(
+        nextActiveFilePath,
+        true,
+        movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+      )
+    }
     setSelectedFilePaths(batchResult.moved.map(result => result.targetPath))
     if (batchResult.moved.length > 1) {
       toast({

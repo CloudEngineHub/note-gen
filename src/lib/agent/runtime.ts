@@ -330,7 +330,48 @@ function validateQuotedEditorWrite(
     return null
   }
 
-  if (toolName === 'editor_replace_range' && quote.from >= 0 && quote.to >= quote.from) {
+  const hasExactRange = quote.from >= 0 && quote.to >= quote.from
+  const hasExactLines = quote.startLine >= 1 && quote.endLine >= quote.startLine
+  const editorWriteTools = new Set([
+    'editor_insert_at_cursor',
+    'editor_replace_range',
+    'editor_replace_lines',
+    'editor_apply_transaction',
+  ])
+
+  if (editorWriteTools.has(toolName)) {
+    const quotePath = quote.articlePath
+    const activeFilePath = context.activeFilePath
+    if (
+      !quotePath
+      || !activeFilePath
+      || normalizeFilePathForCompare(quotePath) !== normalizeFilePathForCompare(activeFilePath)
+    ) {
+      return {
+        ok: false,
+        message: '引用内容不属于当前活动编辑器。请重新打开并引用目标文件后再修改。',
+        error: 'QUOTED_EDITOR_TARGET_CHANGED',
+      }
+    }
+  }
+
+  if (!hasExactRange && !hasExactLines && editorWriteTools.has(toolName)) {
+    if (
+      toolName === 'editor_insert_at_cursor'
+      && args.replaceSelection === true
+      && typeof quote.fullContent === 'string'
+      && typeof quote.selectionToken === 'string'
+    ) {
+      return null
+    }
+    return {
+      ok: false,
+      message: '当前可读取选中文本，但无法安全映射到 Markdown 源码位置。只能使用 editor_insert_at_cursor，并设置 replaceSelection=true；若选区已变化，该操作会自动失败。',
+      error: 'SELECTION_TARGET_UNAVAILABLE',
+    }
+  }
+
+  if (toolName === 'editor_replace_range' && hasExactRange) {
     const from = getNumberArg(args, 'from')
     const to = getNumberArg(args, 'to')
     if (from !== quote.from || to !== quote.to) {

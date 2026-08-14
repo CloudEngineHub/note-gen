@@ -10,6 +10,7 @@ import { clearAiSuggestionHighlight, setAiSuggestionHighlight } from './ai-sugge
 
 interface AISuggestionFloatingProps {
   editor: Editor
+  onPendingChange?: (pending: boolean) => void
 }
 
 interface SuggestionData {
@@ -75,7 +76,7 @@ function calculateFloatingPosition(
   }
 }
 
-export function AISuggestionFloating({ editor }: AISuggestionFloatingProps) {
+export function AISuggestionFloating({ editor, onPendingChange }: AISuggestionFloatingProps) {
   const t = useTranslations('editor')
   const tCommon = useTranslations()
   const [suggestion, setSuggestion] = useState<SuggestionData | null>(null)
@@ -96,11 +97,13 @@ export function AISuggestionFloating({ editor }: AISuggestionFloatingProps) {
 
   useEffect(() => {
     setAiSuggestionShortcutVisible(isVisible)
+    onPendingChange?.(isVisible)
 
     return () => {
       setAiSuggestionShortcutVisible(false)
+      onPendingChange?.(false)
     }
-  }, [isVisible])
+  }, [isVisible, onPendingChange])
 
   useEffect(() => {
     return () => {

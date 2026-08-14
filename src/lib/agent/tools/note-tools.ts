@@ -15,6 +15,20 @@ import emitter from '@/lib/emitter'
 import { getVectorDocumentKey } from '@/lib/vector-document-key'
 import { Store } from '@tauri-apps/plugin-store'
 import { DEFAULT_EXCLUDED_RAG_PATHS, isPathAllowedForRag } from '@/lib/rag-retrieval-policy'
+import {
+  markEditorPathMutation,
+  prepareActiveEditorDeactivation,
+  prepareActiveEditorDeactivationDurably,
+  prepareActiveEditorPathMutationDurably,
+  runEditorPathWriteTransaction,
+} from '@/lib/editor-deactivation'
+
+function activeEditorMutationBlockedResult(): ToolResult {
+  return {
+    success: false,
+    error: '当前编辑器正在处理异步内容，文件操作已取消',
+  }
+}
 
 function normalizeLinkedCandidate(candidate: unknown): string {
   return typeof candidate === 'string' ? candidate.trim() : ''
@@ -398,6 +412,15 @@ export const createFileTool: Tool = {
         }
       }
 
+      const articleStore = useArticleStore.getState()
+      const activatesCreatedFile = filePath.endsWith('.md')
+      if (
+        activatesCreatedFile
+        && !await prepareActiveEditorDeactivationDurably(articleStore.activeFilePath)
+      ) {
+        return activeEditorMutationBlockedResult()
+      }
+
       if (needsParentFolder) {
         const specialParentRelativePath = isSpecialSkillPath
           ? `article/${parentFolderPath}`.replace(/^article\/article\//, 'article/')
@@ -429,7 +452,6 @@ export const createFileTool: Tool = {
       // 构建工作区完整路径
       const fullPath = `${workspacePath}/${filePath}`
 
-      const articleStore = useArticleStore.getState()
       const createdContent = params.content
       const inserted = articleStore.insertLocalEntry(filePath, false)
       await articleStore.ensurePathExpanded(filePath)
@@ -438,12 +460,16 @@ export const createFileTool: Tool = {
       }
 
       // 如果是 Markdown 文件，选中并读取
-      if (filePath.endsWith('.md')) {
+      if (activatesCreatedFile) {
         emitter.emit('editor-file-content-updated', {
           path: filePath,
           content: createdContent,
         })
-        await articleStore.setActiveFilePath(filePath)
+        await articleStore.setActiveFilePath(
+          filePath,
+          false,
+          { deactivationAlreadyPrepared: true },
+        )
         articleStore.setCurrentArticle(createdContent)
         emitter.emit('external-content-update', createdContent)
       }
@@ -544,22 +570,62 @@ export const updateMarkdownFileTool: Tool = {
         }
       }
 
-      if (baseDir) {
-        await writeTextFile(path, params.content, { baseDir })
-      } else {
-        await writeTextFile(path, params.content)
+      const updatedContent = typeof params.content === 'string' ? params.content : String(params.content ?? '')
+      markEditorPathMutation(normalizedFilePath)
+      const didUpdate = await runEditorPathWriteTransaction(normalizedFilePath, async ({ hasQueuedSave }) => {
+        const latestContent = baseDir
+          ? await readTextFile(path, { baseDir })
+          : await readTextFile(path)
+        if (latestContent !== currentContent) return false
+
+        try {
+          if (baseDir) {
+            await writeTextFile(path, updatedContent, { baseDir })
+          } else {
+            await writeTextFile(path, updatedContent)
+          }
+        } catch (writeError) {
+          try {
+            if (baseDir) {
+              await writeTextFile(path, currentContent, { baseDir })
+            } else {
+              await writeTextFile(path, currentContent)
+            }
+          } catch (restoreError) {
+            console.error(`恢复更新失败的文件时出错: ${normalizedFilePath}`, restoreError)
+          }
+          throw writeError
+        }
+
+        const targetIsActive = useArticleStore.getState().activeFilePath === normalizedFilePath
+        const editorIsStable = !targetIsActive || prepareActiveEditorDeactivation()
+        if (!editorIsStable || hasQueuedSave()) {
+          if (baseDir) {
+            await writeTextFile(path, currentContent, { baseDir })
+          } else {
+            await writeTextFile(path, currentContent)
+          }
+          return false
+        }
+        markEditorPathMutation(normalizedFilePath)
+        return true
+      })
+      if (!didUpdate) {
+        return {
+          success: false,
+          error: `文件在更新期间发生变化，已取消覆盖: ${normalizedFilePath}`,
+        }
       }
 
-      const updatedContent = typeof params.content === 'string' ? params.content : String(params.content ?? '')
-      const articleStore = useArticleStore.getState()
       emitter.emit('editor-file-content-updated', {
         path: normalizedFilePath,
         content: updatedContent,
       })
 
-      if (articleStore.activeFilePath === normalizedFilePath) {
+      const latestArticleStore = useArticleStore.getState()
+      if (latestArticleStore.activeFilePath === normalizedFilePath) {
         // Keep the store and editor in sync without routing through the debounced save path.
-        articleStore.setCurrentArticle(updatedContent)
+        latestArticleStore.setCurrentArticle(updatedContent)
         emitter.emit('external-content-update', updatedContent)
       }
 
@@ -602,8 +668,12 @@ export const deleteMarkdownFileTool: Tool = {
       const articleStore = useArticleStore.getState()
       const normalizedFilePath = await ensureSafeWorkspaceRelativePath(params.filePath)
 
-      // 检查是否是当前打开的文件
-      const isCurrentFile = articleStore.activeFilePath === normalizedFilePath
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        [normalizedFilePath],
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
 
       // 统一使用 getFilePathOptions 来处理路径
       const { path, baseDir } = await getFilePathOptions(normalizedFilePath)
@@ -619,6 +689,8 @@ export const deleteMarkdownFileTool: Tool = {
         }
       }
 
+      await articleStore.cleanTabsByDeletedFile(normalizedFilePath)
+
       // 删除向量数据库中的记录
       const filename = normalizedFilePath.split('/').pop() || normalizedFilePath
       try {
@@ -631,14 +703,6 @@ export const deleteMarkdownFileTool: Tool = {
       const removed = articleStore.removeLocalEntry(normalizedFilePath)
       if (!removed) {
         await articleStore.loadFileTree()
-      }
-
-      await articleStore.cleanTabsByDeletedFile(normalizedFilePath)
-
-      // 如果删除的是当前打开的文件，取消选择并清空内容
-      if (isCurrentFile) {
-        await articleStore.setActiveFilePath('')
-        articleStore.setCurrentArticle('')
       }
 
       return {
@@ -990,18 +1054,20 @@ export const deleteMarkdownFilesBatchTool: Tool = {
       }
 
       const articleStore = useArticleStore.getState()
+      const normalizedFilePaths = await Promise.all(
+        params.filePaths.map(filePath => ensureSafeWorkspaceRelativePath(filePath))
+      )
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        normalizedFilePaths,
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
       const results = []
       const errors = []
-      let currentFileDeleted = false
 
-      for (const filePath of params.filePaths) {
+      for (const normalizedFilePath of normalizedFilePaths) {
         try {
-          const normalizedFilePath = await ensureSafeWorkspaceRelativePath(filePath)
-
-          if (articleStore.activeFilePath === normalizedFilePath) {
-            currentFileDeleted = true
-          }
-
           // 统一使用 getFilePathOptions 来处理路径
           const { path, baseDir } = await getFilePathOptions(normalizedFilePath)
 
@@ -1011,9 +1077,11 @@ export const deleteMarkdownFilesBatchTool: Tool = {
             await remove(path)
           }
 
+          await articleStore.cleanTabsByDeletedFile(normalizedFilePath)
+
           results.push(normalizedFilePath)
         } catch (error) {
-          errors.push({ filePath, error: String(error) })
+          errors.push({ filePath: normalizedFilePath, error: String(error) })
         }
       }
 
@@ -1029,11 +1097,6 @@ export const deleteMarkdownFilesBatchTool: Tool = {
       }
 
       await articleStore.loadFileTree()
-
-      if (currentFileDeleted) {
-        await articleStore.setActiveFilePath('')
-        articleStore.setCurrentArticle('')
-      }
 
       // 只要有任何文件删除失败，就标记为失败状态
       const hasErrors = errors.length > 0
@@ -1276,12 +1339,23 @@ export const renameFileTool: Tool = {
         }
       }
 
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        [normalizedFilePath],
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
+      if (isCurrentFile) {
+        currentFileContent = useArticleStore.getState().currentArticle
+      }
+
       // 执行重命名
       if (baseDir) {
         await rename(oldPath, newPath, { oldPathBaseDir: baseDir, newPathBaseDir: baseDir })
       } else {
         await rename(oldPath, newPath)
       }
+      await articleStore.syncOpenTabsForPathChange(normalizedFilePath, newRelativePath)
 
       const migratedVectorUpdatedAt = await mirrorVectorDocuments(normalizedFilePath, newRelativePath)
       if (migratedVectorUpdatedAt !== null) {
@@ -1297,7 +1371,6 @@ export const renameFileTool: Tool = {
         await articleStore.loadFileTree()
       }
 
-      await articleStore.syncOpenTabsForPathChange(normalizedFilePath, newRelativePath)
       const pathChangedEvent: { oldPath: string; newPath: string; content?: string } = {
         oldPath: normalizedFilePath,
         newPath: newRelativePath,
@@ -1309,7 +1382,11 @@ export const renameFileTool: Tool = {
 
       // 如果重命名的是当前打开的文件，更新 activeFilePath 并重新读取内容
       if (isCurrentFile) {
-        await articleStore.setActiveFilePath(newRelativePath)
+        await articleStore.setActiveFilePath(
+          newRelativePath,
+          true,
+          { deactivationAlreadyPrepared: true },
+        )
         articleStore.setCurrentArticle(currentFileContent)
         emitter.emit('external-content-update', currentFileContent)
       }
@@ -1434,12 +1511,23 @@ export const moveFileTool: Tool = {
         }
       }
 
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        [normalizedFilePath],
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
+      if (isCurrentFile) {
+        currentFileContent = useArticleStore.getState().currentArticle
+      }
+
       // 执行移动（使用 rename）
       if (oldBaseDir) {
         await rename(oldPath, newPath, { oldPathBaseDir: oldBaseDir, newPathBaseDir: oldBaseDir })
       } else {
         await rename(oldPath, newPath)
       }
+      await articleStore.syncOpenTabsForPathChange(normalizedFilePath, newRelativePath)
 
       const migratedVectorUpdatedAt = await mirrorVectorDocuments(normalizedFilePath, newRelativePath)
       if (migratedVectorUpdatedAt !== null) {
@@ -1455,7 +1543,6 @@ export const moveFileTool: Tool = {
         await articleStore.loadFileTree()
       }
 
-      await articleStore.syncOpenTabsForPathChange(normalizedFilePath, newRelativePath)
       const pathChangedEvent: { oldPath: string; newPath: string; content?: string } = {
         oldPath: normalizedFilePath,
         newPath: newRelativePath,
@@ -1467,7 +1554,11 @@ export const moveFileTool: Tool = {
 
       // 如果移动的是当前打开的文件，更新 activeFilePath 并重新读取内容
       if (isCurrentFile) {
-        await articleStore.setActiveFilePath(newRelativePath)
+        await articleStore.setActiveFilePath(
+          newRelativePath,
+          true,
+          { deactivationAlreadyPrepared: true },
+        )
         articleStore.setCurrentArticle(currentFileContent)
         emitter.emit('external-content-update', currentFileContent)
       }
@@ -1655,13 +1746,22 @@ export const moveFilesBatchTool: Tool = {
       }
 
       const articleStore = useArticleStore.getState()
+      const normalizedFilePaths = await Promise.all(
+        params.files.map(file => ensureSafeWorkspaceRelativePath(file.filePath))
+      )
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        normalizedFilePaths,
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
       const results = []
       const errors = []
       let currentFileMoved = false
 
-      for (const file of params.files) {
+      for (const [index, file] of params.files.entries()) {
         try {
-          const filePath = await ensureSafeWorkspaceRelativePath(file.filePath)
+          const filePath = normalizedFilePaths[index]
           const targetFolderPath = await ensureSafeWorkspaceRelativePath(file.targetFolderPath)
 
           // 检查是否是当前打开的文件
@@ -1710,6 +1810,7 @@ export const moveFilesBatchTool: Tool = {
           } else {
             await rename(oldPath, newPath)
           }
+          await articleStore.syncOpenTabsForPathChange(filePath, newRelativePath)
 
           const migratedVectorUpdatedAt = await mirrorVectorDocuments(filePath, newRelativePath)
           if (migratedVectorUpdatedAt !== null) {
@@ -1732,8 +1833,11 @@ export const moveFilesBatchTool: Tool = {
       if (currentFileMoved && results.length > 0) {
         const movedFile = results.find(r => articleStore.activeFilePath === r.oldPath)
         if (movedFile) {
-          await articleStore.setActiveFilePath(movedFile.newPath)
-          await articleStore.readArticle(movedFile.newPath)
+          await articleStore.setActiveFilePath(
+            movedFile.newPath,
+            true,
+            { deactivationAlreadyPrepared: true },
+          )
         }
       }
 
@@ -1923,13 +2027,22 @@ export const renameFilesBatchTool: Tool = {
       }
 
       const articleStore = useArticleStore.getState()
+      const normalizedFilePaths = await Promise.all(
+        params.files.map(file => ensureSafeWorkspaceRelativePath(file.filePath))
+      )
+      if (!await prepareActiveEditorPathMutationDurably(
+        articleStore.activeFilePath,
+        normalizedFilePaths,
+      )) {
+        return activeEditorMutationBlockedResult()
+      }
       const results = []
       const errors = []
       let currentFileRenamed = false
 
-      for (const file of params.files) {
+      for (const [index, file] of params.files.entries()) {
         try {
-          const filePath = await ensureSafeWorkspaceRelativePath(file.filePath)
+          const filePath = normalizedFilePaths[index]
           let newName = file.newName
 
           // 验证新文件名以 .md 结尾
@@ -1969,6 +2082,7 @@ export const renameFilesBatchTool: Tool = {
           } else {
             await rename(oldPath, newPath)
           }
+          await articleStore.syncOpenTabsForPathChange(filePath, newRelativePath)
 
           const migratedVectorUpdatedAt = await mirrorVectorDocuments(filePath, newRelativePath)
           if (migratedVectorUpdatedAt !== null) {
@@ -1995,8 +2109,11 @@ export const renameFilesBatchTool: Tool = {
       if (currentFileRenamed && results.length > 0) {
         const renamedFile = results.find(r => articleStore.activeFilePath === r.oldPath)
         if (renamedFile) {
-          await articleStore.setActiveFilePath(renamedFile.newPath)
-          await articleStore.readArticle(renamedFile.newPath)
+          await articleStore.setActiveFilePath(
+            renamedFile.newPath,
+            true,
+            { deactivationAlreadyPrepared: true },
+          )
         }
       }
 

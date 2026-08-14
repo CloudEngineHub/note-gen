@@ -107,6 +107,16 @@ export function EditorLayout() {
   const [showOrganizeNextStepDialog, setShowOrganizeNextStepDialog] = useState(false)
   const [onboardingResumeFilePath, setOnboardingResumeFilePath] = useState('')
 
+  const canDeactivateActiveEditor = useCallback(() => {
+    let canDeactivate = true
+    emitter.emit('editor-prepare-deactivate', {
+      resolve: (nextValue) => {
+        canDeactivate = canDeactivate && nextValue
+      },
+    })
+    return canDeactivate
+  }, [])
+
   useEffect(() => {
     const handleFileContentUpdated = (event: { path: string; content: string }) => {
       if (!event?.path) {
@@ -371,6 +381,10 @@ export function EditorLayout() {
   }, [activeFilePath, isFolderPath, addTab, setActiveTabId, clearActiveMark])
 
   const activateTab = useCallback((tab?: TabInfo | null) => {
+    const nextTabId = tab?.id ?? ''
+    if (nextTabId !== localActiveTabId && !canDeactivateActiveEditor()) {
+      return
+    }
     if (!tab) {
       clearActiveMark()
       setActiveCanvasId(null)
@@ -399,7 +413,7 @@ export function EditorLayout() {
     clearActiveMark()
     setActiveCanvasId(null)
     setActiveFilePath(tab.path)
-  }, [clearActiveMark, getRecordIdForTab, isCanvasEditorTab, isRecordEditorTab, setActiveCanvasId, setActiveFilePath, setActiveMarkId, setActiveTabId])
+  }, [canDeactivateActiveEditor, clearActiveMark, getRecordIdForTab, isCanvasEditorTab, isRecordEditorTab, localActiveTabId, setActiveCanvasId, setActiveFilePath, setActiveMarkId, setActiveTabId])
 
   useEffect(() => {
     const restoredActiveTab = openTabs.find(tab => tab.id === activeTabId)
@@ -420,23 +434,25 @@ export function EditorLayout() {
 
   // Handle new tab button - return to empty state without creating a file
   const handleNewTab = useCallback(async () => {
+    if (!canDeactivateActiveEditor()) return
     await Promise.all([
       setActiveFilePath(''),
       setActiveTabId(''),
     ])
     clearActiveMark()
     setActiveCanvasId(null)
-  }, [clearActiveMark, setActiveCanvasId, setActiveFilePath, setActiveTabId])
+  }, [canDeactivateActiveEditor, clearActiveMark, setActiveCanvasId, setActiveFilePath, setActiveTabId])
 
   // Handle close tab
   const handleCloseTab = useCallback((closedPath: string) => {
-    // Bug fix: Emit event to clean up loadedPathsRef in MdEditor
-    emitter.emit('editor-file-close', { path: closedPath })
-    delete tabContentsRef.current[closedPath]
-
     // Get closedTab from the current ref value
     const closedTab = tabsRef.current.find(t => t.path === closedPath)
     if (!closedTab) return
+    if (localActiveTabId === closedTab.id && !canDeactivateActiveEditor()) return
+
+    // Bug fix: Emit event to clean up loadedPathsRef in MdEditor
+    emitter.emit('editor-file-close', { path: closedPath })
+    delete tabContentsRef.current[closedPath]
 
     // Save the current tabs count before removing
     const tabsCountBeforeRemove = tabsRef.current.length
@@ -459,10 +475,12 @@ export function EditorLayout() {
         activateTab(null)
       }
     }
-  }, [activateTab, localActiveTabId, removeTab])
+  }, [activateTab, canDeactivateActiveEditor, localActiveTabId, removeTab])
 
   // Handle close other tabs
   const handleCloseOtherTabs = useCallback((keepPath: string) => {
+    const keptTab = tabsRef.current.find(t => t.path === keepPath)
+    if (keptTab && localActiveTabId !== keptTab.id && !canDeactivateActiveEditor()) return
     const tabsToRemove = tabsRef.current.filter(t => t.path !== keepPath)
 
     tabsToRemove.forEach(tab => {
@@ -471,25 +489,26 @@ export function EditorLayout() {
     })
 
     // Update active tab if needed
-    const keptTab = tabsRef.current.find(t => t.path === keepPath)
     if (keptTab && localActiveTabId !== keptTab.id) {
       activateTab(keptTab)
     }
-  }, [activateTab, localActiveTabId, removeTab])
+  }, [activateTab, canDeactivateActiveEditor, localActiveTabId, removeTab])
 
   // Handle close all tabs
   const handleCloseAllTabs = useCallback(() => {
+    if (!canDeactivateActiveEditor()) return
     tabsRef.current.forEach(tab => {
       delete tabContentsRef.current[tab.path]
       removeTab(tab.id)
     })
     activateTab(null)
-  }, [activateTab, removeTab])
+  }, [activateTab, canDeactivateActiveEditor, removeTab])
 
   // Handle close left tabs
   const handleCloseLeftTabs = useCallback((rightPath: string) => {
     const rightIndex = tabsRef.current.findIndex(t => t.path === rightPath)
     const tabsToRemove = tabsRef.current.slice(0, rightIndex)
+    if (tabsToRemove.some(tab => tab.id === localActiveTabId) && !canDeactivateActiveEditor()) return
 
     tabsToRemove.forEach(tab => {
       delete tabContentsRef.current[tab.path]
@@ -503,7 +522,7 @@ export function EditorLayout() {
         activateTab(rightTab)
       }
     }
-  }, [activateTab, localActiveTabId, removeTab])
+  }, [activateTab, canDeactivateActiveEditor, localActiveTabId, removeTab])
 
   // Handle close right tabs
   const handleCloseRightTabs = useCallback((leftPath: string) => {
@@ -511,6 +530,7 @@ export function EditorLayout() {
     const leftTab = tabsRef.current[leftIndex]
     const tabsToRemove = tabsRef.current.slice(leftIndex + 1)
     const shouldActivateLeftTab = tabsToRemove.some(tab => tab.id === localActiveTabId)
+    if (shouldActivateLeftTab && !canDeactivateActiveEditor()) return
 
     tabsToRemove.forEach(tab => {
       delete tabContentsRef.current[tab.path]
@@ -519,7 +539,7 @@ export function EditorLayout() {
     if (shouldActivateLeftTab) {
       activateTab(leftTab)
     }
-  }, [activateTab, localActiveTabId, removeTab])
+  }, [activateTab, canDeactivateActiveEditor, localActiveTabId, removeTab])
 
   const onboardingAgentPrompt = getOnboardingAgentPrompt({
     intro: tOnboarding('agentPrompt.intro'),

@@ -47,6 +47,10 @@ import { getFileTreeSyncStatus, validateFileTreeName, type FileTreeSyncStatus } 
 import { FileTreeDecorations } from "../file-tree-decorations";
 import { moveEntryToSystemTrash } from '../system-trash'
 import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
+import {
+  activeEditorPathIsAffected,
+  prepareActiveEditorPathMutationDurably,
+} from '@/lib/editor-deactivation'
 
 export function FolderItem({
   item,
@@ -372,16 +376,13 @@ export function FolderItem({
 
       if (!confirmed) return
 
+      if (!await prepareActiveEditorPathMutationDurably(activeFilePath, [path])) return
+
       const trashed = await moveEntryToSystemTrash(path)
       const removedVectorEntries = new Map(
         Array.from(vectorIndexedFiles.entries())
           .filter(([vectorPath]) => vectorPath === path || vectorPath.startsWith(`${path}/`))
       )
-
-      // 如果删除的文件夹包含当前活动文件，清除活动文件路径
-      if (activeFilePath && activeFilePath.startsWith(path)) {
-        setActiveFilePath('')
-      }
 
       await cleanTabsByDeletedFolder(path)
       if (removedVectorEntries.size > 0) {
@@ -468,6 +469,11 @@ export function FolderItem({
         sourcePath: path,
         targetRelativePath,
       })
+      const movesActiveFile = activeEditorPathIsAffected(activeFilePath, path)
+      if (!await prepareActiveEditorPathMutationDurably(activeFilePath, [path])) {
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
       
       // 根据工作区类型执行重命名操作
       try {
@@ -479,6 +485,7 @@ export function FolderItem({
             oldPathBaseDir: BaseDirectory.AppData
           })
         }
+        await syncOpenTabsForPathChange(path, targetRelativePath)
         try {
           await rewriteWorkspaceMarkdownMediaPaths([{
             sourcePath: path,
@@ -493,6 +500,7 @@ export function FolderItem({
               oldPathBaseDir: BaseDirectory.AppData,
             })
           }
+          await syncOpenTabsForPathChange(targetRelativePath, path)
           throw error
         }
       } catch (error) {
@@ -500,12 +508,15 @@ export function FolderItem({
         setTimeout(() => inputRef.current?.focus(), 0)
         return
       }
+      const nextActiveFilePath = getPathAfterMove(activeFilePath, path, targetRelativePath)
       const { renameVectorDocumentsByPrefix } = await import('@/db/vector')
       await renameVectorDocumentsByPrefix(path, targetRelativePath)
-      const nextActiveFilePath = getPathAfterMove(activeFilePath, path, targetRelativePath)
-      await syncOpenTabsForPathChange(path, targetRelativePath)
       if (nextActiveFilePath !== activeFilePath) {
-        setActiveFilePath(nextActiveFilePath)
+        await setActiveFilePath(
+          nextActiveFilePath,
+          true,
+          movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+        )
       }
     } else {
       // 已有文件夹但名称未改变，直接取消编辑
@@ -601,6 +612,15 @@ export function FolderItem({
     e.stopPropagation()
     clearDragExpandTimer()
     const renamePaths = getFileManagerDragPaths(e.dataTransfer)
+    const movesActiveFile = renamePaths.some(sourcePath => (
+      activeEditorPathIsAffected(activeFilePath, sourcePath)
+    ))
+
+    if (!await prepareActiveEditorPathMutationDurably(activeFilePath, renamePaths)) {
+      setIsDragging(false)
+      setDragItemCount(0)
+      return
+    }
 
     try {
       const batchResult = await moveFileManagerEntries(renamePaths, path)
@@ -625,7 +645,13 @@ export function FolderItem({
       }
       if (requiresReload) await loadFileTree({ skipRemoteSync: true })
       if (!collapsibleList.includes(path)) await setCollapsibleList(path, true)
-      if (nextActiveFilePath !== activeFilePath) setActiveFilePath(nextActiveFilePath)
+      if (nextActiveFilePath !== activeFilePath) {
+        setActiveFilePath(
+          nextActiveFilePath,
+          true,
+          movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+        )
+      }
       setSelectedFilePaths(batchResult.moved.map(result => result.targetPath))
       if (batchResult.moved.length > 1) {
         toast({

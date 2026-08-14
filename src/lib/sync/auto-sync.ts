@@ -15,7 +15,7 @@ import {
 import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { getCurrentSyncContext, getSyncMetadataKey } from '@/lib/sync/sync-context'
 import { toast } from '@/hooks/use-toast'
-import { readTextFile, writeTextFile, stat, mkdir, exists } from '@tauri-apps/plugin-fs'
+import { readTextFile, writeTextFile, stat, mkdir, exists, remove } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 import {
   checkFileLock,
@@ -30,6 +30,13 @@ import { sanitizeFilePath, hasInvalidFileNameChars } from './filename-utils'
 import { useSyncConfirmStore } from '@/stores/sync-confirm'
 import useSyncStore from '@/stores/sync'
 import emitter from '@/lib/emitter'
+import useArticleStore from '@/stores/article'
+import {
+  markEditorPathMutation,
+  prepareActiveEditorDeactivation,
+  prepareActiveEditorDeactivationDurably,
+  runEditorPathWriteTransaction,
+} from '@/lib/editor-deactivation'
 
 // Store 实例缓存
 let storeInstance: Store | null = null
@@ -760,7 +767,6 @@ export async function autoSyncIfNeeded(path: string, options: {
 async function performSync(path: string, enableConflictResolution: boolean): Promise<string | null> {
   try {
     // 获取本地内容用于冲突检测
-    let localContent = ''
     let actualPath = path
     
     // 检查并清理文件名
@@ -768,14 +774,45 @@ async function performSync(path: string, enableConflictResolution: boolean): Pro
       actualPath = sanitizeFilePath(path)
     }
     
-    try {
+    type LocalFileSnapshot = { exists: boolean; content: string }
+    const readCurrentLocalSnapshot = async (): Promise<LocalFileSnapshot> => {
       const workspace = await getWorkspacePath()
       const pathOptions = await getFilePathOptions(actualPath)
-      if (workspace.isCustom) {
-        localContent = await readTextFile(pathOptions.path)
-      } else {
-        localContent = await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
+      const fileExists = workspace.isCustom
+        ? await exists(pathOptions.path)
+        : await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+      if (!fileExists) return { exists: false, content: '' }
+
+      const content = workspace.isCustom
+        ? await readTextFile(pathOptions.path)
+        : await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
+      return { exists: true, content }
+    }
+    const restoreLocalSnapshot = async (snapshot: LocalFileSnapshot): Promise<void> => {
+      if (snapshot.exists) {
+        await saveLocalFile(actualPath, snapshot.content)
+        return
       }
+
+      const workspace = await getWorkspacePath()
+      const pathOptions = await getFilePathOptions(actualPath)
+      const fileExists = workspace.isCustom
+        ? await exists(pathOptions.path)
+        : await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+      if (!fileExists) return
+      if (workspace.isCustom) {
+        await remove(pathOptions.path)
+      } else {
+        await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
+      }
+    }
+    const snapshotsMatch = (left: LocalFileSnapshot, right: LocalFileSnapshot) => (
+      left.exists === right.exists && left.content === right.content
+    )
+
+    let localSnapshot: LocalFileSnapshot = { exists: false, content: '' }
+    try {
+      localSnapshot = await readCurrentLocalSnapshot()
     } catch (error) {
       // 本地文件不存在或目录不存在，这是正常的同步场景
       if (error instanceof Error && 
@@ -787,12 +824,24 @@ async function performSync(path: string, enableConflictResolution: boolean): Pro
       }
       // 继续处理，将直接拉取远程文件
     }
+    const localContent = localSnapshot.content
     
     const remoteContent = await pullRemoteFile(path)
 
     // 获取远程文件的 SHA，用于后续更新记录的 SHA
     const remoteInfo = await getRemoteFileInfo(path)
     const remoteSha = remoteInfo.sha
+
+    // The remote request can outlive a local edit. Flush a stable snapshot and
+    // abort this pull if the local file changed while the request was running.
+    if (!await prepareActiveEditorDeactivationDurably(actualPath)) return null
+    let latestLocalSnapshot: LocalFileSnapshot = { exists: false, content: '' }
+    try {
+      latestLocalSnapshot = await readCurrentLocalSnapshot()
+    } catch {
+      latestLocalSnapshot = { exists: false, content: '' }
+    }
+    if (!snapshotsMatch(latestLocalSnapshot, localSnapshot)) return null
 
     // 检测和处理冲突
     if (enableConflictResolution && localContent && localContent !== remoteContent) {
@@ -829,31 +878,98 @@ async function performSync(path: string, enableConflictResolution: boolean): Pro
           })
           return null
       }
+
+      if (!await prepareActiveEditorDeactivationDurably(actualPath)) return null
+      try {
+        latestLocalSnapshot = await readCurrentLocalSnapshot()
+      } catch {
+        latestLocalSnapshot = { exists: false, content: '' }
+      }
+      if (!snapshotsMatch(latestLocalSnapshot, localSnapshot)) return null
       
-      await saveLocalFile(actualPath, finalContent)
+      markEditorPathMutation(actualPath)
+      const didSave = await runEditorPathWriteTransaction(actualPath, async ({ hasQueuedSave }) => {
+        let snapshotAtGate: LocalFileSnapshot
+        try {
+          snapshotAtGate = await readCurrentLocalSnapshot()
+        } catch {
+          snapshotAtGate = { exists: false, content: '' }
+        }
+        if (!snapshotsMatch(snapshotAtGate, latestLocalSnapshot)) return false
+
+        try {
+          await saveLocalFile(actualPath, finalContent)
+        } catch (writeError) {
+          try {
+            await restoreLocalSnapshot(latestLocalSnapshot)
+          } catch (restoreError) {
+            console.error(`Failed to restore local content after syncing ${actualPath}:`, restoreError)
+          }
+          throw writeError
+        }
+        const targetIsActive = useArticleStore.getState().activeFilePath === actualPath
+        const editorIsStable = !targetIsActive || prepareActiveEditorDeactivation()
+        if (!editorIsStable || hasQueuedSave()) {
+          await restoreLocalSnapshot(latestLocalSnapshot)
+          return false
+        }
+        markEditorPathMutation(actualPath)
+        return true
+      })
+      if (!didSave) return null
+
+      // Apply the accepted snapshot before metadata awaits create another
+      // window for user input. Subsequent edits then naturally queue after it.
+      emitter.emit('sync-content-updated', { path: actualPath, content: finalContent })
       await updateFileSyncTime(actualPath)
 
       // 成功拉取后，更新记录的 SHA
       if (remoteSha) {
         await setLocalRecordedSha(actualPath, remoteSha)
       }
-
-      // 通知编辑器内容已更新
-      emitter.emit('sync-content-updated', { path: actualPath, content: finalContent })
 
       return finalContent
     } else {
       // 无冲突，直接保存
-      await saveLocalFile(actualPath, remoteContent)
+      markEditorPathMutation(actualPath)
+      const didSave = await runEditorPathWriteTransaction(actualPath, async ({ hasQueuedSave }) => {
+        let snapshotAtGate: LocalFileSnapshot
+        try {
+          snapshotAtGate = await readCurrentLocalSnapshot()
+        } catch {
+          snapshotAtGate = { exists: false, content: '' }
+        }
+        if (!snapshotsMatch(snapshotAtGate, latestLocalSnapshot)) return false
+
+        try {
+          await saveLocalFile(actualPath, remoteContent)
+        } catch (writeError) {
+          try {
+            await restoreLocalSnapshot(latestLocalSnapshot)
+          } catch (restoreError) {
+            console.error(`Failed to restore local content after syncing ${actualPath}:`, restoreError)
+          }
+          throw writeError
+        }
+        const targetIsActive = useArticleStore.getState().activeFilePath === actualPath
+        const editorIsStable = !targetIsActive || prepareActiveEditorDeactivation()
+        if (!editorIsStable || hasQueuedSave()) {
+          await restoreLocalSnapshot(latestLocalSnapshot)
+          return false
+        }
+        markEditorPathMutation(actualPath)
+        return true
+      })
+      if (!didSave) return null
+
+      // Keep the editor commit adjacent to the serialized file write.
+      emitter.emit('sync-content-updated', { path: actualPath, content: remoteContent })
       await updateFileSyncTime(actualPath)
 
       // 成功拉取后，更新记录的 SHA
       if (remoteSha) {
         await setLocalRecordedSha(actualPath, remoteSha)
       }
-
-      // 通知编辑器内容已更新
-      emitter.emit('sync-content-updated', { path: actualPath, content: remoteContent })
 
       return remoteContent
     }

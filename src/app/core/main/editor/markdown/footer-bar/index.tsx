@@ -23,6 +23,10 @@ interface FooterBarProps {
   viewMode?: 'visual' | 'source'
   onToggleViewMode?: () => void
   sourceMarkdown?: string
+  getMarkdown?: () => string
+  prepareExternalAction?: () => boolean
+  onMarkdownChange?: (markdown: string) => void
+  deferSourceStatistics?: boolean
 }
 
 export function FooterBar({
@@ -32,6 +36,10 @@ export function FooterBar({
   viewMode = 'visual',
   onToggleViewMode,
   sourceMarkdown,
+  getMarkdown,
+  prepareExternalAction,
+  onMarkdownChange,
+  deferSourceStatistics = false,
 }: FooterBarProps) {
   const activeFilePath = useArticleStore((state) => state.activeFilePath)
   const isMobile = isMobileDevice()
@@ -48,9 +56,9 @@ export function FooterBar({
           <FileText className="size-3.5 shrink-0" />
           <div className="min-w-0 flex items-center gap-1.5 overflow-hidden">
             <span className="block min-w-0 truncate font-medium text-foreground/90">{fileName}</span>
-            {showEditorStats ? (
+            {showEditorStats && !deferSourceStatistics ? (
               <div className="shrink-0">
-                <WordCount editor={editor} compact />
+                <WordCount editor={editor} sourceMarkdown={sourceMarkdown} compact />
               </div>
             ) : null}
           </div>
@@ -68,9 +76,15 @@ export function FooterBar({
               {viewMode === 'source' ? <Eye /> : <Code2 />}
             </Button>
           ) : null}
-          <HistorySheet editor={editor} />
-          <SyncButton />
-          <PullButton editor={editor} />
+          <HistorySheet editor={editor} prepareExternalAction={prepareExternalAction} onMarkdownChange={onMarkdownChange} />
+          <SyncButton getMarkdown={getMarkdown} prepareExternalAction={prepareExternalAction} />
+          <PullButton
+            editor={editor}
+            markdown={sourceMarkdown}
+            getMarkdown={getMarkdown}
+            prepareExternalAction={prepareExternalAction}
+            onMarkdownChange={onMarkdownChange}
+          />
         </div>
       </div>
     )
@@ -80,7 +94,9 @@ export function FooterBar({
     <div className="h-6 flex items-center justify-between px-3 border-t border-border bg-background text-xs text-muted-foreground">
       {/* Left side: Word count, Copy, Export, Outline */}
       <div className="flex items-center gap-1">
-        {showEditorStats ? <WordCount editor={editor} sourceMarkdown={sourceMarkdown} /> : null}
+        {showEditorStats && !deferSourceStatistics ? (
+          <WordCount editor={editor} sourceMarkdown={sourceMarkdown} />
+        ) : null}
         {onToggleViewMode ? (
           <Button
             type="button"
@@ -93,17 +109,25 @@ export function FooterBar({
             {viewMode === 'source' ? <Eye /> : <Code2 />}
           </Button>
         ) : null}
-        <CopyButton editor={editor} markdown={sourceMarkdown} />
-        <ExportButton editor={editor} markdown={sourceMarkdown} />
-        <OutlineToggle
-          editor={editor}
-          outlineOpen={outlineOpen}
-          onToggleOutline={onToggleOutline}
-        />
+        <CopyButton editor={editor} markdown={sourceMarkdown} getMarkdown={getMarkdown} />
+        <ExportButton editor={editor} markdown={sourceMarkdown} getMarkdown={getMarkdown} />
+        {onToggleOutline ? (
+          <OutlineToggle
+            editor={editor}
+            outlineOpen={outlineOpen}
+            onToggleOutline={onToggleOutline}
+          />
+        ) : null}
       </div>
 
       {/* Right side: Sync tools */}
-      <SyncTools editor={editor} />
+      <SyncTools
+        editor={editor}
+        markdown={sourceMarkdown}
+        getMarkdown={getMarkdown}
+        prepareExternalAction={prepareExternalAction}
+        onMarkdownChange={onMarkdownChange}
+      />
     </div>
   )
 }

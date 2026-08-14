@@ -20,9 +20,10 @@ import {
 interface ExportButtonProps {
   editor: Editor
   markdown?: string
+  getMarkdown?: () => string
 }
 
-export function ExportButton({ editor, markdown }: ExportButtonProps) {
+export function ExportButton({ editor, markdown, getMarkdown }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [exporting, setExporting] = useState<MarkdownExportFormat | null>(null)
 
@@ -42,8 +43,8 @@ export function ExportButton({ editor, markdown }: ExportButtonProps) {
         format,
         {
           baseName: getMarkdownExportBaseName(activeFilePath),
-          markdown: () => markdown ?? editor.getMarkdown(),
-          json: () => editor.getJSON(),
+          markdown: () => getMarkdown?.() ?? markdown ?? editor.getMarkdown(),
+          json: getMarkdown || markdown !== undefined ? undefined : () => editor.getJSON(),
           sourcePath: activeFilePath,
         },
         { onPdfRenderStart: showPdfExportStart },
@@ -63,7 +64,7 @@ export function ExportButton({ editor, markdown }: ExportButtonProps) {
       setExporting(null)
       setIsOpen(false)
     }
-  }, [editor, markdown, showPdfExportStart])
+  }, [editor, getMarkdown, markdown, showPdfExportStart])
 
   const handleExport = useCallback((format: MarkdownExportFormat) => {
     void runExport(format)

@@ -18,9 +18,15 @@ import {
 import { CloudFolderConfig, S3Config, WebDAVConfig } from '@/types/sync'
 import useSyncStore from '@/stores/sync'
 import { toast } from '@/hooks/use-toast'
-import { readTextFile } from '@tauri-apps/plugin-fs'
+import { exists, readTextFile, remove } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 import { shouldExclude } from '@/config/sync-exclusions'
+import {
+  getEditorPathMutationRevision,
+  prepareActiveEditorDeactivation,
+  prepareActiveEditorDeactivationDurably,
+  runEditorPathWriteTransaction,
+} from '@/lib/editor-deactivation'
 
 /**
  * 获取 GitLab 分支配置
@@ -98,6 +104,7 @@ export interface SyncResult {
   action: 'push' | 'pull' | 'delete' | 'none' | 'conflict'
   message?: string
   error?: string
+  content?: string
 }
 
 // 同步日志
@@ -317,7 +324,12 @@ export class SyncManager {
   /**
    * 从远程拉取文件
    */
-  async pullFile(path: string): Promise<SyncResult> {
+  async pullFile(
+    path: string,
+    // Direct pulls capture at function entry. Callers that perform version
+    // checks first pass the revision captured before those awaits.
+    initialEditorMutationRevision = getEditorPathMutationRevision(path),
+  ): Promise<SyncResult> {
     try {
       const platform = await this.getCurrentPlatform() as 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
       // S3 不需要 repo
@@ -390,19 +402,82 @@ export class SyncManager {
         if (platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder') {
           decodedContent = decodeBase64ToString(content)
         }
-        await saveLocalFile(path, decodedContent)
 
-        // 获取远程文件的 SHA 并更新本地记录
-        if (platform !== 's3' && platform !== 'webdav') {
-          const remoteSha = await this.getRemoteSha(path)
-          if (remoteSha) {
-            await setLocalRecordedSha(path, remoteSha)
+        if (!await prepareActiveEditorDeactivationDurably(path)) {
+          return { success: false, action: 'none', error: '编辑器正在处理未完成的内容' }
+        }
+        const localPathOptions = await getFilePathOptions(path)
+        const pullAccepted = await runEditorPathWriteTransaction(path, async ({ hasQueuedSave }) => {
+          const stableFileExists = localPathOptions.baseDir
+            ? await exists(localPathOptions.path, { baseDir: localPathOptions.baseDir })
+            : await exists(localPathOptions.path)
+          const stableContent = stableFileExists
+            ? localPathOptions.baseDir
+              ? await readTextFile(localPathOptions.path, { baseDir: localPathOptions.baseDir })
+              : await readTextFile(localPathOptions.path)
+            : null
+
+          const restoreStableContent = async () => {
+            if (stableContent !== null) {
+              await saveLocalFile(path, stableContent)
+              return
+            }
+            const remoteSnapshotExists = localPathOptions.baseDir
+              ? await exists(localPathOptions.path, { baseDir: localPathOptions.baseDir })
+              : await exists(localPathOptions.path)
+            if (!remoteSnapshotExists) return
+            if (localPathOptions.baseDir) {
+              await remove(localPathOptions.path, { baseDir: localPathOptions.baseDir })
+            } else {
+              await remove(localPathOptions.path)
+            }
           }
+
+          if (getEditorPathMutationRevision(path) !== initialEditorMutationRevision) {
+            return false
+          }
+
+          try {
+            await saveLocalFile(path, decodedContent)
+          } catch (error) {
+            await restoreStableContent()
+            throw error
+          }
+
+          // This is deliberately the synchronous preflight. A durable flush
+          // here would await the transaction gate itself. Any newly flushed
+          // editor save is queued behind the gate and detected below.
+          const editorIsStable = prepareActiveEditorDeactivation()
+          if (
+            !editorIsStable
+            || hasQueuedSave()
+            || getEditorPathMutationRevision(path) !== initialEditorMutationRevision
+          ) {
+            await restoreStableContent()
+            return false
+          }
+          return true
+        })
+        if (!pullAccepted) {
+          return { success: false, action: 'none', error: '本地内容在拉取期间发生变化' }
         }
 
-        await updateFileSyncTime(path)
-        await this.logSync(path, 'pull', true)
-        return { success: true, action: 'pull', message: '拉取成功' }
+        // Metadata does not participate in the content transaction. Finish it
+        // in the background so there is no extra await window between the
+        // final content verification and handing the snapshot to the editor.
+        void (async () => {
+          if (platform !== 's3' && platform !== 'webdav') {
+            const remoteSha = await this.getRemoteSha(path)
+            if (remoteSha) {
+              await setLocalRecordedSha(path, remoteSha)
+            }
+          }
+          await updateFileSyncTime(path)
+          await this.logSync(path, 'pull', true)
+        })().catch(error => {
+          console.error('Failed to finalize pull metadata:', error)
+        })
+        return { success: true, action: 'pull', message: '拉取成功', content: decodedContent }
       }
 
       await this.logSync(path, 'pull', false, '文件不存在')
@@ -553,6 +628,7 @@ export class SyncManager {
     }
 
     this.state.isSyncing = true
+    const initialEditorMutationRevision = getEditorPathMutationRevision(path)
 
     try {
       // 获取本地和远程的 SHA
@@ -582,7 +658,7 @@ export class SyncManager {
 
       if (syncResult.action === 'pull') {
         // 拉取远程版本
-        const result = await this.pullFile(path)
+        const result = await this.pullFile(path, initialEditorMutationRevision)
         this.state.lastSyncTime = Date.now()
         this.state.lastSyncSha = remoteSha || ''
         return result
@@ -653,7 +729,10 @@ export class SyncManager {
    * 打开时触发拉取
    * 返回 { updated: true, content: string } 如果拉取了新内容
    */
-  async onOpen(path: string): Promise<{ updated: boolean; content?: string } | null> {
+  async onOpen(
+    path: string,
+    initialEditorMutationRevision = getEditorPathMutationRevision(path),
+  ): Promise<{ updated: boolean; content?: string } | null> {
     if (!this.config.autoSync || !this.config.autoPullOnOpen) {
       return null
     }
@@ -662,36 +741,22 @@ export class SyncManager {
     if (shouldExclude(path)) {
       return null
     }
-
     // 比较版本，决定是否需要拉取
     const syncResult = await compareFileVersions(path)
 
     if (syncResult.action === 'pull') {
-      const result = await this.pullFile(path)
+      const result = await this.pullFile(path, initialEditorMutationRevision)
       if (result.success && result.action === 'pull') {
-        // 读取拉取的内容并返回
-        try {
-          const { pullRemoteFile } = await import('./auto-sync')
-          const content = await pullRemoteFile(path)
-          return { updated: true, content }
-        } catch {
-          return { updated: true }
-        }
+        return { updated: true, content: result.content }
       }
       return { updated: result.success }
     }
 
     // 处理冲突情况：远程文件较新但 SHA 不同（可能是同步过的）
     if (syncResult.action === 'conflict') {
-      const result = await this.pullFile(path)
+      const result = await this.pullFile(path, initialEditorMutationRevision)
       if (result.success && result.action === 'pull') {
-        try {
-          const { pullRemoteFile } = await import('./auto-sync')
-          const content = await pullRemoteFile(path)
-          return { updated: true, content }
-        } catch {
-          return { updated: true }
-        }
+        return { updated: true, content: result.content }
       }
       return { updated: result.success }
     }
@@ -840,9 +905,12 @@ export async function syncOnSave(path: string): Promise<void> {
   await manager.onSave(path)
 }
 
-export async function syncOnOpen(path: string): Promise<{ updated: boolean; content?: string } | null> {
+export async function syncOnOpen(
+  path: string,
+  initialEditorMutationRevision = getEditorPathMutationRevision(path),
+): Promise<{ updated: boolean; content?: string } | null> {
   const manager = getSyncManager()
-  return await manager.onOpen(path)
+  return await manager.onOpen(path, initialEditorMutationRevision)
 }
 
 export async function syncSingleFile(path: string, onConflict?: (local: string, remote: string) => Promise<'local' | 'remote' | 'cancel'>): Promise<SyncResult> {

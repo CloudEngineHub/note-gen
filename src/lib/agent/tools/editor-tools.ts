@@ -1,8 +1,9 @@
 import { Tool, ToolResult } from '../types'
 import emitter from '@/lib/emitter'
 import useArticleStore from '@/stores/article'
+import { markEditorPathMutation } from '@/lib/editor-deactivation'
 import { replaceLinesInRange } from '@/lib/agent/react-diff-helpers'
-import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { exists, readTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions } from '@/lib/workspace'
 import type { AgentEditorStateSnapshot } from '../types'
 
@@ -12,6 +13,26 @@ let storeBackedContentVersion = 0
 function incrementStoreBackedContentVersion() {
   storeBackedContentVersion += 1
   return storeBackedContentVersion
+}
+
+function normalizeEditorFilePath(filePath: string) {
+  return filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+/g, '/').trim()
+}
+
+function isCurrentEditorTarget(filePath: unknown): filePath is string {
+  const activeFilePath = useArticleStore.getState().activeFilePath
+  return typeof filePath === 'string'
+    && filePath.length > 0
+    && Boolean(activeFilePath)
+    && normalizeEditorFilePath(filePath) === normalizeEditorFilePath(activeFilePath || '')
+}
+
+function getEditorTargetChangedResult(): ToolResult {
+  return {
+    success: false,
+    error: 'EDITOR_TARGET_CHANGED',
+    message: '活动编辑器已切换，未执行写入',
+  }
 }
 
 function buildEditorContentPayload(markdown: string, version: number): AgentEditorStateSnapshot & { text: string } {
@@ -48,7 +69,7 @@ export async function readCurrentEditorState(): Promise<AgentEditorStateSnapshot
     }
 
     const timeoutId = setTimeout(() => {
-      void hydrateStoreBackedEditorContent().then(finalize)
+      void hydrateStoreBackedEditorContent().then(data => finalize(data ?? getStoreBackedEditorContent()))
     }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
     emitter.emit('editor-get-content', {
@@ -73,15 +94,21 @@ function getStoreBackedEditorContent() {
   return buildEditorContentPayload(currentArticle || '', storeBackedContentVersion)
 }
 
-async function hydrateStoreBackedEditorContent() {
+async function hydrateStoreBackedEditorContent(expectedFilePath?: string) {
   const articleStore = useArticleStore.getState()
+
+  if (expectedFilePath && !isCurrentEditorTarget(expectedFilePath)) {
+    return null
+  }
 
   if (articleStore.currentArticle || !articleStore.activeFilePath) {
     return getStoreBackedEditorContent()
   }
 
   try {
-    const pathOptions = await getFilePathOptions(articleStore.activeFilePath)
+    const targetFilePath = expectedFilePath || articleStore.activeFilePath
+    if (!targetFilePath) return getStoreBackedEditorContent()
+    const pathOptions = await getFilePathOptions(targetFilePath)
     const fileExists = pathOptions.baseDir
       ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
       : await exists(pathOptions.path)
@@ -94,6 +121,9 @@ async function hydrateStoreBackedEditorContent() {
       ? await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
       : await readTextFile(pathOptions.path)
 
+    if (expectedFilePath && !isCurrentEditorTarget(expectedFilePath)) {
+      return null
+    }
     articleStore.setCurrentArticle(content)
     return buildEditorContentPayload(content, storeBackedContentVersion)
   } catch {
@@ -116,29 +146,38 @@ function replaceNthOccurrence(content: string, searchContent: string, replaceCon
   return `${content.slice(0, foundIndex)}${replaceContent}${content.slice(foundIndex + searchContent.length)}`
 }
 
-async function saveStoreBackedEditorContent(markdown: string) {
+async function saveStoreBackedEditorContent(markdown: string, expectedFilePath?: string) {
   const articleStore = useArticleStore.getState()
+  if (expectedFilePath && !isCurrentEditorTarget(expectedFilePath)) {
+    return false
+  }
   incrementStoreBackedContentVersion()
   articleStore.setCurrentArticle(markdown)
 
-  if (!articleStore.activeFilePath) {
-    return
+  const targetFilePath = expectedFilePath || articleStore.activeFilePath
+  if (!targetFilePath) {
+    return true
   }
 
   try {
-    const pathOptions = await getFilePathOptions(articleStore.activeFilePath)
-    if (pathOptions.baseDir) {
-      await writeTextFile(pathOptions.path, markdown, { baseDir: pathOptions.baseDir })
-    } else {
-      await writeTextFile(pathOptions.path, markdown)
+    if (expectedFilePath && !isCurrentEditorTarget(expectedFilePath)) {
+      return false
     }
+    markEditorPathMutation(targetFilePath)
+    await articleStore.saveCurrentArticle(markdown, targetFilePath)
+    await articleStore.flushPendingArticleSave(targetFilePath)
   } catch {
-    await articleStore.saveCurrentArticle(markdown)
+    return false
   }
+  return true
 }
 
 async function insertIntoStoreBackedEditor(params: Record<string, any>): Promise<ToolResult> {
-  const storeContent = await hydrateStoreBackedEditorContent()
+  if (!isCurrentEditorTarget(params.filePath)) return getEditorTargetChangedResult()
+  const storeContent = await hydrateStoreBackedEditorContent(params.filePath)
+  if (!storeContent || !isCurrentEditorTarget(params.filePath)) {
+    return getEditorTargetChangedResult()
+  }
   const currentMarkdown = storeContent.markdown
   const insertContent = (params.content || '') as string
   const articleStore = useArticleStore.getState()
@@ -154,7 +193,9 @@ async function insertIntoStoreBackedEditor(params: Record<string, any>): Promise
   const insertPosition = Math.min(Math.max(requestedPosition, 0), currentMarkdown.length)
   const updatedMarkdown = `${currentMarkdown.slice(0, insertPosition)}${insertContent}${currentMarkdown.slice(insertPosition)}`
 
-  await saveStoreBackedEditorContent(updatedMarkdown)
+  if (!await saveStoreBackedEditorContent(updatedMarkdown, params.filePath)) {
+    return getEditorTargetChangedResult()
+  }
 
   return {
     success: true,
@@ -184,7 +225,11 @@ function getInsertFallbackResult(): ToolResult {
 }
 
 async function replaceEditorContentWithStore(params: Record<string, any>): Promise<ToolResult> {
-  const storeContent = await hydrateStoreBackedEditorContent()
+  if (!isCurrentEditorTarget(params.filePath)) return getEditorTargetChangedResult()
+  const storeContent = await hydrateStoreBackedEditorContent(params.filePath)
+  if (!storeContent || !isCurrentEditorTarget(params.filePath)) {
+    return getEditorTargetChangedResult()
+  }
   const currentMarkdown = storeContent.markdown
   const replaceContent = (params.content || params.replaceContent || '') as string
 
@@ -213,7 +258,9 @@ async function replaceEditorContentWithStore(params: Record<string, any>): Promi
       }
     }
 
-    await saveStoreBackedEditorContent(updatedMarkdown)
+    if (!await saveStoreBackedEditorContent(updatedMarkdown, params.filePath)) {
+      return getEditorTargetChangedResult()
+    }
 
     return {
       success: true,
@@ -231,7 +278,9 @@ async function replaceEditorContentWithStore(params: Record<string, any>): Promi
     const to = Math.max(from, Math.min(params.to, currentMarkdown.length))
     const updatedMarkdown = `${currentMarkdown.slice(0, from)}${replaceContent}${currentMarkdown.slice(to)}`
 
-    await saveStoreBackedEditorContent(updatedMarkdown)
+    if (!await saveStoreBackedEditorContent(updatedMarkdown, params.filePath)) {
+      return getEditorTargetChangedResult()
+    }
 
     return {
       success: true,
@@ -260,7 +309,9 @@ async function replaceEditorContentWithStore(params: Record<string, any>): Promi
       }
     }
 
-    await saveStoreBackedEditorContent(updatedMarkdown)
+    if (!await saveStoreBackedEditorContent(updatedMarkdown, params.filePath)) {
+      return getEditorTargetChangedResult()
+    }
 
     return {
       success: true,
@@ -414,6 +465,14 @@ export const insertAtCursorTool: Tool = {
       }
 
       const timeoutId = setTimeout(() => {
+        if (params.replaceSelection === true) {
+          finalize({
+            success: false,
+            error: 'Active selection unavailable',
+            message: '当前活动选区不可用，未执行替换',
+          })
+          return
+        }
         void insertIntoStoreBackedEditor({
           ...params,
           position: cursorPosition,
@@ -421,8 +480,15 @@ export const insertAtCursorTool: Tool = {
       }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
       emitter.emit('editor-insert', {
+        filePath: typeof params.filePath === 'string' ? params.filePath : activeFilePath || '',
         content: params.content,
-        position: cursorPosition,
+        replaceSelection: params.replaceSelection === true,
+        expectedSelection: params.replaceSelection === true && typeof params.expectedSelection === 'string'
+          ? params.expectedSelection
+          : undefined,
+        expectedSelectionToken: params.replaceSelection === true && typeof params.expectedSelectionToken === 'string'
+          ? params.expectedSelectionToken
+          : undefined,
         resolve: (result) => {
           clearTimeout(timeoutId)
           finalize({
@@ -568,6 +634,9 @@ When the user quotes content from the editor and exact selection positions are p
       }, EDITOR_TOOL_RESPONSE_TIMEOUT_MS)
 
       emitter.emit('editor-replace', {
+        filePath: typeof params.filePath === 'string'
+          ? params.filePath
+          : useArticleStore.getState().activeFilePath || '',
         content: params.content || params.replaceContent,
         range: (params.from !== undefined && params.to !== undefined)
           ? { from: params.from, to: params.to }

@@ -68,6 +68,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { downloadRecordAssets } from "@/lib/sync/record-assets"
 import { getRecordImageThumbnailPath } from "@/lib/record-image-thumbnail"
+import {
+  markEditorPathMutation,
+  prepareActiveEditorDeactivationDurably,
+  prepareActiveEditorPathMutationDurably,
+  runEditorPathWriteTransaction,
+} from "@/lib/editor-deactivation"
 
 function shouldAutoSyncOnInitialRead(options?: { isNewFile?: boolean }) {
   return options?.isNewFile !== true
@@ -508,6 +514,11 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
     if (!primaryModel || recordIdsToUse.size === 0) return
 
+    const articleState = useArticleStore.getState()
+    if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+      return
+    }
+
     organizingRef.current = true
     setOpen(false)
     setLoading(true)
@@ -531,7 +542,11 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       }
 
       await loadFileTree()
-      await setActiveFilePath(filePath)
+      await setActiveFilePath(
+        filePath,
+        true,
+        { deactivationAlreadyPrepared: true },
+      )
 
       // Switch to files tab in sidebar
       await setLeftSidebarTab('files')
@@ -704,14 +719,19 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
         fullContent = content
         // Update editor content in real-time without reloading file
+        markEditorPathMutation(targetFilePath)
         setCurrentArticle(content)
         emitter.emit('external-content-update', content)
         // Also write to file
-        if (workspace.isCustom) {
-          await writeTextFile(pathOptions.path, content)
-        } else {
-          await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
-        }
+        await runEditorPathWriteTransaction(targetFilePath, async () => {
+          if (workspace.isCustom) {
+            await writeTextFile(pathOptions.path, content)
+          } else {
+            await writeTextFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+          }
+          markEditorPathMutation(targetFilePath)
+          return true
+        })
       }, signal)
       streamFinished = true
 
@@ -744,6 +764,16 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
       if ((titleMatch && titleMatch[1]) || preferredTitle) {
         const title = preferredTitle || titleMatch?.[1]?.trim() || fileName.replace(/\.md$/, '')
         const { filePath: newFilePath, pathOptions: newPathOptions, sanitizedTitle } = await getAvailableOutputPath(outputFolder, title, workspace.isCustom)
+        const pathChanged = newFilePath !== filePath
+        if (
+          pathChanged
+          && !await prepareActiveEditorPathMutationDurably(
+            useArticleStore.getState().activeFilePath,
+            [filePath],
+          )
+        ) {
+          throw new Error('Active editor could not be durably deactivated before renaming the generated note')
+        }
 
         // Write to new file
         if (workspace.isCustom) {
@@ -754,18 +784,22 @@ export const OrganizeNotes = forwardRef<{ openOrganize: () => void }, OrganizeNo
 
         // Delete old file
         const { remove } = await import('@tauri-apps/plugin-fs')
-        if (newFilePath !== filePath) {
+        if (pathChanged) {
           if (workspace.isCustom) {
             await remove(pathOptions.path)
           } else {
             await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
           }
+          await useArticleStore.getState().syncOpenTabsForPathChange(filePath, newFilePath)
         }
 
         // Update file tree and active file
         await loadFileTree()
-        setActiveFilePath(newFilePath)
-        await readArticle(newFilePath, '', shouldAutoSyncOnInitialRead({ isNewFile: true }))
+        await setActiveFilePath(
+          newFilePath,
+          shouldAutoSyncOnInitialRead({ isNewFile: true }),
+          pathChanged ? { deactivationAlreadyPrepared: true } : undefined,
+        )
         if (shouldEmitOrganizeOnboardingComplete({ streamFinished, aborted: signal.aborted })) {
           emitter.emit('onboarding-step-complete', { step: 'organize-note', filePath: newFilePath })
         }

@@ -129,6 +129,7 @@ interface QuoteData {
   endLine: number
   from: number
   to: number
+  selectionToken?: string
   articlePath: string
 }
 
@@ -564,11 +565,13 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       currentQuote: quoteData
         ? {
             fileName: quoteData.fileName,
+            articlePath: quoteData.articlePath,
             startLine: quoteData.startLine,
             endLine: quoteData.endLine,
             from: quoteData.from,
             to: quoteData.to,
             fullContent: quoteData.fullContent,
+            selectionToken: quoteData.selectionToken,
           }
         : undefined,
       attachments: fileAttachments,
@@ -949,7 +952,11 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
 - 禁止在解释/分析类请求中调用编辑工具
 - 禁止使用 from/to 位置参数
 - 禁止使用 searchContent 文本搜索模式
-- 禁止获取整个文档内容后再操作` : `**注意**: 此引用内容没有有效的行号信息。如果需要修改，请先使用 editor_get_selection 工具获取当前选中的行号信息。`}
+- 禁止获取整个文档内容后再操作` : `**注意**: 此引用内容只有选中文本，没有可安全使用的 Markdown 源码位置。
+
+- 如果用户只是在提问、解释、总结或分析，请直接回答，不要调用编辑工具。
+- 如果用户明确要求修改当前选区，只能调用 editor_insert_at_cursor，并设置 replaceSelection=true。
+- 不要推测 from/to 或行号；如果活动选区已经变化，工具会安全失败。`}
 
 请基于这段引用内容回答用户的问题。
 
@@ -1110,11 +1117,13 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       const text = requestText
       const steeringQuote = quoteData ? {
         fileName: quoteData.fileName,
+        articlePath: quoteData.articlePath,
         startLine: quoteData.startLine,
         endLine: quoteData.endLine,
         from: quoteData.from,
         to: quoteData.to,
         fullContent: quoteData.fullContent,
+        selectionToken: quoteData.selectionToken,
       } : undefined
 
       agentHandlerRef.current?.beginSteering()

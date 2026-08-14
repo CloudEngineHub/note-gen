@@ -77,7 +77,13 @@ function roundMs(value: number) {
   return Math.round(value)
 }
 
-export function SyncButton() {
+export function SyncButton({
+  getMarkdown,
+  prepareExternalAction,
+}: {
+  getMarkdown?: () => string
+  prepareExternalAction?: () => boolean
+}) {
   const t = useTranslations()
   const { activeFilePath } = useArticleStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -152,6 +158,7 @@ export function SyncButton() {
   // Push to remote
   const handlePush = useCallback(async () => {
     if (!activeFilePath || isLoading) return
+    if (prepareExternalAction && !prepareExternalAction()) return
 
     const syncStartedAt = getPerfNow()
     let previousPerfAt = syncStartedAt
@@ -182,17 +189,23 @@ export function SyncButton() {
         setIsLoading(false)
         return
       }
-      emitter.emit('sync-push-started', { path: activeFilePath })
       logPerf('loadConfig', {
         hasRepo: Boolean(repo),
       })
 
-      // 始终从磁盘读取最新内容
+      // The section editor may still have a debounced local save. Prefer its
+      // flushed canonical snapshot so a manual push never uploads stale disk content.
+      if (prepareExternalAction && !prepareExternalAction()) {
+        setIsLoading(false)
+        return
+      }
+      emitter.emit('sync-push-started', { path: activeFilePath })
+      const editorMarkdown = getMarkdown?.()
       const workspace = await getWorkspacePath()
       const pathOptions = await getFilePathOptions(activeFilePath)
-      const content = workspace.isCustom
+      const content = editorMarkdown ?? (workspace.isCustom
         ? await readTextFile(pathOptions.path)
-        : await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
+        : await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir }))
       logPerf('readLocalFile', {
         workspaceCustom: workspace.isCustom,
         contentLength: content.length,
@@ -441,7 +454,7 @@ export function SyncButton() {
       setIsLoading(false)
       emitter.emit('sync-push-completed', { path: activeFilePath, success: false })
     }
-  }, [activeFilePath, isLoading, t])
+  }, [activeFilePath, getMarkdown, isLoading, prepareExternalAction, t])
 
   // 如果没有配置同步，不显示按钮
   if (!isConfigured || !activeFilePath) return null

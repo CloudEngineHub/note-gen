@@ -43,6 +43,7 @@ import { useSkillsStore } from '@/stores/skills'
 import useSyncStore from '@/stores/sync'
 import { toast } from '@/hooks/use-toast'
 import type { CloudFolderConfig, SyncPlatform } from '@/types/sync'
+import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
 type OneDrivePanelStatus =
   | 'disconnected'
@@ -84,7 +85,6 @@ export function OneDriveCloudFolderSync({ onActiveProviderChange }: OneDriveClou
     loadWorkspaceCollapsibleList,
     loadFileTree,
     setActiveFilePath,
-    setCurrentArticle,
   } = useArticleStore()
   const refreshSkills = useSkillsStore(state => state.refreshSkills)
   const [config, setConfig] = useState<CloudFolderConfig>({ path: '' })
@@ -181,12 +181,23 @@ export function OneDriveCloudFolderSync({ onActiveProviderChange }: OneDriveClou
     }
   }, [oneDriveT, setCloudFolderConnected, t])
 
+  async function prepareWorkspaceSwitch() {
+    const articleState = useArticleStore.getState()
+    if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+      return false
+    }
+    await articleState.flushAllPendingArticleSaves()
+    await articleState.settleAllVectorCalculations()
+    return true
+  }
+
   async function refreshWorkspaceContent() {
-    setActiveFilePath('')
-    setCurrentArticle('')
+    await setActiveFilePath('', true, { deactivationAlreadyPrepared: true })
     const lastActivePath = await loadWorkspaceCollapsibleList()
     await loadFileTree()
-    if (lastActivePath) await setActiveFilePath(lastActivePath)
+    if (lastActivePath) {
+      await setActiveFilePath(lastActivePath, true, { deactivationAlreadyPrepared: true })
+    }
     await refreshSkills()
   }
 
@@ -240,6 +251,9 @@ export function OneDriveCloudFolderSync({ onActiveProviderChange }: OneDriveClou
   }
 
   async function activateWorkspace(next: CloudFolderConfig, strategy: OneDriveWorkspaceStrategy) {
+    if (!await prepareWorkspaceSwitch()) {
+      throw new Error('无法在切换工作区前保存当前编辑内容')
+    }
     const previousWorkspacePath = workspacePath
     const preparationStartedAt = Date.now()
     const preparation = await prepareOneDriveWorkspace(next, previousWorkspacePath || undefined, strategy)
@@ -262,6 +276,7 @@ export function OneDriveCloudFolderSync({ onActiveProviderChange }: OneDriveClou
       await store.save()
       await setPrimaryBackupMethod('cloudFolder')
       await setWorkspacePath(preparation.path)
+      await setActiveFilePath('', true, { deactivationAlreadyPrepared: true })
       const transferred = await transferWorkspace(preparation)
       await refreshWorkspaceContent()
       await store.delete(PENDING_ONE_DRIVE_CONFIG_KEY)
@@ -288,6 +303,9 @@ export function OneDriveCloudFolderSync({ onActiveProviderChange }: OneDriveClou
       await store.save()
       await setPrimaryBackupMethod(previousMethod)
       if (useSettingStore.getState().workspacePath !== previousWorkspacePath) {
+        if (!await prepareWorkspaceSwitch()) {
+          throw new Error('无法在回滚工作区前保存当前编辑内容')
+        }
         await setWorkspacePath(previousWorkspacePath)
         await refreshWorkspaceContent().catch(() => undefined)
       }

@@ -16,20 +16,49 @@ interface WordCountProps {
   compact?: boolean
 }
 
+const EMPTY_STATISTICS: EditorStatistics = {
+  characters: 0,
+  readingMinutes: 0,
+}
+const SOURCE_STATISTICS_DEBOUNCE_MS = 600
+const SOURCE_STATISTICS_IDLE_TIMEOUT_MS = 1_500
+
 export function WordCount({ editor, sourceMarkdown, compact = false }: WordCountProps) {
   const t = useTranslations('settings.editor.stats')
-  const getCurrentStatistics = () => getEditorStatistics(
+  const [statistics, setStatistics] = useState<EditorStatistics>(() => (
     sourceMarkdown === undefined
-      ? editor.state.doc.textContent
-      : markdownToPlainText(sourceMarkdown)
-  )
-  const [statistics, setStatistics] = useState<EditorStatistics>(getCurrentStatistics)
+      ? getEditorStatistics(editor.state.doc.textContent)
+      : EMPTY_STATISTICS
+  ))
 
   useEffect(() => {
-    if (sourceMarkdown !== undefined) {
-      setStatistics(getEditorStatistics(markdownToPlainText(sourceMarkdown)))
-      return
+    if (sourceMarkdown === undefined) return
+
+    let idleCallbackId: number | null = null
+    const updateTimer = window.setTimeout(() => {
+      const updateStatistics = () => {
+        setStatistics(getEditorStatistics(markdownToPlainText(sourceMarkdown)))
+      }
+
+      if (typeof window.requestIdleCallback === 'function') {
+        idleCallbackId = window.requestIdleCallback(updateStatistics, {
+          timeout: SOURCE_STATISTICS_IDLE_TIMEOUT_MS,
+        })
+      } else {
+        updateStatistics()
+      }
+    }, SOURCE_STATISTICS_DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(updateTimer)
+      if (idleCallbackId !== null) {
+        window.cancelIdleCallback(idleCallbackId)
+      }
     }
+  }, [sourceMarkdown])
+
+  useEffect(() => {
+    if (sourceMarkdown !== undefined) return
 
     let updateTimer: ReturnType<typeof setTimeout> | null = null
 

@@ -45,6 +45,10 @@ import { useSettingsDialogStore } from "@/stores/settings-dialog";
 import { FileTreeDecorations } from "./file-tree-decorations";
 import { moveEntryToSystemTrash } from './system-trash'
 import { rewriteWorkspaceMarkdownMediaPaths } from '@/lib/markdown-media-path'
+import {
+  prepareActiveEditorDeactivationDurably,
+  prepareActiveEditorPathMutationDurably,
+} from '@/lib/editor-deactivation'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -105,7 +109,6 @@ export function FileItem({
   const {
     activeFilePath,
     setActiveFilePath,
-    readArticle,
     fileTree,
     setFileTree,
     loadFileTree,
@@ -114,6 +117,7 @@ export function FileItem({
     checkFileVectorIndexed,
     cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder,
+    syncOpenTabsForPathChange,
     setSelectedFilePaths,
     setEntryLoading,
     setEntrySyncError,
@@ -123,7 +127,6 @@ export function FileItem({
   } = useArticleStore(useShallow((state) => ({
     activeFilePath: state.activeFilePath,
     setActiveFilePath: state.setActiveFilePath,
-    readArticle: state.readArticle,
     fileTree: state.fileTree,
     setFileTree: state.setFileTree,
     loadFileTree: state.loadFileTree,
@@ -132,6 +135,7 @@ export function FileItem({
     checkFileVectorIndexed: state.checkFileVectorIndexed,
     cleanTabsByDeletedFile: state.cleanTabsByDeletedFile,
     cleanTabsByDeletedFolder: state.cleanTabsByDeletedFolder,
+    syncOpenTabsForPathChange: state.syncOpenTabsForPathChange,
     setSelectedFilePaths: state.setSelectedFilePaths,
     setEntryLoading: state.setEntryLoading,
     setEntrySyncError: state.setEntrySyncError,
@@ -309,6 +313,7 @@ export function FileItem({
       try {
         // 使用当前路径，而不是重新计算的路径
         const currentPath = computedParentPath(item)
+        if (!await prepareActiveEditorPathMutationDurably(activeFilePath, [currentPath])) return
         const trashed = await moveEntryToSystemTrash(currentPath)
 
         reconcileLocalFile(currentPath, false)
@@ -476,6 +481,17 @@ export function FileItem({
         targetRelativePath: renamePlan.targetRelativePath,
       })
       const { displayName, operation, targetRelativePath } = renamePlan
+      if (!await prepareActiveEditorDeactivationDurably(activeFilePath)) {
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
+      if (
+        operation === 'rename'
+        && !await prepareActiveEditorPathMutationDurably(activeFilePath, [path])
+      ) {
+        setTimeout(() => inputRef.current?.focus(), 0)
+        return
+      }
       
       // 更新缓存树中的名称
       if (nextFolder && nextFolder.children) {
@@ -516,6 +532,7 @@ export function FileItem({
               oldPathBaseDir: BaseDirectory.AppData
             })
           }
+          await syncOpenTabsForPathChange(path, targetRelativePath)
           try {
             await rewriteWorkspaceMarkdownMediaPaths([{
               sourcePath: path,
@@ -530,6 +547,7 @@ export function FileItem({
                 oldPathBaseDir: BaseDirectory.AppData,
               })
             }
+            await syncOpenTabsForPathChange(targetRelativePath, path)
             throw error
           }
         } catch (error) {
@@ -572,9 +590,11 @@ export function FileItem({
       if (newPath.startsWith('/')) {
         newPath = newPath.slice(1)
       }
-      setActiveFilePath(newPath)
-      // 新建文件后自动选择该文件并读取内容
-      readArticle(newPath, '', shouldAutoSyncOnInitialRead({ isNewFile: true }))
+      await setActiveFilePath(
+        newPath,
+        shouldAutoSyncOnInitialRead({ isNewFile: true }),
+        { deactivationAlreadyPrepared: true },
+      )
     } else {
       // 处理取消创建或无变更的情况
       if (originalName === '') {

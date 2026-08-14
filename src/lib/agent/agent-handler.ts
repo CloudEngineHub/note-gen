@@ -6,7 +6,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
 import { readCurrentEditorState } from './tools/editor-tools'
-import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
+import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentQuoteSnapshot, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
 import type { AgentImageAttachment } from '@/lib/chat-image-context'
 import { retainCompletedAgentTraceEvents } from './trace-retention'
@@ -38,14 +38,7 @@ export interface AgentHandlerConfig {
       to?: number
     }
   ) => Promise<AgentApprovalDecision>
-  currentQuote?: {
-    fileName: string
-    startLine: number
-    endLine: number
-    from: number
-    to: number
-    fullContent?: string
-  }
+  currentQuote?: AgentQuoteSnapshot
   attachments?: RuntimeChatAttachment[]
   imageAttachments?: AgentImageAttachment[]
   selectedSkills?: string[]

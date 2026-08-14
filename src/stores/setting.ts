@@ -20,6 +20,7 @@ import {
   isManagedAgentSystemPrompt,
 } from '@/lib/ai/system-prompt'
 import { APP_FONT_SYSTEM_VALUE, applyAppFontFamily } from '@/lib/font-settings'
+import { prepareActiveEditorDeactivation } from '@/lib/editor-deactivation'
 import type { AgentPermissionMode } from '@/lib/agent/types'
 import { getWorkspaceSyncRepos, setWorkspaceSyncRepo } from '@/lib/sync/workspace-repos'
 import {
@@ -1778,6 +1779,10 @@ const useSettingStore = create<SettingState>((set, get) => ({
 
   editorViewMode: DEFAULT_EDITOR_VIEW_MODE,
   setEditorViewMode: async (editorViewMode) => {
+    if (
+      editorViewMode !== get().editorViewMode
+      && !prepareActiveEditorDeactivation()
+    ) return
     set({ editorViewMode })
     const store = await Store.load('store.json')
     await store.set('editorViewMode', editorViewMode)

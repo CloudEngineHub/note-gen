@@ -14,6 +14,7 @@ import {
 } from "./delete-folder-utils";
 import { moveEntryToSystemTrash } from '../system-trash'
 import useSettingStore from '@/stores/setting'
+import { prepareActiveEditorPathMutationDurably } from '@/lib/editor-deactivation'
 
 interface DeleteFolderProps {
   item: DirTree;
@@ -43,6 +44,9 @@ export function DeleteFolder({ item, shortcut }: DeleteFolderProps) {
       });
       
       if (!confirmed) return;
+
+      const activeFilePath = useArticleStore.getState().activeFilePath
+      if (!await prepareActiveEditorPathMutationDurably(activeFilePath, [path])) return
 
       const trashed = await moveEntryToSystemTrash(path)
       const removedVectorEntries = new Map(

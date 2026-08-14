@@ -1,6 +1,12 @@
 import { readDir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 
 import emitter from '@/lib/emitter'
+import {
+  getEditorPathMutationRevision,
+  markEditorPathMutation,
+  prepareActiveEditorDeactivation,
+  runEditorPathWriteTransaction,
+} from '@/lib/editor-deactivation'
 import { resolveImagePathFromMarkdown, toMarkdownImagePath } from '@/lib/markdown-image-path'
 import { getFilePathOptions } from '@/lib/workspace'
 import useArticleStore from '@/stores/article'
@@ -14,6 +20,9 @@ export interface RewrittenMarkdownFile {
   path: string
   content: string
 }
+
+type PendingMediaPathUpdate = RewrittenMarkdownFile & { previousContent: string }
+type CommittedMediaPathUpdate = PendingMediaPathUpdate & { revision: number }
 
 const MARKDOWN_FILE_RE = /\.(?:md|markdown)$/i
 const EXTERNAL_MEDIA_PATH_RE = /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i
@@ -301,8 +310,9 @@ export async function rewriteWorkspaceMarkdownMediaPaths(
 
   const articleStore = useArticleStore.getState()
   const activeFilePath = normalizeWorkspacePath(articleStore.activeFilePath)
+  const currentActivePath = mapPathForward(activeFilePath, moves)
   const markdownFiles = await listWorkspaceMarkdownFiles()
-  const updates: Array<RewrittenMarkdownFile & { previousContent: string }> = []
+  const updates: PendingMediaPathUpdate[] = []
 
   for (const path of markdownFiles) {
     const previousPath = mapPathBackward(path, moves)
@@ -310,30 +320,91 @@ export async function rewriteWorkspaceMarkdownMediaPaths(
       ? articleStore.currentArticle
       : await readMarkdownFile(path)
     const content = rewriteMarkdownMediaPaths(previousContent, previousPath, path, moves)
-    if (content !== previousContent) {
+    if (content !== previousContent || path === currentActivePath) {
       updates.push({ path, content, previousContent })
     }
   }
 
-  const written: typeof updates = []
+  // Commit the active document last so its canonical editor update can follow
+  // the serialized disk write without awaiting unrelated files in between.
+  updates.sort((left, right) => (
+    Number(left.path === currentActivePath) - Number(right.path === currentActivePath)
+  ))
+
+  const written: CommittedMediaPathUpdate[] = []
+  const committedUpdates: CommittedMediaPathUpdate[] = []
   try {
     for (const update of updates) {
-      await writeMarkdownFile(update.path, update.content)
-      written.push(update)
+      markEditorPathMutation(update.path)
+      const committedUpdateRef: { current: CommittedMediaPathUpdate | null } = { current: null }
+      const didCommit = await runEditorPathWriteTransaction(update.path, async ({ hasQueuedSave }) => {
+        const latestContent = await readMarkdownFile(update.path)
+        const previousPath = mapPathBackward(update.path, moves)
+        const nextContent = rewriteMarkdownMediaPaths(
+          latestContent,
+          previousPath,
+          update.path,
+          moves,
+        )
+        if (nextContent === latestContent) return true
+
+        try {
+          await writeMarkdownFile(update.path, nextContent)
+        } catch (writeError) {
+          try {
+            await writeMarkdownFile(update.path, latestContent)
+          } catch (restoreError) {
+            console.error(`Failed to restore Markdown after a media path write error: ${update.path}`, restoreError)
+          }
+          throw writeError
+        }
+        const targetIsActive = useArticleStore.getState().activeFilePath === update.path
+        const editorIsStable = !targetIsActive || prepareActiveEditorDeactivation()
+        if (!editorIsStable || hasQueuedSave()) {
+          await writeMarkdownFile(update.path, latestContent)
+          return false
+        }
+        markEditorPathMutation(update.path)
+        committedUpdateRef.current = {
+          path: update.path,
+          content: nextContent,
+          previousContent: latestContent,
+          revision: getEditorPathMutationRevision(update.path),
+        }
+        return true
+      })
+      if (!didCommit) {
+        throw new Error(`Markdown changed while rewriting media paths: ${update.path}`)
+      }
+      const committedUpdate = committedUpdateRef.current
+      if (committedUpdate) {
+        written.push(committedUpdate)
+        committedUpdates.push(committedUpdate)
+      }
     }
   } catch (error) {
-    await Promise.allSettled(written.map(update => writeMarkdownFile(update.path, update.previousContent)))
+    await Promise.allSettled(written.map(async update => {
+      markEditorPathMutation(update.path)
+      await runEditorPathWriteTransaction(update.path, async () => {
+        const currentContent = await readMarkdownFile(update.path)
+        if (currentContent !== update.content) return false
+        await writeMarkdownFile(update.path, update.previousContent)
+        markEditorPathMutation(update.path)
+        return true
+      })
+    }))
     throw error
   }
 
-  const currentActivePath = mapPathForward(activeFilePath, moves)
-  for (const update of updates) {
+  for (const update of committedUpdates) {
+    if (getEditorPathMutationRevision(update.path) !== update.revision) continue
     emitter.emit('editor-file-content-updated', { path: update.path, content: update.content })
-    if (update.path === currentActivePath) {
-      useArticleStore.getState().setCurrentArticle(update.content)
+    const latestArticleStore = useArticleStore.getState()
+    if (latestArticleStore.activeFilePath === update.path) {
+      latestArticleStore.setCurrentArticle(update.content)
       emitter.emit('external-content-update', update.content)
     }
   }
 
-  return updates.map(({ path, content }) => ({ path, content }))
+  return committedUpdates.map(({ path, content }) => ({ path, content }))
 }

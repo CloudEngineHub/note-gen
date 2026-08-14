@@ -6,8 +6,6 @@ import { TipTapEditor } from '@/app/core/main/editor/markdown/tiptap-editor'
 import type { Editor } from '@tiptap/react'
 import { Loader2 } from 'lucide-react'
 import useArticleStore from '@/stores/article'
-import { exists, readTextFile } from '@tauri-apps/plugin-fs'
-import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 
 interface MobileEditorProps {
   onEditorReady?: (editor: Editor | null) => void
@@ -15,14 +13,20 @@ interface MobileEditorProps {
 
 export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   const tEditor = useTranslations('editor')
-  const { setCurrentArticle, saveCurrentArticle, activeFilePath } = useArticleStore()
+  const {
+    saveCurrentArticle,
+    activeFilePath,
+    currentArticle,
+    loading: articleLoading,
+  } = useArticleStore()
 
   const [content, setContent] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(Boolean(activeFilePath))
   const [isEditorReady, setIsEditorReady] = useState(false)
 
   const activePathRef = useRef<string>('')
   const contentRef = useRef<string>('')
+  const awaitingInitialContentRef = useRef(Boolean(activeFilePath))
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isSavingRef = useRef(false)
 
@@ -30,9 +34,12 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   useEffect(() => {
     if (activeFilePath && activeFilePath !== activePathRef.current) {
       activePathRef.current = activeFilePath
-      loadFile(activeFilePath)
+      awaitingInitialContentRef.current = true
+      setIsLoading(true)
+      setIsEditorReady(false)
     } else if (!activeFilePath && activePathRef.current) {
       activePathRef.current = ''
+      awaitingInitialContentRef.current = false
       setContent('')
       contentRef.current = ''
       setIsLoading(false)
@@ -40,39 +47,23 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
     }
   }, [activeFilePath])
 
-  // 加载文件内容
-  const loadFile = useCallback(async (path: string) => {
-    if (!path) return
-
-    setIsLoading(true)
-    try {
-      const workspace = await getWorkspacePath()
-      const pathOptions = await getFilePathOptions(path)
-      let fileContent = ''
-
-      if (workspace.isCustom) {
-        const fileExists = await exists(pathOptions.path)
-        if (fileExists) {
-          fileContent = await readTextFile(pathOptions.path)
-        }
-      } else {
-        const fileExists = await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
-        if (fileExists) {
-          fileContent = await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
-        }
-      }
-
-      setContent(fileContent)
-      contentRef.current = fileContent
-      setCurrentArticle(fileContent)
-    } catch {
-      setContent('')
-      contentRef.current = ''
-      setCurrentArticle('')
-    } finally {
-      setIsLoading(false)
+  // The article store owns the single disk read. Wait for its completed value so
+  // large-document detection never runs against a temporary empty string.
+  useEffect(() => {
+    if (
+      !activeFilePath
+      || activePathRef.current !== activeFilePath
+      || !awaitingInitialContentRef.current
+      || articleLoading
+    ) {
+      return
     }
-  }, [setCurrentArticle])
+
+    awaitingInitialContentRef.current = false
+    setContent(currentArticle)
+    contentRef.current = currentArticle
+    setIsLoading(false)
+  }, [activeFilePath, articleLoading, currentArticle])
 
   // 保存文件
   const doSave = useCallback(async () => {
@@ -121,7 +112,7 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   }, [onEditorReady])
 
   // 显示加载状态
-  if (isLoading) {
+  if (isLoading || articleLoading || activeFilePath !== activePathRef.current) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />

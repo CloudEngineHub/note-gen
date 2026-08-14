@@ -9,6 +9,12 @@ import {
 } from '@/lib/markdown-media-path'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 import type { ClipboardItem } from '@/stores/clipboard'
+import useArticleStore from '@/stores/article'
+import {
+  activeEditorPathIsAffected,
+  prepareActiveEditorPathMutationDurably,
+} from '@/lib/editor-deactivation'
+import { getPathAfterMove } from '../file-dnd'
 
 import { getPasteTargetDirectory } from './paste-target'
 
@@ -109,8 +115,6 @@ export async function pasteIntoFolder({
   pasteFailedToastTitle,
   loadFileTree,
   setClipboardItem,
-  cleanTabsByDeletedFile,
-  cleanTabsByDeletedFolder,
 }: PasteIntoFolderOptions): Promise<boolean> {
   const itemsToPaste = clipboardItems.length > 0
     ? clipboardItems
@@ -118,6 +122,20 @@ export async function pasteIntoFolder({
 
   if (itemsToPaste.length === 0) {
     toast({ title: emptyToastTitle, variant: 'destructive' })
+    return false
+  }
+
+  const initialActiveFilePath = useArticleStore.getState().activeFilePath
+  const movesActiveFile = clipboardOperation === 'cut' && itemsToPaste.some(
+    item => activeEditorPathIsAffected(initialActiveFilePath, item.path)
+  )
+  if (
+    clipboardOperation === 'cut'
+    && !await prepareActiveEditorPathMutationDurably(
+      initialActiveFilePath,
+      itemsToPaste.map(item => item.path),
+    )
+  ) {
     return false
   }
 
@@ -161,19 +179,30 @@ export async function pasteIntoFolder({
     if (clipboardOperation === 'cut') {
       await rewriteWorkspaceMarkdownMediaPaths(pathMoves)
 
-      for (const item of itemsToPaste) {
+      const articleStore = useArticleStore.getState()
+      let nextActiveFilePath = initialActiveFilePath
+      for (const [index, item] of itemsToPaste.entries()) {
         const sourcePathOptions = await getFilePathOptions(item.path)
         if (workspace.isCustom) {
           await remove(sourcePathOptions.path, { recursive: true })
         } else {
           await remove(sourcePathOptions.path, { baseDir: sourcePathOptions.baseDir, recursive: true })
         }
-
-        if (item.isDirectory) {
-          await cleanTabsByDeletedFolder?.(item.path)
-        } else {
-          await cleanTabsByDeletedFile?.(item.path)
+        const pathMove = pathMoves[index]
+        await articleStore.syncOpenTabsForPathChange(pathMove.sourcePath, pathMove.targetPath)
+        const movedActiveFilePath = getPathAfterMove(
+          nextActiveFilePath,
+          pathMove.sourcePath,
+          pathMove.targetPath,
+        )
+        if (movedActiveFilePath !== nextActiveFilePath) {
+          await articleStore.setActiveFilePath(
+            movedActiveFilePath,
+            true,
+            movesActiveFile ? { deactivationAlreadyPrepared: true } : undefined,
+          )
         }
+        nextActiveFilePath = movedActiveFilePath
       }
       setClipboardItem(null, 'none')
     }

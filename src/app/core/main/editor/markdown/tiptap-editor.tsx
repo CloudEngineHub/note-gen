@@ -18,10 +18,9 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import Image from '@tiptap/extension-image'
-import { common, createLowlight } from 'lowlight'
 import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
-import { Extension, nodeInputRule, ResizableNodeView, type Editor as CoreEditor, type ResizableNodeViewDirection } from '@tiptap/core'
+import { Extension, nodeInputRule, type Editor as CoreEditor } from '@tiptap/core'
 import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
@@ -29,7 +28,6 @@ import { dropPoint } from '@tiptap/pm/transform'
 import 'katex/dist/katex.min.css'
 import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
-import { MathEditorDialog } from './math-editor-dialog'
 import { SearchReplacePanel } from './search-replace-panel'
 import { useEffect, useId, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent } from 'react'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
@@ -66,14 +64,16 @@ import { AISuggestionFloating } from './ai-suggestion-floating'
 import { AiSuggestionHighlight } from './ai-suggestion-highlight'
 import { AgentDiffPreview, agentDiffPreviewPluginKey } from './agent-diff-preview-extension'
 import emitter from '@/lib/emitter'
+import { markEditorPathMutation } from '@/lib/editor-deactivation'
 import { QuoteMark } from './quote-mark'
 import { MarkdownParagraph, normalizeMarkdownPlaceholders } from './markdown-paragraph'
 import { StableCodeBlockLowlight } from './code-block-extension'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 import useSettingStore from '@/stores/setting'
 import useChatStore, { type PendingQuote } from '@/stores/chat'
-import { ArrowUp, Loader2, X } from 'lucide-react'
+import { ArrowUp, Eye, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { buildMobileSelectionContext, isMobileSelectionContextStale } from './mobile-selection-context'
 import { MobileEditorContextBar } from './mobile-editor-context-bar'
 import { MobileEditorMoreSheet } from './mobile-editor-more-sheet'
@@ -106,20 +106,34 @@ import { isAiSuggestionShortcutVisible } from '@/lib/ai-suggestion-shortcut-stat
 import { getFileManagerDragPath, hasFileManagerDragData } from '@/app/core/main/file/file-dnd'
 import { getMarkLocalAssetPath, type Mark } from '@/db/marks'
 import { SmartFileLink } from './smart-file-link'
+import { isLargeMarkdownDocument } from './large-markdown'
+import {
+  activateImageSource as activateDeferredImageSource,
+  createImageNodeView,
+} from './image-node-view'
+import type {
+  SourceMarkdownEditorController,
+  SourceMarkdownEditorViewState,
+} from './source-markdown-editor'
+import {
+  SectionedMarkdownEditor,
+  type SectionedMarkdownEditorController,
+  type SectionedMarkdownSelection,
+} from './sectioned-markdown-editor'
+import dynamic from 'next/dynamic'
 import './style.css'
 
-const lowlight = createLowlight(common)
-
-const IMAGE_RESIZE_DIRECTIONS: ResizableNodeViewDirection[] = [
-  'top',
-  'right',
-  'bottom',
-  'left',
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-]
+const MathEditorDialog = dynamic(
+  () => import('./math-editor-dialog').then((module) => module.MathEditorDialog),
+  { ssr: false }
+)
+const SourceMarkdownEditor = dynamic(
+  () => import('./source-markdown-editor').then((module) => module.SourceMarkdownEditor),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-full min-h-64 w-full" />,
+  }
+)
 
 const EDITOR_SCROLLBAR_MIN_THUMB_SIZE = 44
 
@@ -165,7 +179,9 @@ function EditorScrollbar({
     if (scrollContainer.firstElementChild) {
       resizeObserver.observe(scrollContainer.firstElementChild)
     }
-    const editorContent = scrollContainer.querySelector('.ProseMirror, textarea')
+    const editorContent = scrollContainer.querySelector(
+      '.sectioned-markdown-editor, .ProseMirror, textarea'
+    )
     if (editorContent) {
       resizeObserver.observe(editorContent)
     }
@@ -777,57 +793,6 @@ function getImageDimensionFromElement(element: HTMLElement, name: 'width' | 'hei
   )
 }
 
-function applyImageNodeAttributes(element: HTMLImageElement, attrs: Record<string, unknown>) {
-  const src = typeof attrs.src === 'string' ? attrs.src : ''
-  const alt = typeof attrs.alt === 'string' ? attrs.alt : ''
-  const title = typeof attrs.title === 'string' ? attrs.title : ''
-  const relativeSrc = typeof attrs.relativeSrc === 'string' ? attrs.relativeSrc : ''
-  const width = parseImageDimension(attrs.width)
-  const height = parseImageDimension(attrs.height)
-  const currentSrc = element.getAttribute('src')
-  const currentRelativeSrc = element.getAttribute('data-relative-src') || ''
-  const shouldKeepConvertedSrc =
-    Boolean(relativeSrc) &&
-    currentRelativeSrc === relativeSrc &&
-    shouldTransformImageSrcToWorkspaceAsset(src) &&
-    currentSrc !== src
-
-  if (!shouldKeepConvertedSrc && currentSrc !== src) {
-    element.setAttribute('src', src)
-  }
-
-  element.setAttribute('alt', alt)
-  element.className = 'max-w-full rounded-lg'
-
-  if (title) {
-    element.setAttribute('title', title)
-  } else {
-    element.removeAttribute('title')
-  }
-
-  if (relativeSrc) {
-    element.setAttribute('data-relative-src', relativeSrc)
-  } else {
-    element.removeAttribute('data-relative-src')
-  }
-
-  if (width) {
-    element.setAttribute('width', String(width))
-    element.style.width = `${width}px`
-  } else {
-    element.removeAttribute('width')
-    element.style.removeProperty('width')
-  }
-
-  if (height) {
-    element.setAttribute('height', String(height))
-    element.style.height = `${height}px`
-  } else {
-    element.removeAttribute('height')
-    element.style.removeProperty('height')
-  }
-}
-
 // 自定义扩展：处理粘贴 Markdown 文本
 const PasteMarkdown = Extension.create({
   name: 'pasteMarkdown',
@@ -1092,6 +1057,7 @@ function runDeferredEditorCommand(onSuccess: () => void, onError: (error: unknow
 interface TipTapEditorProps {
   initialContent: string
   onChange?: (content: string) => void
+  onContentDirty?: () => void
   placeholder?: string
   editable?: boolean
   activeFilePath?: string
@@ -1108,7 +1074,11 @@ interface TipTapEditorProps {
   scrollable?: boolean
   mobileMode?: boolean
   applyLayoutPreferences?: boolean
+  isActive?: boolean
   onTerminate?: () => void
+  documentScope?: 'document' | 'section'
+  documentMarkdown?: string
+  onBlockingActivityChange?: (count: number) => void
 }
 
 type MobileSelectionContext =
@@ -1160,6 +1130,15 @@ function clampSelectionPosition(value: number, docSize: number): number {
   return Math.max(0, Math.min(value, docSize))
 }
 
+function getMarkdownLineAtPosition(markdown: string, position: number): number {
+  const safePosition = Math.max(0, Math.min(position, markdown.length))
+  let line = 1
+  for (let index = 0; index < safePosition; index++) {
+    if (markdown.charCodeAt(index) === 10) line++
+  }
+  return line
+}
+
 function getEditorUndoRedoState(editor: CoreEditor): { undo: boolean; redo: boolean } {
   return {
     undo: undoDepth(editor.state) > 0,
@@ -1197,6 +1176,7 @@ function setEditorContentWithoutUndo(editor: CoreEditor, content: string): void 
 export function TipTapEditor({
   initialContent,
   onChange,
+  onContentDirty,
   placeholder,
   editable = true,
   activeFilePath = '',
@@ -1213,7 +1193,11 @@ export function TipTapEditor({
   scrollable = true,
   mobileMode,
   applyLayoutPreferences = false,
+  isActive = true,
   onTerminate,
+  documentScope = 'document',
+  documentMarkdown,
+  onBlockingActivityChange,
 }: TipTapEditorProps) {
   const t = useTranslations('editor')
   const tMermaid = useTranslations('editor.mermaid.templates')
@@ -1224,16 +1208,118 @@ export function TipTapEditor({
   const setPendingSearchKeyword = useArticleStore((state) => state.setPendingSearchKeyword)
   const setEditorViewState = useArticleStore((state) => state.setEditorViewState)
   const getEditorViewState = useArticleStore((state) => state.getEditorViewState)
+  const isSectionScope = documentScope === 'section'
+  const documentMarkdownRef = useRef(documentMarkdown)
+  documentMarkdownRef.current = documentMarkdown
+  const blockingActivityTokensRef = useRef(new Set<symbol>())
+  const blockingActivityFlushRef = useRef<() => void>(() => {})
+  const blockingActivityFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isEditorUnmountingRef = useRef(false)
+  const discardPendingMarkdownOnUnmountRef = useRef(false)
+  const onBlockingActivityChangeRef = useRef(onBlockingActivityChange)
+  const initialEditorViewState = activeFilePath && !isSectionScope
+    ? getEditorViewState(activeFilePath)
+    : null
 
   const placeholderText = placeholder || t('placeholder')
   const isMobile = mobileMode ?? isMobileDevice()
   const [isRestoringMobileView, setIsRestoringMobileView] = useState(isMobile)
   const [sourceMarkdown, setSourceMarkdown] = useState(initialContent)
+  const sourceMarkdownRef = useRef(initialContent)
+  const sourceSelectionRef = useRef({
+    from: initialEditorViewState?.sourceSelectionFrom ?? 0,
+    to: initialEditorViewState?.sourceSelectionTo ?? 0,
+  })
+  const sourceEditorControllerRef = useRef<SourceMarkdownEditorController | null>(null)
+  const pendingSourceSearchRef = useRef(false)
   const [markdownParseError, setMarkdownParseError] = useState<string | null>(null)
+  const [isLargeDocument, setIsLargeDocument] = useState(
+    () => !isSectionScope && applyLayoutPreferences && isLargeMarkdownDocument(initialContent)
+  )
+  const isLargeDocumentRef = useRef(isLargeDocument)
+  isLargeDocumentRef.current = isLargeDocument
+  const [hasUnparsedSourceChanges, setHasUnparsedSourceChanges] = useState(false)
+  const [largeDocumentVisualOverride, setLargeDocumentVisualOverride] = useState(
+    () => Boolean(initialEditorViewState?.largeDocumentVisualOverride)
+  )
+  const [isPreparingLargeDocumentVisual, setIsPreparingLargeDocumentVisual] = useState(false)
 
   // Use ref for autoScroll to avoid infinite re-render loop
   const autoScrollRef = useRef(autoScroll)
   autoScrollRef.current = autoScroll
+  const isActiveRef = useRef(isActive)
+  isActiveRef.current = isActive
+
+  useEffect(() => {
+    onBlockingActivityChangeRef.current = onBlockingActivityChange
+  }, [onBlockingActivityChange])
+
+  const beginBlockingActivity = useCallback((flushBeforeStart = true) => {
+    if (!isSectionScope) return () => {}
+
+    if (blockingActivityFlushTimerRef.current) {
+      clearTimeout(blockingActivityFlushTimerRef.current)
+      blockingActivityFlushTimerRef.current = null
+    }
+    if (flushBeforeStart && blockingActivityTokensRef.current.size === 0) {
+      blockingActivityFlushRef.current()
+    }
+
+    const token = Symbol('section-editor-activity')
+    let active = true
+    blockingActivityTokensRef.current.add(token)
+    onBlockingActivityChangeRef.current?.(blockingActivityTokensRef.current.size)
+
+    return () => {
+      if (!active) return
+      active = false
+      blockingActivityTokensRef.current.delete(token)
+      if (isEditorUnmountingRef.current) return
+      onBlockingActivityChangeRef.current?.(blockingActivityTokensRef.current.size)
+      if (blockingActivityTokensRef.current.size === 0) {
+        blockingActivityFlushTimerRef.current = setTimeout(() => {
+          blockingActivityFlushTimerRef.current = null
+          if (blockingActivityTokensRef.current.size === 0) {
+            blockingActivityFlushRef.current()
+          }
+        }, 50)
+      }
+    }
+  }, [isSectionScope])
+
+  const aiSuggestionActivityEndRef = useRef<(() => void) | null>(null)
+  const handleAiSuggestionPendingChange = useCallback((pending: boolean) => {
+    if (pending) {
+      if (!aiSuggestionActivityEndRef.current) {
+        aiSuggestionActivityEndRef.current = beginBlockingActivity(false)
+      }
+      return
+    }
+
+    aiSuggestionActivityEndRef.current?.()
+    aiSuggestionActivityEndRef.current = null
+  }, [beginBlockingActivity])
+
+  useEffect(() => () => {
+    isEditorUnmountingRef.current = true
+    discardPendingMarkdownOnUnmountRef.current = blockingActivityTokensRef.current.size > 0
+    if (blockingActivityFlushTimerRef.current) {
+      clearTimeout(blockingActivityFlushTimerRef.current)
+      blockingActivityFlushTimerRef.current = null
+    }
+    aiSuggestionActivityEndRef.current?.()
+    aiSuggestionActivityEndRef.current = null
+    blockingActivityTokensRef.current.clear()
+  }, [])
+  const activeFilePathRef = useRef(activeFilePath)
+  activeFilePathRef.current = activeFilePath
+  const imageSourceContextSubscribersRef = useRef(new Set<() => void>())
+
+  useEffect(() => {
+    for (const notifyContextChanged of imageSourceContextSubscribersRef.current) {
+      notifyContextChanged()
+    }
+  }, [activeFilePath])
 
   const {
     contentTextScale,
@@ -1247,65 +1333,45 @@ export function TipTapEditor({
     enableOutline,
     setEditorViewMode,
   } = useSettingStore()
-  const viewMode: EditorViewMode = applyLayoutPreferences
+  const viewMode: EditorViewMode = applyLayoutPreferences && !isSectionScope
     ? editorViewMode
     : 'visual'
-  const effectiveViewMode: EditorViewMode = markdownParseError ? 'source' : viewMode
-  const previousViewModeRef = useRef<EditorViewMode>(viewMode)
+  const shouldDeferVisualParsing = isLargeDocument && !largeDocumentVisualOverride
+  const shouldDeferVisualParsingRef = useRef(shouldDeferVisualParsing)
+  shouldDeferVisualParsingRef.current = shouldDeferVisualParsing
+  const documentViewMode: EditorViewMode = isLargeDocument
+    ? largeDocumentVisualOverride ? 'visual' : 'source'
+    : viewMode
+  const effectiveViewMode: EditorViewMode = (
+    markdownParseError
+    || shouldDeferVisualParsing
+    || isPreparingLargeDocumentVisual
+    || hasUnparsedSourceChanges
+  ) ? 'source' : documentViewMode
+  const isSourceView = effectiveViewMode === 'source'
+  const isSectionVirtualView = (
+    !isSectionScope
+    && isLargeDocument
+    && largeDocumentVisualOverride
+    && effectiveViewMode === 'visual'
+  )
+  const usesCanonicalMarkdown = isSourceView || isSectionVirtualView
+  const isSourceViewRef = useRef(isSourceView)
+  isSourceViewRef.current = isSourceView
+  const usesCanonicalMarkdownRef = useRef(usesCanonicalMarkdown)
+  usesCanonicalMarkdownRef.current = usesCanonicalMarkdown
+  const previousViewModeRef = useRef<EditorViewMode>(documentViewMode)
 
   // 编辑器容器 ref，用于应用字体缩放
   const editorContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollContainerId = useId()
-  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const sourceMirrorRef = useRef<HTMLDivElement>(null)
-  const sourceLines = useMemo(() => sourceMarkdown.split('\n'), [sourceMarkdown])
-  const [sourceLineHeights, setSourceLineHeights] = useState<number[]>([])
-  const measuredSourceHeight = sourceLineHeights.length === sourceLines.length
-    ? sourceLineHeights.reduce((total, height) => total + height, 48)
-    : undefined
+  const sectionedEditorControllerRef = useRef<SectionedMarkdownEditorController | null>(null)
+  const [activeSectionEditor, setActiveSectionEditor] = useState<TipTapReactEditor | null>(null)
 
-  useLayoutEffect(() => {
-    if (effectiveViewMode !== 'source') return
-
-    const textarea = sourceTextareaRef.current
-    const mirror = sourceMirrorRef.current
-    if (!textarea || !mirror) return
-
-    let frameId: number | null = null
-    const measureLines = () => {
-      mirror.style.width = editorSourceWrap
-        ? `${Math.max(0, textarea.clientWidth - 32)}px`
-        : 'max-content'
-      const nextHeights = Array.from(
-        mirror.children,
-        (line) => line.getBoundingClientRect().height
-      )
-
-      setSourceLineHeights((currentHeights) => (
-        currentHeights.length === nextHeights.length
-        && currentHeights.every((height, index) => height === nextHeights[index])
-          ? currentHeights
-          : nextHeights
-      ))
-    }
-    const scheduleMeasure = () => {
-      if (frameId !== null) cancelAnimationFrame(frameId)
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        measureLines()
-      })
-    }
-
-    const resizeObserver = new ResizeObserver(scheduleMeasure)
-    resizeObserver.observe(textarea)
-    scheduleMeasure()
-
-    return () => {
-      resizeObserver.disconnect()
-      if (frameId !== null) cancelAnimationFrame(frameId)
-    }
-  }, [editorLineHeight, editorSourceWrap, effectiveViewMode, sourceLines])
+  useEffect(() => {
+    sourceMarkdownRef.current = sourceMarkdown
+  }, [sourceMarkdown])
 
   // Math dialog state
   const [mathDialogOpen, setMathDialogOpen] = useState(false)
@@ -1335,8 +1401,16 @@ export function TipTapEditor({
   const initializedForPathRef = useRef<string | null>(null)
   const externalUpdateCounterRef = useRef(0)
   const pendingSyncUpdateRef = useRef<{ path: string; content: string } | null>(null)
+  const canonicalExternalUpdateSequenceRef = useRef(0)
   const restoredViewPathRef = useRef<string | null>(null)
-  const lastViewStateRef = useRef<{ path: string; selectionFrom: number; selectionTo: number; scrollTop: number } | null>(null)
+  const restoreEditorViewStateRef = useRef<(path: string, attempt?: number) => void>(() => {})
+  const lastViewStateRef = useRef<{
+    path: string
+    selectionFrom: number
+    selectionTo: number
+    scrollTop: number
+    sectionId?: string
+  } | null>(null)
 
   // Bug fix: Track when editor is ready (has caught up with content)
   const isReadyRef = useRef(false)
@@ -1345,9 +1419,11 @@ export function TipTapEditor({
 
   // Content version ref for race condition prevention between editor and agent
   const contentVersionRef = useRef(0)
+  const sourceSelectionQuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const markdownChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasPendingMarkdownChangeRef = useRef(false)
   const onChangeRef = useRef(onChange)
+  const classifyCanonicalMarkdownRef = useRef<(value: string) => boolean>(() => false)
   const viewStatePersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const editorDragHandleTargetRef = useRef<{ editor: CoreEditor; from: number; to: number } | null>(null)
   const editorBlockPointerDragStateRef = useRef<EditorBlockPointerDragState | null>(null)
@@ -1366,20 +1442,38 @@ export function TipTapEditor({
     onChangeRef.current = onChange
   }, [onChange])
 
+  const onContentDirtyRef = useRef(onContentDirty)
+  useEffect(() => {
+    onContentDirtyRef.current = onContentDirty
+  }, [onContentDirty])
+
   const flushMarkdownChange = useCallback((targetEditor: TipTapReactEditor) => {
     if (markdownChangeTimerRef.current) {
       clearTimeout(markdownChangeTimerRef.current)
       markdownChangeTimerRef.current = null
     }
 
-    if (!hasPendingMarkdownChangeRef.current || targetEditor.isDestroyed) {
+    if (
+      !hasPendingMarkdownChangeRef.current
+      || targetEditor.isDestroyed
+      || discardPendingMarkdownOnUnmountRef.current
+    ) {
+      return
+    }
+    if (isSectionScope && blockingActivityTokensRef.current.size > 0) {
       return
     }
 
     hasPendingMarkdownChangeRef.current = false
     const markdown = normalizeMarkdownPlaceholders(targetEditor.getMarkdown())
+    if (!isSectionScope) {
+      sourceMarkdownRef.current = markdown
+      if (classifyCanonicalMarkdownRef.current(markdown)) {
+        setSourceMarkdown(markdown)
+      }
+    }
     onChangeRef.current?.(markdown)
-  }, [])
+  }, [isSectionScope])
 
   const scheduleMarkdownChange = useCallback((targetEditor: TipTapReactEditor) => {
     hasPendingMarkdownChangeRef.current = true
@@ -1406,10 +1500,24 @@ export function TipTapEditor({
       initializedForPathRef.current = activeFilePath
       pendingSyncUpdateRef.current = null
       restoredViewPathRef.current = null
+      sourceMarkdownRef.current = initialContent
+      const savedViewState = isSectionScope ? null : getEditorViewState(activeFilePath)
+      sourceSelectionRef.current = {
+        from: savedViewState?.sourceSelectionFrom ?? 0,
+        to: savedViewState?.sourceSelectionTo ?? 0,
+      }
       setSourceMarkdown(initialContent)
+      const nextIsLargeDocument = !isSectionScope
+        && applyLayoutPreferences
+        && isLargeMarkdownDocument(initialContent)
+      isLargeDocumentRef.current = nextIsLargeDocument
+      setIsLargeDocument(nextIsLargeDocument)
+      setHasUnparsedSourceChanges(false)
+      setLargeDocumentVisualOverride(Boolean(savedViewState?.largeDocumentVisualOverride))
+      setIsPreparingLargeDocumentVisual(false)
       setIsRestoringMobileView(isMobile)
     }
-  }, [activeFilePath, initialContent, isMobile])
+  }, [activeFilePath, applyLayoutPreferences, getEditorViewState, initialContent, isMobile, isSectionScope])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -1442,7 +1550,7 @@ export function TipTapEditor({
         nested: true,
       }),
       StableCodeBlockLowlight.configure({
-        lowlight,
+        shouldHighlight: () => !isSourceViewRef.current,
       }),
       CharacterCount,
       Highlight.configure({
@@ -1583,6 +1691,8 @@ export function TipTapEditor({
             alt: node.attrs.alt || '',
             title: node.attrs.title || null,
             class: 'max-w-full rounded-lg',
+            loading: 'lazy',
+            decoding: 'async',
             width,
             height,
             style: style || null,
@@ -1630,78 +1740,35 @@ export function TipTapEditor({
             return null
           }
 
-          const { directions, minWidth, minHeight, alwaysPreserveAspectRatio } = this.options.resize
+          const { minWidth, minHeight, alwaysPreserveAspectRatio } = this.options.resize
 
-          return ({ node, getPos, editor }) => {
-            const element = document.createElement('img')
-            applyImageNodeAttributes(element, node.attrs)
+          return createImageNodeView({
+            minWidth,
+            minHeight,
+            alwaysPreserveAspectRatio,
+            getSourceContextKey: () => activeFilePathRef.current || '',
+            subscribeSourceContextChange: (callback) => {
+              imageSourceContextSubscribersRef.current.add(callback)
+              return () => imageSourceContextSubscribersRef.current.delete(callback)
+            },
+            activateImageSource: async (image) => {
+              const currentFilePath = activeFilePathRef.current
+                || useArticleStore.getState().activeFilePath
+              if (!currentFilePath) return
 
-            const nodeView = new ResizableNodeView({
-              element,
-              editor,
-              node,
-              getPos,
-              onResize: (width, height) => {
-                element.style.width = `${width}px`
-                element.style.height = `${height}px`
-              },
-              onCommit: (width, height) => {
-                const pos = getPos()
-
-                if (typeof pos !== 'number') {
-                  return
+              await activateDeferredImageSource(image, async (relativeSource) => {
+                if (isRecordTabPath(currentFilePath)) {
+                  return await convertImage(relativeSource.replace(/^\.?\//, ''))
                 }
 
-                editor
-                  .chain()
-                  .setNodeSelection(pos)
-                  .updateAttributes(this.name, {
-                    width,
-                    height,
-                  })
-                  .run()
-              },
-              onUpdate: (updatedNode) => {
-                if (updatedNode.type !== node.type) {
-                  return false
-                }
-
-                applyImageNodeAttributes(element, updatedNode.attrs)
-                return true
-              },
-              options: {
-                directions,
-                min: {
-                  width: minWidth,
-                  height: minHeight,
-                },
-                preserveAspectRatio: alwaysPreserveAspectRatio === true,
-                className: {
-                  container: 'image-resize-container',
-                  wrapper: 'image-resize-wrapper',
-                  handle: 'image-resize-handle',
-                  resizing: 'image-resize-active',
-                },
-              },
-            })
-
-            const dom = nodeView.dom as HTMLElement
-            const revealNodeView = () => {
-              dom.style.visibility = ''
-              dom.style.pointerEvents = ''
-            }
-
-            dom.style.visibility = 'hidden'
-            dom.style.pointerEvents = 'none'
-            element.onload = revealNodeView
-            element.onerror = revealNodeView
-
-            if (element.complete) {
-              revealNodeView()
-            }
-
-            return nodeView
-          }
+                const fullRelativePath = resolveImagePathFromMarkdown(
+                  currentFilePath,
+                  relativeSource
+                )
+                return await convertImageByWorkspace(fullRelativePath)
+              })
+            },
+          })
         },
         addInputRules() {
           return [
@@ -1722,7 +1789,6 @@ export function TipTapEditor({
         allowBase64: true,
         resize: {
           enabled: true,
-          directions: IMAGE_RESIZE_DIRECTIONS,
           minWidth: 48,
           minHeight: 48,
           alwaysPreserveAspectRatio: true,
@@ -1744,6 +1810,8 @@ export function TipTapEditor({
       // Bug fix: Only trigger onChange if editor is ready (not during initialization)
       // Using counter to handle rapid successive updates
       if (externalUpdateCounterRef.current === 0 && isReadyRef.current) {
+        markEditorPathMutation(activeFilePathRef.current)
+        onContentDirtyRef.current?.()
         scheduleMarkdownChange(editor)
         // Mark that we've processed the first update
         isFirstUpdateRef.current = false
@@ -1756,6 +1824,11 @@ export function TipTapEditor({
       }
     },
   })
+
+  blockingActivityFlushRef.current = () => {
+    if (!editor || editor.isDestroyed || blockingActivityTokensRef.current.size > 0) return
+    flushMarkdownChange(editor)
+  }
 
   const trySetMarkdownContent = useCallback((
     targetEditor: CoreEditor,
@@ -1772,67 +1845,431 @@ export function TipTapEditor({
         })
       }
       setMarkdownParseError(null)
+      setHasUnparsedSourceChanges(false)
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error('Markdown 可视化解析失败，已切换到源码模式:', error)
+      sourceMarkdownRef.current = content
       setSourceMarkdown(content)
       setMarkdownParseError(message)
+      setHasUnparsedSourceChanges(true)
       return false
     }
   }, [])
 
+  const classifyCanonicalMarkdown = useCallback((value: string) => {
+    const nextIsLargeDocument = !isSectionScope
+      && applyLayoutPreferences
+      && isLargeMarkdownDocument(value)
+    if (nextIsLargeDocument === isLargeDocumentRef.current) {
+      return nextIsLargeDocument
+    }
+
+    isLargeDocumentRef.current = nextIsLargeDocument
+    setIsLargeDocument(nextIsLargeDocument)
+    setLargeDocumentVisualOverride(false)
+    setHasUnparsedSourceChanges(true)
+    if (activeFilePath) {
+      setEditorViewState(activeFilePath, { largeDocumentVisualOverride: false })
+    }
+    return nextIsLargeDocument
+  }, [activeFilePath, applyLayoutPreferences, isSectionScope, setEditorViewState])
+  classifyCanonicalMarkdownRef.current = classifyCanonicalMarkdown
+
   const handleSourceMarkdownChange = useCallback((value: string) => {
+    markEditorPathMutation(activeFilePathRef.current)
+    sourceMarkdownRef.current = value
     setSourceMarkdown(value)
-    if (editor && !markdownParseError) {
-      trySetMarkdownContent(editor, value, { emitUpdate: false })
-    }
+    setHasUnparsedSourceChanges(true)
+    contentVersionRef.current++
     onChangeRef.current?.(value)
-  }, [editor, markdownParseError, trySetMarkdownContent])
+  }, [])
 
-  const handleRetryVisualMode = useCallback(() => {
-    if (!editor) return
+  const handleSectionedMarkdownChange = useCallback((value: string) => {
+    if (sourceMarkdownRef.current === value) return
+    sourceMarkdownRef.current = value
+    setSourceMarkdown(value)
+    setHasUnparsedSourceChanges(false)
+    contentVersionRef.current++
+    onChangeRef.current?.(value)
+    classifyCanonicalMarkdown(value)
+  }, [classifyCanonicalMarkdown])
 
-    if (trySetMarkdownContent(editor, sourceMarkdown, { resetHistory: true }) && applyLayoutPreferences) {
-      void setEditorViewMode('visual')
-    }
-  }, [applyLayoutPreferences, editor, setEditorViewMode, sourceMarkdown, trySetMarkdownContent])
+  const flushSectionedMarkdown = useCallback(() => {
+    const expectedCanonical = sourceMarkdownRef.current
+    const flushedMarkdown = sectionedEditorControllerRef.current?.flush(expectedCanonical)
+    if (flushedMarkdown === undefined) return sourceMarkdownRef.current
+
+    // A remote/Agent replacement can update the canonical ref one render
+    // before the section host installs its new index. Local flushes update the
+    // same ref synchronously through handleSectionedMarkdownChange.
+    return sourceMarkdownRef.current === flushedMarkdown
+      ? flushedMarkdown
+      : sourceMarkdownRef.current
+  }, [])
+
+  const getCurrentMarkdownSnapshot = useCallback(() => {
+    if (isSectionVirtualView) return flushSectionedMarkdown()
+    if (isSourceView || !editor || editor.isDestroyed) return sourceMarkdownRef.current
+
+    flushMarkdownChange(editor)
+    return normalizeMarkdownPlaceholders(editor.getMarkdown())
+  }, [editor, flushMarkdownChange, flushSectionedMarkdown, isSectionVirtualView, isSourceView])
 
   useEffect(() => {
-    if (!editor || previousViewModeRef.current === viewMode) return
+    if (isSectionScope || !isActive) return
 
-    if (viewMode === 'visual') {
-      trySetMarkdownContent(editor, sourceMarkdown, { resetHistory: true })
-    } else if (!markdownParseError) {
-      flushMarkdownChange(editor)
-      setSourceMarkdown(normalizeMarkdownPlaceholders(editor.getMarkdown()))
+    const handlePrepareDeactivate = ({
+      resolve,
+    }: {
+      resolve: (canDeactivate: boolean) => void
+    }) => {
+      if (!(sectionedEditorControllerRef.current?.prepareToDeactivate() ?? true)) {
+        resolve(false)
+        return
+      }
+
+      try {
+        // Visual Tiptap keeps Markdown serialization behind a local 500 ms
+        // timer. Flush that timer synchronously before the durable step drains
+        // the article store queue. Source mode already updates its canonical
+        // ref and onChange bridge on every CodeMirror transaction.
+        getCurrentMarkdownSnapshot()
+        resolve(true)
+      } catch (error) {
+        console.error('Failed to flush the editor before changing files:', error)
+        resolve(false)
+      }
     }
 
-    previousViewModeRef.current = viewMode
-  }, [editor, flushMarkdownChange, markdownParseError, sourceMarkdown, trySetMarkdownContent, viewMode])
+    emitter.on('editor-prepare-deactivate', handlePrepareDeactivate)
+    return () => {
+      emitter.off('editor-prepare-deactivate', handlePrepareDeactivate)
+    }
+  }, [getCurrentMarkdownSnapshot, isActive, isSectionScope])
 
-  const handleToggleViewMode = useCallback(() => {
-    if (markdownParseError) {
-      handleRetryVisualMode()
+  const prepareExternalMarkdownAction = useCallback(() => (
+    sectionedEditorControllerRef.current?.prepareToDeactivate() ?? true
+  ), [])
+
+  const handleActiveSectionEditorChange = useCallback((nextEditor: TipTapReactEditor | null) => {
+    setActiveSectionEditor(nextEditor)
+    if (!nextEditor || !activeFilePath || !isSectionVirtualView) return
+
+    const sectionId = sectionedEditorControllerRef.current?.getActiveSectionId()
+    if (sectionId) {
+      setEditorViewState(activeFilePath, { sectionId })
+    }
+  }, [activeFilePath, isSectionVirtualView, setEditorViewState])
+
+  const handleSectionedSelectionChange = useCallback((selection: SectionedMarkdownSelection | null) => {
+    if (!isActive || !isSectionVirtualView) return
+
+    if (sourceSelectionQuoteTimerRef.current) {
+      clearTimeout(sourceSelectionQuoteTimerRef.current)
+      sourceSelectionQuoteTimerRef.current = null
+    }
+
+    if (!selection) {
+      useChatStore.getState().setEditorSelectionQuote(null)
       return
     }
-    void setEditorViewMode(viewMode === 'source' ? 'visual' : 'source')
-  }, [handleRetryVisualMode, markdownParseError, setEditorViewMode, viewMode])
 
-  const handleSourceKeyDown = useCallback((event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Tab') return
+    if (selection.collapsed) {
+      useChatStore.getState().setEditorSelectionQuote(null)
+      return
+    }
 
-    event.preventDefault()
-    const textarea = event.currentTarget
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const nextMarkdown = `${sourceMarkdown.slice(0, start)}  ${sourceMarkdown.slice(end)}`
+    sourceSelectionQuoteTimerRef.current = setTimeout(() => {
+      sourceSelectionQuoteTimerRef.current = null
+      const currentSelection = sectionedEditorControllerRef.current?.getSelection()
+      if (
+        !currentSelection
+        || currentSelection.collapsed !== selection.collapsed
+        || currentSelection.selectionToken !== selection.selectionToken
+      ) {
+        return
+      }
 
-    handleSourceMarkdownChange(nextMarkdown)
-    requestAnimationFrame(() => {
-      textarea.setSelectionRange(start + 2, start + 2)
+      const selectedMarkdown = currentSelection.markdown || currentSelection.text
+      const quote = currentSelection.text || selectedMarkdown
+      if (!quote.trim()) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+
+      useChatStore.getState().setEditorSelectionQuote({
+        quote,
+        fullContent: selectedMarkdown,
+        fileName: activeFilePath?.split('/').pop() || '',
+        startLine: -1,
+        endLine: -1,
+        from: -1,
+        to: -1,
+        selectionToken: currentSelection.selectionToken,
+        articlePath: activeFilePath || '',
+      })
+    }, 120)
+  }, [activeFilePath, isActive, isSectionVirtualView])
+
+  const handleSourceSelectionChange = useCallback((selection: { from: number; to: number }) => {
+    sourceSelectionRef.current = selection
+    if (isSectionScope) return
+    if (!isActive) return
+
+    if (sourceSelectionQuoteTimerRef.current) {
+      clearTimeout(sourceSelectionQuoteTimerRef.current)
+      sourceSelectionQuoteTimerRef.current = null
+    }
+
+    if (selection.from === selection.to) {
+      useChatStore.getState().setEditorSelectionQuote(null)
+      return
+    }
+
+    sourceSelectionQuoteTimerRef.current = setTimeout(() => {
+      sourceSelectionQuoteTimerRef.current = null
+      if (
+        sourceSelectionRef.current.from !== selection.from
+        || sourceSelectionRef.current.to !== selection.to
+      ) {
+        return
+      }
+
+      const markdown = sourceMarkdownRef.current
+      const from = Math.max(0, Math.min(selection.from, markdown.length))
+      const to = Math.max(from, Math.min(selection.to, markdown.length))
+      const quote = markdown.slice(from, to)
+      if (!quote.trim()) {
+        useChatStore.getState().setEditorSelectionQuote(null)
+        return
+      }
+
+      useChatStore.getState().setEditorSelectionQuote({
+        quote,
+        fullContent: quote,
+        fileName: activeFilePath?.split('/').pop() || '',
+        startLine: getMarkdownLineAtPosition(markdown, from),
+        endLine: getMarkdownLineAtPosition(markdown, to),
+        from,
+        to,
+        articlePath: activeFilePath || '',
+      })
+    }, 120)
+  }, [activeFilePath, isActive, isSectionScope])
+
+  const handleSourceControllerChange = useCallback((controller: SourceMarkdownEditorController | null) => {
+    sourceEditorControllerRef.current = controller
+    if (!controller) return
+
+    const pendingKeyword = useArticleStore.getState().pendingSearchKeyword.trim()
+    if (pendingKeyword) {
+      controller.find(pendingKeyword)
+      setPendingSearchKeyword('')
+      pendingSourceSearchRef.current = false
+      return
+    }
+
+    if (!pendingSourceSearchRef.current) return
+
+    pendingSourceSearchRef.current = false
+    window.requestAnimationFrame(() => controller.openSearch())
+  }, [setPendingSearchKeyword])
+
+  const handleSourceUndoRedoChange = useCallback((state: { undo: boolean; redo: boolean }) => {
+    if (!isActive) return
+    emitter.emit('editor-undo-redo-changed', state)
+  }, [isActive])
+
+  const handleSourceViewStateChange = useCallback((state: SourceMarkdownEditorViewState) => {
+    sourceSelectionRef.current = state.selection
+    if (isSectionScope || !activeFilePath) return
+
+    setEditorViewState(activeFilePath, {
+      sourceSelectionFrom: state.selection.from,
+      sourceSelectionTo: state.selection.to,
+      sourceScrollTop: state.scrollTop,
     })
-  }, [handleSourceMarkdownChange, sourceMarkdown])
+  }, [activeFilePath, isSectionScope, setEditorViewState])
+
+  useEffect(() => {
+    return () => {
+      if (sourceSelectionQuoteTimerRef.current) {
+        clearTimeout(sourceSelectionQuoteTimerRef.current)
+        sourceSelectionQuoteTimerRef.current = null
+      }
+    }
+  }, [activeFilePath, isActive])
+
+  useEffect(() => {
+    if (!isActive || !isSourceView) return
+
+    handleSourceUndoRedoChange(
+      sourceEditorControllerRef.current?.getUndoRedoState() ?? { undo: false, redo: false }
+    )
+    handleSourceSelectionChange(sourceSelectionRef.current)
+  }, [
+    handleSourceSelectionChange,
+    handleSourceUndoRedoChange,
+    isActive,
+    isSourceView,
+  ])
+
+  const handleEnterVisualMode = useCallback(() => {
+    if (!editor || !isActive || isPreparingLargeDocumentVisual) return
+
+    setIsPreparingLargeDocumentVisual(true)
+  }, [editor, isActive, isPreparingLargeDocumentVisual])
+
+  useEffect(() => {
+    if (!editor || !isPreparingLargeDocumentVisual) return
+    if (!isActive) {
+      setIsPreparingLargeDocumentVisual(false)
+      return
+    }
+
+    const currentPath = activeFilePath
+    const parseTimer = window.setTimeout(() => {
+      if (
+        activeFilePath !== currentPath
+        || editor.isDestroyed
+        || !isActiveRef.current
+      ) {
+        setIsPreparingLargeDocumentVisual(false)
+        return
+      }
+
+      const shouldUseSectionView = classifyCanonicalMarkdown(sourceMarkdownRef.current)
+      if (shouldUseSectionView && !isSectionScope) {
+        setMarkdownParseError(null)
+        setHasUnparsedSourceChanges(false)
+        setIsPreparingLargeDocumentVisual(false)
+        setLargeDocumentVisualOverride(true)
+        setEditorViewState(currentPath, { largeDocumentVisualOverride: true })
+        previousViewModeRef.current = 'visual'
+        onReady?.()
+        return
+      }
+
+      isReadyRef.current = false
+      const didLoadVisualContent = trySetMarkdownContent(
+        editor,
+        sourceMarkdownRef.current,
+        { resetHistory: true }
+      )
+      setIsPreparingLargeDocumentVisual(false)
+      if (!didLoadVisualContent) return
+
+      isInitializedRef.current = true
+      isReadyRef.current = true
+      onReady?.()
+      onEditorReady?.(editor)
+      restoreEditorViewStateRef.current(currentPath)
+      setLargeDocumentVisualOverride(true)
+      setEditorViewState(currentPath, { largeDocumentVisualOverride: true })
+      previousViewModeRef.current = 'visual'
+      if (applyLayoutPreferences) {
+        void setEditorViewMode('visual')
+      }
+    }, 0)
+
+    return () => window.clearTimeout(parseTimer)
+  }, [
+    activeFilePath,
+    applyLayoutPreferences,
+    classifyCanonicalMarkdown,
+    editor,
+    isActive,
+    isLargeDocument,
+    isSectionScope,
+    isPreparingLargeDocumentVisual,
+    onEditorReady,
+    onReady,
+    setEditorViewMode,
+    setEditorViewState,
+    trySetMarkdownContent,
+  ])
+
+  useEffect(() => {
+    if (!editor || previousViewModeRef.current === documentViewMode) return
+
+    if (documentViewMode === 'source' && !markdownParseError && isInitializedRef.current) {
+      const nextSourceMarkdown = isLargeDocument && largeDocumentVisualOverride
+        ? flushSectionedMarkdown()
+        : (() => {
+            flushMarkdownChange(editor)
+            return normalizeMarkdownPlaceholders(editor.getMarkdown())
+          })()
+      sourceMarkdownRef.current = nextSourceMarkdown
+      setSourceMarkdown(nextSourceMarkdown)
+      setHasUnparsedSourceChanges(false)
+      if (isLargeDocument) {
+        setLargeDocumentVisualOverride(false)
+        if (activeFilePath) {
+          setEditorViewState(activeFilePath, { largeDocumentVisualOverride: false })
+        }
+      }
+    }
+
+    previousViewModeRef.current = documentViewMode
+  }, [
+    editor,
+    activeFilePath,
+    flushMarkdownChange,
+    flushSectionedMarkdown,
+    isLargeDocument,
+    largeDocumentVisualOverride,
+    markdownParseError,
+    setEditorViewState,
+    documentViewMode,
+  ])
+
+  const handleToggleViewMode = useCallback(() => {
+    if (isSourceView) {
+      handleEnterVisualMode()
+      return
+    }
+
+    if (!editor) return
+    if (
+      isSectionVirtualView
+      && sectionedEditorControllerRef.current
+      && !sectionedEditorControllerRef.current.prepareToDeactivate()
+    ) {
+      return
+    }
+    const nextSourceMarkdown = isSectionVirtualView
+      ? flushSectionedMarkdown()
+      : (() => {
+          flushMarkdownChange(editor)
+          return normalizeMarkdownPlaceholders(editor.getMarkdown())
+        })()
+    sourceMarkdownRef.current = nextSourceMarkdown
+    setSourceMarkdown(nextSourceMarkdown)
+    setHasUnparsedSourceChanges(false)
+    if (isLargeDocument) {
+      setLargeDocumentVisualOverride(false)
+      if (activeFilePath) {
+        setEditorViewState(activeFilePath, { largeDocumentVisualOverride: false })
+      }
+      previousViewModeRef.current = 'source'
+      return
+    }
+    previousViewModeRef.current = 'source'
+    void setEditorViewMode('source')
+  }, [
+    activeFilePath,
+    editor,
+    flushMarkdownChange,
+    flushSectionedMarkdown,
+    handleEnterVisualMode,
+    isLargeDocument,
+    isSectionVirtualView,
+    isSourceView,
+    setEditorViewMode,
+    setEditorViewState,
+  ])
 
   useEffect(() => {
     if (!editor) return
@@ -1849,7 +2286,7 @@ export function TipTapEditor({
   }, [editor, flushMarkdownChange, markdownParseError])
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed) {
+    if (!editor || editor.isDestroyed || isSectionVirtualView) {
       return
     }
 
@@ -1973,7 +2410,7 @@ export function TipTapEditor({
       document.removeEventListener('pointerup', handlePointerUp, true)
       document.removeEventListener('pointercancel', handlePointerCancel, true)
     }
-  }, [editor])
+  }, [editor, isSectionVirtualView])
 
   const clearBlurSelectionHighlight = useCallback(() => {
     if (!editor || editor.isDestroyed) {
@@ -1996,7 +2433,7 @@ export function TipTapEditor({
   }, [clearBlurSelectionHighlight])
 
   const persistEditorViewState = useCallback(() => {
-    if (!editor || !activeFilePath || !scrollContainerRef.current) {
+    if (isSectionScope || !editor || !activeFilePath || !scrollContainerRef.current) {
       return
     }
 
@@ -2007,10 +2444,14 @@ export function TipTapEditor({
     const { selection } = editor.state
     const docSize = editor.state.doc.content.size
     const previousState = lastViewStateRef.current
-    let selectionFrom = selection.from
-    let selectionTo = selection.to
+    let selectionFrom = isSectionVirtualView
+      ? sourceSelectionRef.current.from
+      : selection.from
+    let selectionTo = isSectionVirtualView
+      ? sourceSelectionRef.current.to
+      : selection.to
 
-    if (isFullDocumentSelection(selection, docSize)) {
+    if (!isSectionVirtualView && isFullDocumentSelection(selection, docSize)) {
       if (
         previousState?.path === activeFilePath &&
         !isFullDocumentRange(previousState.selectionFrom, previousState.selectionTo, docSize)
@@ -2028,6 +2469,9 @@ export function TipTapEditor({
       selectionFrom,
       selectionTo,
       scrollTop: scrollContainerRef.current.scrollTop,
+      sectionId: isSectionVirtualView
+        ? sectionedEditorControllerRef.current?.getActiveSectionId() ?? undefined
+        : undefined,
     }
 
     if (
@@ -2035,7 +2479,8 @@ export function TipTapEditor({
       previousState.path === nextState.path &&
       previousState.selectionFrom === nextState.selectionFrom &&
       previousState.selectionTo === nextState.selectionTo &&
-      previousState.scrollTop === nextState.scrollTop
+      previousState.scrollTop === nextState.scrollTop &&
+      previousState.sectionId === nextState.sectionId
     ) {
       return
     }
@@ -2045,8 +2490,9 @@ export function TipTapEditor({
       selectionFrom,
       selectionTo,
       scrollTop: nextState.scrollTop,
+      sectionId: nextState.sectionId,
     })
-  }, [activeFilePath, editor, setEditorViewState])
+  }, [activeFilePath, editor, isSectionScope, isSectionVirtualView, setEditorViewState])
 
   const handleEditorScroll = useCallback((event: ReactUIEvent<HTMLDivElement>) => {
     if (viewStatePersistTimerRef.current) {
@@ -2139,7 +2585,7 @@ export function TipTapEditor({
   }, [persistEditorViewState])
 
   const restoreEditorViewState = useCallback((path: string, attempt: number = 0) => {
-    if (!editor || !path || !scrollContainerRef.current) {
+    if (isSectionScope || !editor || !path || !scrollContainerRef.current) {
       return
     }
 
@@ -2169,6 +2615,31 @@ export function TipTapEditor({
         selectionTo: editor.state.selection.to,
         scrollTop: initialScrollTop,
       }
+      return
+    }
+
+    if (isSectionVirtualView) {
+      sourceSelectionRef.current = {
+        from: savedViewState.selectionFrom,
+        to: savedViewState.selectionTo,
+      }
+      requestAnimationFrame(() => {
+        if (!scrollContainerRef.current) return
+        scrollContainerRef.current.scrollTop = savedViewState.scrollTop
+        restoredViewPathRef.current = path
+        lastViewStateRef.current = {
+          path,
+          selectionFrom: savedViewState.selectionFrom,
+          selectionTo: savedViewState.selectionTo,
+          scrollTop: savedViewState.scrollTop,
+          sectionId: savedViewState.sectionId,
+        }
+        window.setTimeout(() => {
+          if (scrollContainerRef.current && restoredViewPathRef.current === path) {
+            scrollContainerRef.current.scrollTop = savedViewState.scrollTop
+          }
+        }, 50)
+      })
       return
     }
 
@@ -2242,7 +2713,13 @@ export function TipTapEditor({
         }
       })
     })
-  }, [editor, getEditorViewState, isMobile, setEditorViewState])
+  }, [editor, getEditorViewState, isMobile, isSectionScope, isSectionVirtualView, setEditorViewState])
+  restoreEditorViewStateRef.current = restoreEditorViewState
+
+  useEffect(() => {
+    if (!isSectionVirtualView || !activeSectionEditor || !activeFilePath) return
+    restoreEditorViewState(activeFilePath)
+  }, [activeFilePath, activeSectionEditor, isSectionVirtualView, restoreEditorViewState])
 
   const scrollMobileSelectionIntoView = useCallback(() => {
     if (!isMobile || !editor || editor.isDestroyed || !scrollContainerRef.current) {
@@ -2293,7 +2770,7 @@ export function TipTapEditor({
   }, [editor, isMobile])
 
   useEffect(() => {
-    if (!editor || !isMobile) {
+    if (!editor || !isMobile || isSectionVirtualView) {
       return
     }
 
@@ -2329,11 +2806,11 @@ export function TipTapEditor({
       window.visualViewport?.removeEventListener('resize', scheduleSelectionScroll)
       window.visualViewport?.removeEventListener('scroll', scheduleSelectionScroll)
     }
-  }, [editor, isMobile, scrollMobileSelectionIntoView])
+  }, [editor, isMobile, isSectionVirtualView, scrollMobileSelectionIntoView])
 
   // 普通点击编辑链接；组合键点击直接打开链接。
   useEffect(() => {
-    if (!editor || !editorContainerRef.current) return
+    if (!editor || !editorContainerRef.current || isSectionVirtualView) return
 
     const editorElement = editorContainerRef.current
 
@@ -2454,7 +2931,7 @@ export function TipTapEditor({
       editorElement.removeEventListener('click', handleClick)
       document.removeEventListener('tiptap-current-link-open', handleCurrentLinkOpen)
     }
-  }, [editor, isMobile])
+  }, [editor, isMobile, isSectionVirtualView])
 
   const restoreMobileContextSelection = useCallback((context: MobileSelectionContext = mobileContext) => {
     if (!editor || !context) {
@@ -2889,7 +3366,7 @@ export function TipTapEditor({
   }, [editor, isMobile, updateMobileContext])
 
   useEffect(() => {
-    if (!editor) return
+    if (!editor || isSectionScope || usesCanonicalMarkdown) return
 
     const quoteMarkType = editor.state.schema.marks.quote
     if (!quoteMarkType) return
@@ -2915,7 +3392,7 @@ export function TipTapEditor({
     if (changed) {
       editor.view.dispatch(tr)
     }
-  }, [editor, pendingQuote, activeFilePath])
+  }, [editor, pendingQuote, activeFilePath, isSectionScope, usesCanonicalMarkdown])
 
   useEffect(() => {
     if (!editor || !isMobile) return
@@ -2988,12 +3465,6 @@ export function TipTapEditor({
     applyFontSize()
   }, [contentTextScale, editor])
 
-  // Track active file path for image uploads (ref to avoid re-initializing editor)
-  const activeFilePathRef = useRef(activeFilePath)
-  useEffect(() => {
-    activeFilePathRef.current = activeFilePath
-  }, [activeFilePath])
-
   // Handle image paste and file drop
   useEffect(() => {
     // Check if editor is fully initialized
@@ -3010,6 +3481,7 @@ export function TipTapEditor({
 
       // Prevent default to avoid base64 image being inserted
       event.preventDefault()
+      const endBlockingActivity = beginBlockingActivity()
 
       // Insert "Uploading..." text as placeholder
       const { from } = editor.state.selection
@@ -3028,6 +3500,7 @@ export function TipTapEditor({
 
       handleImageUpload(imageFile, activeFilePathRef.current)
         .then(result => {
+          if (editor.isDestroyed) return
           // Delete the placeholder text
           editor.chain()
             .focus()
@@ -3047,6 +3520,7 @@ export function TipTapEditor({
             .run()
         })
         .catch(error => {
+          if (editor.isDestroyed) return
           // Remove the placeholder on error
           editor.chain()
             .focus()
@@ -3059,6 +3533,7 @@ export function TipTapEditor({
             variant: 'destructive',
           })
         })
+        .finally(endBlockingActivity)
     }
 
     const handleDrop = (event: DragEvent) => {
@@ -3089,6 +3564,7 @@ export function TipTapEditor({
         setIsCanvasDragOver(false)
         setIsCanvasDropPending(true)
       }
+      const endBlockingActivity = beginBlockingActivity()
 
       void (async () => {
         if (hasCanvas) {
@@ -3186,6 +3662,7 @@ export function TipTapEditor({
         })
       }).finally(() => {
         if (hasCanvas) setIsCanvasDropPending(false)
+        endBlockingActivity()
       })
     }
 
@@ -3200,7 +3677,7 @@ export function TipTapEditor({
       dom.removeEventListener('paste', handlePaste as EventListener)
       dom.removeEventListener('drop', handleDrop as EventListener, true)
     }
-  }, [editor])
+  }, [beginBlockingActivity, editor, t, tImage])
 
   // Handle copy event to output Markdown format
   useEffect(() => {
@@ -3251,6 +3728,7 @@ export function TipTapEditor({
     if (!selectedText.trim()) {
       return
     }
+    const endBlockingActivity = beginBlockingActivity()
 
     // Create abort controller for this request
     const controller = new AbortController()
@@ -3278,6 +3756,7 @@ export function TipTapEditor({
       await fetchAiPolishStream(
         selectedText,
         (chunk) => {
+          if (controller.signal.aborted || editor.isDestroyed) return
           // Insert chunk as plain text during streaming
           editor.chain()
             .insertContentAt(startPosition + accumulatedResult.length, chunk)
@@ -3301,6 +3780,8 @@ export function TipTapEditor({
           })
         },
       )
+
+      if (controller.signal.aborted || editor.isDestroyed) return
 
       // Streaming complete - replace all content with proper Markdown parsing
       editor.chain()
@@ -3332,8 +3813,10 @@ export function TipTapEditor({
         .insertContent(selectedText)
         .run()
       emitter.emit('ai-streaming-complete')
+    } finally {
+      endBlockingActivity()
     }
-  }, [editor])
+  }, [beginBlockingActivity, editor])
 
   // Handle AI Concise - simplify selected text (with streaming and suggestion mode)
   const handleAIConcise = useCallback(async () => {
@@ -3345,6 +3828,7 @@ export function TipTapEditor({
     if (!selectedText.trim()) {
       return
     }
+    const endBlockingActivity = beginBlockingActivity()
 
     // Create abort controller for this request
     const controller = new AbortController()
@@ -3372,6 +3856,7 @@ export function TipTapEditor({
       await fetchAiConciseStream(
         selectedText,
         (chunk) => {
+          if (controller.signal.aborted || editor.isDestroyed) return
           // Insert chunk as plain text during streaming
           editor.chain()
             .insertContentAt(startPosition + accumulatedResult.length, chunk)
@@ -3395,6 +3880,8 @@ export function TipTapEditor({
           })
         },
       )
+
+      if (controller.signal.aborted || editor.isDestroyed) return
 
       // Streaming complete - replace all content with proper Markdown parsing
       editor.chain()
@@ -3426,8 +3913,10 @@ export function TipTapEditor({
         .insertContent(selectedText)
         .run()
       emitter.emit('ai-streaming-complete')
+    } finally {
+      endBlockingActivity()
     }
-  }, [editor])
+  }, [beginBlockingActivity, editor])
 
   // Handle AI Expand - expand selected text (with streaming and suggestion mode)
   const handleAIExpand = useCallback(async () => {
@@ -3439,6 +3928,7 @@ export function TipTapEditor({
     if (!selectedText.trim()) {
       return
     }
+    const endBlockingActivity = beginBlockingActivity()
 
     // Create abort controller for this request
     const controller = new AbortController()
@@ -3466,6 +3956,7 @@ export function TipTapEditor({
       await fetchAiExpandStream(
         selectedText,
         (chunk) => {
+          if (controller.signal.aborted || editor.isDestroyed) return
           // Insert chunk as plain text during streaming
           editor.chain()
             .insertContentAt(startPosition + accumulatedResult.length, chunk)
@@ -3489,6 +3980,8 @@ export function TipTapEditor({
           })
         },
       )
+
+      if (controller.signal.aborted || editor.isDestroyed) return
 
       // Streaming complete - replace all content with proper Markdown parsing
       editor.chain()
@@ -3520,8 +4013,10 @@ export function TipTapEditor({
         .insertContent(selectedText)
         .run()
       emitter.emit('ai-streaming-complete')
+    } finally {
+      endBlockingActivity()
     }
-  }, [editor])
+  }, [beginBlockingActivity, editor])
 
   const handleAITranslate = useCallback(async (targetLanguage: string) => {
     if (!editor) return
@@ -3532,6 +4027,7 @@ export function TipTapEditor({
     if (!selectedText.trim()) {
       return
     }
+    const endBlockingActivity = beginBlockingActivity()
 
     const controller = new AbortController()
 
@@ -3556,6 +4052,7 @@ export function TipTapEditor({
         selectedText,
         targetLanguage,
         (chunk) => {
+          if (controller.signal.aborted || editor.isDestroyed) return
           editor.chain()
             .insertContentAt(startPosition + accumulatedResult.length, chunk)
             .run()
@@ -3576,6 +4073,8 @@ export function TipTapEditor({
           })
         },
       )
+
+      if (controller.signal.aborted || editor.isDestroyed) return
 
       editor.chain()
         .deleteRange({ from: startPosition, to: startPosition + accumulatedResult.length })
@@ -3603,8 +4102,10 @@ export function TipTapEditor({
         .insertContent(selectedText)
         .run()
       emitter.emit('ai-streaming-complete')
+    } finally {
+      endBlockingActivity()
     }
-  }, [editor])
+  }, [beginBlockingActivity, editor])
 
   useEffect(() => {
     aiActionHandlersRef.current = {
@@ -3617,6 +4118,7 @@ export function TipTapEditor({
 
   const insertImageAtSelection = useCallback(async () => {
     if (!editor) return
+    const endBlockingActivity = beginBlockingActivity()
 
     const insertPos = editor.state.selection.from
     const placeholder = 'Uploading... '
@@ -3679,10 +4181,14 @@ export function TipTapEditor({
         description: error instanceof Error ? error.message : undefined,
         variant: 'destructive',
       })
+    } finally {
+      endBlockingActivity()
     }
-  }, [activeFilePath, editor, isMobile, tImage])
+  }, [activeFilePath, beginBlockingActivity, editor, isMobile, tImage])
 
   useEffect(() => {
+    if (isSectionVirtualView) return
+
     const handleInsertImage = () => {
       void insertImageAtSelection()
     }
@@ -3691,7 +4197,7 @@ export function TipTapEditor({
     return () => {
       document.removeEventListener('tiptap-insert-image', handleInsertImage)
     }
-  }, [insertImageAtSelection])
+  }, [insertImageAtSelection, isSectionVirtualView])
 
   useEffect(() => {
     editorShortcutHandlersRef.current = {
@@ -3848,9 +4354,23 @@ export function TipTapEditor({
         // Check if the file path is still the same (handle race condition)
         if (activeFilePath !== currentPath) return
 
-        const nextContent = initialContent || ''
+        const nextContent = isLargeDocument
+          ? sourceMarkdownRef.current
+          : initialContent || ''
+        sourceMarkdownRef.current = nextContent
         setSourceMarkdown(nextContent)
-        trySetMarkdownContent(editor, nextContent, { resetHistory: true })
+        if (isLargeDocument && !isSectionScope) {
+          isInitializedRef.current = true
+          isReadyRef.current = false
+          setIsRestoringMobileView(false)
+          onReady?.()
+          return
+        }
+
+        const didLoadVisualContent = trySetMarkdownContent(editor, nextContent, { resetHistory: true })
+        setIsPreparingLargeDocumentVisual(false)
+        if (!didLoadVisualContent) return
+
         // Mark as initialized to allow subsequent content updates
         isInitializedRef.current = true
         // Bug fix: Mark editor as ready AFTER content is set
@@ -3860,98 +4380,32 @@ export function TipTapEditor({
         onReady?.()
         // Notify parent component about editor instance
         onEditorReady?.(editor)
-        restoreEditorViewState(currentPath)
+        if (isSectionScope) {
+          // Section editors reuse the real document path for local assets, but
+          // their selection and scroll positions are owned by the section host.
+          setIsRestoringMobileView(false)
+        } else {
+          restoreEditorViewState(currentPath)
+        }
       }, 0)
     }
-  }, [editor, initialContent, onReady, onEditorReady, activeFilePath, restoreEditorViewState, trySetMarkdownContent])
-
-  // 处理编辑器中图片的相对路径，转换为 asset:// URL
-  useEffect(() => {
-    if (!editor || !editor.view) return
-
-    let transformFrameId: number | null = null
-
-    const transformImagePaths = () => {
-      // 获取编辑器 DOM 中的所有图片
-      const editorDom = editor.view.dom
-      const images = editorDom.querySelectorAll('img')
-
-      const currentFilePath = activeFilePath || useArticleStore.getState().activeFilePath
-
-      const resolveEditorImageSource = (src: string) => {
-        if (isRecordTabPath(currentFilePath)) {
-          return convertImage(src.replace(/^\.?\//, ''))
-        }
-        const fullRelativePath = resolveImagePathFromMarkdown(currentFilePath, src)
-        return convertImageByWorkspace(fullRelativePath)
-      }
-
-      for (const img of images) {
-        const src = img.getAttribute('src')
-        // 如果是相对路径，转换为 asset://
-        if (src && currentFilePath && shouldTransformImageSrcToWorkspaceAsset(src)) {
-          // 异步转换路径
-          resolveEditorImageSource(src).then((assetUrl: string) => {
-            // 只有当 src 仍然是相对路径时才更新（避免覆盖已转换的）
-            const currentSrc = img.getAttribute('src')
-            if (currentSrc === src || !currentSrc?.startsWith('asset://')) {
-              img.setAttribute('src', assetUrl)
-            }
-          })
-        }
-        // 添加 onerror 处理：如果加载失败，尝试转换路径
-        if (img && !img.onerror) {
-          img.onerror = async () => {
-            const currentSrc = img.getAttribute('src')
-            if (currentSrc && currentFilePath && shouldTransformImageSrcToWorkspaceAsset(currentSrc)) {
-              const assetUrl = await resolveEditorImageSource(currentSrc)
-              img.setAttribute('src', assetUrl)
-            }
-          }
-        }
-      }
-    }
-
-    const scheduleTransformImagePaths = () => {
-      if (transformFrameId !== null) {
-        cancelAnimationFrame(transformFrameId)
-      }
-
-      transformFrameId = requestAnimationFrame(() => {
-        transformFrameId = null
-        transformImagePaths()
-      })
-    }
-
-    const imageNodeObserver = new MutationObserver((mutations) => {
-      const hasAddedImageNode = mutations.some(mutation =>
-        Array.from(mutation.addedNodes).some(node =>
-          node instanceof HTMLImageElement ||
-          (node instanceof HTMLElement && node.querySelector('img'))
-        )
-      )
-
-      if (hasAddedImageNode) {
-        scheduleTransformImagePaths()
-      }
-    })
-
-    imageNodeObserver.observe(editor.view.dom, { childList: true, subtree: true })
-
-    // 初始执行
-    scheduleTransformImagePaths()
-
-    return () => {
-      imageNodeObserver.disconnect()
-      if (transformFrameId !== null) {
-        cancelAnimationFrame(transformFrameId)
-      }
-    }
-  }, [editor])
+  }, [
+    activeFilePath,
+    editor,
+    initialContent,
+    isLargeDocument,
+    isSectionScope,
+    onEditorReady,
+    onReady,
+    restoreEditorViewState,
+    shouldDeferVisualParsing,
+    trySetMarkdownContent,
+    viewMode,
+  ])
 
   // Listen to editor transactions and notify header/tab bar about undo/redo state
   useEffect(() => {
-    if (!editor) return
+    if (!editor || !isActive || isSectionVirtualView) return
 
     let frameId: number | null = null
 
@@ -3978,11 +4432,29 @@ export function TipTapEditor({
       }
       editor.off('transaction', handleTransaction)
     }
-  }, [editor, activeFilePath])
+  }, [activeFilePath, editor, isActive, isSectionVirtualView])
 
   // Listen for search trigger from layout (Ctrl+F / Cmd+F)
   useEffect(() => {
+    if (isSectionScope) return
+
     const handleSearchTrigger = () => {
+      if (isSectionVirtualView) {
+        pendingSourceSearchRef.current = true
+        handleToggleViewMode()
+        return
+      }
+
+      if (isSourceView) {
+        const sourceController = sourceEditorControllerRef.current
+        if (sourceController) {
+          sourceController.openSearch()
+        } else {
+          pendingSourceSearchRef.current = true
+        }
+        return
+      }
+
       setSearchReplaceOpen(true)
     }
 
@@ -3990,12 +4462,32 @@ export function TipTapEditor({
     return () => {
       emitter.off('editor-search-trigger' as any, handleSearchTrigger)
     }
-  }, [])
+  }, [handleToggleViewMode, isSectionScope, isSectionVirtualView, isSourceView])
 
   useEffect(() => {
-    if (!editor || !activeFilePath || !pendingSearchKeyword.trim()) {
+    if (
+      isSectionScope
+      || !activeFilePath
+      || !pendingSearchKeyword.trim()
+    ) {
       return
     }
+
+    if (isSectionVirtualView) {
+      handleToggleViewMode()
+      return
+    }
+
+    if (isSourceView) {
+      const sourceController = sourceEditorControllerRef.current
+      if (sourceController) {
+        sourceController.find(pendingSearchKeyword)
+        setPendingSearchKeyword('')
+      }
+      return
+    }
+
+    if (!editor) return
 
     let cancelled = false
     let readyRetryTimer: ReturnType<typeof setTimeout> | null = null
@@ -4067,113 +4559,243 @@ export function TipTapEditor({
       if (readyRetryTimer) clearTimeout(readyRetryTimer)
       if (focusTimer) clearTimeout(focusTimer)
     }
-  }, [editor, activeFilePath, pendingSearchKeyword, setPendingSearchKeyword, initialContent])
+  }, [
+    editor,
+    activeFilePath,
+    pendingSearchKeyword,
+    setPendingSearchKeyword,
+    initialContent,
+    handleToggleViewMode,
+    isSectionScope,
+    isSectionVirtualView,
+    isSourceView,
+  ])
 
-  // Handle remote file pull updates via event (instead of initialContent change)
-  // This fixes cursor jump issue caused by unnecessary setContent during local saves
+  // Handle remote file pull updates via event (instead of initialContent change).
+  // All canonical update channels share a sequence so a delayed older event
+  // can never overwrite a newer Agent or sync result.
   useEffect(() => {
+    if (isSectionScope) return
+    let retryTimer: number | null = null
+
     const handleRemoteContentUpdate = (event: { content: string }) => {
       if (!editor || typeof event?.content !== 'string') return
-
-      const currentContent = editor.getMarkdown()
-      const newContent = event.content
-      setSourceMarkdown(newContent)
-
-      // Only update if content actually changed
-      if (newContent !== currentContent) {
-        isReadyRef.current = false
-        externalUpdateCounterRef.current++
-        setTimeout(() => {
-          trySetMarkdownContent(editor, newContent)
-          isReadyRef.current = true
-          setTimeout(() => {
-            externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
-          }, 100)
-        }, 0)
+      if (sourceMarkdownRef.current !== event.content) {
+        markEditorPathMutation(activeFilePathRef.current)
       }
+      const sequence = ++canonicalExternalUpdateSequenceRef.current
+      const applyUpdate = () => {
+        if (sequence !== canonicalExternalUpdateSequenceRef.current) return
+        if (
+          isSectionVirtualView
+          && (
+            sectionedEditorControllerRef.current?.isBusy()
+            || !prepareExternalMarkdownAction()
+          )
+        ) {
+          if (retryTimer !== null) window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(applyUpdate, 100)
+          return
+        }
+        if (retryTimer !== null) {
+          window.clearTimeout(retryTimer)
+          retryTimer = null
+        }
+
+        const newContent = event.content
+        const sourceChanged = sourceMarkdownRef.current !== newContent
+        sourceMarkdownRef.current = newContent
+        setSourceMarkdown(newContent)
+        if (sourceChanged) contentVersionRef.current++
+        const nextIsLargeDocument = classifyCanonicalMarkdown(newContent)
+        if (nextIsLargeDocument) return
+        if (usesCanonicalMarkdownRef.current) {
+          if (sourceChanged && isSourceViewRef.current) setHasUnparsedSourceChanges(true)
+          return
+        }
+
+        const currentContent = editor.getMarkdown()
+        if (newContent !== currentContent) {
+          isReadyRef.current = false
+          externalUpdateCounterRef.current++
+          try {
+            if (sequence !== canonicalExternalUpdateSequenceRef.current) {
+              return
+            }
+            trySetMarkdownContent(editor, newContent)
+          } finally {
+            isReadyRef.current = true
+            externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
+          }
+        }
+      }
+      applyUpdate()
     }
 
     emitter.on('editor-content-from-remote', handleRemoteContentUpdate as any)
     return () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
       emitter.off('editor-content-from-remote', handleRemoteContentUpdate as any)
     }
-  }, [editor, activeFilePath, trySetMarkdownContent])
+  }, [
+    editor,
+    activeFilePath,
+    classifyCanonicalMarkdown,
+    isSectionScope,
+    isSectionVirtualView,
+    prepareExternalMarkdownAction,
+    trySetMarkdownContent,
+  ])
 
-  // NOTE: Removed initialContent useEffect that caused cursor jump during local edits
-  // Remote pull is now handled via 'editor-content-from-remote' event
-  // Sync and external updates are handled by their respective events
-
-  // Handle sync content updated from auto-sync
+  // NOTE: Removed initialContent useEffect that caused cursor jump during local edits.
   useEffect(() => {
+    if (isSectionScope) return
+    let retryTimer: number | null = null
+
     const handleSyncContentUpdated = (event: { path: string; content: string }) => {
-      // Bug fix: Only update if this is the active file
       if (!editor || !event || event.path !== activeFilePath) return
+      if (sourceMarkdownRef.current !== event.content) {
+        markEditorPathMutation(event.path)
+      }
+      const sequence = ++canonicalExternalUpdateSequenceRef.current
+      const applyUpdate = () => {
+        if (sequence !== canonicalExternalUpdateSequenceRef.current) return
+        if (
+          isSectionVirtualView
+          && (
+            sectionedEditorControllerRef.current?.isBusy()
+            || !prepareExternalMarkdownAction()
+          )
+        ) {
+          if (retryTimer !== null) window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(applyUpdate, 100)
+          return
+        }
+        if (retryTimer !== null) {
+          window.clearTimeout(retryTimer)
+          retryTimer = null
+        }
 
-      // Bug fix: Skip if content hasn't actually changed
-      const currentContent = editor.getMarkdown()
-      setSourceMarkdown(event.content)
-      if (currentContent === event.content) return
+        const sourceChanged = sourceMarkdownRef.current !== event.content
+        sourceMarkdownRef.current = event.content
+        setSourceMarkdown(event.content)
+        if (sourceChanged) contentVersionRef.current++
+        const nextIsLargeDocument = classifyCanonicalMarkdown(event.content)
+        if (nextIsLargeDocument) return
+        if (usesCanonicalMarkdownRef.current) {
+          if (sourceChanged && isSourceViewRef.current) setHasUnparsedSourceChanges(true)
+          return
+        }
 
-      // Bug fix: Set pending update and verify path when processing
-      pendingSyncUpdateRef.current = event
-
-      // Bug fix: Mark editor as not ready during update
-      isReadyRef.current = false
-      externalUpdateCounterRef.current++
-      // Use setTimeout to avoid flushSync conflict during React render
-      setTimeout(() => {
-        trySetMarkdownContent(editor, event.content)
-        // Bug fix: Mark editor as ready after content is set
-        isReadyRef.current = true
-        // Reset the counter and pending update after a short delay
-        setTimeout(() => {
-          // Only reset if this is still the same pending update
+        const currentContent = editor.getMarkdown()
+        if (currentContent === event.content) return
+        pendingSyncUpdateRef.current = event
+        isReadyRef.current = false
+        externalUpdateCounterRef.current++
+        try {
+          if (sequence !== canonicalExternalUpdateSequenceRef.current) {
+            return
+          }
+          trySetMarkdownContent(editor, event.content)
+        } finally {
+          isReadyRef.current = true
           if (pendingSyncUpdateRef.current === event) {
             pendingSyncUpdateRef.current = null
           }
           externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
-        }, 100)
-      }, 0)
+        }
+      }
+      applyUpdate()
     }
 
     emitter.on('sync-content-updated', handleSyncContentUpdated as any)
     return () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
       emitter.off('sync-content-updated', handleSyncContentUpdated as any)
     }
-  }, [editor, activeFilePath, trySetMarkdownContent])
+  }, [
+    editor,
+    activeFilePath,
+    classifyCanonicalMarkdown,
+    isSectionScope,
+    isSectionVirtualView,
+    prepareExternalMarkdownAction,
+    trySetMarkdownContent,
+  ])
 
-  // Handle external content updates (e.g., from Agent tools)
+  // Handle external content updates (e.g., from Agent tools).
   useEffect(() => {
-    const handleExternalUpdate = (newContent: string) => {
-      if (editor && externalUpdateCounterRef.current === 0) {
-        // Bug fix: Skip if content hasn't actually changed
-        const currentContent = editor.getMarkdown()
-        setSourceMarkdown(newContent)
-        if (currentContent === newContent) return
+    if (isSectionScope) return
+    let retryTimer: number | null = null
 
-        // Bug fix: Mark editor as not ready during update
-        isReadyRef.current = false
-        // Set counter first to prevent circular updates
-        externalUpdateCounterRef.current++
-        // Use setTimeout to avoid flushSync conflict during React render
-        setTimeout(() => {
-          // Set content in editor with Markdown parsing
-          trySetMarkdownContent(editor, newContent)
-          // Bug fix: Mark editor as ready after content is set
-          isReadyRef.current = true
-          // Reset the counter after a short delay to handle rapid updates
-          setTimeout(() => {
-            externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
-          }, 100)
-        }, 0)
+    const handleExternalUpdate = (newContent: string) => {
+      if (!editor) return
+      if (sourceMarkdownRef.current !== newContent) {
+        markEditorPathMutation(activeFilePathRef.current)
       }
+      const sequence = ++canonicalExternalUpdateSequenceRef.current
+      const applyUpdate = () => {
+        if (sequence !== canonicalExternalUpdateSequenceRef.current) return
+        if (
+          externalUpdateCounterRef.current !== 0
+          || (
+            isSectionVirtualView
+            && (
+              sectionedEditorControllerRef.current?.isBusy()
+              || !prepareExternalMarkdownAction()
+            )
+          )
+        ) {
+          if (retryTimer !== null) window.clearTimeout(retryTimer)
+          retryTimer = window.setTimeout(applyUpdate, 100)
+          return
+        }
+        if (retryTimer !== null) {
+          window.clearTimeout(retryTimer)
+          retryTimer = null
+        }
+
+        const sourceChanged = sourceMarkdownRef.current !== newContent
+        sourceMarkdownRef.current = newContent
+        setSourceMarkdown(newContent)
+        if (sourceChanged) contentVersionRef.current++
+        const nextIsLargeDocument = classifyCanonicalMarkdown(newContent)
+        if (nextIsLargeDocument) return
+        if (usesCanonicalMarkdownRef.current) {
+          if (sourceChanged && isSourceViewRef.current) setHasUnparsedSourceChanges(true)
+          return
+        }
+
+        const currentContent = editor.getMarkdown()
+        if (currentContent === newContent) return
+        isReadyRef.current = false
+        externalUpdateCounterRef.current++
+        try {
+          if (sequence !== canonicalExternalUpdateSequenceRef.current) {
+            return
+          }
+          trySetMarkdownContent(editor, newContent)
+        } finally {
+          isReadyRef.current = true
+          externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
+        }
+      }
+      applyUpdate()
     }
 
     emitter.on('external-content-update', handleExternalUpdate as any)
     return () => {
+      if (retryTimer !== null) window.clearTimeout(retryTimer)
       emitter.off('external-content-update', handleExternalUpdate as any)
     }
-  }, [editor])
+  }, [
+    classifyCanonicalMarkdown,
+    editor,
+    isSectionScope,
+    isSectionVirtualView,
+    prepareExternalMarkdownAction,
+    trySetMarkdownContent,
+  ])
 
   // Set editable state
   useEffect(() => {
@@ -4182,6 +4804,8 @@ export function TipTapEditor({
 
   // Handle AI continue writing
   useEffect(() => {
+    if (isSectionVirtualView) return
+
     let abortController: AbortController | null = null
 
     const handleAIContinue = async (event: Event) => {
@@ -4212,7 +4836,9 @@ export function TipTapEditor({
       }
 
       abortController?.abort()
-      abortController = new AbortController()
+      const currentController = new AbortController()
+      abortController = currentController
+      const endBlockingActivity = beginBlockingActivity()
 
       const startPosition = from
       let accumulatedResult = ''
@@ -4238,6 +4864,7 @@ export function TipTapEditor({
         await fetchCompletionStream(
           context,
           (chunk, isFirst) => {
+            if (currentController.signal.aborted || editor.isDestroyed) return
             if (isFirst) {
               removeLoadingIndicator()
             }
@@ -4247,8 +4874,10 @@ export function TipTapEditor({
             blurEditor()
             accumulatedResult += chunk
           },
-          abortController.signal
+          currentController.signal
         )
+
+        if (currentController.signal.aborted || editor.isDestroyed) return
 
         if (!accumulatedResult) {
           removeLoadingIndicator()
@@ -4292,6 +4921,8 @@ export function TipTapEditor({
             variant: 'destructive',
           })
         }
+      } finally {
+        endBlockingActivity()
       }
     }
 
@@ -4300,10 +4931,12 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-continue', handleAIContinue)
       abortController?.abort()
     }
-  }, [editor, isMobile])
+  }, [beginBlockingActivity, editor, isMobile, isSectionScope, isSectionVirtualView])
 
   // Handle slash-command AI generation actions that operate without selected text.
   useEffect(() => {
+    if (isSectionVirtualView) return
+
     let abortController: AbortController | null = null
 
     const actionTitle: Record<EditorAiGenerationAction, string> = {
@@ -4345,8 +4978,11 @@ export function TipTapEditor({
       }
 
       const { from } = editor.state.selection
-      const fullText = normalizeMarkdownPlaceholders(editor.getMarkdown())
-      const plainText = editor.getText()
+      const localMarkdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
+      const fullText = isSectionScope
+        ? documentMarkdownRef.current ?? localMarkdown
+        : localMarkdown
+      const plainText = isSectionScope ? fullText : editor.getText()
       const textBeforeCursor = editor.state.doc.textBetween(0, from, '\n')
       const textAfterCursor = editor.state.doc.textBetween(from, editor.state.doc.content.size, '\n')
 
@@ -4360,7 +4996,9 @@ export function TipTapEditor({
       }
 
       abortController?.abort()
-      abortController = new AbortController()
+      const currentController = new AbortController()
+      abortController = currentController
+      const endBlockingActivity = beginBlockingActivity()
 
       const startPosition = from
       let accumulatedResult = ''
@@ -4392,6 +5030,7 @@ export function TipTapEditor({
             instruction,
           },
           (chunk, isFirst) => {
+            if (currentController.signal.aborted || editor.isDestroyed) return
             if (isFirst) {
               removeLoadingIndicator()
             }
@@ -4401,8 +5040,10 @@ export function TipTapEditor({
             blurEditor()
             accumulatedResult += chunk
           },
-          abortController.signal
+          currentController.signal
         )
+
+        if (currentController.signal.aborted || editor.isDestroyed) return
 
         if (!accumulatedResult) {
           removeLoadingIndicator()
@@ -4453,6 +5094,8 @@ export function TipTapEditor({
             variant: 'destructive',
           })
         }
+      } finally {
+        endBlockingActivity()
       }
     }
 
@@ -4461,7 +5104,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-generate', handleAIGenerate)
       abortController?.abort()
     }
-  }, [editor, isMobile])
+  }, [beginBlockingActivity, editor, isMobile, isSectionVirtualView])
 
   // Handle drag and drop from marks
   const handleEditorDrop = useCallback((e: React.DragEvent) => {
@@ -4486,6 +5129,7 @@ export function TipTapEditor({
         const mark = JSON.parse(markData) as Mark
         if (mark && mark.id !== undefined) {
           if ((mark.type === 'image' || mark.type === 'scan') && mark.url) {
+            const endBlockingActivity = beginBlockingActivity()
             void (async () => {
               let src = mark.url
               let relativeSrc = mark.url
@@ -4507,7 +5151,7 @@ export function TipTapEditor({
               }
 
               const insertPos = dropPos ?? editor?.state.selection.from
-              if (insertPos === undefined) {
+              if (insertPos === undefined || editor?.isDestroyed) {
                 return
               }
 
@@ -4533,11 +5177,13 @@ export function TipTapEditor({
                 description: error instanceof Error ? error.message : undefined,
                 variant: 'destructive',
               })
-            })
+            }).finally(endBlockingActivity)
             return
           }
 
+          const endBlockingActivity = beginBlockingActivity()
           import('@/lib/mark-to-markdown').then(({ markToMarkdown }) => {
+            if (editor?.isDestroyed) return
             const markdown = markToMarkdown(mark)
             if (dropPos !== undefined) {
               editor?.commands.insertContentAt(dropPos, markdown, { contentType: 'markdown' })
@@ -4548,17 +5194,17 @@ export function TipTapEditor({
               title: '已插入记录',
               description: mark.desc || mark.content?.slice(0, 50) || '记录内容'
             })
-          })
+          }).finally(endBlockingActivity)
         }
       } catch (error) {
         console.error('Failed to parse dropped mark:', error)
       }
     }
-  }, [editor, tImage])
+  }, [beginBlockingActivity, editor, tImage])
 
   // Handle math formula insertion from slash menu
   useEffect(() => {
-    if (!editor) return
+    if (!editor || isSectionVirtualView) return
 
     const handleInsertInlineMath = () => {
       setMathType('inline')
@@ -4577,7 +5223,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-insert-inline-math', handleInsertInlineMath)
       document.removeEventListener('tiptap-insert-block-math', handleInsertBlockMath)
     }
-  }, [editor])
+  }, [editor, isSectionVirtualView])
 
   const handleEditorDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -4614,6 +5260,29 @@ export function TipTapEditor({
     let lastEditorSelectionQuote: PendingQuote | null = null
 
     const buildQuoteDataFromRange = (from: number, to: number): PendingQuote | null => {
+      if (usesCanonicalMarkdown) {
+        const markdown = sourceMarkdownRef.current
+        const safeFrom = Math.max(0, Math.min(from, markdown.length))
+        const safeTo = Math.max(safeFrom, Math.min(to, markdown.length))
+        const quote = markdown.slice(safeFrom, safeTo)
+        if (!quote.trim()) return null
+
+        const fileName = activeFilePath?.split('/').pop() || ''
+        const startLine = getMarkdownLineAtPosition(markdown, safeFrom)
+        const endLine = getMarkdownLineAtPosition(markdown, safeTo)
+
+        return {
+          quote,
+          fullContent: quote,
+          fileName,
+          startLine,
+          endLine,
+          from: safeFrom,
+          to: safeTo,
+          articlePath: activeFilePath || '',
+        }
+      }
+
       if (!editor) {
         return null
       }
@@ -4658,6 +5327,32 @@ export function TipTapEditor({
     }
 
     const buildCurrentQuoteData = (): PendingQuote | null => {
+      if (isSectionVirtualView) {
+        const selection = sectionedEditorControllerRef.current?.getSelection()
+        if (!selection || selection.collapsed) return null
+
+        const quote = selection.text || selection.markdown
+        const selectedMarkdown = selection.markdown || quote
+        if (!quote.trim()) return null
+
+        return {
+          quote,
+          fullContent: selectedMarkdown,
+          fileName: activeFilePath?.split('/').pop() || '',
+          startLine: -1,
+          endLine: -1,
+          from: -1,
+          to: -1,
+          selectionToken: selection.selectionToken,
+          articlePath: activeFilePath || '',
+        }
+      }
+
+      if (usesCanonicalMarkdown) {
+        const { from, to } = sourceSelectionRef.current
+        return buildQuoteDataFromRange(from, to)
+      }
+
       if (!editor) {
         return null
       }
@@ -4689,6 +5384,38 @@ export function TipTapEditor({
     }
 
     const getCurrentEditorSelection = () => {
+      if (isSectionVirtualView) {
+        const selection = sectionedEditorControllerRef.current?.getSelection()
+        if (!selection) {
+          return { text: '', from: -1, to: -1, startLine: -1, endLine: -1 }
+        }
+
+        return {
+          text: selection.text,
+          from: -1,
+          to: -1,
+          startLine: -1,
+          endLine: -1,
+        }
+      }
+
+      if (usesCanonicalMarkdown) {
+        const markdown = sourceMarkdownRef.current
+        const selection = sourceSelectionRef.current
+        const from = Math.max(0, Math.min(selection.from, markdown.length))
+        const to = Math.max(from, Math.min(selection.to, markdown.length))
+        const startLine = getMarkdownLineAtPosition(markdown, from)
+        const endLine = getMarkdownLineAtPosition(markdown, to)
+
+        return {
+          text: markdown.slice(from, to),
+          from,
+          to,
+          startLine,
+          endLine,
+        }
+      }
+
       if (!editor) {
         return { text: '', from: 0, to: 0, startLine: 1, endLine: 1 }
       }
@@ -4714,7 +5441,7 @@ export function TipTapEditor({
 
       resolve({
         ...selection,
-        html: editor.getHTML(),
+        html: usesCanonicalMarkdown ? undefined : editor.getHTML(),
       })
     }
 
@@ -4725,8 +5452,12 @@ export function TipTapEditor({
         return
       }
 
-      const markdown = normalizeMarkdownPlaceholders(editor.getMarkdown())
-      const text = editor.getText()
+      const markdown = usesCanonicalMarkdown
+        ? isSectionVirtualView
+          ? flushSectionedMarkdown()
+          : sourceMarkdownRef.current
+        : normalizeMarkdownPlaceholders(editor.getMarkdown())
+      const text = usesCanonicalMarkdown ? markdown : editor.getText()
       const markdownLines = markdown.split('\n')
       const totalLines = markdownLines.length
       const lineNumberWidth = String(totalLines).length
@@ -4746,18 +5477,128 @@ export function TipTapEditor({
       })
     }
 
+    const applyCanonicalMarkdownChange = (nextMarkdown: string) => {
+      if (isSectionVirtualView) {
+        handleSectionedMarkdownChange(nextMarkdown)
+        return
+      }
+      handleSourceMarkdownChange(nextMarkdown)
+    }
+
     // Insert content at cursor
     const handleInsert = ({
+      filePath,
       content,
       position,
+      replaceSelection = false,
+      expectedSelection,
+      expectedSelectionToken,
       resolve,
     }: {
+      filePath: string;
       content: string;
       position?: number;
+      replaceSelection?: boolean;
+      expectedSelection?: string;
+      expectedSelectionToken?: string;
       resolve: (result: { success: boolean; insertedLength: number; newCursorPosition?: number }) => void;
     }) => {
-      if (!editor) {
+      if (
+        !editor
+        || normalizePathForCompare(filePath) !== normalizePathForCompare(activeFilePath)
+      ) {
         resolve({ success: false, insertedLength: 0 })
+        return
+      }
+      if (isSectionVirtualView && sectionedEditorControllerRef.current?.isBusy()) {
+        resolve({ success: false, insertedLength: 0 })
+        return
+      }
+
+      if (isSectionVirtualView && typeof position !== 'number') {
+        runDeferredEditorCommand(() => {
+          flushSectionedMarkdown()
+          const activeEditor = sectionedEditorControllerRef.current?.getActiveEditor()
+          if (!activeEditor || activeEditor.isDestroyed) {
+            throw new Error('Active section editor is not available')
+          }
+
+          const activeSelection = sectionedEditorControllerRef.current?.getSelection()
+          if (replaceSelection) {
+            const selectedContent = activeSelection?.markdown || activeSelection?.text || ''
+            if (
+              !activeSelection
+              || activeSelection.collapsed
+              || (expectedSelectionToken !== undefined
+                && expectedSelectionToken !== activeSelection.selectionToken)
+              || (expectedSelection !== undefined
+                && expectedSelection !== selectedContent
+                && expectedSelection !== activeSelection.text)
+            ) {
+              throw new Error('The active section selection changed before the edit')
+            }
+          }
+
+          if (!replaceSelection && !activeEditor.state.selection.empty) {
+            activeEditor.commands.setTextSelection(activeEditor.state.selection.to)
+          }
+
+          const didInsert = activeEditor
+            .chain()
+            .focus()
+            .insertContent(content, { contentType: 'markdown' })
+            .run()
+          if (!didInsert) {
+            throw new Error('Unable to insert content into the active section')
+          }
+
+          flushSectionedMarkdown()
+          resolve({ success: true, insertedLength: content.length })
+        }, () => {
+          resolve({ success: false, insertedLength: 0 })
+        })
+        return
+      }
+
+      if (usesCanonicalMarkdown) {
+        const markdown = isSectionVirtualView
+          ? flushSectionedMarkdown()
+          : sourceMarkdownRef.current
+        const sectionSelection = isSectionVirtualView
+          ? sectionedEditorControllerRef.current?.getSelection()
+          : null
+        const currentSelection = sectionSelection ?? sourceSelectionRef.current
+        const insertFrom = Math.max(
+          0,
+          Math.min(
+            typeof position === 'number'
+              ? position
+              : replaceSelection
+                ? currentSelection.from
+                : currentSelection.to,
+            markdown.length
+          )
+        )
+        const insertTo = typeof position === 'number' || !replaceSelection
+          ? insertFrom
+          : Math.max(insertFrom, Math.min(currentSelection.to, markdown.length))
+        const nextMarkdown = `${markdown.slice(0, insertFrom)}${content}${markdown.slice(insertTo)}`
+        const nextSelection = {
+          from: insertFrom + content.length,
+          to: insertFrom + content.length,
+        }
+        const sourceController = sourceEditorControllerRef.current
+        if (sourceController) {
+          sourceController.replaceValue(nextMarkdown, nextSelection)
+        } else {
+          applyCanonicalMarkdownChange(nextMarkdown)
+          sourceSelectionRef.current = nextSelection
+        }
+        resolve({
+          success: true,
+          insertedLength: content.length,
+          newCursorPosition: insertFrom + content.length,
+        })
         return
       }
 
@@ -4768,6 +5609,8 @@ export function TipTapEditor({
           if (typeof position === 'number') {
             const insertPosition = clampSelectionPosition(position, editor.state.doc.content.size)
             editor.commands.setTextSelection({ from: insertPosition, to: insertPosition })
+          } else if (!replaceSelection && !editor.state.selection.empty) {
+            editor.commands.setTextSelection(editor.state.selection.to)
           }
 
           editor.commands.insertContent(content, { contentType: 'markdown' })
@@ -4791,6 +5634,7 @@ export function TipTapEditor({
 
     // Replace content in range
     const handleReplace = ({
+      filePath,
       content,
       range,
       searchContent,
@@ -4800,6 +5644,7 @@ export function TipTapEditor({
       expectedVersion,
       resolve,
     }: {
+      filePath: string
       content?: string
       range?: { from: number; to: number }
       searchContent?: string
@@ -4809,14 +5654,167 @@ export function TipTapEditor({
       expectedVersion?: number
       resolve: (result: { success: boolean; insertedLength: number; message?: string; error?: string; newCursorPosition?: number; versionMismatch?: boolean }) => void
     }) => {
-      if (!editor) {
+      if (
+        !editor
+        || normalizePathForCompare(filePath) !== normalizePathForCompare(activeFilePath)
+      ) {
         resolve({ success: false, insertedLength: 0, error: 'Editor not initialized' })
         return
       }
+      if (isSectionVirtualView && sectionedEditorControllerRef.current?.isBusy()) {
+        resolve({ success: false, insertedLength: 0, error: 'Editor is completing another operation' })
+        return
+      }
+
+      const flushedMarkdown = isSectionVirtualView
+        ? flushSectionedMarkdown()
+        : sourceMarkdownRef.current
 
       // Verify version if provided
       if (expectedVersion !== undefined && expectedVersion !== contentVersionRef.current) {
         resolve({ success: false, versionMismatch: true, insertedLength: 0, error: 'Content has changed, please get editor content again' })
+        return
+      }
+
+      const hasExplicitCanonicalTarget = Boolean(
+        range
+        || searchContent
+        || (startLine !== undefined && endLine !== undefined)
+      )
+      if (isSectionVirtualView && content !== undefined && !hasExplicitCanonicalTarget) {
+        runDeferredEditorCommand(() => {
+          flushSectionedMarkdown()
+          const activeEditor = sectionedEditorControllerRef.current?.getActiveEditor()
+          if (!activeEditor || activeEditor.isDestroyed) {
+            throw new Error('Active section editor is not available')
+          }
+
+          const { from, to } = activeEditor.state.selection
+          const newContent = content || ''
+          const $from = activeEditor.state.doc.resolve(from)
+          const $to = activeEditor.state.doc.resolve(to)
+          const isInlineTextReplacement = !newContent.includes('\n')
+            && $from.sameParent($to)
+            && $from.parent.isTextblock
+          const didReplace = isInlineTextReplacement
+            ? activeEditor.chain().focus().command(({ tr }) => {
+                tr.insertText(newContent, from, to)
+                return true
+              }).run()
+            : newContent
+              ? activeEditor.chain()
+                  .focus()
+                  .deleteRange({ from, to })
+                  .insertContent(newContent, { contentType: 'markdown' })
+                  .run()
+              : activeEditor.chain().focus().deleteRange({ from, to }).run()
+
+          if (!didReplace) {
+            throw new Error('Unable to replace the active section selection')
+          }
+
+          flushSectionedMarkdown()
+          resolve({
+            success: true,
+            insertedLength: newContent.length,
+            message: `成功替换 ${to - from} 个字符为 ${newContent.length} 个字符`,
+          })
+        }, (error) => {
+          resolve({ success: false, insertedLength: 0, error: String(error) })
+        })
+        return
+      }
+
+      if (usesCanonicalMarkdown) {
+        try {
+          const markdown = flushedMarkdown
+          const newContent = content || ''
+          let nextMarkdown: string
+          let replacedLength = 0
+          let newCursorPosition: number | undefined
+
+          if (range) {
+            if (
+              !Number.isInteger(range.from)
+              || !Number.isInteger(range.to)
+              || range.from < 0
+              || range.to < range.from
+              || range.to > markdown.length
+            ) {
+              resolve({ success: false, insertedLength: 0, error: '无效或不可用的 Markdown 范围' })
+              return
+            }
+            const from = range.from
+            const to = range.to
+            nextMarkdown = `${markdown.slice(0, from)}${newContent}${markdown.slice(to)}`
+            replacedLength = to - from
+            newCursorPosition = from + newContent.length
+          } else if (searchContent) {
+            const targetOccurrence = Math.max(1, occurrence || 1)
+            const haystack = markdown.toLocaleLowerCase()
+            const needle = searchContent.toLocaleLowerCase()
+            let searchFrom = 0
+            let foundIndex = -1
+
+            for (let index = 0; index < targetOccurrence; index++) {
+              foundIndex = haystack.indexOf(needle, searchFrom)
+              if (foundIndex === -1) break
+              searchFrom = foundIndex + Math.max(1, needle.length)
+            }
+
+            if (foundIndex === -1) {
+              resolve({ success: false, insertedLength: 0, error: `找不到文本 "${searchContent}"` })
+              return
+            }
+
+            nextMarkdown = `${markdown.slice(0, foundIndex)}${newContent}${markdown.slice(foundIndex + searchContent.length)}`
+            replacedLength = searchContent.length
+            newCursorPosition = foundIndex + newContent.length
+          } else if (startLine !== undefined && endLine !== undefined) {
+            nextMarkdown = replaceLinesInRange(
+              markdown,
+              startLine,
+              endLine,
+              newContent.split('\n')
+            )
+          } else if (content !== undefined) {
+            const selection = sourceSelectionRef.current
+            const from = Math.max(0, Math.min(selection.from, markdown.length))
+            const to = Math.max(from, Math.min(selection.to, markdown.length))
+            nextMarkdown = `${markdown.slice(0, from)}${newContent}${markdown.slice(to)}`
+            replacedLength = to - from
+            newCursorPosition = from + newContent.length
+          } else {
+            resolve({ success: false, insertedLength: 0, error: '请提供 content、range、searchContent 或 startLine/endLine 参数' })
+            return
+          }
+
+          const sourceController = sourceEditorControllerRef.current
+          if (newCursorPosition !== undefined) {
+            const nextSelection = {
+              from: newCursorPosition,
+              to: newCursorPosition,
+            }
+            if (sourceController) {
+              sourceController.replaceValue(nextMarkdown, nextSelection)
+            } else {
+              applyCanonicalMarkdownChange(nextMarkdown)
+              sourceSelectionRef.current = nextSelection
+            }
+          } else if (sourceController) {
+            sourceController.replaceValue(nextMarkdown)
+          } else {
+            applyCanonicalMarkdownChange(nextMarkdown)
+          }
+          resolve({
+            success: true,
+            insertedLength: newContent.length,
+            message: `成功替换 ${replacedLength} 个字符为 ${newContent.length} 个字符`,
+            newCursorPosition,
+          })
+        } catch (error) {
+          resolve({ success: false, insertedLength: 0, error: String(error) })
+        }
         return
       }
 
@@ -4905,6 +5903,20 @@ export function TipTapEditor({
               newContent.split('\n')
             )
 
+            if (classifyCanonicalMarkdown(updatedMarkdown)) {
+              sourceMarkdownRef.current = updatedMarkdown
+              setSourceMarkdown(updatedMarkdown)
+              setHasUnparsedSourceChanges(true)
+              contentVersionRef.current++
+              onChangeRef.current?.(updatedMarkdown)
+              resolve({
+                success: true,
+                insertedLength: newContent.length,
+                message: `成功替换第 ${startLine}-${endLine} 行内容`,
+              })
+              return
+            }
+
             editor.commands.setContent(updatedMarkdown, { contentType: 'markdown' })
           } else {
             const $from = editor.state.doc.resolve(from)
@@ -4958,6 +5970,7 @@ export function TipTapEditor({
 
     // Track if listeners have been set up (for cleanup)
     let listenersSetup = false
+    let editorListenersRegistered = false
 
     // Handle Mermaid diagram insertion
     const handleInsertMermaid = (event: CustomEvent) => {
@@ -4980,11 +5993,29 @@ export function TipTapEditor({
 
     // Handle undo/redo from TabBar buttons
     const handleUndo = () => {
+      if (isSourceView) {
+        sourceEditorControllerRef.current?.undo()
+        return
+      }
+      if (isSectionVirtualView) {
+        const sectionEditor = sectionedEditorControllerRef.current?.getActiveEditor()
+        sectionEditor?.chain().focus().undo().run()
+        return
+      }
       if (!editor) return
       editor.chain().focus().undo().run()
     }
 
     const handleRedo = () => {
+      if (isSourceView) {
+        sourceEditorControllerRef.current?.redo()
+        return
+      }
+      if (isSectionVirtualView) {
+        const sectionEditor = sectionedEditorControllerRef.current?.getActiveEditor()
+        sectionEditor?.chain().focus().redo().run()
+        return
+      }
       if (!editor) return
       editor.chain().focus().redo().run()
     }
@@ -5059,6 +6090,15 @@ export function TipTapEditor({
 
     // Handle query for undo/redo capability
     const handleCanUndoRedo = ({ resolve }: { resolve: (can: { undo: boolean; redo: boolean }) => void }) => {
+      if (isSourceView) {
+        resolve(sourceEditorControllerRef.current?.getUndoRedoState() ?? { undo: false, redo: false })
+        return
+      }
+      if (isSectionVirtualView) {
+        const sectionEditor = sectionedEditorControllerRef.current?.getActiveEditor()
+        resolve(sectionEditor ? getEditorUndoRedoState(sectionEditor) : { undo: false, redo: false })
+        return
+      }
       if (!editor) {
         resolve({ undo: false, redo: false })
         return
@@ -5069,7 +6109,29 @@ export function TipTapEditor({
     // Defer emitter and document listener registration to avoid flushSync conflict during React render
     const setupListeners = () => {
       // Check if editor is initialized before registering listeners
-      if (!editor) return
+      if (!editor || !isActive) return
+
+      if (isSectionScope) {
+        document.addEventListener('tiptap-insert-mermaid', handleInsertMermaid as EventListener)
+        listenersSetup = true
+        return
+      }
+
+      if (usesCanonicalMarkdown) {
+        // Keep the Markdown-aware Agent bridge active, while leaving commands that
+        // target the hidden ProseMirror view (history, diffs and node insertion)
+        // disabled.
+        emitter.on('editor-get-selection', handleGetSelection)
+        emitter.on('editor-get-content', handleGetContent)
+        emitter.on('editor-insert', handleInsert)
+        emitter.on('editor-replace', handleReplace)
+        emitter.on('get-quote-from-editor', handleGetQuote)
+        emitter.on('editor-undo', handleUndo)
+        emitter.on('editor-redo', handleRedo)
+        emitter.on('editor-can-undo-redo', handleCanUndoRedo)
+        editorListenersRegistered = true
+        return
+      }
 
       emitter.on('editor-get-selection', handleGetSelection)
       emitter.on('editor-get-content', handleGetContent)
@@ -5085,6 +6147,7 @@ export function TipTapEditor({
       editor.on('selectionUpdate', syncEditorSelectionQuote)
       document.addEventListener('tiptap-insert-mermaid', handleInsertMermaid as EventListener)
       syncEditorSelectionQuote()
+      editorListenersRegistered = true
       listenersSetup = true
     }
 
@@ -5101,9 +6164,10 @@ export function TipTapEditor({
       emitter.off('mobile-editor-toggle-outline', handleMobileToggleOutline)
       emitter.off('editor-can-undo-redo', handleCanUndoRedo)
       editor?.off('selectionUpdate', syncEditorSelectionQuote)
-      if (!isMobile) {
+      if (editorListenersRegistered && !isMobile) {
         useChatStore.getState().clearEditorSelectionQuote()
       }
+      editorListenersRegistered = false
       // Only remove event listener if it was actually added
       if (listenersSetup) {
         document.removeEventListener('tiptap-insert-mermaid', handleInsertMermaid as EventListener)
@@ -5117,7 +6181,20 @@ export function TipTapEditor({
     }
 
     return cleanupListeners
-  }, [editor, activeFilePath, trySetMarkdownContent])
+  }, [
+    activeFilePath,
+    classifyCanonicalMarkdown,
+    editor,
+    flushSectionedMarkdown,
+    handleSectionedMarkdownChange,
+    handleSourceMarkdownChange,
+    isActive,
+    isSectionScope,
+    isSectionVirtualView,
+    isSourceView,
+    trySetMarkdownContent,
+    usesCanonicalMarkdown,
+  ])
 
   if (!editor) {
     return null
@@ -5169,7 +6246,7 @@ export function TipTapEditor({
   return (
     <div
       ref={editorContainerRef}
-      id="aritcle-md-editor"
+      id={isSectionScope ? undefined : 'aritcle-md-editor'}
       className={cn(
         "tiptap-editor relative flex flex-col",
         scrollable ? "h-full" : "h-auto min-h-full",
@@ -5198,19 +6275,24 @@ export function TipTapEditor({
         <div
           ref={scrollContainerRef}
           id={scrollContainerId}
+          data-editor-viewport-root={scrollable ? 'true' : undefined}
           className={cn(
             "editor-scroll-container relative overflow-x-hidden",
-            scrollable ? "h-full overflow-y-auto" : "overflow-y-visible",
+            scrollable && effectiveViewMode === 'source'
+              ? "h-full overflow-y-hidden"
+              : scrollable
+                ? "h-full overflow-y-auto"
+                : "overflow-y-visible",
             scrollable && !isMobile && "editor-scroll-container-custom",
             isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
             isMobile && activeFilePath && isRestoringMobileView && "opacity-0"
           )}
-          onMouseDownCapture={handleEditorMouseDownCapture}
+          onMouseDownCapture={isSectionVirtualView ? undefined : handleEditorMouseDownCapture}
           onScroll={handleEditorScroll}
-          onDragEnter={effectiveViewMode === 'visual' ? handleEditorDragOver : undefined}
-          onDragOver={effectiveViewMode === 'visual' ? handleEditorDragOver : undefined}
-          onDragLeave={effectiveViewMode === 'visual' ? handleEditorDragLeave : undefined}
-          onDropCapture={effectiveViewMode === 'visual' ? handleEditorDrop : undefined}
+          onDragEnter={effectiveViewMode === 'visual' && !isSectionVirtualView ? handleEditorDragOver : undefined}
+          onDragOver={effectiveViewMode === 'visual' && !isSectionVirtualView ? handleEditorDragOver : undefined}
+          onDragLeave={effectiveViewMode === 'visual' && !isSectionVirtualView ? handleEditorDragLeave : undefined}
+          onDropCapture={effectiveViewMode === 'visual' && !isSectionVirtualView ? handleEditorDrop : undefined}
         >
         {(isCanvasDragOver || isCanvasDropPending) && (
           <div className={cn(
@@ -5225,20 +6307,26 @@ export function TipTapEditor({
         )}
         <div
           className={cn(
-            getEditorContentContainerClass({
-              contentWidth: applyLayoutPreferences
-                ? editorContentWidth
-                : DEFAULT_EDITOR_CONTENT_WIDTH,
-              isMobile,
-              outlineOpen: !!outlineOpen,
-              outlinePosition,
-              contentInset,
-            }),
-            scrollable && effectiveViewMode !== 'source' && 'h-full',
-            effectiveViewMode === 'source' && 'min-h-full'
+            effectiveViewMode === 'source'
+              ? 'w-full'
+              : getEditorContentContainerClass({
+                contentWidth: applyLayoutPreferences
+                  ? editorContentWidth
+                  : DEFAULT_EDITOR_CONTENT_WIDTH,
+                isMobile,
+                outlineOpen: !isSectionVirtualView && !!outlineOpen,
+                outlinePosition,
+                contentInset,
+              }),
+            scrollable && effectiveViewMode !== 'source' && !isSectionVirtualView && 'h-full',
+            isSectionVirtualView && 'min-h-full',
+            effectiveViewMode === 'source' && 'h-full min-h-0'
           )}
           style={
-            !isMobile && outlineOpen
+            !isMobile
+            && effectiveViewMode !== 'source'
+            && !isSectionVirtualView
+            && outlineOpen
               ? {
                 [isOutlineOnLeft(outlinePosition) ? 'paddingLeft' : 'paddingRight']: outlineContentPadding,
               }
@@ -5246,7 +6334,7 @@ export function TipTapEditor({
           }
         >
         {effectiveViewMode === 'source' ? (
-          <div className="flex min-h-full w-full flex-col">
+          <div className="flex h-full min-h-0 w-full flex-col">
             {markdownParseError ? (
               <div className="m-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
                 <div className="min-w-0">
@@ -5258,76 +6346,109 @@ export function TipTapEditor({
                     {markdownParseError}
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleRetryVisualMode}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPreparingLargeDocumentVisual}
+                  onClick={handleEnterVisualMode}
+                >
+                  {isPreparingLargeDocumentVisual ? (
+                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                  ) : null}
                   {t('markdownParseFallback.retry')}
                 </Button>
               </div>
             ) : null}
-            <div className="relative flex min-h-0 flex-1 w-full">
-            {showSourceLineNumbers ? (
-              <div
-                aria-hidden="true"
-                className="relative min-h-full min-w-12 shrink-0 select-none border-r bg-muted/20 py-6 pl-2 pr-3 text-right font-mono text-sm text-muted-foreground before:pointer-events-none before:absolute before:inset-y-0 before:right-full before:w-screen before:bg-muted/20 before:content-['']"
-              >
-                {sourceLines.map((_, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      height: sourceLineHeights[index],
-                      lineHeight: 'var(--editor-line-height)',
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                ))}
+            {isLargeDocument && (shouldDeferVisualParsing || isPreparingLargeDocumentVisual) && !markdownParseError ? (
+              <div className="m-3 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">{t('largeMarkdownMode.title')}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('largeMarkdownMode.description')}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isPreparingLargeDocumentVisual}
+                  onClick={handleEnterVisualMode}
+                >
+                  {isPreparingLargeDocumentVisual ? (
+                    <Loader2 data-icon="inline-start" className="animate-spin" />
+                  ) : (
+                    <Eye data-icon="inline-start" />
+                  )}
+                  {isPreparingLargeDocumentVisual
+                    ? t('largeMarkdownMode.preparing')
+                    : t('largeMarkdownMode.openVisual')}
+                </Button>
               </div>
             ) : null}
-            <div
-              ref={sourceMirrorRef}
-              aria-hidden="true"
-              className={cn(
-                'pointer-events-none invisible absolute left-0 top-0 font-mono',
-                editorSourceWrap ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'
-              )}
-              style={{
-                lineHeight: 'var(--editor-line-height)',
-                overflowWrap: editorSourceWrap ? 'anywhere' : 'normal',
-                tabSize: 2,
-                fontSize: `${(14 * contentTextScale) / 100}px`,
-              }}
-            >
-              {sourceLines.map((line, index) => (
-                <div key={index}>
-                  {line || '\u200b'}
-                </div>
-              ))}
-            </div>
-            <textarea
-              ref={sourceTextareaRef}
+            <SourceMarkdownEditor
+              key={activeFilePath}
               value={sourceMarkdown}
-              disabled={!editable}
-              spellCheck={false}
-              wrap={editorSourceWrap ? 'soft' : 'off'}
-              rows={sourceLines.length}
-              aria-label={tSourceMode('source')}
-              className={cn(
-                'block min-h-full min-w-0 flex-1 resize-none bg-transparent px-4 py-6 font-mono text-foreground outline-none disabled:cursor-not-allowed disabled:opacity-60',
-                editorSourceWrap
-                  ? 'overflow-hidden whitespace-pre-wrap break-words'
-                  : 'overflow-x-auto overflow-y-hidden whitespace-pre'
-              )}
-              style={{
-                height: measuredSourceHeight,
-                lineHeight: 'var(--editor-line-height)',
-                overflowWrap: editorSourceWrap ? 'anywhere' : 'normal',
-                tabSize: 2,
-                fontSize: `${(14 * contentTextScale) / 100}px`,
-              }}
-              onChange={(event) => handleSourceMarkdownChange(event.target.value)}
-              onKeyDown={handleSourceKeyDown}
+              editable={editable}
+              showLineNumbers={showSourceLineNumbers}
+              lineWrapping={editorSourceWrap}
+              fontSize={(14 * contentTextScale) / 100}
+              lineHeight={EDITOR_LINE_HEIGHT_VALUES[editorLineHeight]}
+              ariaLabel={tSourceMode('source')}
+              className="min-w-0 flex-1"
+              onChange={handleSourceMarkdownChange}
+              onControllerChange={handleSourceControllerChange}
+              onSelectionChange={handleSourceSelectionChange}
+              onUndoRedoChange={handleSourceUndoRedoChange}
+              onViewStateChange={handleSourceViewStateChange}
+              initialScrollTop={initialEditorViewState?.sourceScrollTop ?? 0}
+              selection={sourceSelectionRef.current}
             />
-            </div>
           </div>
+        ) : isSectionVirtualView ? (
+          <SectionedMarkdownEditor
+            ref={sectionedEditorControllerRef}
+            markdown={sourceMarkdown}
+            getCanonicalMarkdown={() => sourceMarkdownRef.current}
+            initialActiveSectionId={initialEditorViewState?.sectionId}
+            scrollContainerRef={scrollContainerRef}
+            className="min-h-full"
+            onChange={handleSectionedMarkdownChange}
+            onActiveEditorChange={handleActiveSectionEditorChange}
+            onSelectionChange={handleSectionedSelectionChange}
+            onRequestSourceMode={handleToggleViewMode}
+            renderActiveSection={({
+              editorKey,
+              markdown,
+              onDirty,
+              onChange: onSectionChange,
+              onEditorReady: onSectionEditorReady,
+              onBlockingActivityChange: onSectionBlockingActivityChange,
+            }) => (
+              <TipTapEditor
+                key={editorKey}
+                initialContent={markdown}
+                onChange={onSectionChange}
+                onContentDirty={onDirty}
+                placeholder={placeholderText}
+                editable={editable}
+                activeFilePath={activeFilePath}
+                onEditorReady={onSectionEditorReady}
+                onBlockingActivityChange={onSectionBlockingActivityChange}
+                outlineOpen={false}
+                autoScroll={autoScroll}
+                showOverlay={false}
+                showFooterBar={false}
+                contentInset={false}
+                scrollable={false}
+                mobileMode={isMobile}
+                applyLayoutPreferences={false}
+                isActive={isActive}
+                onTerminate={onTerminate}
+                documentScope="section"
+                documentMarkdown={sourceMarkdown}
+              />
+            )}
+          />
         ) : (
           <>
             <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
@@ -5335,7 +6456,10 @@ export function TipTapEditor({
 
               {!isMobile && <ImageBubbleMenu editor={editor} />}
 
-              <AISuggestionFloating editor={editor} />
+              <AISuggestionFloating
+                editor={editor}
+                onPendingChange={handleAiSuggestionPendingChange}
+              />
 
               {!isMobile && <FloatingTableMenu editor={editor} />}
 
@@ -5363,7 +6487,7 @@ export function TipTapEditor({
         )}
         </div>
         </div>
-        {scrollable && !isMobile ? (
+        {scrollable && !isMobile && effectiveViewMode === 'visual' ? (
           <EditorScrollbar
             refreshKey={viewMode}
             scrollContainerId={scrollContainerId}
@@ -5386,7 +6510,7 @@ export function TipTapEditor({
         </Button>
       )}
 
-      {isMobile && effectiveViewMode === 'visual' && showMobileEditorToolbar && !mobileContext && (
+      {isMobile && effectiveViewMode === 'visual' && !isSectionVirtualView && showMobileEditorToolbar && !mobileContext && (
         <MobileWritingToolbar
           activeActions={mobileWritingActiveActions}
           showUndoRedo={showEditorUndoRedo}
@@ -5416,7 +6540,7 @@ export function TipTapEditor({
         />
       )}
 
-      {isMobile && (
+      {isMobile && !isSectionVirtualView && (
         <Outline
           editor={editor}
           isOpen={mobileOutlineOpen}
@@ -5447,24 +6571,34 @@ export function TipTapEditor({
 
       {showFooterBar ? (
         <FooterBar
-          editor={editor}
-          outlineOpen={effectiveOutlineOpen}
-          onToggleOutline={handleOutlineToggle}
+          editor={activeSectionEditor ?? editor}
+          outlineOpen={isSectionVirtualView ? false : effectiveOutlineOpen}
+          onToggleOutline={isSectionVirtualView ? undefined : handleOutlineToggle}
           viewMode={effectiveViewMode}
           onToggleViewMode={applyLayoutPreferences ? handleToggleViewMode : undefined}
-          sourceMarkdown={effectiveViewMode === 'source' ? sourceMarkdown : undefined}
+          sourceMarkdown={usesCanonicalMarkdown ? sourceMarkdown : undefined}
+          getMarkdown={getCurrentMarkdownSnapshot}
+          prepareExternalAction={prepareExternalMarkdownAction}
+          onMarkdownChange={isSourceView
+            ? handleSourceMarkdownChange
+            : isSectionVirtualView
+              ? handleSectionedMarkdownChange
+              : undefined}
+          deferSourceStatistics={isLargeDocument && usesCanonicalMarkdown}
         />
       ) : null}
 
-      <SlashCommandPortal />
+      {!isSectionVirtualView ? <SlashCommandPortal /> : null}
 
-      <MathEditorDialog
-        open={mathDialogOpen}
-        onOpenChange={setMathDialogOpen}
-        onInsert={handleMathInsert}
-        type={mathType}
-        title={mathType === 'inline' ? '插入行内公式' : '插入块级公式'}
-      />
+      {mathDialogOpen ? (
+        <MathEditorDialog
+          open={mathDialogOpen}
+          onOpenChange={setMathDialogOpen}
+          onInsert={handleMathInsert}
+          type={mathType}
+          title={mathType === 'inline' ? '插入行内公式' : '插入块级公式'}
+        />
+      ) : null}
     </div>
   )
 }

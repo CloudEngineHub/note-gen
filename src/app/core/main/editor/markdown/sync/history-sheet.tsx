@@ -31,10 +31,12 @@ type SyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea'
 
 interface HistorySheetProps {
   editor: Editor
+  prepareExternalAction?: () => boolean
+  onMarkdownChange?: (markdown: string) => void
 }
 
-export function HistorySheet({ editor }: HistorySheetProps) {
-  const { activeFilePath } = useArticleStore()
+export function HistorySheet({ editor, prepareExternalAction, onMarkdownChange }: HistorySheetProps) {
+  const { activeFilePath, flushPendingArticleSave } = useArticleStore()
   const [isOpen, setIsOpen] = useState(false)
   const [history, setHistory] = useState<CommitInfo[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -164,6 +166,7 @@ export function HistorySheet({ editor }: HistorySheetProps) {
   // Restore file from specific commit
   const restoreVersion = useCallback(async (commitSha: string) => {
     if (!activeFilePath || restoringSha) return
+    if (prepareExternalAction && !prepareExternalAction()) return
 
     setRestoringSha(commitSha)
     try {
@@ -218,12 +221,20 @@ export function HistorySheet({ editor }: HistorySheetProps) {
 
 
       if (content) {
+        // The remote request may take long enough for an image upload or AI
+        // edit to start after the initial check. Never overwrite that work.
+        if (prepareExternalAction && !prepareExternalAction()) return
+        await flushPendingArticleSave(activeFilePath)
         // 保存到本地文件
         await saveLocalFile(activeFilePath, content)
 
-        // 更新编辑器内容
-        editor.commands.clearContent()
-        editor.commands.setContent(content, { contentType: 'markdown' })
+        // 更新编辑器内容；轻量模式不触发 Tiptap 全文解析。
+        if (onMarkdownChange) {
+          onMarkdownChange(content)
+        } else {
+          editor.commands.clearContent()
+          editor.commands.setContent(content, { contentType: 'markdown' })
+        }
 
         // 更新同步时间和恢复时间
         await updateFileSyncTime(activeFilePath)
@@ -246,7 +257,15 @@ export function HistorySheet({ editor }: HistorySheetProps) {
     } finally {
       setRestoringSha(null)
     }
-  }, [activeFilePath, editor, getProvider, restoringSha])
+  }, [
+    activeFilePath,
+    editor,
+    flushPendingArticleSave,
+    getProvider,
+    onMarkdownChange,
+    prepareExternalAction,
+    restoringSha,
+  ])
 
   // Load history when sheet opens
   useEffect(() => {

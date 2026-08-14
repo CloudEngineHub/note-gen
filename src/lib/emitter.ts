@@ -137,7 +137,7 @@ interface Events {
   // Agent 编辑器工具事件 - 内联定义避免重复
   'editor-get-selection': { resolve: (data: { text: string; from: number; to: number; html?: string; startLine?: number; endLine?: number }) => void };
   'editor-get-content': { resolve: (data: { markdown: string; text: string; wordCount: number; charCount: number; totalLines?: number; numberedLines?: string; version: number; selection?: { text: string; from: number; to: number; startLine: number; endLine: number } }) => void };
-  'editor-insert': { content: string; position?: number; resolve: (result: { success: boolean; insertedLength: number; newCursorPosition?: number }) => void };
+  'editor-insert': { filePath: string; content: string; position?: number; replaceSelection?: boolean; expectedSelection?: string; expectedSelectionToken?: string; resolve: (result: { success: boolean; insertedLength: number; newCursorPosition?: number }) => void };
   'editor-undo': void;
   'editor-redo': void;
   'editor-agent-diff-preview': {
@@ -150,6 +150,7 @@ interface Events {
   'editor-agent-diff-clear': void;
   'mobile-editor-toggle-outline': void;
   'editor-can-undo-redo': { resolve: (can: { undo: boolean; redo: boolean }) => void };
+  'editor-prepare-deactivate': { resolve: (canDeactivate: boolean) => void };
   'editor-undo-redo-changed': { undo: boolean; redo: boolean };
   'canvas-document-replace': { canvasId: string; document: CanvasDocument };
   'canvas-history-checkpoint': void;
@@ -161,6 +162,7 @@ interface Events {
   'canvas-agent-preview-clear': void;
   'canvas-auto-layout': { recordHistory?: boolean };
   'editor-replace': {
+    filePath: string;
     content?: string;
     range?: { from: number; to: number };
     searchContent?: string;

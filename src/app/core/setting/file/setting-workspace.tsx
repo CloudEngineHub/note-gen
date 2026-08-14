@@ -17,6 +17,7 @@ import {
 import { useState } from "react"
 import { Field, FieldDescription, FieldTitle } from "@/components/ui/field"
 import { toast } from "@/hooks/use-toast"
+import { prepareActiveEditorDeactivationDurably } from "@/lib/editor-deactivation"
 
 export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) {
   const {
@@ -26,7 +27,7 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
     removeWorkspaceHistory,
     clearWorkspaceHistory
   } = useSettingStore()
-  const {loadWorkspaceCollapsibleList, loadFileTree, setActiveFilePath, setCurrentArticle} = useArticleStore()
+  const {loadWorkspaceCollapsibleList, loadFileTree, setActiveFilePath} = useArticleStore()
   const { refreshSkills } = useSkillsStore()
   const t = useTranslations('settings.file')
   const [open, setOpen] = useState(false)
@@ -50,17 +51,29 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
     }
   }
 
+  async function prepareWorkspaceSwitch() {
+    const articleState = useArticleStore.getState()
+    if (!await prepareActiveEditorDeactivationDurably(articleState.activeFilePath)) {
+      return false
+    }
+    await articleState.flushAllPendingArticleSaves()
+    await articleState.settleAllVectorCalculations()
+    return true
+  }
+
   async function restoreWorkspaceContent() {
-    setActiveFilePath('')
-    setCurrentArticle('')
+    await setActiveFilePath('', true, { deactivationAlreadyPrepared: true })
     const lastActivePath = await loadWorkspaceCollapsibleList()
     await loadFileTree()
-    if (lastActivePath) await setActiveFilePath(lastActivePath)
+    if (lastActivePath) {
+      await setActiveFilePath(lastActivePath, true, { deactivationAlreadyPrepared: true })
+    }
   }
 
   // 切换工作区（统一处理文件树、上次文件、Skills 和失败回滚）
   async function switchWorkspace(path: string) {
     if (switchingWorkspace || path === workspacePath) return
+    if (!await prepareWorkspaceSwitch()) return
 
     const previousWorkspacePath = workspacePath
     setSwitchingWorkspace(true)
@@ -72,6 +85,9 @@ export function SettingWorkspace({ showTitle = true }: { showTitle?: boolean }) 
       console.error('切换工作区失败:', error)
 
       try {
+        if (!await prepareWorkspaceSwitch()) {
+          throw new Error('无法在回滚工作区前保存当前编辑内容')
+        }
         await setWorkspacePath(previousWorkspacePath)
         await restoreWorkspaceContent()
         await refreshSkills()

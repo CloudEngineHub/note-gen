@@ -14,13 +14,17 @@ import { ConflictDialog } from './conflict-dialog'
 
 interface PullButtonProps {
   editor: Editor
+  markdown?: string
+  getMarkdown?: () => string
+  prepareExternalAction?: () => boolean
+  onMarkdownChange?: (markdown: string) => void
 }
 
 // 拉取状态
 type PullStatus = 'idle' | 'checking' | 'update-available' | 'pulling' | 'conflict' | 'error'
 
-export function PullButton({ editor }: PullButtonProps) {
-  const { activeFilePath } = useArticleStore()
+export function PullButton({ editor, markdown, getMarkdown, prepareExternalAction, onMarkdownChange }: PullButtonProps) {
+  const { activeFilePath, flushPendingArticleSave } = useArticleStore()
   const { autoPullOnOpen } = useSettingStore()
   const [hasUpdate, setHasUpdate] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -84,12 +88,21 @@ export function PullButton({ editor }: PullButtonProps) {
   // 执行实际的拉取操作
   const executePull = useCallback(async (remoteContent: string) => {
     if (!activeFilePath) return
+    if (prepareExternalAction && !prepareExternalAction()) {
+      setIsLoading(false)
+      return
+    }
 
     setIsLoading(true)
     try {
+      await flushPendingArticleSave(activeFilePath)
       await saveLocalFile(activeFilePath, remoteContent)
-      // 使用 contentType: 'markdown' 让 @tiptap/markdown 扩展解析 Markdown
-      editor.commands.setContent(remoteContent, { contentType: 'markdown' })
+      if (onMarkdownChange) {
+        onMarkdownChange(remoteContent)
+      } else {
+        // 使用 contentType: 'markdown' 让 @tiptap/markdown 扩展解析 Markdown
+        editor.commands.setContent(remoteContent, { contentType: 'markdown' })
+      }
       // 更新同步时间，避免重复检测
       await updateFileSyncTime(activeFilePath)
       // 更新本地记录的远程 SHA，避免重复提示有更新
@@ -114,7 +127,13 @@ export function PullButton({ editor }: PullButtonProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [activeFilePath, editor])
+  }, [
+    activeFilePath,
+    editor,
+    flushPendingArticleSave,
+    onMarkdownChange,
+    prepareExternalAction,
+  ])
 
   // Auto pull from remote (called by interval)
   const checkForUpdates = useCallback(async () => {
@@ -171,8 +190,9 @@ export function PullButton({ editor }: PullButtonProps) {
 
   // 处理冲突 - 打开对比对话框
   const handleConflict = useCallback(() => {
+    if (prepareExternalAction && !prepareExternalAction()) return
     setShowConflictDialog(true)
-  }, [])
+  }, [prepareExternalAction])
 
   // 冲突解决后的回调
   const handleConflictResolved = useCallback(() => {
@@ -299,6 +319,7 @@ export function PullButton({ editor }: PullButtonProps) {
   // Pull from remote (manual) - 使用缓存的远程内容
   const handlePull = useCallback(async () => {
     if (!activeFilePath || isLoading) return
+    if (prepareExternalAction && !prepareExternalAction()) return
 
     // 如果有缓存的远程内容，直接使用
     if (remoteContentRef.current) {
@@ -313,8 +334,10 @@ export function PullButton({ editor }: PullButtonProps) {
       await executePull(content)
     } catch (error) {
       console.error('Pull failed:', error)
+    } finally {
+      setIsLoading(false)
     }
-  }, [activeFilePath, isLoading, executePull])
+  }, [activeFilePath, isLoading, executePull, prepareExternalAction])
 
   // 如果没有配置同步，不显示
   if (!isConfigured || !activeFilePath) return null
@@ -372,6 +395,10 @@ export function PullButton({ editor }: PullButtonProps) {
         onOpenChange={setShowConflictDialog}
         activeFilePath={activeFilePath}
         editor={editor}
+        localMarkdown={markdown}
+        getMarkdown={getMarkdown}
+        prepareExternalAction={prepareExternalAction}
+        onMarkdownChange={onMarkdownChange}
         onResolved={handleConflictResolved}
       />
     </>
