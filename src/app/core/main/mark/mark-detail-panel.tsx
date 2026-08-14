@@ -74,6 +74,7 @@ import { canOpenMarkSource, getMarkOpenAction } from "./mark-open-path"
 import { createRecordTab, getRecordTabPath } from "./mark-record-tab"
 import { getMarkTypeListBadgeClasses } from "./mark-type-meta"
 import { TipTapEditor } from "@/app/core/main/editor/markdown/tiptap-editor"
+import { isLargeMarkdownDocument } from "@/app/core/main/editor/markdown/large-markdown"
 
 const getMarkTitle = (mark: Mark, fallback: string) => {
   const title = mark.desc?.trim() || mark.content?.trim() || mark.url?.trim()
@@ -767,6 +768,7 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
   const { updateMark } = useMarkStore()
   const { fetchTags, getCurrentTag } = useTagStore()
   const [todoData, setTodoData] = useState<TodoData>(() => parseTodoMarkContent(mark))
+  const isLargeDescription = isLargeMarkdownDocument(todoData.description)
 
   useEffect(() => {
     setTodoData(parseTodoMarkContent(mark))
@@ -801,7 +803,12 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
       <SectionBlock title="内容" contentClassName="overflow-visible">
         <div
           id="record-detail-todo-description"
-          className="record-detail-markdown-editor min-h-32 w-full min-w-0 max-w-full overflow-visible bg-background"
+          className={cn(
+            "record-detail-markdown-editor w-full min-w-0 max-w-full bg-background",
+            isLargeDescription
+              ? "h-[min(70vh,720px)] min-h-80 overflow-hidden"
+              : "min-h-32 overflow-visible"
+          )}
         >
           <TipTapEditor
             initialContent={todoData.description}
@@ -810,7 +817,8 @@ function TodoDetailEditor({ mark }: { mark: Mark }) {
             placeholder={t('record.mark.todo.descriptionPlaceholder')}
             editable={mark.deleted !== 1}
             showFooterBar={false}
-            scrollable={false}
+            scrollable={isLargeDescription}
+            enableLargeDocumentMode
           />
         </div>
       </SectionBlock>
@@ -823,7 +831,7 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
   const markT = useTranslations('record.mark')
   const { updateMark } = useMarkStore()
   const { primaryModel } = useSettingStore()
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(() => mark.content || '')
   const [isRecognizingImage, setIsRecognizingImage] = useState(false)
   const [recognizingStage, setRecognizingStage] = useState<ImageRecognitionStage | null>(null)
   const [detailImagePreviewSrc, setDetailImagePreviewSrc] = useState('')
@@ -901,6 +909,7 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
 
   const contentPlaceholder = imageSrc ? t('record.capture.screenshotOcrContent') : markT('content')
   const editorHeightClass = mark.type === 'text' ? 'min-h-[520px]' : 'min-h-[320px]'
+  const isLargeContent = isLargeMarkdownDocument(value)
   const recordEditorPath = getRecordTabPath(mark.id)
 
   return (
@@ -961,7 +970,12 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
       <SectionBlock className="px-0 py-0" contentClassName="overflow-visible">
         <div
           id="record-detail-content"
-          className={cn(editorHeightClass, "record-detail-markdown-editor w-full min-w-0 max-w-full overflow-visible bg-background")}
+          className={cn(
+            "record-detail-markdown-editor w-full min-w-0 max-w-full bg-background",
+            isLargeContent
+              ? "h-[min(75vh,760px)] min-h-[420px] overflow-hidden"
+              : cn(editorHeightClass, "overflow-visible")
+          )}
         >
           <TipTapEditor
             initialContent={value}
@@ -970,7 +984,8 @@ function MarkDetailBody({ mark }: { mark: Mark }) {
             placeholder={contentPlaceholder}
             editable={mark.deleted !== 1}
             showFooterBar={false}
-            scrollable={false}
+            scrollable={isLargeContent}
+            enableLargeDocumentMode
           />
         </div>
       </SectionBlock>
@@ -985,7 +1000,7 @@ function MarkDetailView({ mark, onClose }: { mark: Mark; onClose: () => void }) 
         <MarkDetailToolbar mark={mark} onClose={onClose} />
         <div className="app-panel-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="min-w-full max-w-full overflow-hidden">
-            <MarkDetailBody mark={mark} />
+            <MarkDetailBody key={mark.id} mark={mark} />
           </div>
         </div>
       </div>

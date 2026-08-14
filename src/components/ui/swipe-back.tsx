@@ -56,7 +56,7 @@ export const SwipeBack = forwardRef<SwipeBackHandle, SwipeBackProps>(
     if (
       target instanceof HTMLElement
       && target.closest(
-        '[data-slot="drawer-content"], [data-slot="dialog-content"], [data-swipe-back-ignore], input, textarea, select, [contenteditable]:not([contenteditable="false"]), .ProseMirror'
+        '[data-slot="drawer-content"], [data-slot="dialog-content"], [data-swipe-back-ignore], input, textarea, select, [contenteditable]:not([contenteditable="false"]), .ProseMirror, .cm-editor'
       )
     ) {
       return

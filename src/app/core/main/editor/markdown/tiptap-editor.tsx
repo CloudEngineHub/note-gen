@@ -71,7 +71,7 @@ import { StableCodeBlockLowlight } from './code-block-extension'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 import useSettingStore from '@/stores/setting'
 import useChatStore, { type PendingQuote } from '@/stores/chat'
-import { ArrowUp, Eye, Loader2, X } from 'lucide-react'
+import { ArrowUp, Eye, FileCode2, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { buildMobileSelectionContext, isMobileSelectionContextStale } from './mobile-selection-context'
@@ -1074,6 +1074,7 @@ interface TipTapEditorProps {
   scrollable?: boolean
   mobileMode?: boolean
   applyLayoutPreferences?: boolean
+  enableLargeDocumentMode?: boolean
   isActive?: boolean
   onTerminate?: () => void
   documentScope?: 'document' | 'section'
@@ -1193,6 +1194,7 @@ export function TipTapEditor({
   scrollable = true,
   mobileMode,
   applyLayoutPreferences = false,
+  enableLargeDocumentMode = applyLayoutPreferences,
   isActive = true,
   onTerminate,
   documentScope = 'document',
@@ -1234,7 +1236,7 @@ export function TipTapEditor({
   const pendingSourceSearchRef = useRef(false)
   const [markdownParseError, setMarkdownParseError] = useState<string | null>(null)
   const [isLargeDocument, setIsLargeDocument] = useState(
-    () => !isSectionScope && applyLayoutPreferences && isLargeMarkdownDocument(initialContent)
+    () => !isSectionScope && enableLargeDocumentMode && isLargeMarkdownDocument(initialContent)
   )
   const isLargeDocumentRef = useRef(isLargeDocument)
   isLargeDocumentRef.current = isLargeDocument
@@ -1508,7 +1510,7 @@ export function TipTapEditor({
       }
       setSourceMarkdown(initialContent)
       const nextIsLargeDocument = !isSectionScope
-        && applyLayoutPreferences
+        && enableLargeDocumentMode
         && isLargeMarkdownDocument(initialContent)
       isLargeDocumentRef.current = nextIsLargeDocument
       setIsLargeDocument(nextIsLargeDocument)
@@ -1517,7 +1519,7 @@ export function TipTapEditor({
       setIsPreparingLargeDocumentVisual(false)
       setIsRestoringMobileView(isMobile)
     }
-  }, [activeFilePath, applyLayoutPreferences, getEditorViewState, initialContent, isMobile, isSectionScope])
+  }, [activeFilePath, enableLargeDocumentMode, getEditorViewState, initialContent, isMobile, isSectionScope])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -1860,7 +1862,7 @@ export function TipTapEditor({
 
   const classifyCanonicalMarkdown = useCallback((value: string) => {
     const nextIsLargeDocument = !isSectionScope
-      && applyLayoutPreferences
+      && enableLargeDocumentMode
       && isLargeMarkdownDocument(value)
     if (nextIsLargeDocument === isLargeDocumentRef.current) {
       return nextIsLargeDocument
@@ -1874,7 +1876,7 @@ export function TipTapEditor({
       setEditorViewState(activeFilePath, { largeDocumentVisualOverride: false })
     }
     return nextIsLargeDocument
-  }, [activeFilePath, applyLayoutPreferences, isSectionScope, setEditorViewState])
+  }, [activeFilePath, enableLargeDocumentMode, isSectionScope, setEditorViewState])
   classifyCanonicalMarkdownRef.current = classifyCanonicalMarkdown
 
   const handleSourceMarkdownChange = useCallback((value: string) => {
@@ -6272,6 +6274,20 @@ export function TipTapEditor({
 
       {/* Editor content - scrollable area */}
       <div className={cn('relative min-h-0', scrollable ? 'flex-1' : 'min-h-full')}>
+        {isSectionVirtualView && !showFooterBar ? (
+          <div className="pointer-events-none absolute right-3 top-3 z-30">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="pointer-events-auto bg-background/95 shadow-sm backdrop-blur"
+              onClick={handleToggleViewMode}
+            >
+              <FileCode2 data-icon="inline-start" />
+              {t('largeMarkdownMode.sectioned.returnToSource')}
+            </Button>
+          </div>
+        ) : null}
         <div
           ref={scrollContainerRef}
           id={scrollContainerId}

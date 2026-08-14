@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import dayjs from 'dayjs'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import {
   Copy,
@@ -40,8 +41,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { parseTodoMarkContent } from '@/app/core/main/mark/mark-list-item-content'
+import { getRecordTabPath } from '@/app/core/main/mark/mark-record-tab'
 import { getMarkTypeListBadgeClasses } from '@/app/core/main/mark/mark-type-meta'
 import type { Priority } from '@/app/core/main/mark/todo-form'
+import { isLargeMarkdownDocument } from '@/app/core/main/editor/markdown/large-markdown'
 import { delMark, delMarkForever, getMarkById, restoreMark, type Mark } from '@/db/marks'
 import { toast } from '@/hooks/use-toast'
 import { cn, isHttpUrl } from '@/lib/utils'
@@ -51,6 +54,14 @@ import useTagStore from '@/stores/tag'
 interface MobileRecordDetailProps {
   markId: number
 }
+
+const LargeRecordMarkdownEditor = dynamic(
+  () => import('@/app/core/main/editor/markdown/tiptap-editor').then(module => module.TipTapEditor),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse bg-muted/20" />,
+  }
+)
 
 interface MarkDraft {
   tagId: number
@@ -312,6 +323,9 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
   const imageSrc = getImageSrc(mark)
   const typeLabel = t(`record.mark.type.${mark.type}`)
+  const recordEditorPath = getRecordTabPath(mark.id)
+  const isLargeContent = isLargeMarkdownDocument(draft.content)
+  const isLargeTodoDescription = isLargeMarkdownDocument(draft.todoDescription)
 
   return (
     <SwipeBack
@@ -458,16 +472,31 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
                   </Tabs>
                 </DetailField>
                 <DetailField label={t('record.mark.todo.description')} htmlFor="todo-description">
-                  <Textarea
-                    id="todo-description"
-                    value={draft.todoDescription}
-                    onChange={(event) => setDraft({ ...draft, todoDescription: event.target.value })}
-                    placeholder={t('record.mark.todo.descriptionPlaceholder')}
-                    disabled={isReadOnly}
-                    rows={5}
-                    maxRows={10}
-                    className="min-h-36 resize-none"
-                  />
+                  {isLargeTodoDescription ? (
+                    <div id="todo-description" className="h-[60vh] min-h-80 overflow-hidden rounded-md border bg-background">
+                      <LargeRecordMarkdownEditor
+                        initialContent={draft.todoDescription}
+                        onChange={(value) => setDraft(current => current ? { ...current, todoDescription: value } : current)}
+                        activeFilePath={recordEditorPath}
+                        placeholder={t('record.mark.todo.descriptionPlaceholder')}
+                        editable={!isReadOnly}
+                        showFooterBar={false}
+                        mobileMode
+                        enableLargeDocumentMode
+                      />
+                    </div>
+                  ) : (
+                    <Textarea
+                      id="todo-description"
+                      value={draft.todoDescription}
+                      onChange={(event) => setDraft({ ...draft, todoDescription: event.target.value })}
+                      placeholder={t('record.mark.todo.descriptionPlaceholder')}
+                      disabled={isReadOnly}
+                      rows={5}
+                      maxRows={10}
+                      className="min-h-36 resize-none"
+                    />
+                  )}
                 </DetailField>
               </>
             ) : (
@@ -484,14 +513,28 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
                   </DetailField>
                 ) : null}
                 <DetailField label={t('record.mark.content')} htmlFor="record-content">
-                  <Textarea
-                    id="record-content"
-                    value={draft.content}
-                    onChange={(event) => setDraft({ ...draft, content: event.target.value })}
-                    disabled={isReadOnly}
-                    maxRows={30}
-                    className={cn('resize-none leading-7', mark.type === 'text' ? 'min-h-[48vh]' : 'min-h-56')}
-                  />
+                  {isLargeContent ? (
+                    <div id="record-content" className="h-[65vh] min-h-96 overflow-hidden rounded-md border bg-background">
+                      <LargeRecordMarkdownEditor
+                        initialContent={draft.content}
+                        onChange={(value) => setDraft(current => current ? { ...current, content: value } : current)}
+                        activeFilePath={recordEditorPath}
+                        editable={!isReadOnly}
+                        showFooterBar={false}
+                        mobileMode
+                        enableLargeDocumentMode
+                      />
+                    </div>
+                  ) : (
+                    <Textarea
+                      id="record-content"
+                      value={draft.content}
+                      onChange={(event) => setDraft({ ...draft, content: event.target.value })}
+                      disabled={isReadOnly}
+                      maxRows={30}
+                      className={cn('resize-none leading-7', mark.type === 'text' ? 'min-h-[48vh]' : 'min-h-56')}
+                    />
+                  )}
                 </DetailField>
                 {mark.type === 'link' ? (
                   <DetailField label="URL" htmlFor="record-url">
