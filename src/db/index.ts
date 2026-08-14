@@ -1,35 +1,84 @@
 
-import Database from '@tauri-apps/plugin-sql';
+import Database, { type QueryResult } from '@tauri-apps/plugin-sql'
 
-// 导出数据库实例
-export const db = await Database.load('sqlite:note.db');
+let database: Database | null = null
+let databaseLoading: Promise<Database> | null = null
 
-// Core schema migrations must finish before this module exports. The desktop layout
-// renders children while its initialization effect is still running, so altering a
-// table later can invalidate SQLx's cached `select *` metadata on another query.
-await db.execute(`
-  create table if not exists marks (
-    id integer primary key autoincrement,
-    tagId integer not null,
-    type text not null,
-    content text default null,
-    url text default null,
-    desc text default null,
-    deleted integer default 0,
-    createdAt integer,
-    sourceId text default null
+async function loadDatabase(): Promise<Database> {
+  if (typeof window === 'undefined') {
+    throw new Error('The local database is only available in the Tauri client runtime')
+  }
+
+  const nextDatabase = await Database.load('sqlite:note.db')
+
+  // Core schema migrations must finish before callers receive the connection.
+  // Altering the table later can invalidate SQLx's cached `select *` metadata on
+  // a concurrent query.
+  await nextDatabase.execute(`
+    create table if not exists marks (
+      id integer primary key autoincrement,
+      tagId integer not null,
+      type text not null,
+      content text default null,
+      url text default null,
+      desc text default null,
+      deleted integer default 0,
+      createdAt integer,
+      sourceId text default null
+    )
+  `)
+  try {
+    await nextDatabase.select('select sourceId from marks limit 1')
+  } catch {
+    await nextDatabase.execute('alter table marks add column sourceId text default null')
+  }
+  await nextDatabase.execute(
+    'create unique index if not exists idx_marks_source_id on marks(sourceId) where sourceId is not null'
   )
-`)
-try {
-  await db.select('select sourceId from marks limit 1')
-} catch {
-  await db.execute('alter table marks add column sourceId text default null')
-}
-await db.execute('create unique index if not exists idx_marks_source_id on marks(sourceId) where sourceId is not null')
 
-// 获取数据库实例(兼容旧代码)
-export async function getDb() {
-  return db;
+  return nextDatabase
+}
+
+// Loading must stay behind a function boundary. Next.js may evaluate client
+// module dependencies while rendering on the server, where the Tauri bridge and
+// `window` do not exist.
+export async function getDb(): Promise<Database> {
+  if (database) return database
+
+  if (!databaseLoading) {
+    databaseLoading = loadDatabase()
+      .then((nextDatabase) => {
+        database = nextDatabase
+        return nextDatabase
+      })
+      .catch((error) => {
+        databaseLoading = null
+        throw error
+      })
+  }
+
+  return databaseLoading
+}
+
+// Compatibility facade for modules that historically imported `db` directly.
+// Every method resolves the client-only connection lazily.
+export const db = {
+  async execute(query: string, bindValues?: unknown[]): Promise<QueryResult> {
+    return (await getDb()).execute(query, bindValues)
+  },
+  async select<T>(query: string, bindValues?: unknown[]): Promise<T> {
+    return (await getDb()).select<T>(query, bindValues)
+  },
+  async close(databaseName?: string): Promise<boolean> {
+    const activeDatabase = await getDb()
+    try {
+      return await activeDatabase.close(databaseName)
+    } finally {
+      database = null
+      databaseLoading = null
+      databaseInitialization = null
+    }
+  },
 }
 
 let databaseInitialization: Promise<void> | null = null
