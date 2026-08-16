@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react'
+import { type Range } from '@tiptap/core'
 import { Editor } from '@tiptap/react'
 import { useTranslations } from 'next-intl'
 import { SendHorizontal } from 'lucide-react'
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/button'
 interface MenuState {
   visible: boolean
   editor: Editor | null
+  range: Range | null
   clientRect: DOMRect | null
   query: string
 }
@@ -72,6 +74,7 @@ export const SlashCommandPortal = () => {
   const [state, setState] = useState<MenuState>({
     visible: false,
     editor: null,
+    range: null,
     clientRect: null,
     query: '',
   })
@@ -102,6 +105,7 @@ export const SlashCommandPortal = () => {
     const showHandler = (e: Event) => {
       const event = e as CustomEvent<{
         editor: Editor
+        range: Range
         clientRect: DOMRect
         query: string
       }>
@@ -110,6 +114,7 @@ export const SlashCommandPortal = () => {
       setState({
         visible: true,
         editor: event.detail.editor,
+        range: event.detail.range,
         clientRect: event.detail.clientRect,
         query: event.detail.query,
       })
@@ -117,12 +122,16 @@ export const SlashCommandPortal = () => {
 
     const updateHandler = (e: Event) => {
       const event = e as CustomEvent<{
+        editor: Editor
+        range: Range
         clientRect: DOMRect
         query: string
       }>
       setPosition(calculateMenuPosition(event.detail.clientRect))
       setState((prev) => ({
         ...prev,
+        editor: event.detail.editor,
+        range: event.detail.range,
         clientRect: event.detail.clientRect,
         query: event.detail.query,
       }))
@@ -223,9 +232,10 @@ export const SlashCommandPortal = () => {
     }
   }, [hideCustomPrompt])
 
-  const slashMenuContext = state.visible && state.editor && state.clientRect && position
+  const slashMenuContext = state.visible && state.editor && state.range && state.clientRect && position
     ? {
         editor: state.editor,
+        range: state.range,
         clientRect: state.clientRect,
         position,
       }
@@ -248,6 +258,7 @@ export const SlashCommandPortal = () => {
           <SlashMenu
             ref={menuRef}
             editor={slashMenuContext.editor}
+            range={slashMenuContext.range}
             clientRect={slashMenuContext.clientRect}
             query={state.query}
           />

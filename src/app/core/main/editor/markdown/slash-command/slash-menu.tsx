@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from 'react'
+import { type Range } from '@tiptap/core'
 import { type Editor } from '@tiptap/react'
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from 'lucide-react'
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 interface SlashMenuProps {
   editor: Editor
+  range: Range
   clientRect?: DOMRect | null
   query: string
 }
@@ -33,7 +35,7 @@ function ShortcutHint({ keys }: { keys: string[] }) {
   )
 }
 
-export const SlashMenu = forwardRef<SlashMenuRef, SlashMenuProps>(({ editor, query }, ref) => {
+export const SlashMenu = forwardRef<SlashMenuRef, SlashMenuProps>(({ editor, range, query }, ref) => {
   const t = useTranslations('editor.slashCommand')
   const hasQuery = query.trim().length > 0
   const [selectedGroupIndex, setSelectedGroupIndex] = useState(0)
@@ -197,29 +199,10 @@ export const SlashMenu = forwardRef<SlashMenuRef, SlashMenuProps>(({ editor, que
   const selectItem = useCallback(
     (item: SlashCommandItem | undefined) => {
       if (item) {
-        const { from, to } = editor.state.selection
-        const tr = editor.state.doc
-        let slashStart = from
-        for (let i = from - 1; i >= Math.max(0, from - 20); i--) {
-          const node = tr.nodeAt(i)
-          if (node && node.text && node.text.endsWith('/')) {
-            slashStart = i
-            break
-          }
-          if (node && node.text && !node.text.includes('/')) {
-            break
-          }
-        }
-
-        editor.chain()
-          .focus()
-          .deleteRange({ from: slashStart, to: to })
-          .run()
-
-        item.command({ editor, range: { from: slashStart, to } })
+        item.command({ editor, range })
       }
     },
-    [editor]
+    [editor, range]
   )
 
   const selectVisibleItem = useCallback(

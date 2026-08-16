@@ -251,6 +251,7 @@ const createCustomAiInstructionCommand = () => ({
   command: ({ editor, range }: { editor: Editor; range: Range }) => {
     const position = Math.min(range.from, editor.state.doc.content.size)
     const coords = editor.view.coordsAtPos(position)
+    editor.chain().focus().deleteRange(range).run()
     const event = new CustomEvent('tiptap-ai-custom-instruction-open', {
       detail: {
         clientRect: new DOMRect(
@@ -909,6 +910,7 @@ export const suggestionOptions = {
         const event = new CustomEvent('slash-command-show', {
           detail: {
             editor,
+            range: props.range,
             clientRect,
             query: props.query || '',
           },
@@ -925,6 +927,8 @@ export const suggestionOptions = {
 
         const event = new CustomEvent('slash-command-update', {
           detail: {
+            editor: props.editor,
+            range: props.range,
             clientRect,
             query: props.query || '',
           },
