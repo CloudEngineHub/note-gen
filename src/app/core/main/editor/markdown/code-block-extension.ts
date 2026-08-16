@@ -10,8 +10,13 @@ interface ViewportCodeBlockOptions extends CodeBlockOptions {
 
 export const StableCodeBlockLowlight = CodeBlock.extend<ViewportCodeBlockOptions>({
   addOptions() {
+    const parentOptions = this.parent?.()
+    if (!parentOptions) {
+      throw new Error('CodeBlock parent options are unavailable')
+    }
+
     return {
-      ...this.parent?.(),
+      ...parentOptions,
       shouldHighlight: undefined,
     }
   },

@@ -37,12 +37,11 @@ async function splitMarkdownDocumentOnMainThread(
   if (signal?.aborted) throw createAbortError()
 
   await new Promise<void>((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout>
     const handleAbort = () => {
       clearTimeout(timer)
       reject(createAbortError())
     }
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       signal?.removeEventListener('abort', handleAbort)
       resolve()
     }, 0)

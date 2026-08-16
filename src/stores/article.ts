@@ -1071,10 +1071,11 @@ const useArticleStore = create<NoteState>((set, get) => ({
       editorViewStates: {
         ...current.editorViewStates,
         [path]: {
-          selectionFrom: 0,
-          selectionTo: 0,
-          scrollTop: 0,
-          ...current.editorViewStates[path],
+          ...(current.editorViewStates[path] ?? {
+            selectionFrom: 0,
+            selectionTo: 0,
+            scrollTop: 0,
+          }),
           ...state,
         },
       }

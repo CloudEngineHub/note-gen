@@ -166,11 +166,15 @@ function getFirstEditableSection(document: MarkdownSectionDocument): MarkdownSec
 
 function serializeEditorRange(editor: Editor, from: number, to: number): string {
   if (from === to) return ''
+  const markdownManager = editor.markdown
+  if (!markdownManager) {
+    return editor.state.doc.textBetween(from, to, '\n', '\n')
+  }
 
   try {
     const slice = editor.state.doc.slice(from, to)
     const json = { type: 'doc', content: slice.content.toJSON() }
-    return normalizeMarkdownPlaceholders(editor.markdown.serialize(json))
+    return normalizeMarkdownPlaceholders(markdownManager.serialize(json))
   } catch {
     return editor.state.doc.textBetween(from, to, '\n', '\n')
   }
