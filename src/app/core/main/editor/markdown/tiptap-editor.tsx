@@ -29,7 +29,7 @@ import 'katex/dist/katex.min.css'
 import { InlineMath, BlockMath } from './math-extension'
 import { MermaidDiagram } from './mermaid-extension'
 import { SearchReplacePanel } from './search-replace-panel'
-import { useEffect, useId, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useCallback, useMemo, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type UIEvent as ReactUIEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import { openPath, openUrl } from '@tauri-apps/plugin-opener'
 import { open } from '@tauri-apps/plugin-dialog'
 import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs'
@@ -278,6 +278,19 @@ function EditorScrollbar({
     }
   }, [hasOverflow, maxScrollTop, scrollContainerRef])
 
+  const handleWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer || !hasOverflow || event.deltaY === 0) return
+
+    event.preventDefault()
+    const deltaY = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? event.deltaY * 16
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? event.deltaY * scrollContainer.clientHeight
+        : event.deltaY
+    scrollContainer.scrollTop += deltaY
+  }, [hasOverflow, scrollContainerRef])
+
   return (
     <div
       role="scrollbar"
@@ -297,6 +310,7 @@ function EditorScrollbar({
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       onKeyDown={handleKeyDown}
+      onWheel={handleWheel}
     >
       <div
         data-editor-scrollbar-thumb
@@ -6293,12 +6307,12 @@ export function TipTapEditor({
           id={scrollContainerId}
           data-editor-viewport-root={scrollable ? 'true' : undefined}
           className={cn(
-            "editor-scroll-container relative overflow-x-hidden",
+            "editor-scroll-container relative",
             scrollable && effectiveViewMode === 'source'
-              ? "h-full overflow-y-hidden"
+              ? "h-full overflow-x-hidden overflow-y-hidden overscroll-y-contain"
               : scrollable
-                ? "h-full overflow-y-auto"
-                : "overflow-y-visible",
+                ? "h-full overflow-x-hidden overflow-y-auto overscroll-y-contain"
+                : "overflow-x-clip overflow-y-visible",
             scrollable && !isMobile && "editor-scroll-container-custom",
             isMobile && "mobile-under-dock-scroll mobile-writing-editor-scroll",
             isMobile && activeFilePath && isRestoringMobileView && "opacity-0"

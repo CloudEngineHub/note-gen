@@ -11,11 +11,6 @@
   position: relative;
 }
 
-/* Keep the editor scrollbar easy to grab, including beside the floating outline. */
-.tiptap-editor .editor-scroll-container {
-  overscroll-behavior-y: contain;
-}
-
 .tiptap-editor .editor-scroll-container-custom {
   scrollbar-width: none;
 }
