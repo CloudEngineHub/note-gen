@@ -17,6 +17,94 @@
       "enabled": true
     },
     {
+      "key": "bailian",
+      "title": "阿里云百炼",
+      "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "apiKeyUrl": "https://bailian.console.aliyun.com/?apiKey=1",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/bailian-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "moonshot",
+      "title": "Kimi",
+      "baseURL": "https://api.moonshot.cn/v1",
+      "apiKeyUrl": "https://platform.kimi.com/console/api-keys",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/kimi-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "zhipu",
+      "title": "智谱 GLM",
+      "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+      "apiKeyUrl": "https://open.bigmodel.cn/apikey/platform",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/zhipu-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "minimax",
+      "title": "MiniMax",
+      "baseURL": "https://api.minimaxi.com/v1",
+      "apiKeyUrl": "https://platform.minimaxi.com/subscribe/token-plan?code=1CnznNlJHf&source=link",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/minimax-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "volcengine",
+      "title": "火山方舟",
+      "baseURL": "https://ark.cn-beijing.volces.com/api/v3",
+      "apiKeyUrl": "https://console.volcengine.com/ark/region:ark+cn-beijing/apikey",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/doubao-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "qianfan",
+      "title": "百度千帆",
+      "baseURL": "https://qianfan.baidubce.com/v2",
+      "apiKeyUrl": "https://console.bce.baidu.com/iam/#/iam/apikey/list",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/baiducloud-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "hunyuan",
+      "title": "腾讯云 TokenHub",
+      "baseURL": "https://tokenhub.tencentmaas.com/v1",
+      "apiKeyUrl": "https://console.cloud.tencent.com/tokenhub/apikey",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/tencentcloud-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "stepfun",
+      "title": "阶跃星辰",
+      "baseURL": "https://api.stepfun.com/v1",
+      "apiKeyUrl": "https://platform.stepfun.com/interface-key",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/stepfun-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "lingyiwanwu",
+      "title": "零一万物",
+      "baseURL": "https://api.lingyiwanwu.com/v1",
+      "apiKeyUrl": "https://platform.lingyiwanwu.com/apikeys",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/yi-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "huaweicloud",
+      "title": "华为云 MaaS",
+      "baseURL": "https://api.modelarts-maas.com/openai/v1",
+      "apiKeyUrl": "https://console.huaweicloud.com/modelarts/?region=cn-north-4#/maas/overview",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/huaweicloud-color.svg",
+      "enabled": true
+    },
+    {
+      "key": "baichuan",
+      "title": "百川智能",
+      "baseURL": "https://api.baichuan-ai.com/v1",
+      "apiKeyUrl": "https://platform.baichuan-ai.com/",
+      "icon": "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg@1.94.0/icons/baichuan-color.svg",
+      "enabled": true
+    },
+    {
       "key": "chatgpt",
       "title": "ChatGPT",
       "baseURL": "https://api.openai.com/v1",
@@ -74,7 +162,7 @@
       "key": "qiniu",
       "title": "七牛云",
       "baseURL": "https://openai.qiniu.com/v1",
-      "apiKeyUrl": "https://s.qiniu.com/Znm6je",
+      "apiKeyUrl": "https://s.qiniu.com/v6Bnuu",
       "icon": "https://s2.loli.net/2025/09/15/ALjNPveWrtmsfOY.png",
       "enabled": true
     },

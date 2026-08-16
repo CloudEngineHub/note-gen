@@ -161,6 +161,27 @@ function toToolCallList(
     }))
 }
 
+function resolveStreamingToolCallIndex(
+  toolCalls: Map<number, StreamingToolCallAccumulator>,
+  toolCall: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta.ToolCall
+) {
+  if (Number.isInteger(toolCall.index)) {
+    return toolCall.index
+  }
+
+  if (toolCall.id) {
+    const existing = [...toolCalls.entries()].find(([, current]) => current.id === toolCall.id)
+    if (existing) {
+      return existing[0]
+    }
+    const indexes = [...toolCalls.keys()]
+    return indexes.length > 0 ? Math.max(...indexes) + 1 : 0
+  }
+
+  const indexes = [...toolCalls.keys()]
+  return indexes.length > 0 ? Math.max(...indexes) : 0
+}
+
 function summarizeMessage(message: OpenAI.Chat.ChatCompletionMessageParam, index: number) {
   const content = 'content' in message ? message.content : undefined
   const text = stringifyMessageContent(content)
@@ -1249,6 +1270,7 @@ export class AgentRuntime {
         let toolCallsStarted = false
         let candidateAnswerRendered = false
         let assistantReasoning = ''
+        const assistantReasoningDetails: unknown[] = []
         let streamedText = ''
         let streamedTokenCount = 0
         let lastModelProgressTraceAt = 0
@@ -1271,15 +1293,22 @@ export class AgentRuntime {
 
           finishReason = choice.finish_reason ?? finishReason
           const delta = choice.delta
+          if (!delta) {
+            continue
+          }
           const extendedDelta = delta as typeof delta & {
             reasoning?: string
             reasoning_content?: string
+            reasoning_details?: unknown[]
           }
           const reasoningDelta = extendedDelta.reasoning_content || extendedDelta.reasoning
           if (typeof reasoningDelta === 'string') {
             assistantReasoning += reasoningDelta
             streamedText += reasoningDelta
             activeModelReasoning = assistantReasoning
+          }
+          if (Array.isArray(extendedDelta.reasoning_details)) {
+            assistantReasoningDetails.push(...extendedDelta.reasoning_details)
           }
           if (typeof delta.content === 'string' && delta.content) {
             assistantContent += delta.content
@@ -1299,7 +1328,7 @@ export class AgentRuntime {
               toolCallsStarted = true
             }
 
-            const index = toolCallDelta.index
+            const index = resolveStreamingToolCallIndex(streamedToolCalls, toolCallDelta)
             const current = streamedToolCalls.get(index) || {
               index,
               id: toolCallDelta.id,
@@ -1497,7 +1526,8 @@ export class AgentRuntime {
         messages.push(createAssistantToolCallMessage(
           assistantContent,
           toolUses,
-          assistantReasoning
+          assistantReasoning,
+          assistantReasoningDetails
         ))
 
         const cancelRemainingToolCalls = (afterIndex: number, reason: string) => {

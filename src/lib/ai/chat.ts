@@ -1,5 +1,37 @@
 import OpenAI from 'openai';
-import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, createAssistantToolCallMessage, createChatCompletionStreamWithToolChoiceFallback, getChatTokenLimitParams, handleAIError, convertImageToBase64 } from './utils';
+import { getAISettings, validateAIService, prepareMessages, createOpenAIClient, createAssistantToolCallMessage, createChatCompletionStreamWithToolChoiceFallback, getChatTokenLimitParams, handleAIError, convertImageToBase64, withFastAiRequestOptions, withProviderCompatibleSampling } from './utils';
+
+interface StreamingChatToolCall {
+  id: string
+  type: 'function'
+  function: {
+    name: string
+    arguments: string
+  }
+}
+
+function resolveStreamingChatToolCallIndex(
+  toolCalls: StreamingChatToolCall[],
+  toolCall: OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta.ToolCall
+) {
+  if (Number.isInteger(toolCall.index)) {
+    return toolCall.index
+  }
+
+  if (toolCall.id) {
+    const existingIndex = toolCalls.findIndex((current) => current?.id === toolCall.id)
+    if (existingIndex >= 0) {
+      return existingIndex
+    }
+    return toolCalls.length
+  }
+
+  return Math.max(0, toolCalls.length - 1)
+}
+
+function fallbackToolCallId(index: number) {
+  return `tool-call-${Date.now()}-${index}`
+}
 
 /**
  * 非流式方式获取AI结果
@@ -141,13 +173,17 @@ export async function fetchAiStream(
       requestParams.tool_choice = 'auto'
     }
 
-    const stream = await createChatCompletionStreamWithToolChoiceFallback(openai, requestParams, {
+    const compatibleRequestParams = mcpTools?.length
+      ? withFastAiRequestOptions(requestParams, aiConfig)
+      : withProviderCompatibleSampling(requestParams, aiConfig)
+    const stream = await createChatCompletionStreamWithToolChoiceFallback(openai, compatibleRequestParams, {
       signal: abortSignal
     })
 
     let thinking = ''
+    let reasoningDetails: unknown[] = []
     let fullContent = ''
-    const toolCalls: any[] = []
+    const toolCalls: StreamingChatToolCall[] = []
     let hasToolCalls = false
     
     for await (const chunk of stream) {
@@ -156,7 +192,12 @@ export async function fetchAiStream(
       }
       
       const delta = chunk.choices[0]?.delta
-      const thinkingContent = (delta as any)?.reasoning_content || ''
+      const extendedDelta = delta as (typeof delta & {
+        reasoning?: string
+        reasoning_content?: string
+        reasoning_details?: unknown[]
+      }) | undefined
+      const thinkingContent = extendedDelta?.reasoning_content || extendedDelta?.reasoning || ''
       const content = delta?.content || ''
       
       if (thinkingContent) {
@@ -164,6 +205,9 @@ export async function fetchAiStream(
         if (onThinkingUpdate) {
           onThinkingUpdate(thinking)
         }
+      }
+      if (Array.isArray(extendedDelta?.reasoning_details)) {
+        reasoningDetails.push(...extendedDelta.reasoning_details)
       }
 
       if (content) {
@@ -174,12 +218,12 @@ export async function fetchAiStream(
       if (delta?.tool_calls) {
         hasToolCalls = true
         for (const toolCall of delta.tool_calls) {
-          const index = toolCall.index || 0
+          const index = resolveStreamingChatToolCallIndex(toolCalls, toolCall)
           
           // 初始化工具调用对象
           if (!toolCalls[index]) {
             toolCalls[index] = {
-              id: toolCall.id || '',
+              id: toolCall.id || fallbackToolCallId(index),
               type: 'function',
               function: {
                 name: toolCall.function?.name || '',
@@ -319,11 +363,11 @@ export async function fetchAiStream(
         // 将工具调用和结果添加到消息历史
         conversationMessages = [
           ...conversationMessages,
-          createAssistantToolCallMessage(fullContent, currentToolCalls, thinking),
+          createAssistantToolCallMessage(fullContent, currentToolCalls, thinking, reasoningDetails),
           ...toolResults
         ]
         
-        const nextStream = await createChatCompletionStreamWithToolChoiceFallback(openai, {
+        const nextStream = await createChatCompletionStreamWithToolChoiceFallback(openai, withFastAiRequestOptions({
           model: aiConfig?.model || '',
           messages: conversationMessages,
           temperature: aiConfig?.temperature,
@@ -332,13 +376,14 @@ export async function fetchAiStream(
           tools: mcpTools,
           tool_choice: 'auto',
           ...getChatTokenLimitParams(aiConfig),
-        }, {
+        }, aiConfig), {
           signal: abortSignal
         })
         
         // 重置工具调用数组
         currentToolCalls = []
         thinking = ''
+        reasoningDetails = []
         fullContent = ''
         
         // 处理响应
@@ -348,7 +393,12 @@ export async function fetchAiStream(
           }
           
           const delta = chunk.choices[0]?.delta
-          const thinkingContent = (delta as any)?.reasoning_content || ''
+          const extendedDelta = delta as (typeof delta & {
+            reasoning?: string
+            reasoning_content?: string
+            reasoning_details?: unknown[]
+          }) | undefined
+          const thinkingContent = extendedDelta?.reasoning_content || extendedDelta?.reasoning || ''
           const content = delta?.content || ''
 
           if (thinkingContent) {
@@ -357,6 +407,9 @@ export async function fetchAiStream(
               onThinkingUpdate(thinking)
             }
           }
+          if (Array.isArray(extendedDelta?.reasoning_details)) {
+            reasoningDetails.push(...extendedDelta.reasoning_details)
+          }
           if (content) {
             fullContent += content
           }
@@ -364,11 +417,11 @@ export async function fetchAiStream(
           // 检查是否又有新的工具调用
           if (delta?.tool_calls) {
             for (const toolCall of delta.tool_calls) {
-              const index = toolCall.index || 0
+              const index = resolveStreamingChatToolCallIndex(currentToolCalls, toolCall)
               
               if (!currentToolCalls[index]) {
                 currentToolCalls[index] = {
-                  id: toolCall.id || '',
+                  id: toolCall.id || fallbackToolCallId(index),
                   type: 'function',
                   function: {
                     name: toolCall.function?.name || '',

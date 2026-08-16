@@ -388,8 +388,18 @@ export function isUnsupportedToolChoiceError(error: unknown): boolean {
     && /不支持|不存在|not\s+support|unsupported|unknown\s+(?:parameter|field)|invalid\s+(?:parameter|field)|does\s+not\s+exist\s+in\s+tools|not\s+found\s+in\s+tools|not\s+available/i.test(message)
 }
 
+function isRejectedSamplingParameterError(error: unknown, parameter: 'temperature' | 'top_p') {
+  const message = getAIRequestErrorMessage(error)
+  if (!new RegExp(parameter.replace('_', '[_\\s-]?'), 'i').test(message)) {
+    return false
+  }
+
+  return /不支持|不允许|无效|固定|必须|取值|范围|not\s+support|unsupported|unknown\s+(?:parameter|field)|\binvalid\b|must\s+be|only\s+support|fixed\s+(?:value|to)|range/i.test(message)
+}
+
 type ReasoningAssistantToolCallMessage = OpenAI.Chat.ChatCompletionAssistantMessageParam & {
   reasoning_content?: string
+  reasoning_details?: unknown[]
 }
 
 /**
@@ -399,64 +409,99 @@ type ReasoningAssistantToolCallMessage = OpenAI.Chat.ChatCompletionAssistantMess
 export function createAssistantToolCallMessage(
   content: string,
   toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[],
-  reasoningContent?: string
+  reasoningContent?: string,
+  reasoningDetails?: unknown[]
 ): ReasoningAssistantToolCallMessage {
   return {
     role: 'assistant',
     content,
     tool_calls: toolCalls,
     ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+    ...(reasoningDetails?.length ? { reasoning_details: reasoningDetails } : {}),
   }
 }
 
-function omitToolChoice(
-  params: OpenAI.Chat.ChatCompletionCreateParamsStreaming
-): OpenAI.Chat.ChatCompletionCreateParamsStreaming {
+function getCompatibleRequestFallback(
+  params: OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+  error: unknown
+): OpenAI.Chat.ChatCompletionCreateParamsStreaming | null {
   const fallbackParams = { ...params }
-  delete fallbackParams.tool_choice
-  return fallbackParams
+  let changed = false
+
+  if (params.tool_choice !== undefined && isUnsupportedToolChoiceError(error)) {
+    delete fallbackParams.tool_choice
+    changed = true
+  }
+  if (params.temperature !== undefined && isRejectedSamplingParameterError(error, 'temperature')) {
+    delete fallbackParams.temperature
+    changed = true
+  }
+  if (params.top_p !== undefined && isRejectedSamplingParameterError(error, 'top_p')) {
+    delete fallbackParams.top_p
+    changed = true
+  }
+
+  return changed ? fallbackParams : null
+}
+
+async function createCompatibleChatCompletionStream(
+  client: OpenAICompatibleClient,
+  initialParams: OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+  options?: { signal?: AbortSignal }
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+  let params = initialParams
+
+  while (true) {
+    try {
+      const stream = await client.chat.completions.create(params, options)
+      return (async function* () {
+        let receivedChunk = false
+
+        try {
+          for await (const chunk of stream) {
+            receivedChunk = true
+            yield chunk
+          }
+        } catch (error) {
+          if (receivedChunk) {
+            throw error
+          }
+
+          const fallbackParams = getCompatibleRequestFallback(params, error)
+          if (!fallbackParams) {
+            throw error
+          }
+
+          const fallbackStream = await createCompatibleChatCompletionStream(
+            client,
+            fallbackParams,
+            options
+          )
+          for await (const chunk of fallbackStream) {
+            yield chunk
+          }
+        }
+      })()
+    } catch (error) {
+      const fallbackParams = getCompatibleRequestFallback(params, error)
+      if (!fallbackParams) {
+        throw error
+      }
+      params = fallbackParams
+    }
+  }
 }
 
 /**
- * 部分 OpenAI 兼容的思考模型支持 tools，但会拒绝 tool_choice。
- * 首次请求遇到此类错误时，保留工具定义并省略 tool_choice 重试。
+ * OpenAI 兼容服务对可选参数的支持并不完全一致。服务端明确拒绝
+ * tool_choice 或采样参数时，保留工具定义并仅省略被拒绝的字段重试。
  */
 export async function createChatCompletionStreamWithToolChoiceFallback(
   client: OpenAICompatibleClient,
   params: OpenAI.Chat.ChatCompletionCreateParamsStreaming,
   options?: { signal?: AbortSignal }
 ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
-  const fallbackParams = omitToolChoice(params)
-  let initialStream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>
-
-  try {
-    initialStream = await client.chat.completions.create(params, options)
-  } catch (error) {
-    if (params.tool_choice === undefined || !isUnsupportedToolChoiceError(error)) {
-      throw error
-    }
-    return client.chat.completions.create(fallbackParams, options)
-  }
-
-  return (async function* () {
-    let receivedChunk = false
-
-    try {
-      for await (const chunk of initialStream) {
-        receivedChunk = true
-        yield chunk
-      }
-    } catch (error) {
-      if (receivedChunk || params.tool_choice === undefined || !isUnsupportedToolChoiceError(error)) {
-        throw error
-      }
-
-      const fallbackStream = await client.chat.completions.create(fallbackParams, options)
-      for await (const chunk of fallbackStream) {
-        yield chunk
-      }
-    }
-  })()
+  return createCompatibleChatCompletionStream(client, params, options)
 }
 
 function supportsEnableThinkingSwitch(aiConfig?: AiConfig): boolean {
@@ -480,17 +525,49 @@ function supportsEnableThinkingSwitch(aiConfig?: AiConfig): boolean {
   return isQwenProvider && model.includes('qwen')
 }
 
+function requiresDashScopeGlmToolStream(
+  params: OpenAI.Chat.ChatCompletionCreateParams,
+  aiConfig?: AiConfig
+) {
+  const model = aiConfig?.model?.toLowerCase() || ''
+  const baseURL = aiConfig?.baseURL?.toLowerCase() || ''
+  const isDashScope = baseURL.includes('dashscope') || baseURL.includes('aliyuncs')
+
+  return isDashScope
+    && model.startsWith('glm-')
+    && params.stream === true
+    && Array.isArray(params.tools)
+    && params.tools.length > 0
+}
+
+export function withProviderCompatibleSampling<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
+  params: T,
+  aiConfig?: AiConfig
+): T {
+  const model = aiConfig?.model?.toLowerCase() || ''
+  if (!/kimi-k2\.(?:5|6)(?:$|[-/])/.test(model)) {
+    return params
+  }
+
+  const compatibleParams = { ...params }
+  delete compatibleParams.temperature
+  delete compatibleParams.top_p
+  return compatibleParams
+}
+
 export function withFastAiRequestOptions<const T extends OpenAI.Chat.ChatCompletionCreateParams>(
   params: T,
   aiConfig?: AiConfig
 ): T {
   const hasTaskTokenLimit = params.max_completion_tokens != null || params.max_tokens != null
   const tokenLimitParams = hasTaskTokenLimit ? {} : getChatTokenLimitParams(aiConfig)
+  const compatibleParams = withProviderCompatibleSampling(params, aiConfig)
 
   return {
     ...tokenLimitParams,
-    ...params,
+    ...compatibleParams,
     ...(supportsEnableThinkingSwitch(aiConfig) ? { enable_thinking: false } : {}),
+    ...(requiresDashScopeGlmToolStream(compatibleParams, aiConfig) ? { tool_stream: true } : {}),
   } as T
 }
 
