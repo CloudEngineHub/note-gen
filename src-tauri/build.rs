@@ -79,8 +79,15 @@ fn build_macos_vision_ocr_provider() {
     let resource_output = resource_output_dir.join("notegen-ocr-vision");
     let build_output_dir = out_dir.join("native-ocr");
     let build_output = build_output_dir.join("notegen-ocr-vision");
+    let swift_target = match std::env::var("TARGET").as_deref() {
+        Ok("aarch64-apple-darwin") => "arm64-apple-macosx11.0",
+        Ok("x86_64-apple-darwin") => "x86_64-apple-macosx10.13",
+        Ok(target) => panic!("unsupported macOS OCR target: {target}"),
+        Err(error) => panic!("missing macOS OCR target: {error}"),
+    };
 
     println!("cargo:rerun-if-changed={}", source.display());
+    println!("cargo:rerun-if-env-changed=TARGET");
 
     if Command::new("swiftc").arg("--version").output().is_err() {
         println!(
@@ -94,6 +101,8 @@ fn build_macos_vision_ocr_provider() {
 
     let status = Command::new("swiftc")
         .arg("-O")
+        .arg("-target")
+        .arg(swift_target)
         .arg("-framework")
         .arg("Foundation")
         .arg("-framework")

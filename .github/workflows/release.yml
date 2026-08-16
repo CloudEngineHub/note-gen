@@ -221,10 +221,14 @@ jobs:
             args: '--target aarch64-apple-darwin'
             name: 'macos-arm64'
             bundlePath: 'src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/NoteGen_*.dmg'
-          - platform: 'macos-latest'
+            appPath: 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/NoteGen.app'
+            targetArch: 'arm64'
+          - platform: 'macos-15-intel'
             args: '--target x86_64-apple-darwin'
             name: 'macos-x64'
             bundlePath: 'src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/NoteGen_*.dmg'
+            appPath: 'src-tauri/target/x86_64-apple-darwin/release/bundle/macos/NoteGen.app'
+            targetArch: 'x86_64'
           - platform: 'ubuntu-24.04'
             args: '--bundles deb,rpm'
             name: 'linux-deb-rpm'
@@ -257,7 +261,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos-') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
         if: startsWith(matrix.platform, 'ubuntu-')
@@ -273,7 +277,7 @@ jobs:
 
       - name: Import Apple Certificate
         id: import_apple_certificate
-        if: matrix.platform == 'macos-latest'
+        if: startsWith(matrix.platform, 'macos-')
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -325,6 +329,20 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      - name: Verify macOS bundle architectures
+        if: matrix.targetArch
+        env:
+          APP_PATH: ${{ matrix.appPath }}
+          EXPECTED_ARCH: ${{ matrix.targetArch }}
+        run: |
+          MAIN_EXECUTABLE="$APP_PATH/Contents/MacOS/note-gen"
+          OCR_EXECUTABLE="$APP_PATH/Contents/Resources/resources/ocr/notegen-ocr-vision"
+
+          test -f "$MAIN_EXECUTABLE"
+          test -f "$OCR_EXECUTABLE"
+          test "$(lipo -archs "$MAIN_EXECUTABLE")" = "$EXPECTED_ARCH"
+          test "$(lipo -archs "$OCR_EXECUTABLE")" = "$EXPECTED_ARCH"
+
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -351,7 +369,7 @@ jobs:
           echo "appVersion=${{ steps.save_tag.outputs.appVersion }}" >> $GITHUB_OUTPUT
 
       - name: Cleanup keychain
-        if: matrix.platform == 'macos-latest' && always()
+        if: startsWith(matrix.platform, 'macos-') && always()
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           security delete-keychain $KEYCHAIN_PATH || true
