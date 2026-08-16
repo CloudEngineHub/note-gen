@@ -61,15 +61,14 @@ func defaultRecognitionLanguages() -> [String] {
 }
 
 func supportedRecognitionLanguages(for request: VNRecognizeTextRequest) -> Set<String> {
-    guard #available(macOS 11.0, *) else {
-        return []
+    if #available(macOS 12.0, *) {
+        do {
+            return Set(try request.supportedRecognitionLanguages())
+        } catch {
+            return []
+        }
     }
-
-    do {
-        return Set(try request.supportedRecognitionLanguages())
-    } catch {
-        return []
-    }
+    return []
 }
 
 func setRecognitionLanguages(_ languages: [String], for request: VNRecognizeTextRequest) {
