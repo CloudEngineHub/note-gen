@@ -13,14 +13,15 @@ import TextAlign from '@tiptap/extension-text-align'
 import Typography from '@tiptap/extension-typography'
 import Dropcursor from '@tiptap/extension-dropcursor'
 import DragHandle from '@tiptap/extension-drag-handle'
-import { Table } from '@tiptap/extension-table'
+import { renderTableToMarkdown, Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import Image from '@tiptap/extension-image'
 import { Markdown } from '@tiptap/markdown'
 import { SearchAndReplace } from '@sereneinserenade/tiptap-search-and-replace'
-import { Extension, nodeInputRule, type Editor as CoreEditor } from '@tiptap/core'
+import { Extension, nodeInputRule, type Editor as CoreEditor, type JSONContent } from '@tiptap/core'
+import { Fragment, Slice, type Node as ProseMirrorNode, type NodeType } from '@tiptap/pm/model'
 import { AllSelection, EditorState, Plugin, PluginKey, TextSelection, type Selection } from '@tiptap/pm/state'
 import { redoDepth, undoDepth } from '@tiptap/pm/history'
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
@@ -807,6 +808,78 @@ function getImageDimensionFromElement(element: HTMLElement, name: 'width' | 'hei
   )
 }
 
+function promoteFirstTableRowInMarkdown(node: JSONContent): JSONContent {
+  const [firstRow, ...remainingRows] = node.content ?? []
+  if (!firstRow?.content?.length) return node
+
+  const hasHeader = firstRow.content.some(cell => cell.type === 'tableHeader')
+  if (hasHeader) return node
+
+  return {
+    ...node,
+    content: [
+      {
+        ...firstRow,
+        content: firstRow.content.map(cell => (
+          cell.type === 'tableCell' ? { ...cell, type: 'tableHeader' } : cell
+        )),
+      },
+      ...remainingRows,
+    ],
+  }
+}
+
+const MarkdownTable = Table.extend({
+  renderMarkdown: (node, helpers) => (
+    renderTableToMarkdown(promoteFirstTableRowInMarkdown(node), helpers)
+  ),
+})
+
+function normalizePastedTableNode(
+  node: ProseMirrorNode,
+  tableCellType: NodeType,
+  tableHeaderType: NodeType
+): ProseMirrorNode {
+  if (node.type.name === 'table' && node.childCount > 0) {
+    const firstRow = node.firstChild
+    const isHeaderlessTable = firstRow
+      && firstRow.childCount > 0
+      && Array.from({ length: firstRow.childCount }, (_, index) => firstRow.child(index))
+        .every(cell => cell.type === tableCellType)
+
+    if (firstRow && isHeaderlessTable) {
+      const headerCells = Array.from({ length: firstRow.childCount }, (_, index) => {
+        const cell = firstRow.child(index)
+        return tableHeaderType.create(cell.attrs, cell.content, cell.marks)
+      })
+      const rows = [firstRow.copy(Fragment.fromArray(headerCells))]
+
+      for (let index = 1; index < node.childCount; index += 1) {
+        rows.push(node.child(index))
+      }
+
+      return node.copy(Fragment.fromArray(rows))
+    }
+  }
+
+  if (node.isLeaf) return node
+
+  const content = normalizePastedTableFragment(node.content, tableCellType, tableHeaderType)
+  return content.eq(node.content) ? node : node.copy(content)
+}
+
+function normalizePastedTableFragment(
+  fragment: Fragment,
+  tableCellType: NodeType,
+  tableHeaderType: NodeType
+): Fragment {
+  const nodes: ProseMirrorNode[] = []
+  fragment.forEach(node => {
+    nodes.push(normalizePastedTableNode(node, tableCellType, tableHeaderType))
+  })
+  return Fragment.fromArray(nodes)
+}
+
 // 自定义扩展：处理粘贴 Markdown 文本
 const PasteMarkdown = Extension.create({
   name: 'pasteMarkdown',
@@ -816,6 +889,15 @@ const PasteMarkdown = Extension.create({
     return [
       new Plugin({
         props: {
+          transformPasted(slice) {
+            const { tableCell, tableHeader } = editor.schema.nodes
+            if (!tableCell || !tableHeader) return slice
+
+            const content = normalizePastedTableFragment(slice.content, tableCell, tableHeader)
+            return content.eq(slice.content)
+              ? slice
+              : new Slice(content, slice.openStart, slice.openEnd)
+          },
           handlePaste(_view, event, _slice) {
             void _slice
             const text = (event as ClipboardEvent).clipboardData?.getData('text/plain')
@@ -1621,7 +1703,7 @@ export function TipTapEditor({
             }),
           ]
         : []),
-      Table.configure({
+      MarkdownTable.configure({
         resizable: true,
       }),
       TableRow,
@@ -3487,8 +3569,15 @@ export function TipTapEditor({
     if (!editor || !editor.view || !editor.view.dom) return
 
     const handlePaste = (event: ClipboardEvent) => {
-      const files = event.clipboardData?.files
-      if (!files || files.length === 0) return
+      const clipboardData = event.clipboardData
+      if (!clipboardData) return
+
+      // Spreadsheet apps commonly attach a bitmap preview alongside the HTML table.
+      // Prefer the editable table instead of treating that preview as an image paste.
+      if (/<table(?:\s|>)/i.test(clipboardData.getData('text/html'))) return
+
+      const files = clipboardData.files
+      if (files.length === 0) return
 
       const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
       if (imageFiles.length === 0) return
