@@ -36,6 +36,7 @@ import { RecordSaveTarget } from './record-save-target'
 import { useRecordCompletion } from './use-record-completion'
 import useSettingStore from '@/stores/setting'
 import { getRecordSaveTagIdFromTags } from '@/lib/record-save-target'
+import { MobileSelectDrawer } from '@/app/mobile/components/mobile-select-drawer'
 
 export function ControlText() {
   const t = useTranslations();
@@ -248,11 +249,22 @@ export function ControlText() {
               </DrawerDescription>
             </DrawerHeader>
             <div className="space-y-4 px-4">
-              <RecordSaveTarget
-                selectedTagId={selectedTagId}
-                tags={tags}
-                onTagChange={setSelectedTagId}
-              />
+              {tags.length > 0 ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-save-target-mobile" className="text-xs font-medium text-muted-foreground">
+                    {t('record.capture.saveTarget')}
+                  </Label>
+                  <MobileSelectDrawer
+                    id="record-save-target-mobile"
+                    title={t('record.capture.saveTarget')}
+                    value={String(selectedTagId)}
+                    options={tags.map(tag => ({ value: String(tag.id), label: tag.name }))}
+                    onValueChange={(value) => setSelectedTagId(Number(value))}
+                    placeholder={t('record.capture.saveTargetPlaceholder')}
+                    className="h-9"
+                  />
+                </div>
+              ) : null}
               <Textarea
                 ref={textAreaRef}
                 id="username"
