@@ -751,53 +751,46 @@ export async function remoteFileExists(
 export async function deleteRemoteFile(
   path: string,
   scope: RemoteRepositoryScope = 'workspace',
-): Promise<void> {
+): Promise<boolean> {
   const store = await Store.load('store.json')
   const platform = await getPlatform(store)
 
   if (platform === 's3') {
     const config = await store.get<S3Config>('s3SyncConfig')
-    if (config && await s3HeadObject(config, path)) {
-      await s3Delete(config, path)
-    }
-    return
+    if (!config) return false
+    if (!await s3HeadObject(config, path)) return true
+    return s3Delete(config, path)
   }
 
   if (platform === 'webdav') {
     const config = await store.get<WebDAVConfig>('webdavSyncConfig')
-    if (config && await webdavHeadObject(config, path)) {
-      await webdavDelete(config, path)
-    }
-    return
+    if (!config) return false
+    if (!await webdavHeadObject(config, path)) return true
+    return webdavDelete(config, path)
   }
 
   if (platform === 'cloudFolder') {
     const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
-    if (!config?.path) return
+    if (!config?.path) return false
     if (scope === 'workspace' && supportsCloudFolderWorkspace(config)) {
-      await androidCloudFolderWorkspaceDelete(config, path)
-    } else if (scope === 'data') {
-      await cloudFolderDelete(config, path)
+      return androidCloudFolderWorkspaceDelete(config, path)
     }
-    return
+    if (scope === 'data') return cloudFolderDelete(config, path)
+    return false
   }
 
   const repo = await getGitRepository(platform, scope)
   const sha = await getExistingRemoteSha(platform, path, repo)
-  if (!sha) return
+  if (!sha) return true
 
   switch (platform) {
     case 'github':
-      await deleteGithubFile({ path, sha, repo })
-      break
+      return Boolean(await deleteGithubFile({ path, sha, repo }))
     case 'gitee':
-      await deleteGiteeFile({ path, sha, repo })
-      break
+      return Boolean(await deleteGiteeFile({ path, sha, repo }))
     case 'gitlab':
-      await deleteGitlabFile({ path, repo })
-      break
+      return Boolean(await deleteGitlabFile({ path, repo }))
     case 'gitea':
-      await deleteGiteaFile({ path, sha, repo })
-      break
+      return Boolean(await deleteGiteaFile({ path, sha, repo }))
   }
 }

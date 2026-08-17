@@ -7,10 +7,15 @@ import {
 import { Kbd } from "@/components/ui/kbd"
 import { toast } from "@/hooks/use-toast"
 import useClipboardStore from "@/stores/clipboard"
-import { Copy, File, Trash2 } from "lucide-react"
+import { Copy, File, RefreshCwOff, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import type { FileSelectionEntry } from "./file-selection"
-import { toClipboardItems } from "./file-selection"
+import {
+  getLocalDeletionEntries,
+  getRemoteDeletionEntries,
+  toClipboardItems,
+} from "./file-selection"
+import useSettingStore from "@/stores/setting"
 
 interface BatchSelectionContextMenuProps {
   entries: FileSelectionEntry[]
@@ -26,8 +31,11 @@ export function BatchSelectionContextMenu({
   const t = useTranslations('article.file')
   const tRecordToolbar = useTranslations('record.mark.toolbar')
   const { setClipboardItems } = useClipboardStore()
+  const primaryBackupMethod = useSettingStore(state => state.primaryBackupMethod)
   const count = entries.length
   const allLocal = entries.every(entry => entry.isLocale)
+  const localDeletionCount = getLocalDeletionEntries(entries).length
+  const remoteDeletionCount = getRemoteDeletionEntries(entries).length
   const clipboardItems = toClipboardItems(entries)
 
   function handleCopySelected() {
@@ -40,8 +48,12 @@ export function BatchSelectionContextMenu({
     toast({ title: t('clipboard.cut') })
   }
 
-  function handleDeleteSelected() {
+  function handleDeleteSelectedLocal() {
     window.dispatchEvent(new CustomEvent('filemanager-delete-selection'))
+  }
+
+  function handleDeleteSelectedRemote() {
+    window.dispatchEvent(new CustomEvent('filemanager-delete-remote-selection'))
   }
 
   return (
@@ -71,17 +83,29 @@ export function BatchSelectionContextMenu({
       <ContextMenuSeparator />
       <ContextMenuItem
         inset
-        disabled={!allLocal}
+        disabled={localDeletionCount === 0}
         className="text-red-900"
-        onClick={handleDeleteSelected}
+        onClick={handleDeleteSelectedLocal}
         menuType="file"
       >
         <Trash2 className="mr-2 h-4 w-4" />
-        {tRecordToolbar('deleteSelected', { count })}
+        {t('context.deleteSelectedLocal', { count: localDeletionCount })}
         <ContextMenuShortcut menuType="file">
           <Kbd>{deleteKey}</Kbd>
         </ContextMenuShortcut>
       </ContextMenuItem>
+      {primaryBackupMethod !== 'cloudFolder' ? (
+        <ContextMenuItem
+          inset
+          disabled={remoteDeletionCount === 0}
+          className="text-red-900"
+          onClick={handleDeleteSelectedRemote}
+          menuType="file"
+        >
+          <RefreshCwOff className="mr-2 h-4 w-4" />
+          {t('context.deleteSelectedRemote', { count: remoteDeletionCount })}
+        </ContextMenuItem>
+      ) : null}
     </>
   )
 }

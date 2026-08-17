@@ -83,6 +83,30 @@ export function getTopLevelSelectionEntries(entries: FileSelectionEntry[]) {
   })
 }
 
+function hasRemoteData(entry: FileSelectionEntry) {
+  if (entry.sha || !entry.isLocale) return true
+
+  let remoteDataFound = false
+  function walk(item: DirTree) {
+    if (remoteDataFound) return
+    remoteDataFound = Boolean(item.sha) || !item.isLocale
+    item.children?.forEach(walk)
+  }
+
+  walk(entry.item)
+  return remoteDataFound
+}
+
+export function getLocalDeletionEntries(entries: FileSelectionEntry[]) {
+  return getTopLevelSelectionEntries(entries)
+    .filter(entry => entry.isLocale && entry.name !== '')
+}
+
+export function getRemoteDeletionEntries(entries: FileSelectionEntry[]) {
+  return getTopLevelSelectionEntries(entries)
+    .filter(entry => entry.name !== '' && hasRemoteData(entry))
+}
+
 export function rectsIntersect(a: ClientRectLike, b: ClientRectLike) {
   return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top
 }

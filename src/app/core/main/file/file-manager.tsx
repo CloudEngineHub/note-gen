@@ -26,8 +26,9 @@ import { moveEntriesToSystemTrash } from './system-trash'
 import {
   flattenFileTree,
   getFileSelectionEntries,
+  getLocalDeletionEntries,
+  getRemoteDeletionEntries,
   getSiblingSelectionPaths,
-  getTopLevelSelectionEntries,
   isInteractiveSelectionTarget,
   rectsIntersect,
   type FileSelectionEntry,
@@ -75,6 +76,11 @@ import { useFileTree } from './use-file-tree'
 import { useSyncAvailability } from './use-sync-availability'
 import useSettingStore from '@/stores/setting'
 import { buildFileTreeSyncStatusMap } from './file-tree-action-policy'
+import { deleteRemoteFile } from '@/lib/sync/remote-library'
+import {
+  clearFolderRemoteState,
+  deleteRemoteFolder,
+} from './folder-item/delete-folder-utils'
 
 type SearchPhase = 'idle' | 'local' | 'remote' | 'complete'
 
@@ -397,7 +403,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   }
 
   async function handleDeleteSelectedEntries() {
-    const entries = getTopLevelSelectionEntries(selectedEntries).filter(entry => entry.isLocale && entry.name !== '')
+    const entries = getLocalDeletionEntries(selectedEntries)
     if (entries.length === 0) {
       return
     }
@@ -444,6 +450,64 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       })
       await loadFileTree()
     }
+  }
+
+  async function handleDeleteSelectedRemoteEntries() {
+    const entries = getRemoteDeletionEntries(selectedEntries)
+    if (entries.length === 0) {
+      return
+    }
+
+    const { ask } = await import('@tauri-apps/plugin-dialog')
+    const confirmed = await ask(t('context.confirmDeleteSelectedRemote', { count: entries.length }), {
+      title: t('context.delete'),
+      kind: 'warning',
+    })
+
+    if (!confirmed) {
+      return
+    }
+
+    const deletedEntries: FileSelectionEntry[] = []
+    let failedCount = 0
+
+    for (const entry of entries) {
+      try {
+        if (entry.isDirectory) {
+          const result = await deleteRemoteFolder(entry.item, false)
+          if (!result.attempted || result.failedPaths.length > 0) {
+            throw new Error(result.failedPaths.join(', ') || entry.path)
+          }
+        } else {
+          const deleted = await deleteRemoteFile(entry.path)
+          if (!deleted) {
+            throw new Error(entry.path)
+          }
+        }
+        deletedEntries.push(entry)
+      } catch (error) {
+        failedCount += 1
+        console.error(`Delete remote entry failed: ${entry.path}`, error)
+      }
+    }
+
+    if (deletedEntries.length > 0) {
+      const nextTree = cloneDeep(useArticleStore.getState().fileTree)
+      deletedEntries.forEach(entry => clearFolderRemoteState(nextTree, entry.path))
+      setFileTree(nextTree)
+      const remainingPaths = new Set(flattenFileTree(nextTree).map(entry => entry.path))
+      setSelectedFilePaths(selectedFilePaths.filter(path => remainingPaths.has(path)))
+    }
+
+    toast({
+      title: failedCount === 0
+        ? t('context.deleteSelectedRemoteSuccess', { count: deletedEntries.length })
+        : t('context.deleteSelectedRemoteResult', {
+            deleted: deletedEntries.length,
+            failed: failedCount,
+          }),
+      variant: failedCount > 0 ? 'destructive' : undefined,
+    })
   }
 
   async function moveEntriesToRoot(sourcePaths: string[]) {
@@ -845,6 +909,17 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       window.removeEventListener('filemanager-delete-selection', handleDeleteSelection)
     }
   }, [handleDeleteSelectedEntries])
+
+  useEffect(() => {
+    function handleDeleteRemoteSelection() {
+      void handleDeleteSelectedRemoteEntries()
+    }
+
+    window.addEventListener('filemanager-delete-remote-selection', handleDeleteRemoteSelection)
+    return () => {
+      window.removeEventListener('filemanager-delete-remote-selection', handleDeleteRemoteSelection)
+    }
+  }, [handleDeleteSelectedRemoteEntries])
 
   // 根据开关状态过滤文件树 - 使用 useMemo 缓存结果
   const filteredFileTree = useMemo(
