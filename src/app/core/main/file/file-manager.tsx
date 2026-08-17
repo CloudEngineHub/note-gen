@@ -26,6 +26,7 @@ import { moveEntriesToSystemTrash } from './system-trash'
 import {
   flattenFileTree,
   getFileSelectionEntries,
+  getSiblingSelectionPaths,
   getTopLevelSelectionEntries,
   isInteractiveSelectionTarget,
   rectsIntersect,
@@ -267,36 +268,37 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       return
     }
 
-    const clientBox = getSelectionBox(start.x, start.y, currentX, currentY)
     const containerRect = container.getBoundingClientRect()
-    setSelectionBox({
-      left: clientBox.left - containerRect.left + container.scrollLeft,
-      top: clientBox.top - containerRect.top + container.scrollTop,
-      width: clientBox.width,
-      height: clientBox.height,
-    })
+    const contentBox = getSelectionBox(
+      start.x,
+      start.y,
+      currentX - containerRect.left + container.scrollLeft,
+      currentY - containerRect.top + container.scrollTop,
+    )
+    setSelectionBox(contentBox)
 
     const selectedPaths: string[] = []
     const treeContainer = treeContainerRef.current
     if (!treeContainer) return
-    const clientHitBox = {
-      left: clientBox.left,
-      right: clientBox.left + clientBox.width,
-      top: clientBox.top,
-      bottom: clientBox.top + clientBox.height,
+    const contentHitBox = {
+      left: contentBox.left,
+      right: contentBox.left + contentBox.width,
+      top: contentBox.top,
+      bottom: contentBox.top + contentBox.height,
     }
     const treeRect = treeContainer.getBoundingClientRect()
+    const treeContentTop = treeRect.top - containerRect.top + container.scrollTop
     treeItems.forEach((treeItem, index) => {
       const node = treeItem.getItemData()
       if (!node.item) return
-      const rowTop = treeRect.top + index * 28
+      const rowTop = treeContentTop + index * 28
       const rowRect = {
-        left: containerRect.left,
-        right: containerRect.right,
+        left: 0,
+        right: container.clientWidth,
         top: rowTop,
         bottom: rowTop + 28,
       }
-      if (rectsIntersect(clientHitBox, rowRect)) selectedPaths.push(node.path)
+      if (rectsIntersect(contentHitBox, rowRect)) selectedPaths.push(node.path)
     })
     setSelectedFilePaths(selectedPaths)
   }
@@ -306,8 +308,14 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
       return
     }
 
+    e.preventDefault()
+    window.getSelection()?.removeAllRanges()
     focusSidebar()
-    selectionStartRef.current = { x: e.clientX, y: e.clientY }
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    selectionStartRef.current = {
+      x: e.clientX - containerRect.left + e.currentTarget.scrollLeft,
+      y: e.clientY - containerRect.top + e.currentTarget.scrollTop,
+    }
     selectingRef.current = false
     pointerIdRef.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -873,6 +881,19 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     && !isSearchLoading
     && treeModel.rootChildren.length === 0
   const treeItems = tree.getItems()
+
+  useEffect(() => {
+    function handleSelectAll(event: Event) {
+      const { anchorPath } = (event as CustomEvent<{ anchorPath?: string }>).detail
+      setSelectedFilePaths(getSiblingSelectionPaths(filteredFileTree, anchorPath ?? ''))
+    }
+
+    window.addEventListener('filemanager-select-all', handleSelectAll)
+    return () => {
+      window.removeEventListener('filemanager-select-all', handleSelectAll)
+    }
+  }, [filteredFileTree, setSelectedFilePaths])
+
   const rowVirtualizer = useVirtualizer({
     count: treeItems.length,
     getScrollElement: () => containerRef.current,
@@ -907,7 +928,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
     <div
       ref={containerRef}
       className={cn(
-        "app-panel-scrollbar relative h-full min-h-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background transition-colors",
+        "app-panel-scrollbar relative h-full min-h-full min-w-0 flex-1 select-none overflow-x-hidden overflow-y-auto bg-background transition-colors",
         isDragging && "bg-accent/60 outline-2 outline-dashed -outline-offset-4 outline-ring/60"
       )}
       onDrop={(e) => handleDrop(e)}
@@ -928,7 +949,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
             {t('context.dropTarget', { name: t('mobile.root'), count: dragItemCount })}
           </Badge>
         ) : null}
-        <div ref={toolbarRef} className="sticky top-0 z-10 bg-background/95 px-2 py-2 backdrop-blur-sm">
+        <div ref={toolbarRef} className="sticky top-0 z-10 select-none bg-background/95 px-2 py-2 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-1.5">
               <InputGroup
                 focusRing="subtle"
@@ -941,7 +962,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
                 </InputGroupAddon>
                 <InputGroupInput
                   ref={searchInputRef}
-                  className="text-xs"
+                  className={cn('text-xs', filterQuery ? 'select-text' : 'select-none')}
                   value={filterQuery}
                   onChange={event => setFilterQuery(event.target.value)}
                   placeholder={t('search.placeholder')}

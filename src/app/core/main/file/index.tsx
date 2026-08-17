@@ -94,11 +94,25 @@ function useFileManagerShortcuts() {
     const selectedEntries = getFileSelectionEntries(fileTree, selectedFilePaths)
     const allSelectedEntriesAreLocal = selectedEntries.every(entry => entry.isLocale)
     const activeItem = getActiveItem()
-    if (selectedEntries.length === 0 && (!activeItem || !activeItem.isLocale)) {
+
+    const modPressed = isModKey(e)
+
+    // 全选: Cmd+A / Ctrl+A
+    // 以最后选中的项目为锚点，选择它所在父文件夹下的全部直接子项。
+    if (modPressed && e.key.toLowerCase() === 'a') {
+      e.preventDefault()
+      e.stopPropagation()
+      window.dispatchEvent(new CustomEvent('filemanager-select-all', {
+        detail: {
+          anchorPath: selectedFilePaths.at(-1) ?? activeItem?.path ?? '',
+        },
+      }))
       return
     }
 
-    const modPressed = isModKey(e)
+    if (selectedEntries.length === 0 && (!activeItem || !activeItem.isLocale)) {
+      return
+    }
 
     // 复制: Cmd+C / Ctrl+C
     if (modPressed && e.key === 'c') {

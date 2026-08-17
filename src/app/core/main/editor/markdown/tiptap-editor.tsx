@@ -6264,7 +6264,7 @@ export function TipTapEditor({
       ref={editorContainerRef}
       id={isSectionScope ? undefined : 'aritcle-md-editor'}
       className={cn(
-        "tiptap-editor relative flex flex-col",
+        "tiptap-editor relative flex select-none flex-col",
         scrollable ? "h-full" : "h-auto min-h-full",
         !contentInset && "tiptap-editor-no-inset"
       )}
@@ -6424,7 +6424,7 @@ export function TipTapEditor({
               fontSize={(14 * contentTextScale) / 100}
               lineHeight={EDITOR_LINE_HEIGHT_VALUES[editorLineHeight]}
               ariaLabel={tSourceMode('source')}
-              className="min-w-0 flex-1"
+              className="min-w-0 flex-1 select-text"
               onChange={handleSourceMarkdownChange}
               onControllerChange={handleSourceControllerChange}
               onSelectionChange={handleSourceSelectionChange}
@@ -6441,7 +6441,7 @@ export function TipTapEditor({
             getCanonicalMarkdown={() => sourceMarkdownRef.current}
             initialActiveSectionId={initialEditorViewState?.sectionId}
             scrollContainerRef={scrollContainerRef}
-            className="min-h-full"
+            className="min-h-full select-text"
             onChange={handleSectionedMarkdownChange}
             onActiveEditorChange={handleActiveSectionEditorChange}
             onSelectionChange={handleSectionedSelectionChange}
@@ -6481,7 +6481,7 @@ export function TipTapEditor({
           />
         ) : (
           <>
-            <EditorContent editor={editor} className={cn("relative", scrollable && "h-full")}>
+            <EditorContent editor={editor} className={cn("relative select-text", scrollable && "h-full")}>
               <SmartFileLink editor={editor} activeFilePath={activeFilePath} />
 
               {!isMobile && <ImageBubbleMenu editor={editor} />}

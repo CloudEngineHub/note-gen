@@ -51,7 +51,7 @@ export function FooterBar({
 
   if (isMobile) {
     return (
-      <div className="mobile-editor-footer h-7 flex items-center justify-between gap-3 px-3 border-t border-border bg-background text-xs text-muted-foreground">
+      <div className="mobile-editor-footer flex h-7 select-none items-center justify-between gap-3 border-t border-border bg-background px-3 text-xs text-muted-foreground">
         <div className="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
           <FileText className="size-3.5 shrink-0" />
           <div className="min-w-0 flex items-center gap-1.5 overflow-hidden">
@@ -91,7 +91,7 @@ export function FooterBar({
   }
 
   return (
-    <div className="h-6 flex items-center justify-between px-3 border-t border-border bg-background text-xs text-muted-foreground">
+    <div className="flex h-6 select-none items-center justify-between border-t border-border bg-background px-3 text-xs text-muted-foreground">
       {/* Left side: Word count, Copy, Export, Outline */}
       <div className="flex items-center gap-1">
         {showEditorStats && !deferSourceStatistics ? (

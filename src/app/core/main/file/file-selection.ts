@@ -55,6 +55,18 @@ export function getFileSelectionEntries(tree: DirTree[], paths: string[]) {
   return paths.map(path => entryMap.get(path)).filter((entry): entry is FileSelectionEntry => Boolean(entry))
 }
 
+export function getSiblingSelectionPaths(tree: DirTree[], anchorPath: string) {
+  if (!anchorPath) return []
+
+  const parentPath = anchorPath.split('/').slice(0, -1).join('/')
+  return flattenFileTree(tree)
+    .filter(entry => (
+      entry.name !== ''
+      && entry.path.split('/').slice(0, -1).join('/') === parentPath
+    ))
+    .map(entry => entry.path)
+}
+
 export function isDescendantPath(path: string, parentPath: string) {
   return path.startsWith(`${parentPath}/`)
 }
