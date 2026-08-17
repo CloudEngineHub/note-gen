@@ -296,7 +296,7 @@ export function FileSidebar() {
       tabIndex={-1}
     >
       <div className="min-h-0 flex-1 overflow-hidden">
-        <FileManager focusSidebar={focusSidebar} />
+        <FileManager focusSidebar={focusSidebar} showSearch={false} />
       </div>
       <FileFooter />
     </div>

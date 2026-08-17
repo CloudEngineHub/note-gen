@@ -4620,6 +4620,7 @@ export function TipTapEditor({
       }
 
       storage.searchTerm = pendingSearchKeyword
+      setSearchReplaceOpen(true)
       editor.view.dispatch(editor.state.tr)
 
       focusTimer = setTimeout(() => {

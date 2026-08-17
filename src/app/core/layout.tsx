@@ -18,7 +18,6 @@ import initQuickRecordText from "@/lib/shortcut/quick-record-text"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import initShowWindow from "@/lib/shortcut/show-window"
 import { initMcp } from "@/lib/mcp/init"
-import { SearchDialog } from "@/components/search-dialog"
 import { ActivityDrawer } from "@/components/activity/activity-drawer"
 import { reportAppStart } from "@/lib/event-report"
 import { TitleBar } from "@/components/title-bar"
@@ -62,7 +61,6 @@ export default function RootLayout({
   const { openSettings } = useSettingsDialogStore()
   const t = useTranslations()
   const { toast } = useToast()
-  const [searchOpen, setSearchOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
 
   useEffect(() => {
@@ -413,9 +411,10 @@ export default function RootLayout({
           return
         }
 
-        // 否则打开全局搜索
+        // 否则聚焦左侧栏搜索
         e.preventDefault()
-        setSearchOpen(true)
+        if (pathname !== '/core/main') router.push('/core/main')
+        void useSidebarStore.getState().requestSidebarSearchFocus()
         return
       }
 
@@ -436,7 +435,7 @@ export default function RootLayout({
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [])
+  }, [pathname, router])
 
   return (
     <ThemeProvider
@@ -447,7 +446,6 @@ export default function RootLayout({
     >
       <TextSizeProvider>
         <TitleBar
-          onSearchClick={() => setSearchOpen(true)}
           onActivityClick={() => setActivityOpen(open => !open)}
           activityOpen={activityOpen}
         />
@@ -455,7 +453,6 @@ export default function RootLayout({
           {children}
         </main>
         <ActivityDrawer open={activityOpen} onOpenChange={setActivityOpen} />
-        <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
         <SettingsDialog />
         <SyncConfirmDialog />
         <MemoryAutoNotifications />

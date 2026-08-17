@@ -3249,15 +3249,17 @@
   "search": {
     "placeholder": "搜尋筆記、記錄和畫布...",
     "results": "{count} 個搜索結果",
-    "exactMatches": "精確匹配",
+    "exactMatches": "精確結果",
     "relatedContent": "相關內容",
     "searchingRelated": "正在尋找語意相關內容…",
     "indexingProgress": "建庫 {ready}/{total}",
     "noResults": "暫無搜索結果",
     "tryDifferentKeywords": "嘗試使用不同的關鍵字搜索",
+    "clear": "清除搜索",
+    "openFailed": "無法開啟搜索結果",
     "item": {
       "record": "記錄",
-      "article": "文章",
+      "article": "檔案",
       "canvas": "畫布",
       "matches": "{count}個匹配項",
       "scanType": "截圖"

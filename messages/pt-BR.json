@@ -3242,15 +3242,17 @@
   "search": {
     "placeholder": "Pesquisar notas, registros e telas...",
     "results": "{count} resultados da pesquisa",
-    "exactMatches": "Correspondências exatas",
+    "exactMatches": "Resultados exatos",
     "relatedContent": "Conteúdo relacionado",
     "searchingRelated": "Buscando conteúdo semanticamente relacionado…",
     "indexingProgress": "Indexando {ready}/{total}",
     "noResults": "Nenhum resultado de pesquisa",
     "tryDifferentKeywords": "Tente usar palavras-chave diferentes",
+    "clear": "Limpar pesquisa",
+    "openFailed": "Não foi possível abrir o resultado da pesquisa",
     "item": {
       "record": "Registro",
-      "article": "Artigo",
+      "article": "Arquivo",
       "canvas": "Tela",
       "matches": "{count} correspondências",
       "scanType": "digitalização"

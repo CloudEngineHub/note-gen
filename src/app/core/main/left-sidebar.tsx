@@ -12,6 +12,7 @@ import { ExpandableTabs } from "@/components/ui/expandable-tabs"
 import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import { CanvasActions, CanvasSidebar } from './canvas/canvas-sidebar'
+import { SidebarSearch } from './sidebar-search'
 
 const SIDEBAR_TABS = [
   { title: "files", icon: Files },
@@ -91,29 +92,31 @@ export function LeftSidebar() {
             </motion.div>
           </div>
         </div>
-        <div className="relative min-h-0 flex-1">
-          <TabsContent
-            forceMount
-            value="files"
-            className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-          >
-            <FileSidebar />
-          </TabsContent>
-          <TabsContent
-            forceMount
-            value="notes"
-            className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-          >
-            <NoteSidebar />
-          </TabsContent>
-          <TabsContent
-            forceMount
-            value="canvases"
-            className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
-          >
-            <CanvasSidebar />
-          </TabsContent>
-        </div>
+        <SidebarSearch activeTab={leftSidebarTab}>
+          <div className="relative min-h-0 flex-1">
+            <TabsContent
+              forceMount
+              value="files"
+              className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
+              <FileSidebar />
+            </TabsContent>
+            <TabsContent
+              forceMount
+              value="notes"
+              className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
+              <NoteSidebar />
+            </TabsContent>
+            <TabsContent
+              forceMount
+              value="canvases"
+              className="absolute inset-0 m-0 overflow-hidden data-[state=inactive]:hidden"
+            >
+              <CanvasSidebar />
+            </TabsContent>
+          </div>
+        </SidebarSearch>
       </Tabs>
     </div>
   )

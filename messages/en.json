@@ -3411,15 +3411,17 @@
   "search": {
     "placeholder": "Search notes, records, and canvases...",
     "results": "{count} search results",
-    "exactMatches": "Exact matches",
+    "exactMatches": "Exact results",
     "relatedContent": "Related content",
     "searchingRelated": "Finding semantically related content…",
     "indexingProgress": "Indexing {ready}/{total}",
     "noResults": "No search results",
     "tryDifferentKeywords": "Try using different keywords",
+    "clear": "Clear search",
+    "openFailed": "Unable to open search result",
     "item": {
       "record": "Record",
-      "article": "Article",
+      "article": "File",
       "canvas": "Canvas",
       "matches": "{count} matches",
       "scanType": "scan"

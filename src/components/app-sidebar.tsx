@@ -19,17 +19,15 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from "react"
 import useImageStore from "@/stores/imageHosting"
 import { useSettingsDialogStore } from "@/stores/settings-dialog"
+import { useSidebarStore } from "@/stores/sidebar"
  
-interface AppSidebarProps {
-  onSearchClick?: () => void
-}
-
-export function AppSidebar({ onSearchClick }: AppSidebarProps) {
+export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const t = useTranslations()
   const { imageRepoUserInfo } = useImageStore()
   const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
+  const requestSidebarSearchFocus = useSidebarStore(state => state.requestSidebarSearchFocus)
   const [items, setItems] = useState([
     {
       title: t('navigation.write'),
@@ -58,9 +56,10 @@ export function AppSidebar({ onSearchClick }: AppSidebarProps) {
   }
 
   async function menuHandler(item: typeof items[0]) {
-    // 如果是搜索按钮，打开搜索对话框
+    // 搜索入口统一聚焦主界面的左侧栏搜索框
     if (item.url === '/core/search') {
-      onSearchClick?.()
+      router.push('/core/main')
+      await requestSidebarSearchFocus()
       return
     }
 

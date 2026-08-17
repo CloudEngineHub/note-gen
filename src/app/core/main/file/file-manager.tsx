@@ -121,7 +121,13 @@ function getSelectionBox(startX: number, startY: number, currentX: number, curre
   }
 }
 
-export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
+export function FileManager({
+  focusSidebar,
+  showSearch = true,
+}: {
+  focusSidebar: () => void
+  showSearch?: boolean
+}) {
   const [isDragging, setIsDragging] = useState(false)
   const [dragItemCount, setDragItemCount] = useState(0)
   const [filterQuery, setFilterQuery] = useState('')
@@ -378,7 +384,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
   }
 
   function handleFileManagerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+    if (showSearch && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
       event.preventDefault()
       event.stopPropagation()
       searchInputRef.current?.focus()
@@ -740,13 +746,16 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
 
   useEffect(() => {
     const toolbar = toolbarRef.current
-    if (!toolbar) return
+    if (!toolbar) {
+      setTreeScrollMargin(0)
+      return
+    }
     const updateMargin = () => setTreeScrollMargin(toolbar.offsetHeight)
     updateMargin()
     const observer = new ResizeObserver(updateMargin)
     observer.observe(toolbar)
     return () => observer.disconnect()
-  }, [])
+  }, [showSearch])
 
   useEffect(() => {
     remoteSearchRootLoadedRef.current = false
@@ -1024,7 +1033,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
             {t('context.dropTarget', { name: t('mobile.root'), count: dragItemCount })}
           </Badge>
         ) : null}
-        <div ref={toolbarRef} className="sticky top-0 z-10 select-none bg-background/95 px-2 py-2 backdrop-blur-sm">
+        {showSearch ? <div ref={toolbarRef} className="sticky top-0 z-10 select-none bg-background/95 px-2 py-2 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-1.5">
               <InputGroup
                 focusRing="subtle"
@@ -1110,7 +1119,7 @@ export function FileManager({ focusSidebar }: { focusSidebar: () => void }) {
                 </Button>
               </div>
           )}
-        </div>
+        </div> : null}
         <div
           {...tree.getContainerProps(t('treeLabel'))}
           ref={treeContainerRef}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { platform } from '@tauri-apps/plugin-os'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isMobileDevice } from '@/lib/check'
-import { Search, Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog, CalendarDays } from 'lucide-react'
+import { Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog, CalendarDays } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
@@ -12,9 +12,7 @@ import AppStatus from './app-status'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import useSettingStore from '@/stores/setting'
-import useArticleStore from '@/stores/article'
 import useUpdateStore from '@/stores/update'
-import React from 'react'
 import { ControlText } from '@/app/core/main/mark/control-text'
 import { ControlRecording } from '@/app/core/main/mark/control-recording'
 import { ControlScan } from '@/app/core/main/mark/control-scan'
@@ -42,12 +40,11 @@ import { useSettingsDialogStore } from '@/stores/settings-dialog'
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
 interface TitleBarProps {
-  onSearchClick?: () => void
   onActivityClick?: () => void
   activityOpen?: boolean
 }
 
-export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false }: TitleBarProps) {
+export function TitleBar({ onActivityClick, activityOpen = false }: TitleBarProps) {
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isMobile, setIsMobile] = useState(true)
   const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
@@ -72,19 +69,9 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
     return false
   }
   const { recordToolbarConfig, setRecordToolbarConfig } = useSettingStore()
-  const { activeFilePath } = useArticleStore()
   const { hasUpdate } = useUpdateStore()
   const t = useTranslations()
   const { isModifierPressed } = useToolbarShortcuts()
-
-  const getFileName = () => {
-    if (!activeFilePath) return ''
-    const parts = activeFilePath.split('/')
-    return parts[parts.length - 1]
-  }
-
-  const searchPlaceholder = getFileName() || t('navigation.searchPlaceholder')
-
 
   // 拖拽传感器配置
   const sensors = useSensors(
@@ -239,19 +226,7 @@ export function TitleBar({ onSearchClick, onActivityClick, activityOpen = false 
           </TooltipProvider>
         </div>
 
-        {/* 中间搜索输入框 */}
-        <div className="flex-1 flex items-center justify-center px-4 min-w-[200px] max-w-[600px] mx-auto" data-tauri-drag-region>
-          <div 
-            className="relative w-full h-6 max-w-md group cursor-pointer flex justify-center items-center border rounded-sm"
-            onClick={() => onSearchClick?.()}
-            data-tauri-drag-region="false"
-          >
-            <Search className="size-3.5 text-muted-foreground" />
-            <div className="pl-2 text-xs text-muted-foreground transition-colors">
-              <span className="truncate">{searchPlaceholder}</span>
-            </div>
-          </div>
-        </div>
+        <div className="min-w-[120px] flex-1" data-tauri-drag-region />
 
         {/* 右侧按钮 */}
         <div className="flex items-center gap-0.5 px-2 shrink-0" data-tauri-drag-region="false">

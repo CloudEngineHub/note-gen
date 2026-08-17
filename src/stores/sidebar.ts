@@ -10,6 +10,8 @@ export interface SidebarState {
   toggleNoteSidebar: () => Promise<void>
   showNoteSidebar: () => Promise<void>
   leftSidebarVisible: boolean
+  sidebarSearchFocusRequest: number
+  requestSidebarSearchFocus: () => Promise<void>
   toggleLeftSidebar: () => Promise<void>
   centerPanelVisible: boolean
   toggleCenterPanel: () => Promise<void>
@@ -66,6 +68,17 @@ export const useSidebarStore = create<SidebarState>((set, get) => ({
     store.set('noteSidebarVisible', true)
   },
   leftSidebarVisible: initialState.left,
+  sidebarSearchFocusRequest: 0,
+  requestSidebarSearchFocus: async () => {
+    set((state) => ({
+      leftSidebarVisible: true,
+      sidebarSearchFocusRequest: state.sidebarSearchFocusRequest + 1,
+    }))
+    localStorage.setItem('leftSidebarVisible', 'true')
+    const store = await Store.load('store.json')
+    await store.set('leftSidebarVisible', true)
+    await store.save()
+  },
   toggleLeftSidebar: async () => {
     const { leftSidebarVisible, centerPanelVisible, rightSidebarVisible } = get()
     

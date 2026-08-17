@@ -192,6 +192,7 @@ export function SearchReplacePanel({ editor, open, onOpenChange }: SearchReplace
     const storage = getSearchAndReplaceStorage(editor)
     const results = storage?.results || []
     const activeSearchTerm = storage?.searchTerm || ''
+    setSearchText(current => current === activeSearchTerm ? current : activeSearchTerm)
 
     if (!activeSearchTerm) {
       setResultCount(0)
@@ -215,6 +216,14 @@ export function SearchReplacePanel({ editor, open, onOpenChange }: SearchReplace
     return () => {
       editor.off('transaction', handleUpdate)
     }
+  }, [editor, open, updateResults])
+
+  useEffect(() => {
+    if (!editor || !open) return
+    const storage = getSearchAndReplaceStorage(editor)
+    const activeSearchTerm = storage?.searchTerm || ''
+    if (activeSearchTerm) setSearchText(activeSearchTerm)
+    updateResults()
   }, [editor, open, updateResults])
 
   // 替换当前

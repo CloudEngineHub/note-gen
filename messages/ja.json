@@ -3402,15 +3402,17 @@
   "search": {
     "placeholder": "ノート、記録、キャンバスを検索...",
     "results": "{count} 件の検索結果",
-    "exactMatches": "完全一致",
+    "exactMatches": "完全一致の結果",
     "relatedContent": "関連コンテンツ",
     "searchingRelated": "意味的に関連する内容を検索中…",
     "indexingProgress": "インデックス {ready}/{total}",
     "noResults": "検索結果がありません",
     "tryDifferentKeywords": "別のキーワードで検索してみてください",
+    "clear": "検索をクリア",
+    "openFailed": "検索結果を開けませんでした",
     "item": {
       "record": "記録",
-      "article": "記事",
+      "article": "ファイル",
       "canvas": "キャンバス",
       "matches": "{count}件の一致",
       "scanType": "スキャン"
