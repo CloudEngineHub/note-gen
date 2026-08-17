@@ -36,6 +36,7 @@ import type { KnowledgeSearchCandidate, KnowledgeSourceType } from '@/types/know
 interface SearchDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  mobile?: boolean
 }
 
 type SearchFilter = 'all' | 'record' | 'article' | 'canvas'
@@ -61,7 +62,7 @@ interface EnhancedSearchResult {
   firstMatchIndex?: number
 }
 
-export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
+export function SearchDialog({ open, onOpenChange, mobile = false }: SearchDialogProps) {
   const t = useTranslations()
   const router = useRouter()
   const pathname = usePathname()
@@ -79,7 +80,7 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
   const loadCanvasProjects = useCanvasStore(state => state.loadProjects)
   const openCanvasProject = useCanvasStore(state => state.openProject)
   const setPendingCanvasFocus = useCanvasStore(state => state.setPendingFocus)
-  const isMobileRoute = pathname.startsWith('/mobile')
+  const isMobileRoute = mobile || pathname.startsWith('/mobile')
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const semanticRequestRef = useRef(0)
   const lastSemanticRunRef = useRef<{ key: string; at: number } | null>(null)
@@ -445,13 +446,15 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
       fetchAllMarks()
       fetchTags()
       void loadCanvasProjects()
-      void getKnowledgeIndexStats().then(stats => {
-        const values = Object.values(stats).flatMap(sourceStats => Object.values(sourceStats))
-        setIndexCoverage({
-          ready: Object.values(stats).reduce((sum, sourceStats) => sum + sourceStats.ready, 0),
-          total: values.reduce((sum, value) => sum + value, 0),
+      if (!isMobileRoute) {
+        void getKnowledgeIndexStats().then(stats => {
+          const values = Object.values(stats).flatMap(sourceStats => Object.values(sourceStats))
+          setIndexCoverage({
+            ready: Object.values(stats).reduce((sum, sourceStats) => sum + sourceStats.ready, 0),
+            total: values.reduce((sum, value) => sum + value, 0),
+          })
         })
-      })
+      }
     }
   }, [fetchAllMarks, fetchTags, isMobileRoute, loadAllArticle, loadCanvasProjects, open])
 
@@ -528,18 +531,22 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
         <div
           className={cn(
             "flex shrink-0 items-center gap-3",
-            isMobileRoute && "justify-between px-1"
+            isMobileRoute && "justify-end px-1"
           )}
         >
-          <div className="text-sm font-semibold tracking-tight text-foreground/90">
-            {t('search.results', { count: groupedSearchResults.length })}
-          </div>
-          {indexCoverage && indexCoverage.ready < indexCoverage.total ? (
-            <Badge variant="outline">
-              {t('search.indexingProgress', indexCoverage)}
-            </Badge>
+          {!isMobileRoute ? (
+            <>
+              <div className="text-sm font-semibold tracking-tight text-foreground/90">
+                {t('search.results', { count: groupedSearchResults.length })}
+              </div>
+              {indexCoverage && indexCoverage.ready < indexCoverage.total ? (
+                <Badge variant="outline">
+                  {t('search.indexingProgress', indexCoverage)}
+                </Badge>
+              ) : null}
+              <Separator orientation="vertical" className="h-5" />
+            </>
           ) : null}
-          {!isMobileRoute && <Separator orientation="vertical" className="h-5" />}
           <ToggleGroup
             type="single"
             variant="outline"

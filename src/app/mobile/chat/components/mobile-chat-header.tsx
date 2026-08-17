@@ -215,7 +215,7 @@ export function MobileChatHeader() {
 
         </div>
       </header>
-      {searchOpen ? <SearchDialog open onOpenChange={setSearchOpen} /> : null}
+      {searchOpen ? <SearchDialog open mobile onOpenChange={setSearchOpen} /> : null}
     </>
   )
 }
