@@ -75,7 +75,7 @@ import useChatStore, { type PendingQuote } from '@/stores/chat'
 import { ArrowUp, Eye, FileCode2, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { buildMobileSelectionContext, isMobileSelectionContextStale } from './mobile-selection-context'
+import { buildMobileSelectionContext, getMobileContextPrimaryActions, isMobileSelectionContextStale } from './mobile-selection-context'
 import { MobileEditorContextBar } from './mobile-editor-context-bar'
 import { MobileEditorMoreSheet } from './mobile-editor-more-sheet'
 import { MobileWritingToolbar } from './mobile-writing-toolbar'
@@ -3292,7 +3292,46 @@ export function TipTapEditor({
     if (!editor) return
 
     if (!mobileContext) {
-      runMobileWritingAction(action)
+      switch (action) {
+        case 'ai':
+          setMobileSheetMode('ai-write')
+          return
+        case 'bold':
+          runMobileWritingAction('format-bold')
+          return
+        case 'highlight':
+          runMobileWritingAction('format-highlight')
+          return
+        case 'italic':
+          runMobileWritingAction('format-italic')
+          return
+        case 'underline':
+          editor.chain().focus().toggleUnderline().run()
+          return
+        case 'strike':
+          editor.chain().focus().toggleStrike().run()
+          return
+        case 'code':
+          editor.chain().focus().toggleCode().run()
+          return
+        case 'blockquote':
+          editor.chain().focus().toggleBlockquote().run()
+          return
+        case 'bulletList':
+          editor.chain().focus().toggleBulletList().run()
+          return
+        case 'orderedList':
+          editor.chain().focus().toggleOrderedList().run()
+          return
+        case 'taskList':
+          editor.chain().focus().toggleTaskList().run()
+          return
+        case 'codeBlock':
+          editor.chain().focus().toggleCodeBlock().run()
+          return
+        default:
+          runMobileWritingAction(action)
+      }
       return
     }
 
@@ -6367,11 +6406,11 @@ export function TipTapEditor({
           : undefined
       }
     >
-      {isMobile && mobileContext && (
+      {isMobile && effectiveViewMode === 'visual' && !isSectionVirtualView && (
         <MobileEditorContextBar
-          mode={mobileContext.mode}
-          previewText={mobileContext.mode === 'text' ? mobileContext.previewText : undefined}
-          activeActions={mobileContext.actions}
+          mode={mobileContext?.mode ?? 'text'}
+          previewText={mobileContext?.mode === 'text' ? mobileContext.previewText : undefined}
+          activeActions={mobileContext?.actions ?? [...getMobileContextPrimaryActions('text')]}
           onAction={runMobileEditorAction}
         />
       )}

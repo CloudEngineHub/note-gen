@@ -1218,6 +1218,11 @@
     display: none;
   }
 
+  #mobile-writing .mobile-editor-context-bar [data-slot="button"] {
+    min-height: 2rem;
+    min-width: 2rem;
+  }
+
   #mobile-writing .mobile-writing-toolbar-track {
     animation: mobile-writing-toolbar-menu-in 160ms ease-out;
     will-change: opacity, transform;
