@@ -2872,37 +2872,43 @@ export function TipTapEditor({
       return
     }
 
-    const timers = new Set<number>()
-    const scrollDelays = [0, 80, 180, 360, 600]
+    let scrollTimer: number | null = null
+    let viewportSettleAt = 0
 
-    const clearTimers = () => {
-      timers.forEach((timer) => window.clearTimeout(timer))
-      timers.clear()
+    const scheduleSelectionScroll = (minimumDelay = 0) => {
+      if (scrollTimer !== null) {
+        window.clearTimeout(scrollTimer)
+      }
+
+      const delay = Math.max(minimumDelay, viewportSettleAt - Date.now())
+      scrollTimer = window.setTimeout(() => {
+        scrollTimer = null
+        requestAnimationFrame(scrollMobileSelectionIntoView)
+      }, delay)
+    }
+    const handleEditorFocus = () => {
+      viewportSettleAt = Date.now() + 320
+      scheduleSelectionScroll()
+    }
+    const handleSelectionUpdate = () => scheduleSelectionScroll()
+    const handleViewportChange = () => {
+      viewportSettleAt = Date.now() + 120
+      scheduleSelectionScroll()
     }
 
-    const scheduleSelectionScroll = () => {
-      clearTimers()
-
-      scrollDelays.forEach((delay) => {
-        const timer = window.setTimeout(() => {
-          timers.delete(timer)
-          requestAnimationFrame(scrollMobileSelectionIntoView)
-        }, delay)
-        timers.add(timer)
-      })
-    }
-
-    editor.on('focus', scheduleSelectionScroll)
-    editor.on('selectionUpdate', scheduleSelectionScroll)
-    window.visualViewport?.addEventListener('resize', scheduleSelectionScroll)
-    window.visualViewport?.addEventListener('scroll', scheduleSelectionScroll)
+    editor.on('focus', handleEditorFocus)
+    editor.on('selectionUpdate', handleSelectionUpdate)
+    window.visualViewport?.addEventListener('resize', handleViewportChange)
+    window.visualViewport?.addEventListener('scroll', handleViewportChange)
 
     return () => {
-      clearTimers()
-      editor.off('focus', scheduleSelectionScroll)
-      editor.off('selectionUpdate', scheduleSelectionScroll)
-      window.visualViewport?.removeEventListener('resize', scheduleSelectionScroll)
-      window.visualViewport?.removeEventListener('scroll', scheduleSelectionScroll)
+      if (scrollTimer !== null) {
+        window.clearTimeout(scrollTimer)
+      }
+      editor.off('focus', handleEditorFocus)
+      editor.off('selectionUpdate', handleSelectionUpdate)
+      window.visualViewport?.removeEventListener('resize', handleViewportChange)
+      window.visualViewport?.removeEventListener('scroll', handleViewportChange)
     }
   }, [editor, isMobile, isSectionVirtualView, scrollMobileSelectionIntoView])
 
@@ -6410,7 +6416,10 @@ export function TipTapEditor({
         <MobileEditorContextBar
           mode={mobileContext?.mode ?? 'text'}
           previewText={mobileContext?.mode === 'text' ? mobileContext.previewText : undefined}
-          activeActions={mobileContext?.actions ?? [...getMobileContextPrimaryActions('text')]}
+          activeActions={[
+            ...(showEditorUndoRedo ? ['undo', 'redo'] : []),
+            ...(mobileContext?.actions ?? getMobileContextPrimaryActions('text')),
+          ]}
           onAction={runMobileEditorAction}
         />
       )}
@@ -6672,7 +6681,6 @@ export function TipTapEditor({
       {isMobile && effectiveViewMode === 'visual' && !isSectionVirtualView && showMobileEditorToolbar && !mobileContext && (
         <MobileWritingToolbar
           activeActions={mobileWritingActiveActions}
-          showUndoRedo={showEditorUndoRedo}
           onAction={runMobileWritingAction}
         />
       )}

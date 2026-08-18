@@ -1215,17 +1215,34 @@
   }
 
   #mobile-writing .mobile-writing-toolbar {
-    display: none;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 45;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
   }
 
   #mobile-writing .mobile-editor-context-bar [data-slot="button"] {
-    min-height: 2rem;
-    min-width: 2rem;
+    min-height: 2.25rem;
+    min-width: 2.25rem;
+  }
+
+  #mobile-writing .mobile-writing-toolbar [data-slot="button"] {
+    min-height: 2.25rem;
+    min-width: 2.25rem;
   }
 
   #mobile-writing .mobile-writing-toolbar-track {
     animation: mobile-writing-toolbar-menu-in 160ms ease-out;
     will-change: opacity, transform;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* 确保移动端写作页面的编辑器容器不会阻止滑动 */
@@ -1236,21 +1253,19 @@
   }
 
   .mobile-keyboard-open #mobile-writing .mobile-writing-toolbar {
-    display: block;
-    position: sticky;
-    bottom: 0;
-    z-index: 45;
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-    flex-shrink: 0;
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    padding-bottom: 0.25rem;
   }
 
   .mobile-keyboard-open #mobile-writing .tiptap-editor .ProseMirror {
-    padding-bottom: 24px;
+    padding-bottom: calc(24px + 3rem);
   }
 
   .mobile-keyboard-open #mobile-writing .mobile-writing-editor-scroll {
     padding-bottom: 0;
-    scroll-padding-bottom: 0;
+    scroll-padding-bottom: 3rem;
   }
 
   .mobile-keyboard-open #mobile-writing .mobile-editor-footer {

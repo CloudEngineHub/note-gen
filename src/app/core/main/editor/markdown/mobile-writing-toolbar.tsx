@@ -23,11 +23,9 @@ import {
   PieChart,
   Plus,
   Quote,
-  Redo2,
   Sigma,
   Sparkles,
   Table2,
-  Undo2,
   Workflow,
 } from 'lucide-react'
 import { useState, type MouseEvent, type PointerEvent } from 'react'
@@ -72,7 +70,6 @@ type MobileWritingToolbarAction =
 
 interface MobileWritingToolbarProps {
   activeActions?: string[]
-  showUndoRedo?: boolean
   onAction: (action: MobileWritingToolbarAction) => void
 }
 
@@ -151,20 +148,11 @@ const SECONDARY_ITEMS: Record<Exclude<MobileWritingToolbarMenu, 'root'>, Toolbar
 
 export function MobileWritingToolbar({
   activeActions = [],
-  showUndoRedo = false,
   onAction,
 }: MobileWritingToolbarProps) {
   const [activeMenu, setActiveMenu] = useState<MobileWritingToolbarMenu>('root')
   const items = activeMenu === 'root'
-    ? [
-        ...(showUndoRedo
-          ? [
-              { kind: 'action', action: 'undo', label: '撤销', icon: Undo2 },
-              { kind: 'action', action: 'redo', label: '重做', icon: Redo2 },
-            ] satisfies ToolbarItem[]
-          : []),
-        ...ROOT_ITEMS,
-      ]
+    ? ROOT_ITEMS
     : SECONDARY_ITEMS[activeMenu]
 
   const preventFocusSteal = (event: PointerEvent<HTMLButtonElement> | MouseEvent<HTMLButtonElement>) => {
@@ -172,8 +160,8 @@ export function MobileWritingToolbar({
   }
 
   return (
-    <div className="mobile-writing-toolbar border-t border-border bg-background/95 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div key={activeMenu} className="mobile-writing-toolbar-track flex items-center gap-1 overflow-x-auto px-2 scrollbar-hide">
+    <div className="mobile-writing-toolbar border-t border-border bg-background/95 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div key={activeMenu} className="mobile-writing-toolbar-track flex items-center gap-1 overflow-x-auto overflow-y-hidden px-2 scrollbar-hide">
         {activeMenu !== 'root' && (
           <Button
             type="button"
@@ -181,7 +169,7 @@ export function MobileWritingToolbar({
             title="返回一级菜单"
             variant="default"
             size="sm"
-            className="h-10 min-w-10 shrink-0 rounded-full px-3 text-xs"
+            className="h-9 min-w-9 shrink-0 rounded-full px-2.5 text-xs"
             onPointerDown={preventFocusSteal}
             onMouseDown={preventFocusSteal}
             onClick={() => setActiveMenu('root')}
@@ -204,7 +192,7 @@ export function MobileWritingToolbar({
               variant="ghost"
               size="sm"
               className={cn(
-                'h-10 min-w-10 shrink-0 rounded-full px-3 text-xs',
+                'h-9 min-w-9 shrink-0 rounded-full px-2.5 text-xs',
                 'text-muted-foreground hover:bg-muted/80 hover:text-foreground',
                 isActive && 'bg-muted text-foreground',
               )}

@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 
 const KEYBOARD_OPEN_THRESHOLD = 80
 const EDITABLE_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
+const RICH_TEXT_EDITOR_SELECTOR = '.ProseMirror[contenteditable]:not([contenteditable="false"])'
 const KEYBOARD_KEEPALIVE_SELECTOR = '.mobile-writing-toolbar'
 const DRAWER_CONTENT_SELECTOR = '[data-slot="drawer-content"]'
 const KEYBOARD_VIEWPORT_CHECK_DELAYS = [0, 80, 160, 320, 600, 900]
@@ -72,6 +73,13 @@ export function MobileViewport() {
 
       const activeElement = document.activeElement
       if (!(activeElement instanceof HTMLElement) || !isEditableElement(activeElement)) {
+        return
+      }
+
+      // Tiptap keeps the caret visible by scrolling its own editor viewport.
+      // Moving the entire contenteditable during the keyboard animation causes
+      // a feedback loop with visualViewport updates on iOS.
+      if (activeElement.matches(RICH_TEXT_EDITOR_SELECTOR)) {
         return
       }
 
