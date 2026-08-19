@@ -2,7 +2,7 @@ name: note-gen
 options:
   bundleIdPrefix: com.codexu.NoteGen
   deploymentTarget:
-    iOS: 13.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug
