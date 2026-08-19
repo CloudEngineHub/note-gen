@@ -3662,6 +3662,8 @@
         "save": "Salvar",
         "emptyDir": "Esta pasta está vazia",
         "root": "Raiz",
+        "editor": "Editor",
+        "backToFiles": "Voltar aos arquivos",
         "openFiles": "Abrir arquivos",
         "remote": "Arquivo remoto",
         "remoteFileNotPulled": "Somente nuvem · Toque para baixar",

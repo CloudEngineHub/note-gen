@@ -20,6 +20,10 @@ import {
 import { MobileRecordTools } from '@/components/mobile-record-tools'
 import useRecordingStore from '@/stores/recording'
 import emitter from '@/lib/emitter'
+import useMarkStore from '@/stores/mark'
+import useCanvasStore from '@/stores/canvas'
+import useArticleStore from '@/stores/article'
+import useChatStore from '@/stores/chat'
 
 const OrganizeNotes = dynamic(
   () => import('@/app/core/main/mark/organize-notes').then(module => module.OrganizeNotes),
@@ -52,6 +56,9 @@ export function AppFootbar() {
   const [quickActionOpen, setQuickActionOpen] = useState(false)
   const organizeRef = useRef<{ openOrganize: () => void }>(null)
   const { isRecording, recordingDuration } = useRecordingStore()
+  const activeFilePath = useArticleStore(state => state.activeFilePath)
+  const activeMarkId = useMarkStore(state => state.activeMarkId)
+  const activeCanvasId = useCanvasStore(state => state.activeCanvasId)
 
   const items: FootbarItem[] = [
     {
@@ -79,19 +86,25 @@ export function AppFootbar() {
     {
       id: 'record',
       label: t('navigation.mobileDock.record'),
-      url: '/mobile/record',
+      url: activeMarkId === null
+        ? '/mobile/record'
+        : `/mobile/record/detail?id=${encodeURIComponent(activeMarkId)}`,
       icon: Highlighter,
     },
     {
       id: 'canvas',
       label: t('navigation.mobileDock.canvas'),
-      url: '/mobile/canvas',
+      url: activeCanvasId
+        ? `/mobile/canvas/editor?id=${encodeURIComponent(activeCanvasId)}`
+        : '/mobile/canvas',
       icon: Palette,
     },
   ]
 
   const routeActiveIndex = items.findIndex(item => {
     if (item.id === 'chat' && pathname.startsWith('/mobile/setting')) return true
+    if (item.id === 'record') return pathname.startsWith('/mobile/record')
+    if (item.id === 'canvas') return pathname.startsWith('/mobile/canvas')
     return pathname === item.url
   })
   const quickActionIndex = items.findIndex(item => item.isQuickAction)
@@ -112,6 +125,14 @@ export function AppFootbar() {
     }
 
     setQuickActionOpen(false)
+    const chatState = useChatStore.getState()
+    if (item.id === 'writing') {
+      chatState.setMobileActiveContexts({ articlePath: activeFilePath || null })
+    } else if (item.id === 'record') {
+      chatState.setMobileActiveContexts({ markId: activeMarkId })
+    } else if (item.id === 'canvas') {
+      chatState.setMobileActiveContexts({ canvasId: activeCanvasId })
+    }
     router.push(item.url)
     const store = await Store.load('store.json')
     await store.set('currentPage', item.url)

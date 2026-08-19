@@ -3,7 +3,7 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
 import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import dynamic from "next/dynamic"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { applyAppFontFamily } from "@/lib/font-settings"
@@ -23,6 +23,8 @@ import useArticleStore from "@/stores/article"
 import { MobileModeProvider } from "@/hooks/use-mobile"
 import { Skeleton } from "@/components/ui/skeleton"
 import AppStatus from "@/components/app-status"
+import useMarkStore from "@/stores/mark"
+import useCanvasStore from "@/stores/canvas"
 
 const WritingScreen = dynamic(
   () => import('./writing/writing-screen').then(module => module.WritingScreen),
@@ -35,6 +37,14 @@ const WritingScreen = dynamic(
       </div>
     ),
   },
+)
+const MobileRecordDetail = dynamic(
+  () => import('./record/mobile-record-detail').then(module => module.MobileRecordDetail),
+  { ssr: false },
+)
+const MobileCanvasEditorScreen = dynamic(
+  () => import('./canvas/editor/page').then(module => module.MobileCanvasEditorScreen),
+  { ssr: false },
 )
 const MemoryAutoNotifications = dynamic(
   () => import('@/components/memories/memory-auto-notifications').then(module => module.MemoryAutoNotifications),
@@ -79,7 +89,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const isWritingRoute = pathname === '/mobile/writing'
+  const isRecordDetailRoute = pathname === '/mobile/record/detail'
+  const isCanvasEditorRoute = pathname === '/mobile/canvas/editor'
+  const routeMarkId = Number(searchParams.get('id'))
+  const routeCanvasId = searchParams.get('id') || ''
+  const activeMarkId = useMarkStore(state => state.activeMarkId)
+  const activeCanvasId = useCanvasStore(state => state.activeCanvasId)
+  const cachedMarkId = activeMarkId ?? (
+    isRecordDetailRoute && Number.isFinite(routeMarkId) ? routeMarkId : null
+  )
+  const cachedCanvasId = activeCanvasId || (isCanvasEditorRoute ? routeCanvasId : '')
   const [hasWritingCache, setHasWritingCache] = useState(isWritingRoute)
   const { initSettingData, customThemeColors, appFontFamily } = useSettingStore()
   const { initMainHosting } = useImageStore()
@@ -91,6 +112,24 @@ export default function RootLayout({
       setHasWritingCache(true)
     }
   }, [isWritingRoute])
+
+  useEffect(() => {
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement)) return
+
+    const hiddenRootIds = [
+      !isRecordDetailRoute ? 'mobile-record-detail' : null,
+      !isCanvasEditorRoute ? 'mobile-canvas-editor' : null,
+    ].filter((id): id is string => Boolean(id))
+
+    for (const hiddenRootId of hiddenRootIds) {
+      const hiddenRoot = document.getElementById(hiddenRootId)
+      if (hiddenRoot?.contains(activeElement)) {
+        activeElement.blur()
+        return
+      }
+    }
+  }, [isCanvasEditorRoute, isRecordDetailRoute])
 
   useEffect(() => {
     if (isWritingRoute) {
@@ -190,8 +229,10 @@ export default function RootLayout({
 
   const hideFootbar =
     pathname.startsWith('/mobile/setting/pages')
-    || pathname === '/mobile/record/detail'
-    || pathname === '/mobile/canvas/editor'
+
+  const usesCachedRoute = isWritingRoute
+    || (isRecordDetailRoute && cachedMarkId !== null)
+    || (isCanvasEditorRoute && Boolean(cachedCanvasId))
 
   return (
     <MobileModeProvider mobile>
@@ -216,7 +257,23 @@ export default function RootLayout({
                     <WritingScreen />
                   </div>
                 ) : null}
-                {!isWritingRoute ? children : null}
+                {cachedMarkId !== null ? (
+                  <div
+                    className={isRecordDetailRoute ? "h-full w-full min-w-0" : "hidden"}
+                    aria-hidden={!isRecordDetailRoute}
+                  >
+                    <MobileRecordDetail markId={cachedMarkId} />
+                  </div>
+                ) : null}
+                {cachedCanvasId ? (
+                  <div
+                    className={isCanvasEditorRoute ? "h-full w-full min-w-0" : "hidden"}
+                    aria-hidden={!isCanvasEditorRoute}
+                  >
+                    <MobileCanvasEditorScreen canvasId={cachedCanvasId} />
+                  </div>
+                ) : null}
+                {!usesCachedRoute ? children : null}
               </main>
               {!hideFootbar ? (
                 <div className="mobile-footbar">

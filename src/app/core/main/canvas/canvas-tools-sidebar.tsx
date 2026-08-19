@@ -97,7 +97,7 @@ function RailButton({ label, active, onClick, icon: Icon, mobile = false }: Rail
           <Icon data-icon="inline-start" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side={mobile ? 'top' : 'right'}>{label}</TooltipContent>
+      <TooltipContent side={mobile ? 'bottom' : 'right'}>{label}</TooltipContent>
     </Tooltip>
   )
 }
@@ -174,7 +174,7 @@ export function CanvasToolsSidebar({
     <div className={cn(
       'absolute z-10 flex',
       mobile
-        ? 'inset-x-0 bottom-0 max-w-none flex-col-reverse items-stretch'
+        ? 'inset-x-0 top-0 max-w-none flex-col items-stretch'
         : 'inset-y-3 left-3 max-w-[calc(100%-1.5rem)] items-start'
     )}>
       <div
@@ -183,7 +183,7 @@ export function CanvasToolsSidebar({
         className={cn(
           'flex shrink-0 items-center bg-background',
           mobile
-            ? 'h-[calc(3.5rem+env(safe-area-inset-bottom))] w-full flex-row border-t px-1 pb-[env(safe-area-inset-bottom)]'
+            ? 'h-14 w-full flex-row border-b px-1'
             : 'w-12 flex-col gap-1 rounded-xl border p-1 shadow-sm'
         )}
       >
@@ -270,7 +270,7 @@ export function CanvasToolsSidebar({
         <div className={cn(
           'flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
           mobile
-            ? 'mx-3 mb-2 max-h-[min(60vh,32rem)] w-[calc(100%-1.5rem)]'
+            ? 'mx-3 mt-2 max-h-[min(60vh,32rem)] w-[calc(100%-1.5rem)]'
             : 'ml-2 max-h-full w-[min(18rem,calc(100vw-5.5rem))]'
         )}>
           <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">

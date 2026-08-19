@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { TipTapEditor } from '@/app/core/main/editor/markdown/tiptap-editor'
 import type { Editor } from '@tiptap/react'
@@ -11,7 +11,14 @@ interface MobileEditorProps {
   onEditorReady?: (editor: Editor | null) => void
 }
 
-export function MobileEditor({ onEditorReady }: MobileEditorProps) {
+export interface MobileEditorHandle {
+  flushPendingSave: () => Promise<void>
+}
+
+export const MobileEditor = forwardRef<MobileEditorHandle, MobileEditorProps>(function MobileEditor(
+  { onEditorReady },
+  ref,
+) {
   const tEditor = useTranslations('editor')
   const {
     saveCurrentArticle,
@@ -28,7 +35,7 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   const contentRef = useRef<string>('')
   const awaitingInitialContentRef = useRef(Boolean(activeFilePath))
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isSavingRef = useRef(false)
+  const savePromiseRef = useRef<Promise<void> | null>(null)
 
   // 监听 activeFilePath 变化
   useEffect(() => {
@@ -70,17 +77,38 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
     const path = activePathRef.current
     const newContent = contentRef.current
 
-    if (!path || isSavingRef.current || !isEditorReady) {
+    if (!path || !isEditorReady) {
       return
     }
 
-    isSavingRef.current = true
+    if (savePromiseRef.current) {
+      await savePromiseRef.current
+      return
+    }
+
+    const savePromise = saveCurrentArticle(newContent, path)
+    savePromiseRef.current = savePromise
     try {
-      await saveCurrentArticle(newContent, path)
+      await savePromise
     } finally {
-      isSavingRef.current = false
+      if (savePromiseRef.current === savePromise) {
+        savePromiseRef.current = null
+      }
     }
   }, [isEditorReady, saveCurrentArticle])
+
+  useImperativeHandle(ref, () => ({
+    flushPendingSave: async () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+      if (savePromiseRef.current) {
+        await savePromiseRef.current
+      }
+      await doSave()
+    },
+  }), [doSave])
 
   // 处理内容变化
   const handleContentChange = useCallback((newContent: string) => {
@@ -134,6 +162,6 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
       />
     </div>
   )
-}
+})
 
 export default MobileEditor

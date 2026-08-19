@@ -37,6 +37,19 @@ import {
   reduceLearnedContextWindow,
 } from '@/lib/ai/model-capacity'
 import type { CanvasSelectionContext } from '@/types/canvas'
+import { useIsMobile } from '@/hooks/use-mobile'
+
+function getContextualArticleSnapshot(articleState: {
+  activeFilePath: string
+  currentArticle: string
+}, isMobile: boolean) {
+  const mobileContexts = useChatStore.getState().mobileActiveContexts
+  const includeArticle = !isMobile || Boolean(mobileContexts.articlePath)
+  return {
+    activeFilePath: includeArticle ? articleState.activeFilePath : '',
+    currentArticle: includeArticle ? articleState.currentArticle : '',
+  }
+}
 
 function buildCanvasSelectionContext(context: CanvasSelectionContext | null) {
   if (!context) return ''
@@ -183,6 +196,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   const repeatedScriptApprovalRef = useRef<{ signature: string; count: number }>({ signature: '', count: 0 })
   const contextOverflowRetryRef = useRef(0)
   const t = useTranslations()
+  const isMobile = useIsMobile()
   const requestText = inputValue.trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt')
 
   const buildPartialSuccessContent = (result: string, toolCalls: { result?: { success?: boolean; data?: any; error?: string } }[]) => {
@@ -237,10 +251,11 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   const buildSteeringContext = async () => {
     const useArticleStore = (await import('@/stores/article')).default
     const articleStore = useArticleStore.getState()
+    const activeArticle = getContextualArticleSnapshot(articleStore, isMobile)
     let context = ''
 
-    if (articleStore.activeFilePath && articleStore.currentArticle) {
-      context += `## 当前打开的笔记\n文件路径: ${articleStore.activeFilePath}\n\n内容:\n${articleStore.currentArticle}\n\n`
+    if (activeArticle.activeFilePath && activeArticle.currentArticle) {
+      context += `## 当前打开的笔记\n文件路径: ${activeArticle.activeFilePath}\n\n内容:\n${activeArticle.currentArticle}\n\n`
     }
 
     if (linkedResource && isLinkedFolder(linkedResource)) {
@@ -333,8 +348,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         }
 
         const articleState = useArticleStore.getState()
-        const additionalContext = articleState.activeFilePath
-          ? articleState.currentArticle || ''
+        const activeArticle = getContextualArticleSnapshot(articleState, isMobile)
+        const additionalContext = activeArticle.activeFilePath
+          ? activeArticle.currentArticle || ''
           : ''
 
         return prepareConversationHistory({
@@ -476,8 +492,13 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
 
     const useArticleStore = (await import('@/stores/article')).default
     const articleStore = useArticleStore.getState()
+    const activeArticle = getContextualArticleSnapshot(articleStore, isMobile)
     const useCanvasStore = (await import('@/stores/canvas')).default
     const canvasStore = useCanvasStore.getState()
+    const mobileContexts = useChatStore.getState().mobileActiveContexts
+    const activeCanvasId = !isMobile || mobileContexts.canvasId
+      ? canvasStore.activeCanvasId
+      : null
     let pendingCapacityProbe: { contextWindow: number } | undefined
     let deferredOverflowError: string | undefined
     let contextCapacityProbeActive = false
@@ -558,8 +579,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       conversationId: placeholderMessage.conversationId,
       workspaceId: useSettingStore.getState().workspacePath.trim().replace(/\\/g, '/').replace(/\/+$/, '') || 'default',
       useMemories: !useChatStore.getState().isTemporaryConversation,
-      activeFilePath: articleStore.activeFilePath,
-      activeCanvasId: canvasStore.activeCanvasId || undefined,
+      activeFilePath: activeArticle.activeFilePath,
+      activeCanvasId: activeCanvasId || undefined,
       permissionMode: agentPermissionMode,
       requestConfirmation,
       currentQuote: quoteData
@@ -823,11 +844,11 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       // 这里不再重复追加 currentArticle，避免同一篇正文占用两份上下文。
 
       agentDebugLog('chat_context_active_note', {
-        activeFilePath: articleStore.activeFilePath || null,
-        currentArticleLength: articleStore.currentArticle?.length || 0,
+        activeFilePath: activeArticle.activeFilePath || null,
+        currentArticleLength: activeArticle.currentArticle.length,
         injected: false,
-        injectedByRuntimeSnapshot: Boolean(articleStore.activeFilePath),
-        preview: previewText(articleStore.currentArticle || ''),
+        injectedByRuntimeSnapshot: Boolean(activeArticle.activeFilePath),
+        preview: previewText(activeArticle.currentArticle),
       })
       // 3. 关联文件夹作为 Agent 自动检索时的优先范围，不在发送前预先检索。
       if (linkedResource && isLinkedFolder(linkedResource)) {
@@ -841,9 +862,9 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
 
       // 4. 如果有关联文件（非文件夹），始终注入完整内容作为 Agent 上下文
       const linkedResourceIsActiveFile = linkedResource && !isLinkedFolder(linkedResource) && (
-        linkedResource.relativePath === articleStore.activeFilePath ||
-        linkedResource.path === articleStore.activeFilePath ||
-        linkedResource.name === articleStore.activeFilePath.split('/').pop()
+        linkedResource.relativePath === activeArticle.activeFilePath ||
+        linkedResource.path === activeArticle.activeFilePath ||
+        linkedResource.name === activeArticle.activeFilePath.split('/').pop()
       )
 
       if (linkedResource && !isLinkedFolder(linkedResource) && !linkedResourceIsActiveFile) {
@@ -982,7 +1003,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       // 6. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
       const compactionContext = [
         context,
-        articleStore.activeFilePath ? articleStore.currentArticle || '' : '',
+        activeArticle.activeFilePath ? activeArticle.currentArticle : '',
       ].filter(Boolean).join('\n\n')
       const chatState = useChatStore.getState()
       const { chats } = chatState

@@ -1,7 +1,7 @@
 'use client'
 
 import { Editor } from '@tiptap/react'
-import { Code2, Eye, FileText } from 'lucide-react'
+import { Code2, Eye } from 'lucide-react'
 import { WordCount } from './word-count'
 import { CopyButton } from './copy-button'
 import { ExportButton } from './export-button'
@@ -10,7 +10,6 @@ import { OutlineToggle } from './outline-toggle'
 import { SyncButton } from '../sync/sync-button'
 import { PullButton } from '../sync/pull-button'
 import { HistorySheet } from '../sync/history-sheet'
-import useArticleStore from '@/stores/article'
 import { isMobileDevice } from '@/lib/check'
 import { Button } from '@/components/ui/button'
 import useSettingStore from '@/stores/setting'
@@ -41,27 +40,16 @@ export function FooterBar({
   onMarkdownChange,
   deferSourceStatistics = false,
 }: FooterBarProps) {
-  const activeFilePath = useArticleStore((state) => state.activeFilePath)
   const isMobile = isMobileDevice()
   const showEditorStats = useSettingStore((state) => state.showEditorStats)
   const tSourceMode = useTranslations('settings.editor.sourceMode')
-  const fileName = activeFilePath
-    ? activeFilePath.split('/').pop() || activeFilePath
-    : '未命名'
-
   if (isMobile) {
     return (
       <div className="mobile-editor-footer flex h-7 select-none items-center justify-between gap-3 border-t border-border bg-background px-3 text-xs text-muted-foreground">
-        <div className="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
-          <FileText className="size-3.5 shrink-0" />
-          <div className="min-w-0 flex items-center gap-1.5 overflow-hidden">
-            <span className="block min-w-0 truncate font-medium text-foreground/90">{fileName}</span>
-            {showEditorStats && !deferSourceStatistics ? (
-              <div className="shrink-0">
-                <WordCount editor={editor} sourceMarkdown={sourceMarkdown} compact />
-              </div>
-            ) : null}
-          </div>
+        <div className="min-w-0 flex-1">
+          {showEditorStats && !deferSourceStatistics ? (
+            <WordCount editor={editor} sourceMarkdown={sourceMarkdown} compact />
+          ) : null}
         </div>
         <div className="shrink-0 flex items-center gap-2">
           {onToggleViewMode ? (

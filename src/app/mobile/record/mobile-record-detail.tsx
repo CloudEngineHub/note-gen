@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import dayjs from 'dayjs'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import {
@@ -15,6 +15,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { Store } from '@tauri-apps/plugin-store'
 import { AudioPlayer } from '@/components/audio-player'
 import { LocalImage } from '@/components/local-image'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +51,7 @@ import { toast } from '@/hooks/use-toast'
 import { cn, isHttpUrl } from '@/lib/utils'
 import useMarkStore from '@/stores/mark'
 import useTagStore from '@/stores/tag'
+import useChatStore from '@/stores/chat'
 
 interface MobileRecordDetailProps {
   markId: number
@@ -117,10 +119,13 @@ function DetailField({
 export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   const t = useTranslations()
   const router = useRouter()
+  const pathname = usePathname()
   const {
     updateMark,
     fetchMarkPreviews,
     fetchTrashMarkPreviews,
+    setActiveMarkId,
+    clearActiveMark,
   } = useMarkStore()
   const { tags, fetchTags, getCurrentTag } = useTagStore()
   const [mark, setMark] = useState<Mark | null>(null)
@@ -132,6 +137,13 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   const swipeBackRef = useRef<SwipeBackHandle>(null)
 
   useEffect(() => {
+    if (pathname !== '/mobile/record/detail') return
+    setActiveMarkId(markId)
+    const chatState = useChatStore.getState()
+    chatState.setMobileActiveContexts({ markId })
+  }, [markId, pathname, setActiveMarkId])
+
+  useEffect(() => {
     let cancelled = false
 
     const load = async () => {
@@ -139,6 +151,13 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
         const [record] = await Promise.all([getMarkById(markId), fetchTags()])
         if (!cancelled) {
           setMark(record || null)
+          if (!record) {
+            clearActiveMark()
+            const mobileContexts = useChatStore.getState().mobileActiveContexts
+            if (mobileContexts.markId === markId) {
+              useChatStore.getState().setMobileActiveContexts({ markId: null })
+            }
+          }
         }
       } catch (error) {
         toast({
@@ -155,7 +174,7 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
     return () => {
       cancelled = true
     }
-  }, [fetchTags, markId])
+  }, [clearActiveMark, fetchTags, markId])
 
   useEffect(() => {
     if (mark) setDraft(createDraft(mark))
@@ -167,7 +186,10 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
   const currentTag = tags.find((tag) => tag.id === draft?.tagId)
 
   function navigateBack() {
+    clearActiveMark()
+    useChatStore.getState().setMobileActiveContexts({ markId: null })
     router.push('/mobile/record')
+    void Store.load('store.json').then(store => store.set('currentPage', '/mobile/record'))
   }
 
   const refreshRecords = useCallback(async (deleted: boolean) => {
@@ -206,6 +228,10 @@ export function MobileRecordDetail({ markId }: MobileRecordDetailProps) {
 
       await updateMark(nextMark)
       setMark(nextMark)
+      const mobileContexts = useChatStore.getState().mobileActiveContexts
+      if (mobileContexts.markId === nextMark.id) {
+        useChatStore.getState().setMobileActiveContexts({ markId: nextMark.id })
+      }
       if (sourceMark.tagId !== nextDraft.tagId) {
         await refreshRecords(false)
       }

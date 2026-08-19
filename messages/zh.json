@@ -3973,6 +3973,8 @@
         "save": "保存",
         "emptyDir": "该目录为空",
         "root": "根目录",
+        "editor": "编辑器",
+        "backToFiles": "返回文件管理",
         "openFiles": "打开文件",
         "remote": "远程文件",
         "remoteFileNotPulled": "仅云端 · 点击后拉取",

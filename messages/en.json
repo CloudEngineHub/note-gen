@@ -3953,6 +3953,8 @@
         "save": "Save",
         "emptyDir": "This folder is empty",
         "root": "Root",
+        "editor": "Editor",
+        "backToFiles": "Back to files",
         "openFiles": "Open files",
         "remote": "Remote file",
         "remoteFileNotPulled": "Cloud only · Tap to pull",

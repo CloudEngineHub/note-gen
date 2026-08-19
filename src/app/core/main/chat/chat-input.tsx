@@ -47,8 +47,8 @@ import {
   type MentionedRecord,
 } from './chat-context-strip'
 import { getMarkListItemContent } from '@/app/core/main/mark/mark-list-item-content'
-import { getRecordIdFromTabPath } from '@/app/core/main/mark/mark-record-tab'
-import { getCanvasIdFromTabPath } from '@/app/core/main/canvas/canvas-tab'
+import { getRecordIdFromTabPath, getRecordTabPath } from '@/app/core/main/mark/mark-record-tab'
+import { getCanvasIdFromTabPath, getCanvasTabPath } from '@/app/core/main/canvas/canvas-tab'
 import { getMarkById, type Mark } from '@/db/marks'
 import type { CanvasProject, CanvasSelectionContext } from '@/types/canvas'
 import type { SkillMetadata } from '@/lib/skills/types'
@@ -120,6 +120,7 @@ export const ChatInput = React.memo(function ChatInput() {
     clearEditorSelectionQuote,
     agentState,
     isTemporaryConversation,
+    mobileActiveContexts,
   } = useChatStore()
   const {
     activeFilePath,
@@ -127,11 +128,27 @@ export const ChatInput = React.memo(function ChatInput() {
     currentArticle,
     openTabs,
   } = useArticleStore()
-  const activeTabPath = React.useMemo(
-    () => openTabs.find(tab => tab.id === activeTabId)?.path || activeFilePath,
-    [activeFilePath, activeTabId, openTabs]
-  )
-  const canvasSelectionContext = useCanvasStore(state => state.selectionContext)
+  const isMobile = useIsMobile()
+  const activeContextPaths = React.useMemo(() => {
+    if (!isMobile) {
+      const activeTabPath = openTabs.find(tab => tab.id === activeTabId)?.path || activeFilePath
+      return activeTabPath ? [activeTabPath] : []
+    }
+
+    return [
+      mobileActiveContexts.articlePath,
+      mobileActiveContexts.markId === null ? null : getRecordTabPath(mobileActiveContexts.markId),
+      mobileActiveContexts.canvasId ? getCanvasTabPath(mobileActiveContexts.canvasId) : null,
+    ].filter((path): path is string => Boolean(path))
+  }, [activeFilePath, activeTabId, isMobile, mobileActiveContexts, openTabs])
+  const contextualActiveFilePath = !isMobile || mobileActiveContexts.articlePath
+    ? activeFilePath
+    : ''
+  const contextualCurrentArticle = contextualActiveFilePath ? currentArticle : ''
+  const storedCanvasSelectionContext = useCanvasStore(state => state.selectionContext)
+  const canvasSelectionContext = !isMobile || mobileActiveContexts.canvasId
+    ? storedCanvasSelectionContext
+    : null
   const setCanvasSelectionContext = useCanvasStore(state => state.setSelectionContext)
   const [isComposing, setIsComposing] = useState(false)
   const t = useTranslations()
@@ -151,11 +168,10 @@ export const ChatInput = React.memo(function ChatInput() {
     query: string
   } | null>(null)
   const [selectedSkills, setSelectedSkills] = useState<SkillMetadata[]>([])
-  const [activeTabContext, setActiveTabContext] = useState<MentionedContext | null>(null)
+  const [activeTabContexts, setActiveTabContexts] = useState<MentionedContext[]>([])
   const [mentionedContexts, setMentionedContexts] = useState<MentionedContext[]>([])
   const chatSendRef = useRef<{ sendChat: () => void } | null>(null)
   const composerMenuRef = useRef<ChatComposerMenuHandle>(null)
-  const isMobile = useIsMobile()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const isMobileDevice_ = isMobileDevice()
@@ -164,19 +180,24 @@ export const ChatInput = React.memo(function ChatInput() {
   const onboardingTypingTimerRefs = useRef<number[]>([])
   const maxImageSizeLabel = formatFileSize(MAX_IMAGE_ATTACHMENT_SIZE_BYTES)
   const activeQuote = pendingQuote || editorSelectionQuote
-  const visibleActiveTabContext = React.useMemo(() => {
-    if (activeTabContext?.kind === 'record') {
-      return activeQuote?.articlePath === activeTabContext.record.articlePath
-        ? null
-        : activeTabContext
-    }
-    return activeTabContext
-  }, [activeQuote?.articlePath, activeTabContext])
+  const visibleActiveTabContexts = React.useMemo(
+    () => activeTabContexts.filter(context => {
+      if (context.kind === 'record') {
+        return activeQuote?.articlePath !== context.record.articlePath
+      }
+      if (context.kind === 'canvas') {
+        return canvasSelectionContext?.canvasId !== context.canvas.canvasId
+      }
+      return true
+    }),
+    [activeQuote?.articlePath, activeTabContexts, canvasSelectionContext?.canvasId]
+  )
   const visibleMentionedContexts = React.useMemo(
     () => mentionedContexts.filter(context => {
       if (
-        visibleActiveTabContext
-        && getMentionedContextKey(visibleActiveTabContext) === getMentionedContextKey(context)
+        visibleActiveTabContexts.some(activeContext => (
+          getMentionedContextKey(activeContext) === getMentionedContextKey(context)
+        ))
       ) {
         return false
       }
@@ -200,17 +221,17 @@ export const ChatInput = React.memo(function ChatInput() {
       canvasSelectionContext?.canvasId,
       linkedResource,
       mentionedContexts,
-      visibleActiveTabContext,
+      visibleActiveTabContexts,
     ]
   )
   const contextUsageLinkedResourceIsActiveFile = Boolean(
     linkedResource
     && !isLinkedFolder(linkedResource)
-    && activeFilePath
+    && contextualActiveFilePath
     && (
-      linkedResource.relativePath === activeFilePath
-      || linkedResource.path === activeFilePath
-      || linkedResource.name === activeFilePath.split('/').pop()
+      linkedResource.relativePath === contextualActiveFilePath
+      || linkedResource.path === contextualActiveFilePath
+      || linkedResource.name === contextualActiveFilePath.split('/').pop()
     )
   )
   const contextUsageAgentRuntime = React.useMemo(() => {
@@ -234,7 +255,7 @@ export const ChatInput = React.memo(function ChatInput() {
     agentState.toolCalls,
   ])
   const contextUsageAdditionalContext = React.useMemo(() => [
-    activeFilePath ? currentArticle : '',
+    contextualCurrentArticle,
     contextUsageLinkedResourceIsActiveFile ? '' : linkedResourcePreview,
     contextUsageLinkedContent,
     linkedResource && !contextUsageLinkedResourceIsActiveFile
@@ -243,13 +264,11 @@ export const ChatInput = React.memo(function ChatInput() {
     activeQuote?.fullContent,
     contextUsageAgentRuntime,
     canvasSelectionContext ? JSON.stringify(canvasSelectionContext) : '',
-    visibleActiveTabContext
-      ? visibleActiveTabContext.kind === 'record'
-        ? visibleActiveTabContext.record.fullContent
-        : visibleActiveTabContext.kind === 'canvas'
-          ? JSON.stringify(visibleActiveTabContext.canvas)
-          : `${visibleActiveTabContext.file.name}\n${visibleActiveTabContext.file.relativePath}`
-      : '',
+    ...visibleActiveTabContexts.map(context => {
+      if (context.kind === 'record') return context.record.fullContent
+      if (context.kind === 'canvas') return JSON.stringify(context.canvas)
+      return `${context.file.name}\n${context.file.relativePath}`
+    }),
     ...visibleMentionedContexts.map(context => {
       if (context.kind === 'file') {
         return `${context.file.name}\n${context.file.relativePath}`
@@ -262,8 +281,7 @@ export const ChatInput = React.memo(function ChatInput() {
     ...fileAttachments.map(attachment => attachment.preview || ''),
   ].filter(Boolean).join('\n\n'), [
     activeQuote?.fullContent,
-    activeFilePath,
-    currentArticle,
+    contextualCurrentArticle,
     contextUsageAgentRuntime,
     canvasSelectionContext,
     fileAttachments,
@@ -272,7 +290,7 @@ export const ChatInput = React.memo(function ChatInput() {
     contextUsageLinkedResourceIsActiveFile,
     linkedResourcePreview,
     visibleMentionedContexts,
-    visibleActiveTabContext,
+    visibleActiveTabContexts,
   ])
 
   useEffect(() => {
@@ -471,8 +489,53 @@ export const ChatInput = React.memo(function ChatInput() {
 
   // 移除关联文件
   function removeLinkedFile() {
+    const linkedResourceIsMobileArticle = Boolean(
+      isMobile
+      && linkedResource
+      && mobileActiveContexts.articlePath
+      && (
+        linkedResource.relativePath === mobileActiveContexts.articlePath
+        || linkedResource.path === mobileActiveContexts.articlePath
+      )
+    )
+    if (linkedResourceIsMobileArticle) {
+      useChatStore.getState().setMobileActiveContexts({ articlePath: null })
+    }
     setLinkedResource(null)
     setChatLinkedResource(null)
+    setLinkedResourcePreview(null)
+  }
+
+  function removeActiveTabContext(key: string) {
+    const removedContext = activeTabContexts.find(context => (
+      getMentionedContextKey(context) === key
+    ))
+
+    setActiveTabContexts(current => (
+      current.filter(context => getMentionedContextKey(context) !== key)
+    ))
+
+    if (!isMobile || !removedContext) return
+    if (removedContext.kind === 'record') {
+      useChatStore.getState().setMobileActiveContexts({ markId: null })
+    } else if (removedContext.kind === 'canvas') {
+      useChatStore.getState().setMobileActiveContexts({ canvasId: null })
+    }
+  }
+
+  function removeCanvasContext() {
+    const removedCanvasId = canvasSelectionContext?.canvasId
+    if (
+      isMobile
+      && removedCanvasId
+      && mobileActiveContexts.canvasId === removedCanvasId
+    ) {
+      useChatStore.getState().setMobileActiveContexts({ canvasId: null })
+      setActiveTabContexts(current => current.filter(context => (
+        context.kind !== 'canvas' || context.canvas.canvasId !== removedCanvasId
+      )))
+    }
+    setCanvasSelectionContext(null)
   }
 
   function removeImage(id: string) {
@@ -1082,142 +1145,88 @@ ${previewLines.join('\n')}
     }
   }
 
-  // 自动关联当前打开的 markdown 文件或文件夹
+  // 自动关联当前打开的文件、记录和画布。移动端三类上下文可以同时存在。
   useEffect(() => {
     let cancelled = false
 
-    async function linkCurrentResource() {
-      if (!activeTabPath) {
-        setActiveTabContext(null)
-        setLinkedResource(null)
-        setChatLinkedResource(null)
-        setLinkedResourcePreview(null)
-        return
-      }
+    async function linkCurrentResources() {
+      const nextActiveContexts: MentionedContext[] = []
+      let nextLinkedResource: LinkedResource | null = null
+      let nextLinkedResourcePreview: string | null = null
 
-      const recordId = getRecordIdFromTabPath(activeTabPath)
-      if (recordId !== null) {
-        const mark = await getMarkById(recordId)
-        if (cancelled) return
-        setActiveTabContext(mark && mark.deleted === 0
-          ? { kind: 'record', record: createRecordQuote(mark) }
-          : null)
-        setLinkedResource(null)
-        setChatLinkedResource(null)
-        setLinkedResourcePreview(null)
-        return
-      }
+      for (const contextPath of activeContextPaths) {
+        const recordId = getRecordIdFromTabPath(contextPath)
+        if (recordId !== null) {
+          const mark = await getMarkById(recordId)
+          if (mark && mark.deleted === 0) {
+            nextActiveContexts.push({ kind: 'record', record: createRecordQuote(mark) })
+          }
+          continue
+        }
 
-      const canvasId = getCanvasIdFromTabPath(activeTabPath)
-      if (canvasId !== null) {
-        const canvasStore = useCanvasStore.getState()
-        const project = canvasStore.projects.find(item => item.id === canvasId)
-          || await canvasStore.openProject(canvasId)
-        if (cancelled) return
-        const latestDocument = useCanvasStore.getState().documents[canvasId]
-        setActiveTabContext(project
-          ? {
+        const canvasId = getCanvasIdFromTabPath(contextPath)
+        if (canvasId !== null) {
+          const canvasStore = useCanvasStore.getState()
+          const project = canvasStore.projects.find(item => item.id === canvasId)
+            || await canvasStore.openProject(canvasId)
+          if (project) {
+            const latestDocument = useCanvasStore.getState().documents[canvasId]
+            nextActiveContexts.push({
               kind: 'canvas',
               canvas: createCanvasContext({
                 ...project,
                 document: latestDocument || project.document,
               }),
-            }
-          : null)
-        setLinkedResource(null)
-        setChatLinkedResource(null)
-        setLinkedResourcePreview(null)
-        return
-      }
-
-      const workspace = await getWorkspacePath()
-      if (cancelled) return
-
-      // 检查是否是支持的文件类型（包括 markdown、代码文件等）
-      if (activeTabPath.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template)$/i)) {
-        // 文件关联逻辑
-        const fileName = activeTabPath.split('/').pop() || activeTabPath
-
-        // 构建完整路径
-        let fullPath: string
-        if (workspace.isCustom) {
-          const pathParts = activeTabPath.split('/')
-          fullPath = workspace.path + '/' + pathParts.join('/')
-        } else {
-          fullPath = activeTabPath
-        }
-
-        const resource = {
-          name: fileName,
-          path: fullPath,
-          relativePath: activeTabPath
-        }
-        setActiveTabContext(null)
-        setLinkedResource(resource)
-        setChatLinkedResource(resource)
-        setLinkedResourcePreview(null)
-
-        // 生成并设置文件预览
-        const preview = await generateFilePreview(fullPath, workspace.isCustom, activeTabPath === resource.relativePath)
-        if (cancelled) return
-        setLinkedResourcePreview(preview)
-      } else if (!activeTabPath.includes('.')) {
-        // 文件夹关联逻辑 - 只有当路径不包含 . 时才可能是文件夹
-        const folderName = activeTabPath.split('/').pop() || activeTabPath
-
-        // 构建完整路径
-        let fullPath: string
-        if (workspace.isCustom) {
-          const pathParts = activeTabPath.split('/')
-          fullPath = workspace.path + '/' + pathParts.join('/')
-        } else {
-          fullPath = activeTabPath
-        }
-
-        // 计算文件夹中的文件数量和索引状态
-        const { collectMarkdownFiles } = await import('@/lib/files')
-        const files = await collectMarkdownFiles(activeTabPath)
-        if (cancelled) return
-        const { vectorIndexedFiles } = useArticleStore.getState()
-        const indexedCount = files.filter(f =>
-          vectorIndexedFiles.has(f.path)
-        ).length
-
-        // 只有在有索引文件时才关联文件夹
-        if (indexedCount > 0) {
-          const resource = {
-            name: folderName,
-            path: fullPath,
-            relativePath: activeTabPath,
-            fileCount: files.length,
-            indexedCount: indexedCount
+            })
           }
-          setActiveTabContext(null)
-          setLinkedResource(resource)
-          setChatLinkedResource(resource)
-          // 文件夹不生成行号预览
-          setLinkedResourcePreview(null)
-        } else {
-          // 没有索引文件，清除关联
-          setActiveTabContext(null)
-          setLinkedResource(null)
-          setChatLinkedResource(null)
-          setLinkedResourcePreview(null)
+          continue
         }
-      } else {
-        // 不支持的文件类型（如 .docx, .pdf 等），不进行关联
-        setActiveTabContext(null)
-        setLinkedResource(null)
-        setChatLinkedResource(null)
-        setLinkedResourcePreview(null)
+
+        const workspace = await getWorkspacePath()
+        const name = contextPath.split('/').pop() || contextPath
+        const fullPath = workspace.isCustom
+          ? `${workspace.path}/${contextPath}`
+          : contextPath
+
+        if (contextPath.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template)$/i)) {
+          nextLinkedResource = {
+            name,
+            path: fullPath,
+            relativePath: contextPath,
+          }
+          nextLinkedResourcePreview = await generateFilePreview(fullPath, workspace.isCustom, true)
+          continue
+        }
+
+        if (!contextPath.includes('.')) {
+          const { collectMarkdownFiles } = await import('@/lib/files')
+          const files = await collectMarkdownFiles(contextPath)
+          const { vectorIndexedFiles } = useArticleStore.getState()
+          const indexedCount = files.filter(file => vectorIndexedFiles.has(file.path)).length
+          if (indexedCount > 0) {
+            nextLinkedResource = {
+              name,
+              path: fullPath,
+              relativePath: contextPath,
+              fileCount: files.length,
+              indexedCount,
+            }
+          }
+        }
       }
+
+      if (cancelled) return
+      setActiveTabContexts(nextActiveContexts)
+      setLinkedResource(nextLinkedResource)
+      setChatLinkedResource(nextLinkedResource)
+      setLinkedResourcePreview(nextLinkedResourcePreview)
     }
 
-    void linkCurrentResource()
+    void linkCurrentResources()
     return () => {
       cancelled = true
     }
-  }, [activeTabPath])
+  }, [activeContextPaths, setChatLinkedResource, setLinkedResourcePreview])
 
   return (
     <footer
@@ -1287,15 +1296,15 @@ ${previewLines.join('\n')}
         )}
         <ChatContextStrip
           linkedResource={linkedResource}
-          activeTabContext={visibleActiveTabContext}
+          activeTabContexts={visibleActiveTabContexts}
           quoteData={activeQuote}
           canvasContext={canvasSelectionContext}
           selectedSkills={selectedSkills}
           mentionedContexts={visibleMentionedContexts}
           onRemoveLinkedResource={removeLinkedFile}
-          onRemoveActiveTabContext={() => setActiveTabContext(null)}
+          onRemoveActiveTabContext={removeActiveTabContext}
           onRemoveQuote={removeQuote}
-          onRemoveCanvas={() => setCanvasSelectionContext(null)}
+          onRemoveCanvas={removeCanvasContext}
           onRemoveSkill={skillId => {
             setSelectedSkills(current => current.filter(skill => skill.id !== skillId))
           }}
@@ -1424,19 +1433,19 @@ ${previewLines.join('\n')}
               canvasSelectionContext={canvasSelectionContext}
               selectedSkillIds={selectedSkills.map(skill => skill.id)}
               mentionedFiles={[
-                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleActiveTabContexts,
                 ...visibleMentionedContexts,
               ].flatMap(context =>
                 context.kind === 'file' ? [context.file] : []
               )}
               mentionedRecords={[
-                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleActiveTabContexts,
                 ...visibleMentionedContexts,
               ].flatMap(context =>
                 context.kind === 'record' ? [context.record] : []
               )}
               mentionedCanvases={[
-                ...(visibleActiveTabContext ? [visibleActiveTabContext] : []),
+                ...visibleActiveTabContexts,
                 ...visibleMentionedContexts,
               ].flatMap(context =>
                 context.kind === 'canvas' ? [context.canvas] : []

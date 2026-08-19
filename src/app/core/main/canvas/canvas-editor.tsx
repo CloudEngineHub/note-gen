@@ -2481,7 +2481,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           <div className={cn(
             'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
             mobile
-              ? 'inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(60vh,32rem)]'
+              ? 'inset-x-3 top-[4.25rem] max-h-[min(60vh,32rem)]'
               : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
           )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">
@@ -2828,7 +2828,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           <div className={cn(
             'absolute z-10 flex flex-col overflow-hidden rounded-xl border bg-background shadow-lg',
             mobile
-              ? 'inset-x-3 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] max-h-[min(60vh,32rem)]'
+              ? 'inset-x-3 top-[4.25rem] max-h-[min(60vh,32rem)]'
               : 'left-[4.25rem] top-3 max-h-[calc(100%-1.5rem)] w-[min(18rem,calc(100%-5.5rem))]'
           )}>
             <div className="flex h-12 shrink-0 items-center justify-between gap-3 px-4">

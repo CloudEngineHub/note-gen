@@ -48,13 +48,13 @@ export function getMentionedContextKey(context: MentionedContext) {
 
 interface ChatContextStripProps {
   linkedResource: LinkedResource | null
-  activeTabContext: MentionedContext | null
+  activeTabContexts: MentionedContext[]
   quoteData: PendingQuote | null
   canvasContext: CanvasSelectionContext | null
   selectedSkills: SkillMetadata[]
   mentionedContexts: MentionedContext[]
   onRemoveLinkedResource: () => void
-  onRemoveActiveTabContext: () => void
+  onRemoveActiveTabContext: (key: string) => void
   onRemoveQuote: () => void
   onRemoveCanvas: () => void
   onRemoveSkill: (skillId: string) => void
@@ -207,7 +207,7 @@ function MentionedContextBadge({
 
 export function ChatContextStrip({
   linkedResource,
-  activeTabContext,
+  activeTabContexts,
   quoteData,
   canvasContext,
   selectedSkills,
@@ -221,7 +221,7 @@ export function ChatContextStrip({
 }: ChatContextStripProps) {
   if (
     !linkedResource
-    && !activeTabContext
+    && activeTabContexts.length === 0
     && !quoteData
     && !canvasContext
     && selectedSkills.length === 0
@@ -237,12 +237,16 @@ export function ChatContextStrip({
           onRemove={onRemoveLinkedResource}
         />
       ) : null}
-      {activeTabContext ? (
-        <MentionedContextBadge
-          context={activeTabContext}
-          onRemove={onRemoveActiveTabContext}
-        />
-      ) : null}
+      {activeTabContexts.map(context => {
+        const key = getMentionedContextKey(context)
+        return (
+          <MentionedContextBadge
+            key={key}
+            context={context}
+            onRemove={() => onRemoveActiveTabContext(key)}
+          />
+        )
+      })}
       {quoteData ? (
         <ContextBadge
           icon={<TextSelect />}

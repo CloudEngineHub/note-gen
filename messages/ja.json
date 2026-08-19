@@ -3679,6 +3679,8 @@
         "save": "保存",
         "emptyDir": "このディレクトリは空です",
         "root": "ルート",
+        "editor": "エディター",
+        "backToFiles": "ファイル管理に戻る",
         "openFiles": "ファイルを開く",
         "remote": "リモートファイル",
         "remoteFileNotPulled": "クラウドのみ · タップして取得",

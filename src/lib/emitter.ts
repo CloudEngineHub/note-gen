@@ -149,6 +149,7 @@ interface Events {
   };
   'editor-agent-diff-clear': void;
   'mobile-editor-toggle-outline': void;
+  'editor-search-trigger': void;
   'editor-can-undo-redo': { resolve: (can: { undo: boolean; redo: boolean }) => void };
   'editor-prepare-deactivate': { resolve: (canDeactivate: boolean) => void };
   'editor-undo-redo-changed': { undo: boolean; redo: boolean };

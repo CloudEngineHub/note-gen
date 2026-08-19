@@ -19,6 +19,12 @@ export interface PendingQuote {
   articlePath: string
 }
 
+export interface MobileActiveContexts {
+  articlePath: string | null
+  markId: number | null
+  canvasId: string | null
+}
+
 function getPendingQuoteIdentity(quote: PendingQuote | null) {
   if (!quote) {
     return ''
@@ -104,6 +110,9 @@ interface ChatState {
   // 关联文件的行号预览（用于 AI 对话时快速了解文件结构）
   linkedResourcePreview: string | null
   setLinkedResourcePreview: (preview: string | null) => void
+
+  mobileActiveContexts: MobileActiveContexts
+  setMobileActiveContexts: (contexts: Partial<MobileActiveContexts>) => void
 
   pendingQuote: PendingQuote | null
   setPendingQuote: (quote: PendingQuote | null) => void
@@ -248,6 +257,20 @@ const useChatStore = create<ChatState>((set, get) => ({
   linkedResourcePreview: null,
   setLinkedResourcePreview: (preview: string | null) => {
     set({ linkedResourcePreview: preview })
+  },
+
+  mobileActiveContexts: {
+    articlePath: null,
+    markId: null,
+    canvasId: null,
+  },
+  setMobileActiveContexts: (contexts) => {
+    set(state => ({
+      mobileActiveContexts: {
+        ...state.mobileActiveContexts,
+        ...contexts,
+      },
+    }))
   },
 
   pendingQuote: null,

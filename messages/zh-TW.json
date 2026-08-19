@@ -3669,6 +3669,8 @@
         "save": "保存",
         "emptyDir": "該目錄為空",
         "root": "根目錄",
+        "editor": "編輯器",
+        "backToFiles": "返回文件管理",
         "openFiles": "打開文件",
         "remote": "遠端文件",
         "remoteFileNotPulled": "僅雲端 · 點擊後拉取",

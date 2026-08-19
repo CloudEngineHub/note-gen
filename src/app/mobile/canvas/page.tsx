@@ -54,6 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { canvasDocumentToSvg } from '@/lib/canvas/static-export'
 import { isAutoDataSyncProviderConfigured } from '@/lib/sync/auto-data-sync-queue'
 import useCanvasStore from '@/stores/canvas'
+import useChatStore from '@/stores/chat'
 import useSettingStore from '@/stores/setting'
 import type { CanvasProject, CanvasProjectType } from '@/types/canvas'
 
@@ -110,6 +111,7 @@ export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}
   const loadProjects = useCanvasStore(state => state.loadProjects)
   const createProject = useCanvasStore(state => state.createProject)
   const openProject = useCanvasStore(state => state.openProject)
+  const setActiveCanvasId = useCanvasStore(state => state.setActiveCanvasId)
   const duplicateProject = useCanvasStore(state => state.duplicateProject)
   const deleteProject = useCanvasStore(state => state.deleteProject)
   const renameProject = useCanvasStore(state => state.renameProject)
@@ -123,8 +125,10 @@ export function MobileCanvasPage({ preview = false }: MobileCanvasPageProps = {}
 
   useEffect(() => {
     if (preview) return
+    setActiveCanvasId(null)
+    useChatStore.getState().setMobileActiveContexts({ canvasId: null })
     void loadProjects()
-  }, [loadProjects, preview])
+  }, [loadProjects, preview, setActiveCanvasId])
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {

@@ -7,17 +7,10 @@ import { platform as getRuntimePlatform } from '@tauri-apps/plugin-os'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { cloneDeep } from 'lodash-es'
-import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, Folder, FolderDown, FolderInput, FolderPlus, FolderUp, List, Pencil, RefreshCw, Scissors, Search, SearchCode, Trash2, Unplug } from 'lucide-react'
+import { ChevronLeft, ClipboardPaste, Copy, FilePlus, FileUp, FolderDown, FolderInput, FolderPlus, FolderUp, Pencil, RefreshCw, Scissors, Search, Trash2, Unplug } from 'lucide-react'
 import { MobileMeSheet } from '@/app/mobile/components/mobile-me-sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTrigger,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer"
 import emitter from '@/lib/emitter'
 import { toast } from '@/hooks/use-toast'
 import useArticleStore from '@/stores/article'
@@ -68,7 +61,12 @@ type DragPoint = {
   y: number
 }
 
-export function WritingHeader() {
+interface MobileFileBrowserProps {
+  active: boolean
+  onOpenFile: () => void
+}
+
+export function MobileFileBrowser({ active, onOpenFile }: MobileFileBrowserProps) {
   const router = useRouter()
   const t = useTranslations('record.chat.input.fileLink')
   const tFile = useTranslations('article.file')
@@ -76,8 +74,6 @@ export function WritingHeader() {
   const tMobile = useTranslations('article.file.mobile')
   const tSyncStatus = useTranslations('article.file.syncStatus')
   const tToolbar = useTranslations('article.file.toolbar')
-  const tEditor = useTranslations('article.editor')
-  const tOutline = useTranslations('editor.outline')
   const tSync = useTranslations('settings.sync')
   const {
     activeFilePath,
@@ -116,13 +112,12 @@ export function WritingHeader() {
   }, [router, tSync])
   const { clipboardItem, clipboardItems, clipboardOperation, setClipboardItem } = useClipboardStore()
 
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentDir, setCurrentDir] = useState('')
   const [folderLoading, setFolderLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [entryMetaMap, setEntryMetaMap] = useState<Record<string, { modifiedAt?: string; size?: number }>>({})
-  const hasInitializedDrawerRef = useRef(false)
+  const hasInitializedBrowserRef = useRef(false)
   const remoteRefreshInFlightRef = useRef(false)
 
   const [createType, setCreateType] = useState<'file' | 'folder' | null>(null)
@@ -194,7 +189,7 @@ export function WritingHeader() {
   }, [rawEntries, currentDir, searchQuery])
 
   useEffect(() => {
-    if (!drawerOpen) return
+    if (!active) return
 
     const localEntries = rawEntries.filter((node) => node.isLocale)
     if (localEntries.length === 0) return
@@ -229,7 +224,7 @@ export function WritingHeader() {
     }
 
     loadEntryMeta()
-  }, [drawerOpen, rawEntries, currentDir])
+  }, [active, rawEntries, currentDir])
 
   const formatDateTime = useCallback((value?: string) => {
     if (!value) return ''
@@ -498,14 +493,14 @@ export function WritingHeader() {
   ])
 
   useEffect(() => {
-    if (!drawerOpen) {
-      hasInitializedDrawerRef.current = false
+    if (!active) {
+      hasInitializedBrowserRef.current = false
       resetDragState()
       return
     }
 
-    if (hasInitializedDrawerRef.current) return
-    hasInitializedDrawerRef.current = true
+    if (hasInitializedBrowserRef.current) return
+    hasInitializedBrowserRef.current = true
 
     const initialDir = parentPath(normalizedActivePath)
     setCurrentDir(initialDir)
@@ -517,12 +512,12 @@ export function WritingHeader() {
     }
 
     init()
-  }, [drawerOpen, normalizedActivePath, refreshRemoteInBackground, refreshTree, resetDragState])
+  }, [active, normalizedActivePath, refreshRemoteInBackground, refreshTree, resetDragState])
 
   useEffect(() => {
-    if (!drawerOpen) return
+    if (!active) return
 
-    let active = true
+    let subscribed = true
     let timer: number | undefined
 
     const handleVisibilityChange = () => {
@@ -530,18 +525,18 @@ export function WritingHeader() {
     }
 
     const startOneDriveRefresh = async () => {
-      if (!await isMobileOneDriveSyncEnabled() || !active) return
+      if (!await isMobileOneDriveSyncEnabled() || !subscribed) return
       timer = window.setInterval(() => void refreshRemoteInBackground(), 15_000)
       document.addEventListener('visibilitychange', handleVisibilityChange)
     }
 
     void startOneDriveRefresh()
     return () => {
-      active = false
+      subscribed = false
       if (timer !== undefined) window.clearInterval(timer)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [drawerOpen, refreshRemoteInBackground])
+  }, [active, refreshRemoteInBackground])
 
   const ensureLocalFolder = useCallback(async (dir: string) => {
     if (!dir) return
@@ -584,7 +579,7 @@ export function WritingHeader() {
     }
 
     await setActiveFilePath(entry.relativePath)
-    setDrawerOpen(false)
+    onOpenFile()
   }
 
   const handleUploadEntry = async (entry: BrowserEntry) => {
@@ -873,7 +868,7 @@ export function WritingHeader() {
             true,
             { deactivationAlreadyPrepared: true },
           )
-          setDrawerOpen(false)
+          onOpenFile()
         }
       } else {
         const relativePath = targetDir ? `${targetDir}/${rawName}` : rawName
@@ -1146,107 +1141,70 @@ export function WritingHeader() {
     })
   }
 
-  const handleToggleOutline = useCallback(() => {
-    emitter.emit('mobile-editor-toggle-outline' as any)
-  }, [])
-
-  const handleSearchReplace = useCallback(() => {
-    emitter.emit('editor-search-trigger' as any)
-  }, [])
-
   return (
-    <header className="mobile-page-header flex w-full items-center justify-between gap-2 border-b bg-background px-2 text-sm">
-      <div className="flex shrink-0 items-center">
-        <MobileMeSheet />
-      </div>
+    <div className="flex h-full min-h-0 w-full flex-col bg-background">
+      <header className="mobile-page-header flex w-full items-center gap-2 border-b bg-background px-2 text-sm">
+        <div className="flex shrink-0 items-center">
+          <MobileMeSheet />
+        </div>
+        <div className="min-w-0 flex-1 truncate text-center font-medium">
+          {currentDirLabel}
+        </div>
+        <div className="flex shrink-0 items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            onClick={() => {
+              setCreateType('file')
+              setCreateName('')
+              setCreateTargetDir(currentDir)
+            }}
+            title={tToolbar('newArticle')}
+            aria-label={tToolbar('newArticle')}
+          >
+            <FilePlus className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            onClick={() => {
+              setCreateType('folder')
+              setCreateName('')
+              setCreateTargetDir(currentDir)
+            }}
+            title={tToolbar('newFolder')}
+            aria-label={tToolbar('newFolder')}
+          >
+            <FolderPlus className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 shrink-0"
+            onClick={() => refreshTree(currentDir)}
+            title={tToolbar('refresh')}
+            aria-label={tToolbar('refresh')}
+            disabled={isBrowserRefreshing}
+          >
+            <RefreshCw className={`size-4 ${isBrowserRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+          <CloudLibraryMenu className="size-9 shrink-0" />
+        </div>
+      </header>
 
-      <div className="flex shrink-0 items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleSearchReplace}
-          aria-label={tEditor('search.placeholder')}
-        >
-          <SearchCode />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleToggleOutline}
-          aria-label={tOutline('open')}
-        >
-          <List />
-        </Button>
-
-        <Drawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          handleOnly={!!dragEntry}
-          dismissible={!dragEntry}
-        >
-          <DrawerTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Folder />
-              <span className="sr-only">{tMobile('openFiles')}</span>
-            </Button>
-          </DrawerTrigger>
-          <DrawerContent className="h-[85%]">
-            <DrawerHeader className="gap-2">
-              <DrawerTitle className="sr-only">{currentDirLabel}</DrawerTitle>
-            </DrawerHeader>
-            <div className="px-4 pb-4 h-full flex flex-col overflow-hidden">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="relative flex-1">
-                  <Search className="size-4 text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder={t('searchPlaceholder')}
-                    className="h-9 pl-8"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0"
-                  onClick={() => {
-                    setCreateType('file')
-                    setCreateName('')
-                    setCreateTargetDir(currentDir)
-                  }}
-                  title={tToolbar('newArticle')}
-                  aria-label={tToolbar('newArticle')}
-                >
-                  <FilePlus className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0"
-                  onClick={() => {
-                    setCreateType('folder')
-                    setCreateName('')
-                    setCreateTargetDir(currentDir)
-                  }}
-                  title={tToolbar('newFolder')}
-                  aria-label={tToolbar('newFolder')}
-                >
-                  <FolderPlus className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 shrink-0"
-                  onClick={() => refreshTree(currentDir)}
-                  title={tToolbar('refresh')}
-                  aria-label={tToolbar('refresh')}
-                  disabled={isBrowserRefreshing}
-                >
-                  <RefreshCw className={`size-4 ${isBrowserRefreshing ? 'animate-spin' : ''}`} />
-                </Button>
-                <CloudLibraryMenu className="size-9 shrink-0" />
-              </div>
-              {currentDir !== '' && (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4 pt-3">
+        <div className="relative mb-3">
+          <Search className="absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('searchPlaceholder')}
+            className="h-9 pl-8"
+          />
+        </div>
+        {currentDir !== '' && (
                 <button
                   ref={(node) => {
                     parentDropTargetRef.current = node
@@ -1271,9 +1229,9 @@ export function WritingHeader() {
                     {dragEntry ? tMobile('dragToParent') : currentDirLabel}
                   </span>
                 </button>
-              )}
+        )}
 
-              <div
+        <div
                 className={cn(
                   "relative flex-1",
                   dragEntry ? "overflow-visible" : "overflow-y-auto overflow-x-hidden"
@@ -1426,10 +1384,7 @@ export function WritingHeader() {
                     ))}
                   </div>
                 )}
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
+        </div>
       </div>
 
       <NameInputDialog
@@ -1467,6 +1422,6 @@ export function WritingHeader() {
           }
         }}
       />
-    </header>
+    </div>
   )
 }
