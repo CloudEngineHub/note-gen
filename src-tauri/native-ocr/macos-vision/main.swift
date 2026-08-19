@@ -60,6 +60,7 @@ func defaultRecognitionLanguages() -> [String] {
     ]
 }
 
+@available(macOS 10.15, *)
 func supportedRecognitionLanguages(for request: VNRecognizeTextRequest) -> Set<String> {
     if #available(macOS 12.0, *) {
         do {
@@ -71,6 +72,7 @@ func supportedRecognitionLanguages(for request: VNRecognizeTextRequest) -> Set<S
     return []
 }
 
+@available(macOS 10.15, *)
 func setRecognitionLanguages(_ languages: [String], for request: VNRecognizeTextRequest) {
     let normalizedLanguages = languages.compactMap(normalizeLanguage)
     let candidateLanguages = normalizedLanguages.isEmpty
@@ -86,6 +88,7 @@ func setRecognitionLanguages(_ languages: [String], for request: VNRecognizeText
     }
 }
 
+@available(macOS 10.15, *)
 func sortedRecognizedLines(from observations: [VNRecognizedTextObservation]) -> [(text: String, confidence: Float, x: CGFloat, y: CGFloat)] {
     observations.compactMap { observation in
         guard let candidate = observation.topCandidates(1).first else {
