@@ -620,6 +620,7 @@ export async function getRemoteCommitInfo(path: string): Promise<{
   try {
     const store = await Store.load('store.json')
     const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github'
+    if (primaryBackupMethod === 'selfHosted') return null
     const repo = await getSyncRepoName(primaryBackupMethod as 'github' | 'gitee' | 'gitlab' | 'gitea')
     
     let commits: any[] = []
@@ -1023,6 +1024,31 @@ export async function hasNetworkConnection(): Promise<boolean> {
         clearTimeout(timeoutId)
         const config = await store.get<CloudFolderConfig>('cloudFolderSyncConfig')
         return Boolean(config && supportsCloudFolderWorkspace(config))
+      }
+      case 'selfHosted': {
+        clearTimeout(timeoutId)
+        const { connectedProfileId } = await import('@/lib/self-hosted-sync/workspaces')
+        const profileId = await connectedProfileId()
+        if (!profileId) return false
+        const {
+          authenticatedClient,
+          getProfile,
+          isSelfHostedAuthenticationError,
+        } = await import('@/lib/self-hosted-sync/profile')
+        try {
+          const { client } = await authenticatedClient(profileId)
+          await client.capabilities()
+          return true
+        } catch (error) {
+          if (
+            isSelfHostedAuthenticationError(error)
+            || (await getProfile(profileId))?.state === 'reauthentication-required'
+          ) {
+            console.info('[self-hosted-sync] Network check requires reauthentication', { profileId })
+            return false
+          }
+          throw error
+        }
       }
       case 's3': {
         clearTimeout(timeoutId)

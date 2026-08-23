@@ -39,7 +39,12 @@ import { handleImageUpload, saveImageToWorkspace } from '@/lib/image-handler'
 import useArticleStore from '@/stores/article'
 import { cn, convertImage, convertImageByWorkspace } from '@/lib/utils'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
-import { getFilePathOptions, getWorkspacePath, isAbsoluteFsPath } from '@/lib/workspace'
+import {
+  getDefaultArticleAbsolutePath,
+  getFilePathOptions,
+  getWorkspacePath,
+  isAbsoluteFsPath,
+} from '@/lib/workspace'
 import { isMobileDevice } from '@/lib/check'
 import { pickImagesFromPhotoLibrary } from '@/lib/image-picker'
 import { useTranslations } from 'next-intl'
@@ -64,13 +69,19 @@ import { AISuggestion } from './ai-suggestion'
 import { AISuggestionFloating } from './ai-suggestion-floating'
 import { AiSuggestionHighlight } from './ai-suggestion-highlight'
 import { AgentDiffPreview, agentDiffPreviewPluginKey } from './agent-diff-preview-extension'
-import emitter from '@/lib/emitter'
-import { markEditorPathMutation } from '@/lib/editor-deactivation'
+import emitter, { type Events } from '@/lib/emitter'
+import {
+  editorPathsReferToSameFile,
+  getCurrentEditorWorkspaceRoot,
+  markEditorPathMutation,
+  workspaceRootsReferToSameLocation,
+} from '@/lib/editor-deactivation'
 import { QuoteMark } from './quote-mark'
 import { MarkdownParagraph, normalizeMarkdownPlaceholders } from './markdown-paragraph'
 import { StableCodeBlockLowlight } from './code-block-extension'
 import { shouldTransformImageSrcToWorkspaceAsset } from './image-src'
 import useSettingStore from '@/stores/setting'
+import useSyncStore from '@/stores/sync'
 import useChatStore, { type PendingQuote } from '@/stores/chat'
 import { ArrowUp, Eye, FileCode2, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -122,6 +133,10 @@ import {
   type SectionedMarkdownSelection,
 } from './sectioned-markdown-editor'
 import dynamic from 'next/dynamic'
+import {
+  openMarkdownCollaboration,
+  type MarkdownCollaborationController,
+} from '@/lib/self-hosted-sync/markdown-collaboration'
 import './style.css'
 
 const MathEditorDialog = dynamic(
@@ -939,6 +954,174 @@ interface BlurSelectionState {
   to: number
 }
 
+interface SelfHostedRemoteCursor {
+  deviceId: string
+  label: string
+  anchor: number
+  head: number
+  coordinateSpace: 'markdown' | 'prosemirror'
+}
+
+const selfHostedRemoteCursorPluginKey = new PluginKey<SelfHostedRemoteCursor[]>('selfHostedRemoteCursors')
+const REMOTE_CURSOR_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0891b2']
+
+function remoteCursorColor(deviceId: string) {
+  let hash = 0
+  for (const character of deviceId) hash = (Math.imul(hash, 31) + character.charCodeAt(0)) | 0
+  return REMOTE_CURSOR_COLORS[Math.abs(hash) % REMOTE_CURSOR_COLORS.length]!
+}
+
+function createRemoteCursorDecorations(
+  doc: ProseMirrorNode,
+  cursors: SelfHostedRemoteCursor[],
+) {
+  const decorations: Decoration[] = []
+  const maxPosition = doc.content.size
+  for (const cursor of cursors) {
+    const anchor = Math.max(0, Math.min(cursor.anchor, maxPosition))
+    const head = Math.max(0, Math.min(cursor.head, maxPosition))
+    const color = remoteCursorColor(cursor.deviceId)
+    if (anchor !== head) {
+      decorations.push(Decoration.inline(Math.min(anchor, head), Math.max(anchor, head), {
+        style: `background-color: color-mix(in srgb, ${color} 22%, transparent);`,
+        class: 'self-hosted-remote-selection',
+      }))
+    }
+    decorations.push(Decoration.widget(head, () => {
+      const cursorElement = document.createElement('span')
+      cursorElement.className = 'self-hosted-remote-cursor'
+      cursorElement.style.borderColor = color
+      cursorElement.setAttribute('aria-label', `${cursor.label} 的光标`)
+      const label = document.createElement('span')
+      label.className = 'self-hosted-remote-cursor-label'
+      label.style.backgroundColor = color
+      label.textContent = cursor.label
+      cursorElement.append(label)
+      return cursorElement
+    }, { key: cursor.deviceId, side: 1 }))
+  }
+  return DecorationSet.create(doc, decorations)
+}
+
+const SelfHostedRemoteCursors = Extension.create({
+  name: 'selfHostedRemoteCursors',
+
+  addProseMirrorPlugins() {
+    return [new Plugin<SelfHostedRemoteCursor[]>({
+      key: selfHostedRemoteCursorPluginKey,
+      state: {
+        init: () => [],
+        apply(transaction, current) {
+          const next = transaction.getMeta(selfHostedRemoteCursorPluginKey) as SelfHostedRemoteCursor[] | undefined
+          if (next) return next
+          return current.map(cursor => ({
+            ...cursor,
+            anchor: transaction.mapping.map(cursor.anchor),
+            head: transaction.mapping.map(cursor.head),
+          }))
+        },
+      },
+      props: {
+        decorations(state) {
+          return createRemoteCursorDecorations(
+            state.doc,
+            selfHostedRemoteCursorPluginKey.getState(state) ?? [],
+          )
+        },
+      },
+    })]
+  },
+})
+
+function updateSelfHostedRemoteCursors(
+  editor: TipTapReactEditor,
+  cursors: SelfHostedRemoteCursor[],
+) {
+  editor.view.dispatch(editor.state.tr.setMeta(selfHostedRemoteCursorPluginKey, cursors))
+}
+
+function projectRemoteCursorPosition(position: number, fromLength: number, toLength: number) {
+  const safePosition = Math.max(0, Math.min(position, fromLength))
+  if (fromLength <= 0 || toLength <= 0) return 0
+  return Math.round((safePosition / fromLength) * toLength)
+}
+
+function projectRemoteCursor(
+  cursor: SelfHostedRemoteCursor,
+  coordinateSpace: SelfHostedRemoteCursor['coordinateSpace'],
+  markdownLength: number,
+  proseMirrorLength: number,
+): SelfHostedRemoteCursor {
+  if (cursor.coordinateSpace === coordinateSpace) return cursor
+  const [fromLength, toLength] = coordinateSpace === 'markdown'
+    ? [proseMirrorLength, markdownLength]
+    : [markdownLength, proseMirrorLength]
+  return {
+    ...cursor,
+    anchor: projectRemoteCursorPosition(cursor.anchor, fromLength, toLength),
+    head: projectRemoteCursorPosition(cursor.head, fromLength, toLength),
+    coordinateSpace,
+  }
+}
+
+function getEditorPresenceSelection(editor: TipTapReactEditor) {
+  const selection = editor.state.selection
+  if (isFullDocumentSelection(selection, editor.state.doc.content.size)) {
+    return { anchor: selection.head, head: selection.head }
+  }
+  return { anchor: selection.anchor, head: selection.head }
+}
+
+interface TextReplacement {
+  from: number
+  to: number
+  insert: string
+}
+
+function singleTextReplacement(base: string, next: string): TextReplacement {
+  const prefixLimit = Math.min(base.length, next.length)
+  let from = 0
+  while (from < prefixLimit && base[from] === next[from]) from++
+
+  const suffixLimit = Math.min(base.length, next.length) - from
+  let suffix = 0
+  while (suffix < suffixLimit
+    && base[base.length - 1 - suffix] === next[next.length - 1 - suffix]) {
+    suffix++
+  }
+  return {
+    from,
+    to: base.length - suffix,
+    insert: next.slice(from, next.length - suffix),
+  }
+}
+
+function mergeCollaborationSetupMarkdown(base: string, local: string, remote: string) {
+  if (local === base) return remote
+  if (remote === base || local === remote) return local
+
+  const localChange = singleTextReplacement(base, local)
+  const remoteChange = singleTextReplacement(base, remote)
+  if (localChange.from === remoteChange.from
+    && localChange.to === remoteChange.to
+    && localChange.insert === remoteChange.insert) {
+    return remote
+  }
+
+  if (localChange.to <= remoteChange.from) {
+    return remote.slice(0, localChange.from)
+      + localChange.insert
+      + remote.slice(localChange.to)
+  }
+  if (remoteChange.to <= localChange.from) {
+    const remoteOffset = remoteChange.insert.length - (remoteChange.to - remoteChange.from)
+    const from = localChange.from + remoteOffset
+    const to = localChange.to + remoteOffset
+    return remote.slice(0, from) + localChange.insert + remote.slice(to)
+  }
+  return null
+}
+
 const blurSelectionPluginKey = new PluginKey<BlurSelectionState>('blurSelectionHighlight')
 
 function isFullDocumentRange(from: number, to: number, docSize: number): boolean {
@@ -1429,8 +1612,11 @@ export function TipTapEditor({
     showEditorUndoRedo,
     showMobileEditorToolbar,
     enableOutline,
+    primaryBackupMethod,
+    workspacePath,
     setEditorViewMode,
   } = useSettingStore()
+  const selfHostedRuntimeReady = useSyncStore((state) => state.selfHostedRuntimeReady)
   const viewMode: EditorViewMode = applyLayoutPreferences && !isSectionScope
     ? editorViewMode
     : 'visual'
@@ -1486,6 +1672,7 @@ export function TipTapEditor({
   const [customAiInstruction, setCustomAiInstruction] = useState('')
   const [isCanvasDragOver, setIsCanvasDragOver] = useState(false)
   const [isCanvasDropPending, setIsCanvasDropPending] = useState(false)
+  const [selfHostedCollaborators, setSelfHostedCollaborators] = useState<SelfHostedRemoteCursor[]>([])
   const aiActionHandlersRef = useRef({
     polish: async () => {},
     concise: async () => {},
@@ -1498,7 +1685,8 @@ export function TipTapEditor({
   const isInitializedRef = useRef(false)
   const initializedForPathRef = useRef<string | null>(null)
   const externalUpdateCounterRef = useRef(0)
-  const pendingSyncUpdateRef = useRef<{ path: string; content: string } | null>(null)
+  const pendingSyncUpdateRef = useRef<Events['sync-content-updated'] | null>(null)
+  const selfHostedCollaborationRef = useRef<MarkdownCollaborationController | null>(null)
   const canonicalExternalUpdateSequenceRef = useRef(0)
   const restoredViewPathRef = useRef<string | null>(null)
   const restoreEditorViewStateRef = useRef<(path: string, attempt?: number) => void>(() => {})
@@ -1519,6 +1707,8 @@ export function TipTapEditor({
   const contentVersionRef = useRef(0)
   const sourceSelectionQuoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const markdownChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const collaborationChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingCollaborationEditorRef = useRef<TipTapReactEditor | null>(null)
   const hasPendingMarkdownChangeRef = useRef(false)
   const onChangeRef = useRef(onChange)
   const classifyCanonicalMarkdownRef = useRef<(value: string) => boolean>(() => false)
@@ -1571,6 +1761,7 @@ export function TipTapEditor({
       }
     }
     onChangeRef.current?.(markdown)
+    selfHostedCollaborationRef.current?.applyLocal(markdown)
   }, [isSectionScope])
 
   const scheduleMarkdownChange = useCallback((targetEditor: TipTapReactEditor) => {
@@ -1584,6 +1775,28 @@ export function TipTapEditor({
       flushMarkdownChange(targetEditor)
     }, 500)
   }, [flushMarkdownChange])
+
+  const flushCollaborationChange = useCallback(() => {
+    if (collaborationChangeTimerRef.current) {
+      clearTimeout(collaborationChangeTimerRef.current)
+      collaborationChangeTimerRef.current = null
+    }
+    const targetEditor = pendingCollaborationEditorRef.current
+    pendingCollaborationEditorRef.current = null
+    if (!targetEditor || targetEditor.isDestroyed || externalUpdateCounterRef.current > 0) return
+    selfHostedCollaborationRef.current?.applyLocal(
+      normalizeMarkdownPlaceholders(targetEditor.getMarkdown()),
+    )
+  }, [])
+
+  const scheduleCollaborationChange = useCallback((targetEditor: TipTapReactEditor) => {
+    pendingCollaborationEditorRef.current = targetEditor
+    if (collaborationChangeTimerRef.current) return
+    collaborationChangeTimerRef.current = setTimeout(() => {
+      collaborationChangeTimerRef.current = null
+      flushCollaborationChange()
+    }, 120)
+  }, [flushCollaborationChange])
 
   const runEditorShortcutCommand = useCallback((id: EditorShortcutCommandId, targetEditor: CoreEditor) => {
     return editorShortcutHandlersRef.current[id]?.(targetEditor) ?? false
@@ -1898,6 +2111,7 @@ export function TipTapEditor({
       // 自定义粘贴 Markdown 扩展
       PasteMarkdown,
       BlurSelectionHighlight,
+      SelfHostedRemoteCursors,
     ],
     // Parse after initialization so malformed or unsupported Markdown cannot
     // throw during React render and take down the entire editor tab.
@@ -1909,7 +2123,9 @@ export function TipTapEditor({
       // Using counter to handle rapid successive updates
       if (externalUpdateCounterRef.current === 0 && isReadyRef.current) {
         markEditorPathMutation(activeFilePathRef.current)
+        selfHostedCollaborationRef.current?.markLocalActivity()
         onContentDirtyRef.current?.()
+        scheduleCollaborationChange(editor)
         scheduleMarkdownChange(editor)
         // Mark that we've processed the first update
         isFirstUpdateRef.current = false
@@ -1922,6 +2138,27 @@ export function TipTapEditor({
       }
     },
   })
+
+  const selfHostedMarkdownCursors = useMemo(() => {
+    const markdownLength = sourceMarkdownRef.current.length
+    const proseMirrorLength = editor?.state.doc.content.size ?? markdownLength
+    return selfHostedCollaborators.map(cursor => projectRemoteCursor(
+      cursor,
+      'markdown',
+      markdownLength,
+      proseMirrorLength,
+    ))
+  }, [editor, isSourceView, selfHostedCollaborators, sourceMarkdown])
+  const selfHostedProseMirrorCursors = useMemo(() => {
+    const markdownLength = sourceMarkdownRef.current.length
+    const proseMirrorLength = editor?.state.doc.content.size ?? markdownLength
+    return selfHostedCollaborators.map(cursor => projectRemoteCursor(
+      cursor,
+      'prosemirror',
+      markdownLength,
+      proseMirrorLength,
+    ))
+  }, [editor, isSourceView, selfHostedCollaborators, sourceMarkdown])
 
   blockingActivityFlushRef.current = () => {
     if (!editor || editor.isDestroyed || blockingActivityTokensRef.current.size > 0) return
@@ -1977,22 +2214,228 @@ export function TipTapEditor({
 
   const handleSourceMarkdownChange = useCallback((value: string) => {
     markEditorPathMutation(activeFilePathRef.current)
+    selfHostedCollaborationRef.current?.markLocalActivity()
     sourceMarkdownRef.current = value
     setSourceMarkdown(value)
     setHasUnparsedSourceChanges(true)
     contentVersionRef.current++
     onChangeRef.current?.(value)
+    selfHostedCollaborationRef.current?.applyLocal(value)
   }, [])
 
   const handleSectionedMarkdownChange = useCallback((value: string) => {
     if (sourceMarkdownRef.current === value) return
+    selfHostedCollaborationRef.current?.markLocalActivity()
     sourceMarkdownRef.current = value
     setSourceMarkdown(value)
     setHasUnparsedSourceChanges(false)
     contentVersionRef.current++
     onChangeRef.current?.(value)
+    selfHostedCollaborationRef.current?.applyLocal(value)
     classifyCanonicalMarkdown(value)
   }, [classifyCanonicalMarkdown])
+
+  useEffect(() => {
+    let cancelled = false
+    let stopPresence: (() => void) | null = null
+    const setup = async () => {
+      if (primaryBackupMethod !== 'selfHosted' || !selfHostedRuntimeReady
+        || !isActive || isSectionScope || !activeFilePath || !editor) return
+      const workspace = await getWorkspacePath()
+      const workspaceRoot = workspace.isCustom
+        ? workspace.path
+        : await getDefaultArticleAbsolutePath('')
+      const normalizedRoot = workspaceRoot.normalize('NFC').replaceAll('\\', '/').replace(/\/$/, '')
+      const normalizedPath = activeFilePath.normalize('NFC').replaceAll('\\', '/')
+      const relativePath = normalizedPath.startsWith(`${normalizedRoot}/`)
+        ? normalizedPath.slice(normalizedRoot.length + 1)
+        : normalizedPath
+      const setupContentVersion = contentVersionRef.current
+      const setupBaseMarkdown = sourceMarkdownRef.current
+      let setupMergeBaseMarkdown = setupBaseMarkdown
+      let setupAuthoritativeMarkdown = setupBaseMarkdown
+      let controllerReady = false
+      const applyAuthoritativeMarkdown = (markdown: string) => {
+        externalUpdateCounterRef.current++
+        sourceMarkdownRef.current = markdown
+        setSourceMarkdown(markdown)
+        if (!isSourceViewRef.current) {
+          trySetMarkdownContent(editor, markdown, { resetHistory: true })
+        }
+        onChangeRef.current?.(markdown)
+        queueMicrotask(() => {
+          externalUpdateCounterRef.current = Math.max(0, externalUpdateCounterRef.current - 1)
+        })
+      }
+      try {
+        const controller = await openMarkdownCollaboration(
+          workspaceRoot,
+          relativePath,
+          setupBaseMarkdown,
+          markdown => {
+            setupAuthoritativeMarkdown = markdown
+            if (!controllerReady && contentVersionRef.current === setupContentVersion) {
+              setupMergeBaseMarkdown = markdown
+            }
+            if (cancelled || markdown === sourceMarkdownRef.current) return
+            if (!controllerReady && contentVersionRef.current !== setupContentVersion) return
+            applyAuthoritativeMarkdown(markdown)
+          },
+        )
+        controllerReady = true
+        if (cancelled) controller.close()
+        else {
+          selfHostedCollaborationRef.current = controller
+          // Rebase edits made while the asynchronous session was opening onto
+          // the authoritative baseline. Never replace that baseline wholesale
+          // with the stale source ref captured before visual-editor debounce.
+          if (contentVersionRef.current !== setupContentVersion) {
+            const setupLocalMarkdown = isSourceViewRef.current
+              ? sourceMarkdownRef.current
+              : normalizeMarkdownPlaceholders(editor.getMarkdown())
+            const mergedMarkdown = mergeCollaborationSetupMarkdown(
+              setupMergeBaseMarkdown,
+              setupLocalMarkdown,
+              setupAuthoritativeMarkdown,
+            )
+            const nextMarkdown = mergedMarkdown ?? setupAuthoritativeMarkdown
+            if (mergedMarkdown === null) {
+              console.warn('[self-hosted-sync] Concurrent setup edits overlapped; kept the authoritative document')
+            } else if (mergedMarkdown !== setupAuthoritativeMarkdown) {
+              controller.applyLocal(mergedMarkdown)
+            }
+            if (nextMarkdown !== setupLocalMarkdown) {
+              applyAuthoritativeMarkdown(nextMarkdown)
+            } else if (sourceMarkdownRef.current !== nextMarkdown) {
+              sourceMarkdownRef.current = nextMarkdown
+              setSourceMarkdown(nextMarkdown)
+              onChangeRef.current?.(nextMarkdown)
+            }
+          }
+          stopPresence = controller.subscribePresence(message => {
+            const deviceId = typeof message.deviceId === 'string' ? message.deviceId : null
+            if (!deviceId) return
+            if (message.type === 'presence.cleared') {
+              setSelfHostedCollaborators(current => current.filter(item => item.deviceId !== deviceId))
+            } else if (message.type === 'presence.updated') {
+              const label = typeof message.label === 'string' ? message.label : 'NoteGen'
+              const anchor = typeof message.anchor === 'number' ? message.anchor : 0
+              const head = typeof message.head === 'number' ? message.head : anchor
+              const coordinateSpace = message.coordinateSpace === 'markdown'
+                ? 'markdown'
+                : 'prosemirror'
+              setSelfHostedCollaborators(current => [
+                ...current.filter(item => item.deviceId !== deviceId),
+                { deviceId, label, anchor, head, coordinateSpace },
+              ])
+            }
+          })
+          if (isSourceViewRef.current) {
+            if (sourceEditorControllerRef.current?.isFocused()) {
+              controller.updatePresence(
+                sourceSelectionRef.current.from,
+                sourceSelectionRef.current.to,
+                isMobile ? '移动端' : '桌面端',
+                'markdown',
+              )
+            }
+          } else if (editor.isFocused) {
+            const selection = getEditorPresenceSelection(editor)
+            controller.updatePresence(
+              selection.anchor,
+              selection.head,
+              isMobile ? '移动端' : '桌面端',
+              'prosemirror',
+            )
+          }
+        }
+      } catch (error) {
+        console.warn('[self-hosted-sync] Collaborative document is unavailable:', error)
+      }
+    }
+    void setup()
+    return () => {
+      cancelled = true
+      stopPresence?.()
+      setSelfHostedCollaborators([])
+      flushCollaborationChange()
+      selfHostedCollaborationRef.current?.close()
+      selfHostedCollaborationRef.current = null
+    }
+  }, [
+    activeFilePath,
+    editor,
+    flushCollaborationChange,
+    isActive,
+    isMobile,
+    isSectionScope,
+    primaryBackupMethod,
+    selfHostedRuntimeReady,
+    trySetMarkdownContent,
+  ])
+
+  useEffect(() => {
+    if (!editor) return
+    updateSelfHostedRemoteCursors(
+      editor,
+      isSourceView ? [] : selfHostedProseMirrorCursors,
+    )
+  }, [editor, isSourceView, selfHostedProseMirrorCursors])
+
+  useEffect(() => {
+    if (!editor) return
+    const updatePresence = () => {
+      if (isSourceViewRef.current || !editor.isFocused) return
+      const selection = getEditorPresenceSelection(editor)
+      selfHostedCollaborationRef.current?.updatePresence(
+        selection.anchor,
+        selection.head,
+        isMobile ? '移动端' : '桌面端',
+        'prosemirror',
+      )
+    }
+    const clearPresence = () => {
+      if (isSourceViewRef.current) return
+      selfHostedCollaborationRef.current?.clearPresence()
+    }
+    editor.on('selectionUpdate', updatePresence)
+    editor.on('focus', updatePresence)
+    editor.on('blur', clearPresence)
+    return () => {
+      editor.off('selectionUpdate', updatePresence)
+      editor.off('focus', updatePresence)
+      editor.off('blur', clearPresence)
+    }
+  }, [activeFilePath, editor, isMobile])
+
+  useEffect(() => {
+    const controller = selfHostedCollaborationRef.current
+    if (!controller || !editor) return
+    if (isSourceView) {
+      if (!sourceEditorControllerRef.current?.isFocused()) {
+        controller.clearPresence()
+        return
+      }
+      controller.updatePresence(
+        sourceSelectionRef.current.from,
+        sourceSelectionRef.current.to,
+        isMobile ? '移动端' : '桌面端',
+        'markdown',
+      )
+      return
+    }
+    if (editor.isFocused) {
+      const selection = getEditorPresenceSelection(editor)
+      controller.updatePresence(
+        selection.anchor,
+        selection.head,
+        isMobile ? '移动端' : '桌面端',
+        'prosemirror',
+      )
+    } else {
+      controller.clearPresence()
+    }
+  }, [editor, isMobile, isSourceView])
 
   const flushSectionedMarkdown = useCallback(() => {
     const expectedCanonical = sourceMarkdownRef.current
@@ -2115,6 +2558,14 @@ export function TipTapEditor({
     sourceSelectionRef.current = selection
     if (isSectionScope) return
     if (!isActive) return
+    if (!sourceEditorControllerRef.current?.isFocused()) return
+
+    selfHostedCollaborationRef.current?.updatePresence(
+      selection.from,
+      selection.to,
+      isMobile ? '移动端' : '桌面端',
+      'markdown',
+    )
 
     if (sourceSelectionQuoteTimerRef.current) {
       clearTimeout(sourceSelectionQuoteTimerRef.current)
@@ -2155,7 +2606,22 @@ export function TipTapEditor({
         articlePath: activeFilePath || '',
       })
     }, 120)
-  }, [activeFilePath, isActive, isSectionScope])
+  }, [activeFilePath, isActive, isMobile, isSectionScope])
+
+  const handleSourceFocusChange = useCallback((focused: boolean) => {
+    const controller = selfHostedCollaborationRef.current
+    if (!controller || !isActive || !isSourceViewRef.current) return
+    if (!focused) {
+      controller.clearPresence()
+      return
+    }
+    controller.updatePresence(
+      sourceSelectionRef.current.from,
+      sourceSelectionRef.current.to,
+      isMobile ? '移动端' : '桌面端',
+      'markdown',
+    )
+  }, [isActive, isMobile])
 
   const handleSourceControllerChange = useCallback((controller: SourceMarkdownEditorController | null) => {
     sourceEditorControllerRef.current = controller
@@ -2182,6 +2648,14 @@ export function TipTapEditor({
 
   const handleSourceViewStateChange = useCallback((state: SourceMarkdownEditorViewState) => {
     sourceSelectionRef.current = state.selection
+    if (isSourceViewRef.current && sourceEditorControllerRef.current?.isFocused()) {
+      selfHostedCollaborationRef.current?.updatePresence(
+        state.selection.from,
+        state.selection.to,
+        isMobile ? '移动端' : '桌面端',
+        'markdown',
+      )
+    }
     if (isSectionScope || !activeFilePath) return
 
     setEditorViewState(activeFilePath, {
@@ -2189,7 +2663,7 @@ export function TipTapEditor({
       sourceSelectionTo: state.selection.to,
       sourceScrollTop: state.scrollTop,
     })
-  }, [activeFilePath, isSectionScope, setEditorViewState])
+  }, [activeFilePath, isMobile, isSectionScope, setEditorViewState])
 
   useEffect(() => {
     return () => {
@@ -4802,11 +5276,44 @@ export function TipTapEditor({
   useEffect(() => {
     if (isSectionScope) return
     let retryTimer: number | null = null
+    let disposed = false
+    let syncEventSequence = 0
+    const currentWorkspaceRootPromise = getCurrentEditorWorkspaceRoot()
+      .catch(() => null)
 
-    const handleSyncContentUpdated = (event: { path: string; content: string }) => {
-      if (!editor || !event || event.path !== activeFilePath) return
+    const handleSyncContentUpdated = async (event: Events['sync-content-updated']) => {
+      if (!event) return
+      const eventSequence = ++syncEventSequence
+      const sourceMarkdownBeforeRootCheck = sourceMarkdownRef.current
+      if (event.workspaceRoot) {
+        const currentWorkspaceRoot = await currentWorkspaceRootPromise
+        if (
+          disposed
+          || eventSequence !== syncEventSequence
+          || !currentWorkspaceRoot
+          || !workspaceRootsReferToSameLocation(
+            currentWorkspaceRoot,
+            event.workspaceRoot,
+          )
+          || (
+            sourceMarkdownRef.current !== sourceMarkdownBeforeRootCheck
+            && sourceMarkdownRef.current !== event.content
+          )
+        ) {
+          return
+        }
+      }
+      if (
+        !editor
+        || !event
+        || !editorPathsReferToSameFile(
+          event.path,
+          activeFilePath,
+          event.workspaceRoot,
+        )
+      ) return
       if (sourceMarkdownRef.current !== event.content) {
-        markEditorPathMutation(event.path)
+        markEditorPathMutation(event.path, event.workspaceRoot)
       }
       const sequence = ++canonicalExternalUpdateSequenceRef.current
       const applyUpdate = () => {
@@ -4861,6 +5368,7 @@ export function TipTapEditor({
 
     emitter.on('sync-content-updated', handleSyncContentUpdated as any)
     return () => {
+      disposed = true
       if (retryTimer !== null) window.clearTimeout(retryTimer)
       emitter.off('sync-content-updated', handleSyncContentUpdated as any)
     }
@@ -4872,6 +5380,7 @@ export function TipTapEditor({
     isSectionVirtualView,
     prepareExternalMarkdownAction,
     trySetMarkdownContent,
+    workspacePath,
   ])
 
   // Handle external content updates (e.g., from Agent tools).
@@ -6412,6 +6921,16 @@ export function TipTapEditor({
           : undefined
       }
     >
+      {selfHostedCollaborators.length > 0 ? (
+        <div className="absolute right-3 top-3 z-40 flex items-center gap-1 rounded-full border bg-background/90 px-2 py-1 shadow-sm backdrop-blur">
+          {selfHostedCollaborators.slice(0, 3).map(collaborator => (
+            <span key={collaborator.deviceId} className="grid size-6 place-items-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground" title={collaborator.label}>
+              {collaborator.label.slice(0, 1).toUpperCase()}
+            </span>
+          ))}
+          <span className="text-xs text-muted-foreground">{selfHostedCollaborators.length}</span>
+        </div>
+      ) : null}
       {isMobile && effectiveViewMode === 'visual' && !isSectionVirtualView && (
         <MobileEditorContextBar
           mode={mobileContext?.mode ?? 'text'}
@@ -6568,8 +7087,10 @@ export function TipTapEditor({
               onSelectionChange={handleSourceSelectionChange}
               onUndoRedoChange={handleSourceUndoRedoChange}
               onViewStateChange={handleSourceViewStateChange}
+              onFocusChange={handleSourceFocusChange}
               initialScrollTop={initialEditorViewState?.sourceScrollTop ?? 0}
               selection={sourceSelectionRef.current}
+              remoteCursors={selfHostedMarkdownCursors}
             />
           </div>
         ) : isSectionVirtualView ? (

@@ -23,13 +23,33 @@ import type {
   CanvasProjectType,
   CanvasSelectionContext,
 } from '@/types/canvas'
+import useSettingStore from '@/stores/setting'
 
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const thumbnailTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const thumbnailGenerationPromises = new Map<string, Promise<void>>()
 const thumbnailRepairAttempts = new Set<string>()
 const historySaveChains = new Map<string, Promise<void>>()
+const collaborationSyncChains = new Map<string, Promise<void>>()
 const MAX_THUMBNAIL_REPAIR_ATTEMPTS = 256
+
+function syncCanvasCollaboration(id: string, document: CanvasDocument, flush: boolean) {
+  if (useSettingStore.getState().primaryBackupMethod !== 'selfHosted') return Promise.resolve()
+  const previousSync = collaborationSyncChains.get(id) || Promise.resolve()
+  const nextSync = previousSync
+    .catch(() => undefined)
+    .then(async () => {
+      const { syncCanvasDocument } = await import('@/lib/self-hosted-sync/canvas-collaboration')
+      await syncCanvasDocument(id, document, { flush })
+    })
+  collaborationSyncChains.set(id, nextSync)
+  void nextSync.then(() => {
+    if (collaborationSyncChains.get(id) === nextSync) collaborationSyncChains.delete(id)
+  }, () => {
+    if (collaborationSyncChains.get(id) === nextSync) collaborationSyncChains.delete(id)
+  })
+  return nextSync
+}
 
 function persistCanvasHistory(id: string, history: CanvasHistoryState) {
   const previousSave = historySaveChains.get(id) || Promise.resolve()
@@ -106,12 +126,17 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ loading: true })
     const allProjects = await getCanvasProjects({ includeDeleted: true })
     const projects = allProjects.filter(project => !project.deletedAt)
-    set({
+    set(state => ({
       projects,
       deletedProjects: allProjects.filter(project => project.deletedAt),
-      documents: Object.fromEntries(projects.map(project => [project.id, project.document])),
+      documents: Object.fromEntries(projects.map(project => [
+        project.id,
+        project.id === state.activeCanvasId
+          ? state.documents[project.id] ?? project.document
+          : project.document,
+      ])),
       loading: false,
-    })
+    }))
     void (async () => {
       for (const project of projects.filter(project => !hasCurrentThumbnail(project))) {
         await get().repairThumbnail(project.id)
@@ -197,6 +222,9 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
 
   updateDocument: (id, document) => {
     set(state => ({ documents: { ...state.documents, [id]: document } }))
+    void syncCanvasCollaboration(id, document, false).catch(error => {
+      console.warn('[self-hosted-sync] Unable to queue canvas update', { canvasId: id, error })
+    })
     const previousTimer = saveTimers.get(id)
     if (previousTimer) clearTimeout(previousTimer)
     saveTimers.set(id, setTimeout(() => {
@@ -225,10 +253,12 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     const hasDocumentChanges = !cachedProject
       || JSON.stringify(cachedProject.document) !== JSON.stringify(document)
     if (!hasDocumentChanges) {
+      await syncCanvasCollaboration(id, document, true)
       if (!cachedProject?.thumbnailPath) void get().refreshThumbnail(id)
       return
     }
     const updatedAt = await updateCanvasDocument(id, document)
+    await syncCanvasCollaboration(id, document, true)
     set(state => ({
       projects: state.projects
         .map(project => project.id === id ? { ...project, document, updatedAt } : project)
@@ -301,6 +331,10 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     set(state => ({
       projects: state.projects.map(item => item.id === id ? { ...item, pinnedAt, updatedAt } : item),
     }))
+    if (useSettingStore.getState().primaryBackupMethod === 'selfHosted') {
+      const { enqueueCanvasSnapshot } = await import('@/lib/self-hosted-sync/outbox')
+      await enqueueCanvasSnapshot(id)
+    }
   },
 
   renameProject: async (id, title) => {
@@ -312,6 +346,10 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
         project.id === id ? { ...project, title: normalized, updatedAt } : project
       )),
     }))
+    if (useSettingStore.getState().primaryBackupMethod === 'selfHosted') {
+      const { enqueueCanvasSnapshot } = await import('@/lib/self-hosted-sync/outbox')
+      await enqueueCanvasSnapshot(id)
+    }
   },
 
   deleteProject: async (id, configured) => {
@@ -324,10 +362,20 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
     for (const key of thumbnailRepairAttempts) {
       if (key.startsWith(`${id}:`)) thumbnailRepairAttempts.delete(key)
     }
+    const selfHosted = useSettingStore.getState().primaryBackupMethod === 'selfHosted'
+    if (selfHosted) {
+      await get().saveProject(id)
+      const { closeCanvasCollaboration } = await import('@/lib/self-hosted-sync/canvas-collaboration')
+      await closeCanvasCollaboration(id)
+    }
     const deletedAt = await softDeleteCanvasProject(id, { enqueueSync: false })
-    const syncConfigured = configured ?? await isAutoDataSyncProviderConfigured()
+    if (selfHosted) {
+      const { enqueueCanvasSnapshot } = await import('@/lib/self-hosted-sync/outbox')
+      await enqueueCanvasSnapshot(id, 'delete')
+    }
+    const syncConfigured = selfHosted || (configured ?? await isAutoDataSyncProviderConfigured())
     let synced = false
-    if (syncConfigured) {
+    if (syncConfigured && !selfHosted) {
       try {
         synced = await uploadCanvas(id)
       } catch {
@@ -350,6 +398,7 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       }
     })
     if (!syncConfigured) return 'local'
+    if (selfHosted) return 'pending'
     return synced ? 'synced' : 'pending'
   },
 
@@ -379,6 +428,10 @@ const useCanvasStore = create<CanvasState>((set, get) => ({
       documents: { ...state.documents, [id]: project.document },
     }))
     if (!hasCurrentThumbnail(project)) void get().refreshThumbnail(id)
+    if (useSettingStore.getState().primaryBackupMethod === 'selfHosted') {
+      const { enqueueCanvasSnapshot } = await import('@/lib/self-hosted-sync/outbox')
+      await enqueueCanvasSnapshot(id)
+    }
     return project
   },
 }))

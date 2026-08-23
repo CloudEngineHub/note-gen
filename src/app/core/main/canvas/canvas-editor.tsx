@@ -114,6 +114,13 @@ import { getMarkListItemContent } from '@/app/core/main/mark/mark-list-item-cont
 import { applyCanvasOperations } from '@/lib/canvas/operations'
 import { getFilePathOptions } from '@/lib/workspace'
 import {
+  beginCanvasLocalInteraction,
+  clearCanvasDragPresence,
+  endCanvasLocalInteraction,
+  markCanvasLocalActivity,
+  updateCanvasDragPresence,
+} from '@/lib/self-hosted-sync/canvas-collaboration'
+import {
   createFreehandGeometry,
   getFreehandOutline,
   getSvgPathFromStroke,
@@ -382,6 +389,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   const persistedEdgesRef = useRef(edges)
   const pendingDocumentRef = useRef<CanvasDocument | null>(null)
   const pendingDocumentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const applyingStoreDocumentRef = useRef<{ nodes: FlowCanvasNode[]; edges: Edge[] } | null>(null)
   const chartGenerationRef = useRef(new Map<string, AbortController>())
   const lastStoreDocumentRef = useRef(document)
   const appliedDefaultZoomRef = useRef('')
@@ -632,6 +640,9 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
   }, [canvasId, document, openProject])
 
   useEffect(() => () => {
+    endCanvasLocalInteraction(canvasId, 'drawing')
+    endCanvasLocalInteraction(canvasId, 'drag')
+    endCanvasLocalInteraction(canvasId, 'resize')
     if (pendingDocumentTimerRef.current) clearTimeout(pendingDocumentTimerRef.current)
     const pendingDocument = pendingDocumentRef.current
     if (pendingDocument) {
@@ -652,6 +663,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     ))
     const nextEdges = document.edges as Edge[]
     const restoredNodes = restoreCanvasNodes(nextNodes)
+    applyingStoreDocumentRef.current = { nodes: restoredNodes, edges: nextEdges }
     persistedNodesRef.current = restoredNodes
     persistedEdgesRef.current = nextEdges
     const savedHistory = useCanvasStore.getState().projects.find(project => project.id === canvasId)?.history
@@ -698,8 +710,20 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
 
   useEffect(() => {
     if (!document) return
+    const applyingStoreDocument = applyingStoreDocumentRef.current
+    if (applyingStoreDocument) {
+      const storeNodesApplied = !havePersistentNodesChanged(applyingStoreDocument.nodes, nodes)
+      const storeEdgesApplied = !havePersistentEdgesChanged(applyingStoreDocument.edges, edges)
+      if (storeNodesApplied && storeEdgesApplied) {
+        persistedNodesRef.current = nodes
+        persistedEdgesRef.current = edges
+        applyingStoreDocumentRef.current = null
+      }
+      return
+    }
     if (!havePersistentNodesChanged(persistedNodesRef.current, nodes)
       && !havePersistentEdgesChanged(persistedEdgesRef.current, edges)) return
+    markCanvasLocalActivity(canvasId)
     persistedNodesRef.current = nodes
     persistedEdgesRef.current = edges
     const nextDocument: CanvasDocument = {
@@ -825,12 +849,14 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     if (changes.some(change => change.type === 'remove') || (startsResize && !resizingRef.current)) {
       pushHistory()
     }
+    if (startsResize && !resizingRef.current) beginCanvasLocalInteraction(canvasId, 'resize')
     if (startsResize) resizingRef.current = true
     if (changes.some(change => change.type === 'dimensions' && change.resizing === false)) {
       resizingRef.current = false
+      endCanvasLocalInteraction(canvasId, 'resize')
     }
     onNodesChangeBase(changes)
-  }, [onNodesChangeBase, pushHistory])
+  }, [canvasId, onNodesChangeBase, pushHistory])
 
   const onEdgesChangeTracked = useCallback((changes: EdgeChange<Edge>[]) => {
     if (changes.some(change => change.type === 'remove')) pushHistory()
@@ -1988,6 +2014,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
 
   const handleDrawingPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!drawOverlayEnabled) return
+    beginCanvasLocalInteraction(canvasId, 'drawing')
     event.currentTarget.setPointerCapture(event.pointerId)
     if (tool === 'eraser') {
       pushHistory()
@@ -2000,7 +2027,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     if (tool === 'eraser') eraseAtPoint(flowPoint)
     setDrawingPoints([localPoint])
     drawingFlowPointsRef.current = [point]
-  }, [drawOverlayEnabled, eraseAtPoint, pushHistory, screenToFlowPosition, tool])
+  }, [canvasId, drawOverlayEnabled, eraseAtPoint, pushHistory, screenToFlowPosition, tool])
 
   const handleDrawingPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
@@ -2054,7 +2081,8 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
     setDrawingPoints([])
     drawingFlowPointsRef.current = []
     setPreviewPath('')
-  }, [activeBrushColor, activeBrushStyle, pushHistory, setNodes, tool])
+    endCanvasLocalInteraction(canvasId, 'drawing')
+  }, [activeBrushColor, activeBrushStyle, canvasId, pushHistory, setNodes, tool])
 
   const persistViewport = useCallback((viewport: CanvasDocument['viewport']) => {
     if (!document || suppressViewportPersistRef.current) return
@@ -2297,6 +2325,7 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
         }}
         onMoveEnd={(_event, viewport) => persistViewport(viewport)}
         onNodeDragStart={(_event, node) => {
+          beginCanvasLocalInteraction(canvasId, 'drag')
           if (mobile) setMobileSelectionCommitted(false)
           pushHistory()
           if (node.type !== 'group' || !Array.isArray(node.data.childIds)) return
@@ -2308,6 +2337,10 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
           }
         }}
         onNodeDrag={(_event, node) => {
+          const draggedNodes = node.selected
+            ? nodes.filter(item => item.selected).map(item => item.id === node.id ? node : item)
+            : [node]
+          void updateCanvasDragPresence(canvasId, draggedNodes)
           const drag = groupDragRef.current
           if (!drag || drag.groupId !== node.id) return
           const delta = { x: node.position.x - drag.start.x, y: node.position.y - drag.start.y }
@@ -2316,7 +2349,11 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
             return start ? { ...item, position: { x: start.x + delta.x, y: start.y + delta.y } } : item
           }))
         }}
-        onNodeDragStop={() => { groupDragRef.current = null }}
+        onNodeDragStop={() => {
+          groupDragRef.current = null
+          endCanvasLocalInteraction(canvasId, 'drag')
+          void clearCanvasDragPresence(canvasId)
+        }}
         deleteKeyCode={null}
         nodesDraggable={!previewSnapshot && tool === 'select'}
         nodesConnectable={!previewSnapshot && tool === 'select'}

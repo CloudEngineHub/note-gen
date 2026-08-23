@@ -3,7 +3,7 @@ import { endOfWeek, startOfWeek } from 'date-fns'
 import type { ActivityCalendarData, ActivityDaySummary } from '@/lib/activity/types'
 import { SyncStateEnum } from '@/lib/sync/github.types'
 
-type SyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'
+type SyncProvider = 'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder' | 'selfHosted'
 
 interface BuildProfileCardDataInput {
   primaryBackupMethod: SyncProvider
@@ -26,6 +26,7 @@ interface QuickLinkStatusInput {
   s3Connected?: boolean
   webdavConnected?: boolean
   cloudFolderConnected?: boolean
+  selfHostedConnected?: boolean
   configuredLabel: string
   unavailableLabel: string
 }
@@ -174,6 +175,7 @@ export function getBackupMethodStatus({
   s3Connected,
   webdavConnected,
   cloudFolderConnected,
+  selfHostedConnected,
   configuredLabel,
   unavailableLabel,
 }: QuickLinkStatusInput) {
@@ -193,6 +195,8 @@ export function getBackupMethodStatus({
         return Boolean(webdavConnected)
       case 'cloudFolder':
         return Boolean(cloudFolderConnected)
+      case 'selfHosted':
+        return Boolean(selfHostedConnected)
       default:
         return false
     }
@@ -203,7 +207,8 @@ export function getBackupMethodStatus({
 
 export function getBackupProviderName(
   primaryBackupMethod: SyncProvider,
-  cloudFolderName = 'Cloud Drive'
+  cloudFolderName = 'Cloud Drive',
+  selfHostedName = 'Self-hosted',
 ) {
   switch (primaryBackupMethod) {
     case 'github':
@@ -220,6 +225,8 @@ export function getBackupProviderName(
       return 'WebDAV'
     case 'cloudFolder':
       return cloudFolderName
+    case 'selfHosted':
+      return selfHostedName
     default:
       return toTitleCase(primaryBackupMethod)
   }

@@ -29,6 +29,8 @@ import { GitlabSync } from './gitlab-sync'
 import { S3Sync } from './s3-sync'
 import { WebDAVSync } from './webdav-sync'
 import { CloudFolderSync } from './cloud-folder-sync'
+import { SelfHostedSync } from './self-hosted-sync'
+import { SelfHostedPersonalDataOptions } from './self-hosted-personal-data-options'
 import { UsePlatformButton } from './components/use-platform-button'
 import { WorkspaceRepoMapping } from './components/workspace-repo-mapping'
 import { DataSyncOverview } from './components/data-sync-overview'
@@ -77,6 +79,7 @@ const PLATFORM_ICONS: Record<SyncPlatform, LucideIcon> = {
   s3: Database,
   webdav: Cloud,
   cloudFolder: FolderSync,
+  selfHosted: Server,
 }
 
 const PLATFORM_LOGOS: Partial<Record<SyncPlatform, string>> = {
@@ -84,6 +87,7 @@ const PLATFORM_LOGOS: Partial<Record<SyncPlatform, string>> = {
   gitee: '/sync-platforms/gitee.svg',
   gitlab: '/sync-platforms/gitlab.svg',
   gitea: '/sync-platforms/gitea.svg',
+  selfHosted: '/app-icon.png',
 }
 
 export default function SyncPage() {
@@ -118,6 +122,7 @@ export default function SyncPage() {
     s3Connected,
     webdavConnected,
     cloudFolderConnected,
+    selfHostedConnected,
   } = useSyncStore()
 
   const [platform, setPlatform] = useState<SyncPlatform>(primaryBackupMethod)
@@ -222,15 +227,19 @@ export default function SyncPage() {
         return webdavConnected ? SyncStateEnum.success : SyncStateEnum.fail
       case 'cloudFolder':
         return cloudFolderConnected ? SyncStateEnum.success : SyncStateEnum.fail
+      case 'selfHosted':
+        return selfHostedConnected ? SyncStateEnum.success : SyncStateEnum.fail
     }
   }
 
   const currentSyncState = getSyncState(platform)
   const isAutoSyncDisabled = currentSyncState !== SyncStateEnum.success
-  const currentPlatformInfo = SYNC_PLATFORM_INFO[platform]
-  const currentPlatformName = platform === 'cloudFolder'
-    ? t('settings.sync.cloudFolder.title')
-    : currentPlatformInfo.name
+  const getPlatformName = (targetPlatform: SyncPlatform) => {
+    if (targetPlatform === 'cloudFolder') return t('settings.sync.cloudFolder.title')
+    if (targetPlatform === 'selfHosted') return t('settings.sync.selfHosted.title')
+    return SYNC_PLATFORM_INFO[targetPlatform].name
+  }
+  const currentPlatformName = getPlatformName(platform)
 
   function handlePlatformChange(nextPlatform: SyncPlatform) {
     setPlatform(nextPlatform)
@@ -265,6 +274,8 @@ export default function SyncPage() {
         return <WebDAVSync />
       case 'cloudFolder':
         return <CloudFolderSync />
+      case 'selfHosted':
+        return <SelfHostedSync />
     }
   }
 
@@ -313,7 +324,6 @@ export default function SyncPage() {
           <CardContent>
             <ItemGroup className="gap-1">
               {SYNC_PLATFORMS.map((itemPlatform) => {
-                const platformInfo = SYNC_PLATFORM_INFO[itemPlatform]
                 const isCurrentPlatform = primaryBackupMethod === itemPlatform
                 const isSelectedPlatform = platform === itemPlatform
                 return (
@@ -335,9 +345,7 @@ export default function SyncPage() {
                       </ItemMedia>
                       <ItemContent>
                         <ItemTitle>
-                          {itemPlatform === 'cloudFolder'
-                            ? t('settings.sync.cloudFolder.title')
-                            : platformInfo.name}
+                          {getPlatformName(itemPlatform)}
                         </ItemTitle>
                       </ItemContent>
                       {isCurrentPlatform ? (
@@ -359,7 +367,17 @@ export default function SyncPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <SyncPlatformIcon platform={platform} />
                 <div className="min-w-0 flex-1">
-                  <CardTitle>{currentPlatformName}</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    {currentPlatformName}
+                    {platform === 'selfHosted' ? (
+                      <Badge
+                        variant="outline"
+                        className="border-warning/40 bg-warning/10 text-warning-foreground"
+                      >
+                        {t('settings.sync.experimental')}
+                      </Badge>
+                    ) : null}
+                  </CardTitle>
                   <CardDescription>{t('settings.sync.platformDesc')}</CardDescription>
                 </div>
               </div>
@@ -389,7 +407,7 @@ export default function SyncPage() {
 
             <TabsContent value="connection" className="flex flex-col gap-4">
               {renderSyncContent()}
-              {platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder' ? (
+              {platform !== 's3' && platform !== 'webdav' && platform !== 'cloudFolder' && platform !== 'selfHosted' ? (
                 <WorkspaceRepoMapping
                   platform={platform}
                   workspaceOptions={workspaceOptions}
@@ -460,16 +478,20 @@ export default function SyncPage() {
                 </CardContent>
               </Card>
 
-              <DataSyncOverview
-                autoRecordSyncEnabled={autoRecordSyncEnabled}
-                autoSettingsSyncEnabled={autoSettingsSyncEnabled}
-                autoConversationSyncEnabled={autoConversationSyncEnabled}
-                excludeSensitiveConfig={excludeSensitiveConfig}
-                onRecordSyncChange={setAutoRecordSyncEnabled}
-                onSettingsSyncChange={setAutoSettingsSyncEnabled}
-                onConversationSyncChange={setAutoConversationSyncEnabled}
-                onSensitiveConfigChange={handleExcludeSensitiveConfigChange}
-              />
+              {platform === 'selfHosted' ? (
+                <SelfHostedPersonalDataOptions />
+              ) : (
+                <DataSyncOverview
+                  autoRecordSyncEnabled={autoRecordSyncEnabled}
+                  autoSettingsSyncEnabled={autoSettingsSyncEnabled}
+                  autoConversationSyncEnabled={autoConversationSyncEnabled}
+                  excludeSensitiveConfig={excludeSensitiveConfig}
+                  onRecordSyncChange={setAutoRecordSyncEnabled}
+                  onSettingsSyncChange={setAutoSettingsSyncEnabled}
+                  onConversationSyncChange={setAutoConversationSyncEnabled}
+                  onSensitiveConfigChange={handleExcludeSensitiveConfigChange}
+                />
+              )}
 
             </TabsContent>
           </Tabs>
@@ -499,7 +521,10 @@ function SyncPlatformIcon({
     >
       {logo ? (
         <Image
-          className="size-full object-contain"
+          className={cn(
+            'size-full object-contain',
+            platform === 'selfHosted' && 'rounded-[22%]',
+          )}
           src={logo}
           alt={`${platformInfo.name} logo`}
           width={small ? 24 : 32}

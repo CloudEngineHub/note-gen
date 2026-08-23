@@ -43,6 +43,7 @@ import {
   prepareActiveEditorDeactivationDurably,
   prepareActiveEditorPathMutationDurably,
 } from '@/lib/editor-deactivation'
+import { deleteSelfHostedWorkspacePath } from '@/lib/self-hosted-sync/files'
 
 function shouldLoadRemoteOnTreeRefresh(options?: { isCreateFlow?: boolean }) {
   return options?.isCreateFlow !== true
@@ -998,11 +999,17 @@ export function MobileFileBrowser({ active, onOpenFile }: MobileFileBrowserProps
     if (!await prepareActiveEditorPathMutationDurably(normalizedActivePath, [entry.relativePath])) return
 
     const pathOptions = await getFilePathOptions(entry.relativePath)
+    const deletedBySelfHosted = await deleteSelfHostedWorkspacePath(
+      entry.relativePath,
+      entry.type === 'folder' ? 'folder' : 'file',
+    )
     if (entry.type === 'folder') {
-      if (pathOptions.baseDir) {
-        await remove(pathOptions.path, { baseDir: pathOptions.baseDir, recursive: true })
-      } else {
-        await remove(pathOptions.path, { recursive: true })
+      if (!deletedBySelfHosted) {
+        if (pathOptions.baseDir) {
+          await remove(pathOptions.path, { baseDir: pathOptions.baseDir, recursive: true })
+        } else {
+          await remove(pathOptions.path, { recursive: true })
+        }
       }
       await cleanTabsByDeletedFolder(entry.relativePath)
       const nextTree = cloneDeep(fileTree)
@@ -1014,10 +1021,12 @@ export function MobileFileBrowser({ active, onOpenFile }: MobileFileBrowserProps
         console.error('Failed to clear deleted folder vectors:', error)
       })
     } else {
-      if (pathOptions.baseDir) {
-        await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
-      } else {
-        await remove(pathOptions.path)
+      if (!deletedBySelfHosted) {
+        if (pathOptions.baseDir) {
+          await remove(pathOptions.path, { baseDir: pathOptions.baseDir })
+        } else {
+          await remove(pathOptions.path)
+        }
       }
       await cleanTabsByDeletedFile(entry.relativePath)
       reconcileLocalFile(entry.relativePath, false)
@@ -1050,7 +1059,9 @@ export function MobileFileBrowser({ active, onOpenFile }: MobileFileBrowserProps
     if (!ok) return
 
     const store = await Store.load('store.json')
-    const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder'>('primaryBackupMethod') || 'github'
+    const backupMethod = await store.get<'github' | 'gitee' | 'gitlab' | 'gitea' | 's3' | 'webdav' | 'cloudFolder' | 'selfHosted'>('primaryBackupMethod') || 'github'
+
+    if (backupMethod === 'selfHosted') return
 
     if (entry.type === 'folder') {
       const node = getNodeByPath(fileTree, entry.relativePath)

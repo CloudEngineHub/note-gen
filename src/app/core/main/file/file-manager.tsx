@@ -154,12 +154,25 @@ export function FileManager({
   const remoteSearchLoadedPathsRef = useRef(new Set<string>())
   const scrollSaveTimerRef = useRef<number | null>(null)
   const workspacePath = useSettingStore(state => state.workspacePath)
+  const primaryBackupMethod = useSettingStore(state => state.primaryBackupMethod)
   const t = useTranslations('article.file')
   const tRecordToolbar = useTranslations('record.mark.toolbar')
   const {
     configurationRevision: syncConfigurationRevision,
     refresh: refreshSyncAvailability,
   } = useSyncAvailability()
+
+  useEffect(() => {
+    if (primaryBackupMethod !== 'selfHosted') return
+    void (async () => {
+      const { refreshSelfHostedSyncRuntime } = await import('@/lib/self-hosted-sync/lifecycle')
+      await refreshSelfHostedSyncRuntime()
+      await refreshSyncAvailability()
+    })().catch(error => {
+      console.warn('[self-hosted-sync] Unable to prepare the current workspace', error)
+    })
+  }, [primaryBackupMethod, refreshSyncAvailability, workspacePath])
+
   const {
     activeFilePath,
     fileTree,
