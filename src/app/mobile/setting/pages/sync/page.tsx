@@ -22,6 +22,7 @@ import { ICloudFolderSync } from '@/app/mobile/setting/pages/sync/ios-cloud-fold
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
 import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
+import { hasConfiguredSelfHostedSync } from '@/lib/diagnostics/self-hosted'
 import type { SyncRepoPlatform, WorkspaceSyncRepos } from '@/lib/sync/workspace-repos'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
@@ -45,12 +46,6 @@ export default function SyncPage() {
   const currentPlatform = platform()
   const isIOS = currentPlatform === 'ios'
   const isAndroid = currentPlatform === 'android'
-  const standardPlatforms = SYNC_PLATFORMS.filter(platformName => platformName !== 'cloudFolder')
-  const availablePlatforms: MobileSyncPlatform[] = isIOS
-    ? [...standardPlatforms, 'iCloud', 'oneDrive']
-    : isAndroid
-      ? [...standardPlatforms, 'oneDrive']
-      : standardPlatforms
   const {
     primaryBackupMethod,
     setPrimaryBackupMethod,
@@ -72,6 +67,7 @@ export default function SyncPage() {
     setGiteeCustomSyncRepo,
     setGitlabCustomSyncRepo,
     setGiteaCustomSyncRepo,
+    developerMode,
   } = useSettingStore()
   const {
     syncRepoState,
@@ -88,6 +84,31 @@ export default function SyncPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [activeCloudFolderProvider, setActiveCloudFolderProvider] = useState<'folder' | 'oneDrive' | null>(null)
   const [workspaceRepos, setWorkspaceRepos] = useState<Record<string, WorkspaceSyncRepos>>({})
+  const [hasSelfHostedConfiguration, setHasSelfHostedConfiguration] = useState(false)
+
+  const standardPlatforms = useMemo(
+    () => SYNC_PLATFORMS.filter(platformName => platformName !== 'cloudFolder'
+      && (platformName !== 'selfHosted'
+        || developerMode
+        || primaryBackupMethod === 'selfHosted'
+        || hasSelfHostedConfiguration)),
+    [developerMode, hasSelfHostedConfiguration, primaryBackupMethod],
+  )
+  const availablePlatforms: MobileSyncPlatform[] = isIOS
+    ? [...standardPlatforms, 'iCloud', 'oneDrive']
+    : isAndroid
+      ? [...standardPlatforms, 'oneDrive']
+      : standardPlatforms
+
+  useEffect(() => {
+    let cancelled = false
+    void hasConfiguredSelfHostedSync().then(configured => {
+      if (!cancelled) setHasSelfHostedConfiguration(configured)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selfHostedConnected])
 
   const workspaceOptions = useMemo(
     () => Array.from(new Set([workspacePath, '', ...workspaceHistory])),

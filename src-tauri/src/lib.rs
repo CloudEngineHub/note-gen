@@ -66,6 +66,24 @@ use skills::{
     import_skill, import_skill_zip, install_skill_package, uninstall_skill, validate_skill_package,
 };
 
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[tauri::command]
+fn open_developer_tools(window: tauri::WebviewWindow) {
+    window.open_devtools();
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[tauri::command]
+fn close_developer_tools(window: tauri::WebviewWindow) {
+    window.close_devtools();
+}
+
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[tauri::command]
+fn is_developer_tools_open(window: tauri::WebviewWindow) -> bool {
+    window.is_devtools_open()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -185,6 +203,12 @@ pub fn run() {
             printing::print_webview,
             mobile_system_bars::set_mobile_system_bars,
             system_trash::move_paths_to_trash,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            open_developer_tools,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            close_developer_tools,
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            is_developer_tools_open,
             self_hosted_crypto::self_hosted_generate_workspace_key,
             self_hosted_crypto::self_hosted_generate_device_key_pair,
             self_hosted_crypto::self_hosted_encrypt,

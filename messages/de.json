@@ -1940,6 +1940,32 @@
     "dev": {
       "title": "Erweitert",
       "desc": "Konfiguriere erweiterte Optionen wie Netzwerk-Proxy, Datenverwaltung und Konfigurationsdateien. Einige Aktionen können sich auf vorhandene Daten auswirken, nimm Änderungen daher mit Vorsicht vor.",
+      "developerTitle": "Entwickler",
+      "developerDesc": "Zugriff auf experimentelle Funktionen, Entwicklerwerkzeuge und lokale Diagnose.",
+      "developerModeTitle": "Entwicklermodus",
+      "developerModeDesc": "Zeigt selbst gehostete Synchronisierung und Entwicklerdiagnose. Diese Einstellung gilt nur für dieses Gerät.",
+      "developerToolsTitle": "Entwicklerwerkzeuge",
+      "developerToolsDesc": "Über diese Schaltfläche, F12, Cmd/Strg+Umschalt+I oder das Kontextmenü öffnen.",
+      "openDeveloperTools": "Entwicklerwerkzeuge öffnen",
+      "openDeveloperToolsFailed": "Entwicklerwerkzeuge konnten nicht geöffnet werden",
+      "performanceInfoTitle": "Editor-Leistungsinformationen",
+      "performanceInfoDesc": "Dokumentgröße, Arbeitsmodus und Renderzeit im Editor anzeigen.",
+      "diagnostics": {
+        "title": "Diagnose und Konsolenprotokolle",
+        "description": "{count} bereinigte Laufzeitprotokolle erfasst. Vor dem Kopieren oder Exportieren prüfen.",
+        "preview": "Vorschau erzeugen",
+        "previewTitle": "Vorschau der bereinigten Diagnose",
+        "reviewWarning": "Die automatische Bereinigung erkennt nicht jeden Anwendungstext. Bitte vor dem Teilen prüfen. Notizinhalte werden nicht absichtlich gelesen.",
+        "clear": "Protokolle löschen",
+        "cleared": "Protokolle gelöscht",
+        "copy": "Kopieren",
+        "copied": "Kopiert",
+        "copyFailed": "Diagnose konnte nicht kopiert werden",
+        "export": "JSON exportieren",
+        "exported": "Diagnose exportiert",
+        "exportFailed": "Diagnose konnte nicht exportiert werden",
+        "failed": "Diagnose konnte nicht erstellt werden"
+      },
       "clearData": "Daten löschen",
       "clearDataConfirm": "Dadurch werden Systemeinstellungen, die Datenbank und alle Aufzeichnungen dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden. Fortfahren?",
       "proxy": "Proxy, wird zur Lösung von Netzwerkproblemen verwendet. Nach der Konfiguration wird ein Neustart der Anwendung empfohlen.",
@@ -4232,6 +4258,14 @@
     "description": "Klicken, um ein Aufnahme-Tool auszuwählen und schnell Aufzeichnungen zu erstellen"
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "Dokumentgröße",
+      "mode": "Dokumentmodus",
+      "view": "Editoransicht",
+      "renderTime": "Renderzeit",
+      "largeDocument": "Großes Dokument",
+      "standardDocument": "Standarddokument"
+    },
     "placeholder": "Tippe /, um das Menü zu öffnen, oder beginne zu schreiben...",
     "markdownParseFallback": {
       "title": "Visuelles Parsen fehlgeschlagen; in den Quelltextmodus gewechselt",

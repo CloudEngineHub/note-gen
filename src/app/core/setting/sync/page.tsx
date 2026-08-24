@@ -66,6 +66,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import { RepoNames, SyncStateEnum } from '@/lib/sync/github.types'
 import { checkSyncProviderStatus } from '@/lib/sync/provider-status'
+import { hasConfiguredSelfHostedSync } from '@/lib/diagnostics/self-hosted'
 import type { SyncRepoPlatform, WorkspaceSyncRepos } from '@/lib/sync/workspace-repos'
 import useSettingStore from '@/stores/setting'
 import useSyncStore from '@/stores/sync'
@@ -113,6 +114,7 @@ export default function SyncPage() {
     setGiteeCustomSyncRepo,
     setGitlabCustomSyncRepo,
     setGiteaCustomSyncRepo,
+    developerMode,
   } = useSettingStore()
   const {
     syncRepoState,
@@ -131,6 +133,25 @@ export default function SyncPage() {
   const [checkingPlatforms, setCheckingPlatforms] = useState<Set<SyncPlatform>>(new Set())
   const checkingPlatformsRef = useRef<Set<SyncPlatform>>(new Set())
   const [workspaceRepos, setWorkspaceRepos] = useState<Record<string, WorkspaceSyncRepos>>({})
+  const [hasSelfHostedConfiguration, setHasSelfHostedConfiguration] = useState(false)
+
+  const visiblePlatforms = useMemo(
+    () => SYNC_PLATFORMS.filter(itemPlatform => itemPlatform !== 'selfHosted'
+      || developerMode
+      || primaryBackupMethod === 'selfHosted'
+      || hasSelfHostedConfiguration),
+    [developerMode, hasSelfHostedConfiguration, primaryBackupMethod],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    void hasConfiguredSelfHostedSync().then(configured => {
+      if (!cancelled) setHasSelfHostedConfiguration(configured)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selfHostedConnected])
 
   const workspaceOptions = useMemo(
     () => Array.from(new Set([workspacePath, '', ...workspaceHistory])),
@@ -323,7 +344,7 @@ export default function SyncPage() {
           </CardHeader>
           <CardContent>
             <ItemGroup className="gap-1">
-              {SYNC_PLATFORMS.map((itemPlatform) => {
+              {visiblePlatforms.map((itemPlatform) => {
                 const isCurrentPlatform = primaryBackupMethod === itemPlatform
                 const isSelectedPlatform = platform === itemPlatform
                 return (

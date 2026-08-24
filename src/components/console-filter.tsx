@@ -1,6 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
+import { recordRuntimeLog } from '@/lib/diagnostics/runtime-log-buffer'
+import useSettingStore from '@/stores/setting'
+
+function captureRuntimeLog(level: 'info' | 'warn' | 'error', args: unknown[]) {
+  if (useSettingStore.getState().developerMode) recordRuntimeLog(level, args)
+}
 
 function shouldFilterConsoleMessage(args: unknown[]) {
   const message = args.map((arg) => String(arg)).join(' ')
@@ -74,6 +80,7 @@ export function ConsoleFilter() {
   useEffect(() => {
     const originalError = console.error
     const originalWarn = console.warn
+    const originalInfo = console.info
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       if (isKnownTauriDevNoise(getErrorMessage(event.reason))) {
@@ -92,6 +99,7 @@ export function ConsoleFilter() {
       if (shouldFilterConsoleMessage(args)) {
         return
       }
+      captureRuntimeLog('error', args)
       originalError.apply(console, args)
     }
 
@@ -99,7 +107,13 @@ export function ConsoleFilter() {
       if (shouldFilterConsoleMessage(args)) {
         return
       }
+      captureRuntimeLog('warn', args)
       originalWarn.apply(console, args)
+    }
+
+    console.info = (...args: unknown[]) => {
+      captureRuntimeLog('info', args)
+      originalInfo.apply(console, args)
     }
 
     window.addEventListener('unhandledrejection', handleUnhandledRejection)
@@ -108,6 +122,7 @@ export function ConsoleFilter() {
     return () => {
       console.error = originalError
       console.warn = originalWarn
+      console.info = originalInfo
       window.removeEventListener('unhandledrejection', handleUnhandledRejection)
       window.removeEventListener('error', handleError)
     }

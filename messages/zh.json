@@ -1958,6 +1958,32 @@
     "dev": {
       "title": "高级设置",
       "desc": "配置网络代理、数据管理和配置文件等高级选项。部分操作可能影响现有数据，请谨慎修改。",
+      "developerTitle": "开发者",
+      "developerDesc": "开放实验性功能、开发者工具和本机诊断能力。",
+      "developerModeTitle": "开发者模式",
+      "developerModeDesc": "开启后显示自托管同步和开发者诊断。此设置仅在当前设备生效。",
+      "developerToolsTitle": "开发者工具",
+      "developerToolsDesc": "可通过此按钮、F12、Cmd/Ctrl+Shift+I 或右键检查元素打开。",
+      "openDeveloperTools": "打开开发者工具",
+      "openDeveloperToolsFailed": "无法打开开发者工具",
+      "performanceInfoTitle": "编辑器性能信息",
+      "performanceInfoDesc": "在编辑器中显示文档大小、工作模式和渲染耗时。",
+      "diagnostics": {
+        "title": "诊断与控制台日志",
+        "description": "已采集 {count} 条脱敏运行日志，可预览后复制或导出。",
+        "preview": "生成预览",
+        "previewTitle": "脱敏诊断预览",
+        "reviewWarning": "自动脱敏无法覆盖所有业务文本，复制或提交前请人工复核。诊断不会主动读取笔记正文。",
+        "clear": "清空日志",
+        "cleared": "日志已清空",
+        "copy": "复制",
+        "copied": "已复制",
+        "copyFailed": "复制诊断失败",
+        "export": "导出 JSON",
+        "exported": "诊断已导出",
+        "exportFailed": "导出诊断失败",
+        "failed": "生成诊断失败"
+      },
       "clearData": "清理数据",
       "clearDataConfirm": "这会永久删除系统配置、数据库和全部记录，且无法撤销。确定继续吗？",
       "proxy": "代理，用于解决网络问题，配置后建议重启应用。",
@@ -4263,6 +4289,14 @@
     "description": "点击选择记录工具，快速创建记录"
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "文档大小",
+      "mode": "文档模式",
+      "view": "编辑视图",
+      "renderTime": "渲染耗时",
+      "largeDocument": "长文档",
+      "standardDocument": "常规文档"
+    },
     "placeholder": "输入 / 唤起菜单，或直接开始写作...",
     "markdownParseFallback": {
       "title": "可视化解析失败，已切换到源码模式",

@@ -8,6 +8,7 @@ import Script from "next/script";
 import { getSyncPushQueue } from "@/lib/sync/sync-push-queue";
 import { ConsoleFilter } from "@/components/console-filter";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { DeveloperModeController } from "@/components/developer-mode-controller";
 
 export default function RootLayout({
   children,
@@ -45,6 +46,7 @@ export default function RootLayout({
         </head>
         <body suppressHydrationWarning>
           <ConsoleFilter />
+          <DeveloperModeController />
           <Suspense>
             <TooltipProvider>
               <NextIntlProvider>

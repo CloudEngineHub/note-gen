@@ -1892,6 +1892,32 @@
     "dev": {
       "title": "Avançado",
       "desc": "Configure opções avançadas, como proxy de rede, gerenciamento de dados e arquivos de configuração. Algumas ações podem afetar dados existentes, portanto faça alterações com cuidado.",
+      "developerTitle": "Desenvolvedor",
+      "developerDesc": "Acesse recursos experimentais, ferramentas de desenvolvedor e diagnósticos locais.",
+      "developerModeTitle": "Modo de desenvolvedor",
+      "developerModeDesc": "Mostra a sincronização auto-hospedada e os diagnósticos. Esta configuração afeta somente este dispositivo.",
+      "developerToolsTitle": "Ferramentas de desenvolvedor",
+      "developerToolsDesc": "Abra por este botão, F12, Cmd/Ctrl+Shift+I ou pelo menu de contexto.",
+      "openDeveloperTools": "Abrir ferramentas de desenvolvedor",
+      "openDeveloperToolsFailed": "Não foi possível abrir as ferramentas de desenvolvedor",
+      "performanceInfoTitle": "Informações de desempenho do editor",
+      "performanceInfoDesc": "Mostra tamanho do documento, modo de operação e tempo de renderização no editor.",
+      "diagnostics": {
+        "title": "Diagnósticos e logs do console",
+        "description": "{count} logs de execução anonimizados coletados. Revise antes de copiar ou exportar.",
+        "preview": "Gerar prévia",
+        "previewTitle": "Prévia dos diagnósticos anonimizados",
+        "reviewWarning": "A anonimização automática não identifica todo texto do aplicativo. Revise antes de compartilhar. O conteúdo das notas não é lido intencionalmente.",
+        "clear": "Limpar logs",
+        "cleared": "Logs limpos",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "copyFailed": "Não foi possível copiar os diagnósticos",
+        "export": "Exportar JSON",
+        "exported": "Diagnósticos exportados",
+        "exportFailed": "Não foi possível exportar os diagnósticos",
+        "failed": "Não foi possível gerar os diagnósticos"
+      },
       "clearData": "Limpar Dados",
       "clearDataConfirm": "Isso excluirá permanentemente as configurações do sistema, o banco de dados e todos os registros. Esta ação não pode ser desfeita. Continuar?",
       "proxy": "Proxy, usado para resolver problemas de rede, após a configuração, é recomendado reiniciar o aplicativo.",
@@ -4060,6 +4086,14 @@
     }
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "Tamanho do documento",
+      "mode": "Modo do documento",
+      "view": "Visualização do editor",
+      "renderTime": "Tempo de renderização",
+      "largeDocument": "Documento grande",
+      "standardDocument": "Documento padrão"
+    },
     "markdownParseFallback": {
       "title": "Falha na análise visual; o modo de código-fonte foi ativado",
       "description": "O Markdown original foi preservado. Continue editando ou corrija a sintaxe e tente novamente o modo visual.",

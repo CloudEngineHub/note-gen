@@ -1867,6 +1867,32 @@
     "dev": {
       "title": "詳細設定",
       "desc": "ネットワークプロキシ、データ管理、設定ファイルなどの詳細オプションを設定します。一部の操作は既存のデータに影響する可能性があるため、慎重に変更してください。",
+      "developerTitle": "開発者",
+      "developerDesc": "実験的な機能、開発者ツール、ローカル診断を利用します。",
+      "developerModeTitle": "開発者モード",
+      "developerModeDesc": "セルフホスト同期と開発者診断を表示します。この設定は現在の端末でのみ有効です。",
+      "developerToolsTitle": "開発者ツール",
+      "developerToolsDesc": "このボタン、F12、Cmd/Ctrl+Shift+I、またはコンテキストメニューから開けます。",
+      "openDeveloperTools": "開発者ツールを開く",
+      "openDeveloperToolsFailed": "開発者ツールを開けませんでした",
+      "performanceInfoTitle": "エディターのパフォーマンス情報",
+      "performanceInfoDesc": "文書サイズ、動作モード、レンダリング時間をエディターに表示します。",
+      "diagnostics": {
+        "title": "診断とコンソールログ",
+        "description": "匿名化された実行ログを {count} 件収集しました。コピーまたは書き出す前に確認できます。",
+        "preview": "プレビューを生成",
+        "previewTitle": "匿名化診断のプレビュー",
+        "reviewWarning": "自動匿名化ですべてのアプリ内テキストを判別することはできません。共有前に確認してください。ノート本文を意図的に読み取ることはありません。",
+        "clear": "ログを消去",
+        "cleared": "ログを消去しました",
+        "copy": "コピー",
+        "copied": "コピーしました",
+        "copyFailed": "診断をコピーできませんでした",
+        "export": "JSON を書き出す",
+        "exported": "診断を書き出しました",
+        "exportFailed": "診断を書き出せませんでした",
+        "failed": "診断を生成できませんでした"
+      },
       "clearData": "データをクリア",
       "clearDataConfirm": "システム設定、データベース、すべての記録が完全に削除されます。この操作は元に戻せません。続行しますか？",
       "proxy": "ネットワーク問題解決用のプロキシ。設定後はアプリの再起動を推奨します。",
@@ -4080,6 +4106,14 @@
     "description": "記録ツールを選択して、素早く記録を作成"
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "文書サイズ",
+      "mode": "文書モード",
+      "view": "エディター表示",
+      "renderTime": "レンダリング時間",
+      "largeDocument": "長文書",
+      "standardDocument": "標準文書"
+    },
     "placeholder": "「/」を入力してメニューを開くか、直接書き始める...",
     "markdownParseFallback": {
       "title": "ビジュアル解析に失敗したため、ソースモードに切り替えました",

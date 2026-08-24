@@ -118,6 +118,12 @@ interface SettingState {
   closeBehavior: CloseBehavior
   setCloseBehavior: (behavior: CloseBehavior) => Promise<void>
 
+  developerMode: boolean
+  setDeveloperMode: (enabled: boolean) => void
+
+  developerPerformanceInfo: boolean
+  setDeveloperPerformanceInfo: (enabled: boolean) => void
+
   // setting - ai - 当前选择的模型 key
   currentAi: string
   setCurrentAi: (currentAi: string) => void
@@ -996,6 +1002,12 @@ const useSettingStore = create<SettingState>((set, get) => ({
     await store.set('closeBehavior', closeBehavior)
     await store.save()
   },
+
+  developerMode: false,
+  setDeveloperMode: (developerMode) => set({ developerMode }),
+
+  developerPerformanceInfo: false,
+  setDeveloperPerformanceInfo: (developerPerformanceInfo) => set({ developerPerformanceInfo }),
 
   currentAi: '',
   setCurrentAi: (currentAi) => set({ currentAi }),

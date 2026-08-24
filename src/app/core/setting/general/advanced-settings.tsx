@@ -29,16 +29,37 @@ import {
   ItemTitle,
 } from '@/components/ui/item'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/hooks/use-toast'
+import { openDeveloperTools, supportsNativeDeveloperTools } from '@/lib/developer-tools'
+import useSettingStore from '@/stores/setting'
 import { ConfigFileActions } from './config-file-actions'
-import { AlertTriangle, Database, FolderX, Network } from 'lucide-react'
+import { AlertTriangle, Code2, Database, FolderX, Gauge, MonitorCog, Network } from 'lucide-react'
 import { SettingSection } from '../components/setting-base'
+import { DeveloperDiagnostics } from './developer-diagnostics'
 
 export function AdvancedSettings({ showConfigFileActions = true }: { showConfigFileActions?: boolean }) {
   const t = useTranslations('settings.dev')
   const [proxy, setProxy] = useState('')
   const [pendingAction, setPendingAction] = useState<'data' | 'files' | null>(null)
+  const developerMode = useSettingStore(state => state.developerMode)
+  const setDeveloperMode = useSettingStore(state => state.setDeveloperMode)
+  const developerPerformanceInfo = useSettingStore(state => state.developerPerformanceInfo)
+  const setDeveloperPerformanceInfo = useSettingStore(state => state.setDeveloperPerformanceInfo)
+  const desktop = supportsNativeDeveloperTools()
   const { toast } = useToast()
+
+  async function handleOpenDeveloperTools() {
+    try {
+      await openDeveloperTools()
+    } catch (error) {
+      toast({
+        title: t('openDeveloperToolsFailed'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      })
+    }
+  }
 
   async function handleClearData() {
     setPendingAction('data')
@@ -109,6 +130,61 @@ export function AdvancedSettings({ showConfigFileActions = true }: { showConfigF
             </ItemActions>
           </Item>
           {showConfigFileActions ? <ConfigFileActions /> : null}
+        </ItemGroup>
+      </SettingSection>
+
+      <SettingSection title={t('developerTitle')} desc={t('developerDesc')}>
+        <ItemGroup className="gap-3">
+          <Item variant="warning">
+            <ItemMedia variant="icon"><Code2 /></ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t('developerModeTitle')}</ItemTitle>
+              <ItemDescription>{t('developerModeDesc')}</ItemDescription>
+            </ItemContent>
+            <ItemActions className="ml-auto">
+              <Switch
+                checked={developerMode}
+                onCheckedChange={setDeveloperMode}
+                aria-label={t('developerModeTitle')}
+              />
+            </ItemActions>
+          </Item>
+
+          {developerMode ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed p-2">
+              {desktop ? (
+                <Item variant="outline" size="sm">
+                  <ItemMedia variant="icon"><MonitorCog /></ItemMedia>
+                  <ItemContent>
+                    <ItemTitle>{t('developerToolsTitle')}</ItemTitle>
+                    <ItemDescription>{t('developerToolsDesc')}</ItemDescription>
+                  </ItemContent>
+                  <ItemActions className="ml-auto">
+                    <Button variant="outline" size="sm" onClick={() => void handleOpenDeveloperTools()}>
+                      {t('openDeveloperTools')}
+                    </Button>
+                  </ItemActions>
+                </Item>
+              ) : null}
+
+              <Item variant="outline" size="sm">
+                <ItemMedia variant="icon"><Gauge /></ItemMedia>
+                <ItemContent>
+                  <ItemTitle>{t('performanceInfoTitle')}</ItemTitle>
+                  <ItemDescription>{t('performanceInfoDesc')}</ItemDescription>
+                </ItemContent>
+                <ItemActions className="ml-auto">
+                  <Switch
+                    checked={developerPerformanceInfo}
+                    onCheckedChange={setDeveloperPerformanceInfo}
+                    aria-label={t('performanceInfoTitle')}
+                  />
+                </ItemActions>
+              </Item>
+
+              <DeveloperDiagnostics />
+            </div>
+          ) : null}
         </ItemGroup>
       </SettingSection>
 

@@ -1844,6 +1844,32 @@
     "dev": {
       "title": "進階設定",
       "desc": "設定網路代理、資料管理和設定檔等進階選項。部分操作可能影響現有資料，請謹慎修改。",
+      "developerTitle": "開發者",
+      "developerDesc": "開放實驗性功能、開發者工具和本機診斷能力。",
+      "developerModeTitle": "開發者模式",
+      "developerModeDesc": "開啟後顯示自託管同步和開發者診斷。此設定僅在目前裝置生效。",
+      "developerToolsTitle": "開發者工具",
+      "developerToolsDesc": "可透過此按鈕、F12、Cmd/Ctrl+Shift+I 或右鍵檢查元素開啟。",
+      "openDeveloperTools": "開啟開發者工具",
+      "openDeveloperToolsFailed": "無法開啟開發者工具",
+      "performanceInfoTitle": "編輯器效能資訊",
+      "performanceInfoDesc": "在編輯器中顯示文件大小、工作模式和渲染耗時。",
+      "diagnostics": {
+        "title": "診斷與主控台日誌",
+        "description": "已收集 {count} 筆脫敏執行日誌，可預覽後複製或匯出。",
+        "preview": "產生預覽",
+        "previewTitle": "脫敏診斷預覽",
+        "reviewWarning": "自動脫敏無法涵蓋所有業務文字，複製或提交前請人工複核。診斷不會主動讀取筆記正文。",
+        "clear": "清除日誌",
+        "cleared": "日誌已清除",
+        "copy": "複製",
+        "copied": "已複製",
+        "copyFailed": "複製診斷失敗",
+        "export": "匯出 JSON",
+        "exported": "診斷已匯出",
+        "exportFailed": "匯出診斷失敗",
+        "failed": "產生診斷失敗"
+      },
       "clearData": "清理數據",
       "clearDataConfirm": "這會永久刪除系統設定、資料庫和全部記錄，且無法復原。確定繼續嗎？",
       "proxy": "代理，用於解決網路問題，配置後建議重啟應用。",
@@ -4070,6 +4096,14 @@
     }
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "文件大小",
+      "mode": "文件模式",
+      "view": "編輯檢視",
+      "renderTime": "渲染耗時",
+      "largeDocument": "長文件",
+      "standardDocument": "一般文件"
+    },
     "placeholder": "輸入 / 叫出選單，或直接開始寫作...",
     "markdownParseFallback": {
       "title": "視覺化解析失敗，已切換到原始碼模式",

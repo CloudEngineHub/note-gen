@@ -1958,6 +1958,32 @@
     "dev": {
       "title": "Advanced",
       "desc": "Configure advanced options such as network proxy, data management, and configuration files. Some actions may affect existing data, so make changes carefully.",
+      "developerTitle": "Developer",
+      "developerDesc": "Access experimental features, developer tools, and local diagnostics.",
+      "developerModeTitle": "Developer mode",
+      "developerModeDesc": "Shows self-hosted sync and developer diagnostics. This setting only affects this device.",
+      "developerToolsTitle": "Developer tools",
+      "developerToolsDesc": "Open with this button, F12, Cmd/Ctrl+Shift+I, or Inspect Element from the context menu.",
+      "openDeveloperTools": "Open developer tools",
+      "openDeveloperToolsFailed": "Could not open developer tools",
+      "performanceInfoTitle": "Editor performance information",
+      "performanceInfoDesc": "Show document size, operating mode, and render time in the editor.",
+      "diagnostics": {
+        "title": "Diagnostics and console logs",
+        "description": "{count} redacted runtime logs collected. Preview them before copying or exporting.",
+        "preview": "Generate preview",
+        "previewTitle": "Redacted diagnostics preview",
+        "reviewWarning": "Automatic redaction cannot identify every piece of application text. Review this data before sharing it. Diagnostics never intentionally read note content.",
+        "clear": "Clear logs",
+        "cleared": "Logs cleared",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Could not copy diagnostics",
+        "export": "Export JSON",
+        "exported": "Diagnostics exported",
+        "exportFailed": "Could not export diagnostics",
+        "failed": "Could not generate diagnostics"
+      },
       "clearData": "Clear Data",
       "clearDataConfirm": "This permanently deletes system settings, the database, and all records. This action cannot be undone. Continue?",
       "proxy": "Proxy, used to solve network problems, after configuration, it is recommended to restart the application.",
@@ -4240,6 +4266,14 @@
     "description": "Click to select a recording tool and quickly create records"
   },
   "editor": {
+    "developerPerformance": {
+      "documentSize": "Document size",
+      "mode": "Document mode",
+      "view": "Editor view",
+      "renderTime": "Render time",
+      "largeDocument": "Large document",
+      "standardDocument": "Standard document"
+    },
     "placeholder": "Type / to open menu, or start writing...",
     "markdownParseFallback": {
       "title": "Visual parsing failed; switched to source mode",
