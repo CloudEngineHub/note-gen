@@ -5,7 +5,8 @@
   "windows": [
     "main",
     "screenshot",
-    "pdf-print-*"
+    "pdf-print-*",
+    "editor-*"
   ],
   "permissions": [
     "core:default",
@@ -91,6 +92,7 @@
     "core:window:allow-set-focus",
     "core:window:allow-set-size",
     "core:window:allow-set-position",
+    "core:window:allow-set-title",
     "core:window:allow-hide",
     "core:window:allow-show",
     "core:window:allow-destroy",
@@ -100,6 +102,7 @@
     "core:window:allow-unminimize",
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
+    "core:window:allow-set-always-on-top",
     {
       "identifier": "http:allow-fetch",
       "allow": [

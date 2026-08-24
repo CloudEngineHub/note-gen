@@ -640,8 +640,8 @@
         "readingTime": "约 {count} 分钟"
       },
       "sourceMode": {
-        "visual": "所见即所得模式",
-        "source": "Markdown 源码模式"
+        "visual": "所见即所得",
+        "source": "源码模式"
       },
       "sourceLineNumbers": {
         "title": "源码行号",
@@ -4560,11 +4560,42 @@
       }
     }
   },
+  "editorWindow": {
+    "missing": "编辑窗口会话不存在或已经关闭",
+    "fileMissing": "文件已被移动或删除，无法继续保存",
+    "opening": "正在打开笔记…",
+    "saving": "正在保存",
+    "unsaved": "未保存",
+    "discardTitle": "放弃未保存的更改？",
+    "discardDescription": "文件无法保存。关闭窗口将丢失当前更改。",
+    "discardCancel": "继续编辑",
+    "discardConfirm": "放弃并关闭",
+    "pin": "窗口置顶",
+    "unpin": "取消窗口置顶",
+    "more": "更多窗口操作",
+    "close": "关闭窗口"
+  },
   "tabContext": {
     "close": "关闭",
     "closeOthers": "关闭其他",
     "closeAll": "关闭全部",
     "closeLeft": "关闭左侧",
-    "closeRight": "关闭右侧"
+    "closeRight": "关闭右侧",
+    "splitLeft": "向左拆分",
+    "splitRight": "向右拆分",
+    "splitUp": "向上拆分",
+    "splitDown": "向下拆分",
+    "openInNewWindow": "在新窗口打开",
+    "moveToNewWindow": "移动到新窗口",
+    "openWindowFailed": "无法打开独立编辑窗口",
+    "maximizeGroup": "最大化编辑器组",
+    "restoreGroup": "恢复编辑器组",
+    "closeGroup": "关闭编辑器组",
+    "groupActions": "编辑器组操作",
+    "newTab": "新建标签页",
+    "emptyGroup": "将标签页拖到此处，或从文件列表打开笔记",
+    "loadingLayout": "正在恢复编辑器布局…",
+    "undo": "撤销",
+    "redo": "重做"
   }
 }

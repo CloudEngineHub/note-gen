@@ -385,6 +385,7 @@ export function PullButton({ editor, markdown, getMarkdown, prepareExternalActio
             title="手动拉取远程文件"
           >
             <ArrowDownCircle size={14} />
+            <span className="text-xs">拉取</span>
           </button>
         )}
       </div>

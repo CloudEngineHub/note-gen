@@ -3,6 +3,7 @@
 import { Editor } from '@tiptap/react'
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { Type } from 'lucide-react'
 
 import {
   getEditorStatistics,
@@ -87,11 +88,12 @@ export function WordCount({ editor, sourceMarkdown, compact = false }: WordCount
   }, [editor, sourceMarkdown])
 
   if (compact) {
-    return <span className="text-xs">{t('characters', { count: statistics.characters })}</span>
+    return <span className="flex items-center gap-1 text-xs"><Type className="size-3" />{t('characters', { count: statistics.characters })}</span>
   }
 
   return (
     <span className="flex items-center gap-1.5 text-xs">
+      <Type className="size-3" />
       <span>{t('characters', { count: statistics.characters })}</span>
       <span aria-hidden="true">·</span>
       <span>{t('readingTime', { count: statistics.readingMinutes })}</span>

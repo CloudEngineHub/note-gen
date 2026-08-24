@@ -640,8 +640,8 @@
         "readingTime": "about {count} min"
       },
       "sourceMode": {
-        "visual": "Visual editor",
-        "source": "Markdown source"
+        "visual": "WYSIWYG",
+        "source": "Source mode"
       },
       "sourceLineNumbers": {
         "title": "Source line numbers",
@@ -4537,11 +4537,42 @@
       }
     }
   },
+  "editorWindow": {
+    "missing": "The editor window session does not exist or is closed",
+    "fileMissing": "The file was moved or deleted and can no longer be saved",
+    "opening": "Opening note…",
+    "saving": "Saving",
+    "unsaved": "Unsaved",
+    "discardTitle": "Discard unsaved changes?",
+    "discardDescription": "The file could not be saved. Closing the window will lose the current changes.",
+    "discardCancel": "Keep Editing",
+    "discardConfirm": "Discard and Close",
+    "pin": "Always on Top",
+    "unpin": "Turn Off Always on Top",
+    "more": "More Window Actions",
+    "close": "Close Window"
+  },
   "tabContext": {
     "close": "Close",
     "closeOthers": "Close Others",
     "closeAll": "Close All",
     "closeLeft": "Close Left",
-    "closeRight": "Close Right"
+    "closeRight": "Close Right",
+    "splitLeft": "Split Left",
+    "splitRight": "Split Right",
+    "splitUp": "Split Up",
+    "splitDown": "Split Down",
+    "openInNewWindow": "Open in New Window",
+    "moveToNewWindow": "Move into New Window",
+    "openWindowFailed": "Could not open the standalone editor window",
+    "maximizeGroup": "Maximize Editor Group",
+    "restoreGroup": "Restore Editor Group",
+    "closeGroup": "Close Editor Group",
+    "groupActions": "Editor Group Actions",
+    "newTab": "New Tab",
+    "emptyGroup": "Drop a tab here, or open a note from the file list",
+    "loadingLayout": "Restoring editor layout…",
+    "undo": "Undo",
+    "redo": "Redo"
   }
 }

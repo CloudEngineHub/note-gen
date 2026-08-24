@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react"
 import { FileManager } from "./file-manager"
-import { FileFooter } from "./file-footer"
 import useArticleStore from "@/stores/article"
 import useClipboardStore from "@/stores/clipboard"
 import { isMobileDevice } from "@/lib/check"
@@ -298,7 +297,6 @@ export function FileSidebar() {
       <div className="min-h-0 flex-1 overflow-hidden">
         <FileManager focusSidebar={focusSidebar} showSearch={false} />
       </div>
-      <FileFooter />
     </div>
   )
 }

@@ -289,6 +289,7 @@ export function Outline({
   const [collapsedHeadingIds, setCollapsedHeadingIds] = useState<Set<string>>(() => new Set())
   const [editingHeadingId, setEditingHeadingId] = useState<string | null>(null)
   const [editingHeadingText, setEditingHeadingText] = useState('')
+  const [outlineOverflowing, setOutlineOverflowing] = useState(false)
   const t = useTranslations('editor')
   // Use ref to always get latest headings in event handlers
   const headingsRef = useRef<HeadingItem[]>([])
@@ -796,6 +797,25 @@ export function Outline({
     }
   }, [activeHeadingId, normalizedSearchQuery, outlineMeta, visibleHeadingIds])
 
+  useEffect(() => {
+    const scrollContainer = outlineScrollContainerRef.current
+    if (!isOpen || !isReady || !scrollContainer) return
+
+    const updateOverflow = () => {
+      setOutlineOverflowing(scrollContainer.scrollHeight > scrollContainer.clientHeight + 1)
+    }
+    const observer = new ResizeObserver(updateOverflow)
+    observer.observe(scrollContainer)
+    const content = scrollContainer.firstElementChild
+    if (content) observer.observe(content)
+    const frame = window.requestAnimationFrame(updateOverflow)
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [isOpen, isReady, visibleHeadings])
+
   // 如果编辑器还没准备好或没有打开Outline，直接返回 null
   if (!isOpen || !isReady) return null
 
@@ -826,7 +846,10 @@ export function Outline({
           )}
         </div>
       </div>
-      <div ref={outlineScrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        ref={outlineScrollContainerRef}
+        className={cn('min-h-0 flex-1', outlineOverflowing ? 'overflow-y-auto' : 'overflow-y-hidden')}
+      >
         <OutlineItems
           headings={visibleHeadings}
           totalHeadingCount={headings.length}

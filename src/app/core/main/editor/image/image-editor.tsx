@@ -23,9 +23,11 @@ import { Toggle } from '@/components/ui/toggle'
 import { ImageFooter } from './image-footer'
 import { TooltipButton } from '@/components/tooltip-button'
 import NextImage from 'next/image'
+import { MainStatusBarPortal } from '../../main-status-bar'
 
 interface ImageEditorProps {
   filePath: string
+  isActive?: boolean
 }
 
 interface CropperLayoutState {
@@ -39,7 +41,7 @@ interface CropperLayoutState {
   }
 }
 
-export function ImageEditor({ filePath }: ImageEditorProps) {
+export function ImageEditor({ filePath, isActive = true }: ImageEditorProps) {
   const cropperRef = useRef<CropperRef>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const cropperContainerRef = useRef<HTMLDivElement>(null)
@@ -492,12 +494,14 @@ export function ImageEditor({ filePath }: ImageEditorProps) {
           )}
       </div>
 
-      {/* Footer */}
-      <ImageFooter 
-        filePath={filePath} 
-        imageWidth={imageWidth} 
-        imageHeight={imageHeight} 
-      />
+      <MainStatusBarPortal active={isActive}>
+        <ImageFooter
+          filePath={filePath}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          embedded
+        />
+      </MainStatusBarPortal>
     </div>
   )
 }

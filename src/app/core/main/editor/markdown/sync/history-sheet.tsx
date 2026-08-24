@@ -279,12 +279,13 @@ export function HistorySheet({ editor, prepareExternalAction, onMarkdownChange }
   const trigger = (
     <button
       className={cn(
-        'p-0.5 rounded transition-colors hover:bg-[hsl(var(--muted))]',
+        'flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-[hsl(var(--muted))]',
         isOpen && 'bg-[hsl(var(--muted))]'
       )}
       title="历史记录"
     >
       <History size={14} />
+      <span className="text-xs">历史</span>
     </button>
   )
 

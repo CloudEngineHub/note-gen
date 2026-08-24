@@ -17,6 +17,7 @@ export default function RootLayout({
 }>) {
   // 初始化同步推送队列
   useEffect(() => {
+    if (window.location.pathname.startsWith('/editor-window')) return
     getSyncPushQueue()
   }, [])
 

@@ -640,8 +640,8 @@
         "readingTime": "etwa {count} Min"
       },
       "sourceMode": {
-        "visual": "Visueller Editor",
-        "source": "Markdown-Quellcode"
+        "visual": "WYSIWYG",
+        "source": "Quelltextmodus"
       },
       "sourceLineNumbers": {
         "title": "Quellcode-Zeilennummern",
@@ -4529,11 +4529,42 @@
       }
     }
   },
+  "editorWindow": {
+    "missing": "Die Editorfenster-Sitzung existiert nicht oder wurde geschlossen",
+    "fileMissing": "Die Datei wurde verschoben oder gelöscht und kann nicht mehr gespeichert werden",
+    "opening": "Notiz wird geöffnet…",
+    "saving": "Wird gespeichert",
+    "unsaved": "Nicht gespeichert",
+    "discardTitle": "Nicht gespeicherte Änderungen verwerfen?",
+    "discardDescription": "Die Datei konnte nicht gespeichert werden. Beim Schließen gehen die aktuellen Änderungen verloren.",
+    "discardCancel": "Weiter bearbeiten",
+    "discardConfirm": "Verwerfen und schließen",
+    "pin": "Immer im Vordergrund",
+    "unpin": "Immer im Vordergrund deaktivieren",
+    "more": "Weitere Fensteraktionen",
+    "close": "Fenster schließen"
+  },
   "tabContext": {
     "close": "Schließen",
     "closeOthers": "Andere schließen",
     "closeAll": "Alle schließen",
     "closeLeft": "Links schließen",
-    "closeRight": "Rechts schließen"
+    "closeRight": "Rechts schließen",
+    "splitLeft": "Nach links teilen",
+    "splitRight": "Nach rechts teilen",
+    "splitUp": "Nach oben teilen",
+    "splitDown": "Nach unten teilen",
+    "openInNewWindow": "In neuem Fenster öffnen",
+    "moveToNewWindow": "In neues Fenster verschieben",
+    "openWindowFailed": "Das eigenständige Editorfenster konnte nicht geöffnet werden",
+    "maximizeGroup": "Editorgruppe maximieren",
+    "restoreGroup": "Editorgruppe wiederherstellen",
+    "closeGroup": "Editorgruppe schließen",
+    "groupActions": "Aktionen für Editorgruppe",
+    "newTab": "Neuer Tab",
+    "emptyGroup": "Tab hier ablegen oder eine Notiz aus der Dateiliste öffnen",
+    "loadingLayout": "Editorlayout wird wiederhergestellt…",
+    "undo": "Rückgängig",
+    "redo": "Wiederholen"
   }
 }

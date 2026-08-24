@@ -157,6 +157,7 @@ import {
 } from './nodes/canvas-nodes'
 import { ChartEditorPanel } from './chart-editor-panel'
 import { CanvasFooter } from './canvas-footer'
+import { MainStatusBarPortal } from '../main-status-bar'
 import {
   CANVAS_SHAPE_DEFINITIONS,
   CanvasToolsSidebar,
@@ -219,6 +220,7 @@ const nodeTypes: NodeTypes = {
 interface CanvasEditorProps {
   canvasId: string
   mobile?: boolean
+  isActive?: boolean
 }
 
 interface CanvasSnapshot {
@@ -300,7 +302,7 @@ function havePersistentEdgesChanged(previous: Edge[], current: Edge[]) {
   })
 }
 
-function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
+function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: CanvasEditorProps) {
   const t = useTranslations('canvas')
   const { resolvedTheme } = useTheme()
   const document = useCanvasStore(state => state.documents[canvasId])
@@ -2948,21 +2950,26 @@ function CanvasEditorInner({ canvasId, mobile = false }: CanvasEditorProps) {
         )}
       </div>
 
-      {!mobile && <CanvasFooter
-        showGrid={canvasGridVisible}
-        snapToGrid={canvasSnapToGrid}
-        zoom={viewport.zoom}
-        onToggleGrid={() => void setCanvasGridVisible(!canvasGridVisible)}
-        onToggleSnap={() => void setCanvasSnapToGrid(!canvasSnapToGrid)}
-        onZoomChange={zoom => void setViewport({ ...getViewport(), zoom }, { duration: 120 })}
-        onFitView={() => void fitView({ padding: 0.2, duration: 300 })}
-        onLayout={() => void layoutNodes()}
-        onExport={(format, pixelRatio) => void exportCanvas(format, pixelRatio)}
-        onExportRecord={() => void exportCanvasAsRecord()}
-        onExportSource={format => void exportPortableFile(format)}
-        onImportFile={() => void importCanvasFile()}
-        onImportContent={() => setImportContentOpen(true)}
-      />}
+      {!mobile && (
+        <MainStatusBarPortal active={isActive}>
+          <CanvasFooter
+            showGrid={canvasGridVisible}
+            snapToGrid={canvasSnapToGrid}
+            zoom={viewport.zoom}
+            onToggleGrid={() => void setCanvasGridVisible(!canvasGridVisible)}
+            onToggleSnap={() => void setCanvasSnapToGrid(!canvasSnapToGrid)}
+            onZoomChange={zoom => void setViewport({ ...getViewport(), zoom }, { duration: 120 })}
+            onFitView={() => void fitView({ padding: 0.2, duration: 300 })}
+            onLayout={() => void layoutNodes()}
+            onExport={(format, pixelRatio) => void exportCanvas(format, pixelRatio)}
+            onExportRecord={() => void exportCanvasAsRecord()}
+            onExportSource={format => void exportPortableFile(format)}
+            onImportFile={() => void importCanvasFile()}
+            onImportContent={() => setImportContentOpen(true)}
+            embedded
+          />
+        </MainStatusBarPortal>
+      )}
 
       <Dialog open={edgeEditorOpen} onOpenChange={setEdgeEditorOpen}>
         <DialogContent className="sm:max-w-sm">

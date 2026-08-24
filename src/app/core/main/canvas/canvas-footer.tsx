@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 interface CanvasFooterProps {
   showGrid: boolean
@@ -42,6 +43,7 @@ interface CanvasFooterProps {
   onExportSource: (format: 'canvas' | 'mermaid') => void
   onImportFile: () => void
   onImportContent: () => void
+  embedded?: boolean
 }
 
 function FooterButton({
@@ -60,12 +62,13 @@ function FooterButton({
       <TooltipTrigger asChild>
         <Button
           variant={active === true ? 'secondary' : 'ghost'}
-          size="icon-xs"
+          size="xs"
           aria-label={label}
           aria-pressed={active}
           onClick={onClick}
         >
           {children}
+          <span>{label}</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>
@@ -87,11 +90,15 @@ export function CanvasFooter({
   onExportSource,
   onImportFile,
   onImportContent,
+  embedded = false,
 }: CanvasFooterProps) {
   const t = useTranslations('canvas.footer')
 
   return (
-    <div className="flex h-6 min-h-6 max-h-6 shrink-0 items-center justify-between gap-3 border-t border-border bg-background px-3 text-xs text-muted-foreground">
+    <div className={cn(
+      'flex h-6 min-h-6 max-h-6 min-w-0 shrink-0 items-center gap-2 overflow-hidden bg-background text-xs text-muted-foreground',
+      embedded ? 'w-auto justify-start' : 'w-full justify-between border-t border-border px-3',
+    )}>
       <div className="flex shrink-0 items-center gap-0.5">
         <FooterButton label={t('grid')} active={showGrid} onClick={onToggleGrid}>
           <Grid3X3 />
@@ -106,8 +113,9 @@ export function CanvasFooter({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-xs" aria-label={t('import.title')}>
+                <Button variant="ghost" size="xs" aria-label={t('import.title')}>
                   <FileInput />
+                  <span>{t('import.title')}</span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
@@ -128,8 +136,9 @@ export function CanvasFooter({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-xs" aria-label={t('export')}>
+                <Button variant="ghost" size="xs" aria-label={t('export')}>
                   <Download />
+                  <span>{t('export')}</span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>

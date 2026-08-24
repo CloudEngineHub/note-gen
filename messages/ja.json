@@ -577,8 +577,8 @@
         "readingTime": "約 {count} 分"
       },
       "sourceMode": {
-        "visual": "ビジュアルエディター",
-        "source": "Markdown ソース"
+        "visual": "WYSIWYG",
+        "source": "ソースモード"
       },
       "sourceLineNumbers": {
         "title": "ソースの行番号",
@@ -4377,11 +4377,42 @@
       }
     }
   },
+  "editorWindow": {
+    "missing": "エディターウィンドウのセッションが存在しないか、閉じられています",
+    "fileMissing": "ファイルが移動または削除されたため、保存できません",
+    "opening": "ノートを開いています…",
+    "saving": "保存中",
+    "unsaved": "未保存",
+    "discardTitle": "未保存の変更を破棄しますか？",
+    "discardDescription": "ファイルを保存できませんでした。ウィンドウを閉じると現在の変更は失われます。",
+    "discardCancel": "編集を続ける",
+    "discardConfirm": "破棄して閉じる",
+    "pin": "常に手前に表示",
+    "unpin": "常に手前に表示を解除",
+    "more": "その他のウィンドウ操作",
+    "close": "ウィンドウを閉じる"
+  },
   "tabContext": {
     "close": "閉じる",
     "closeOthers": "その他を閉じる",
     "closeAll": "すべて閉じる",
     "closeLeft": "左を閉じる",
-    "closeRight": "右を閉じる"
+    "closeRight": "右を閉じる",
+    "splitLeft": "左に分割",
+    "splitRight": "右に分割",
+    "splitUp": "上に分割",
+    "splitDown": "下に分割",
+    "openInNewWindow": "新しいウィンドウで開く",
+    "moveToNewWindow": "新しいウィンドウへ移動",
+    "openWindowFailed": "独立したエディターウィンドウを開けませんでした",
+    "maximizeGroup": "エディターグループを最大化",
+    "restoreGroup": "エディターグループを復元",
+    "closeGroup": "エディターグループを閉じる",
+    "groupActions": "エディターグループ操作",
+    "newTab": "新しいタブ",
+    "emptyGroup": "ここにタブをドロップするか、ファイル一覧からノートを開いてください",
+    "loadingLayout": "エディターレイアウトを復元しています…",
+    "undo": "元に戻す",
+    "redo": "やり直す"
   }
 }

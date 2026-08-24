@@ -114,7 +114,7 @@ export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectP
             variant="ghost"
             size="xs"
             disabled={disabled}
-            className="h-5 min-w-0 max-w-[55%] gap-1 px-1 text-xs font-normal text-muted-foreground"
+            className="h-5 min-w-0 max-w-48 gap-1 px-1 text-xs font-normal text-muted-foreground"
             aria-label={t('tooltip')}
           >
             {selectedModel ? <BotMessageSquare data-icon="inline-start" /> : <BotOff data-icon="inline-start" />}

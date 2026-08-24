@@ -32,6 +32,7 @@ function ResizableHandle({
   withHandle,
   collapsed = false,
   expandDirection,
+  collapsedTriggerClassName,
   className,
   onClick,
   onPointerDown,
@@ -43,6 +44,7 @@ function ResizableHandle({
   withHandle?: boolean
   collapsed?: boolean
   expandDirection?: "left" | "right"
+  collapsedTriggerClassName?: string
 }) {
   const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = React.useRef(false)
@@ -98,6 +100,7 @@ function ResizableHandle({
         collapsed &&
           expandDirection === "left" &&
           "after:right-0 after:left-auto after:w-8 after:translate-x-0",
+        collapsed && "pointer-events-none",
         className
       )}
       onPointerDown={(event) => {
@@ -140,18 +143,25 @@ function ResizableHandle({
     >
       {withHandle && collapsed && (
         <div
-          data-collapsed="true"
           className={cn(
-            "pointer-events-auto absolute top-1/2 left-1/2 z-10 h-10 w-3 -translate-x-1/2 -translate-y-1/2 scale-y-100 rounded-full border border-background bg-muted-foreground/60 shadow-md transition-[width,height,margin,transform,background-color,box-shadow] duration-200 group-hover/resize-handle:h-20 group-hover/resize-handle:w-7 group-hover/resize-handle:bg-muted-foreground/75 group-hover/resize-handle:shadow-lg group-focus-visible/resize-handle:h-20 group-focus-visible/resize-handle:w-7 group-focus-visible/resize-handle:bg-muted-foreground/75",
-            collapsedPositionClass
+            "pointer-events-auto absolute inset-y-0 left-1/2 w-8 -translate-x-1/2",
+            collapsedTriggerClassName
           )}
         >
-          {expandDirection ? (
-            <ExpandIcon
-              aria-hidden="true"
-              className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 stroke-[2.5] text-background opacity-0 transition-opacity duration-150 group-hover/resize-handle:opacity-100 group-focus-visible/resize-handle:opacity-100"
-            />
-          ) : null}
+          <div
+            data-collapsed="true"
+            className={cn(
+              "absolute top-1/2 left-1/2 z-10 h-10 w-3 -translate-x-1/2 -translate-y-1/2 scale-y-100 rounded-full border border-background bg-muted-foreground/60 shadow-md transition-[width,height,margin,transform,background-color,box-shadow] duration-200 group-hover/resize-handle:h-20 group-hover/resize-handle:w-7 group-hover/resize-handle:bg-muted-foreground/75 group-hover/resize-handle:shadow-lg group-focus-visible/resize-handle:h-20 group-focus-visible/resize-handle:w-7 group-focus-visible/resize-handle:bg-muted-foreground/75",
+              collapsedPositionClass
+            )}
+          >
+            {expandDirection ? (
+              <ExpandIcon
+                aria-hidden="true"
+                className="absolute top-1/2 left-1/2 size-5 -translate-x-1/2 -translate-y-1/2 stroke-[2.5] text-background opacity-0 transition-opacity duration-150 group-hover/resize-handle:opacity-100 group-focus-visible/resize-handle:opacity-100"
+              />
+            ) : null}
+          </div>
         </div>
       )}
     </ResizablePrimitive.Separator>

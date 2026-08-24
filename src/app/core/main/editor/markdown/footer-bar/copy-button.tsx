@@ -94,9 +94,10 @@ export function CopyButton({ editor, markdown, getMarkdown }: CopyButtonProps) {
       <DropdownMenuTrigger asChild>
         <button
           title="复制"
-          className="p-1 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-0"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-0"
         >
           <Copy className="size-3" />
+          <span>复制</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

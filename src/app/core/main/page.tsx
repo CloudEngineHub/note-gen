@@ -9,6 +9,8 @@ import { useSidebarStore } from "@/stores/sidebar"
 import { useEffect, useState, useRef } from 'react'
 import { Store } from '@tauri-apps/plugin-store'
 import { Layout, PanelImperativeHandle } from 'react-resizable-panels'
+import { restoreEditorWindows } from '@/lib/editor-windows'
+import { MainStatusBar } from './main-status-bar'
 
 function getDefaultLayout(layoutKey: string) {
   const storageKey = `react-resizable-panels:main-layout:${layoutKey}`
@@ -73,6 +75,10 @@ function ResizableWrapper() {
   const [minEditorSize, setMinEditorSize] = useState(30)
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(!leftSidebarVisible)
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(!rightSidebarVisible)
+
+  useEffect(() => {
+    void restoreEditorWindows()
+  }, [])
   
   // 使用稳定的 layoutKey 用于存储，但不作为 React key
   const visiblePanels = [
@@ -84,22 +90,35 @@ function ResizableWrapper() {
   
   const calculateMinSizes = () => {
     const windowWidth = window.innerWidth
-    const minLeftSidebarPercent = Math.max(18, (MIN_LEFT_SIDEBAR_WIDTH_PX / windowWidth) * 100)
-    const minRightSidebarPercent = Math.max(15, (MIN_RIGHT_SIDEBAR_WIDTH_PX / windowWidth) * 100)
-    const minEditorPercent = Math.max(25, (MIN_EDITOR_WIDTH_PX / windowWidth) * 100)
-    setMinLeftSidebarSize(Math.min(minLeftSidebarPercent, 40))
-    setMinRightSidebarSize(Math.min(minRightSidebarPercent, 40))
-    setMinEditorSize(Math.min(minEditorPercent, 50))
+    const preferredSizes = {
+      left: Math.min(Math.max(18, (MIN_LEFT_SIDEBAR_WIDTH_PX / windowWidth) * 100), 40),
+      center: Math.min(Math.max(25, (MIN_EDITOR_WIDTH_PX / windowWidth) * 100), 50),
+      right: Math.min(Math.max(15, (MIN_RIGHT_SIDEBAR_WIDTH_PX / windowWidth) * 100), 40),
+    }
+    const visibleMinimumTotal = (
+      (leftSidebarVisible ? preferredSizes.left : 0)
+      + (centerPanelVisible ? preferredSizes.center : 0)
+      + (rightSidebarVisible ? preferredSizes.right : 0)
+    )
+    const scale = visibleMinimumTotal > 99 ? 99 / visibleMinimumTotal : 1
+
+    setMinLeftSidebarSize(preferredSizes.left * (leftSidebarVisible ? scale : 1))
+    setMinEditorSize(preferredSizes.center * (centerPanelVisible ? scale : 1))
+    setMinRightSidebarSize(preferredSizes.right * (rightSidebarVisible ? scale : 1))
   }
 
   // 初始化侧边栏状态
   useEffect(() => {
     initSidebarState()
+  }, [initSidebarState])
+
+  // 窗口或可见面板变化时，重新平衡各面板的最小宽度
+  useEffect(() => {
     calculateMinSizes()
-    
+
     window.addEventListener('resize', calculateMinSizes)
     return () => window.removeEventListener('resize', calculateMinSizes)
-  }, [])
+  }, [centerPanelVisible, leftSidebarVisible, rightSidebarVisible])
 
   // 当面板可见性变化时，控制面板的折叠和展开
   useEffect(() => {
@@ -244,6 +263,7 @@ function ResizableWrapper() {
         withHandle
         collapsed={isRightHandleCollapsed}
         expandDirection="left"
+        collapsedTriggerClassName="top-12 bottom-0"
         className={shouldShowRightHandle ? undefined : 'hidden'}
         onClick={isRightHandleCollapsed ? revealRightPanel : undefined}
       />
@@ -269,13 +289,16 @@ function ResizableWrapper() {
   }
 
   return (
-    <ResizablePanelGroup 
-      orientation="horizontal"
-      onLayoutChanged={onLayout}
-      className="h-full"
-    >
-      {renderLayout()}
-    </ResizablePanelGroup>
+    <div className="flex h-full min-h-0 flex-col">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        onLayoutChanged={onLayout}
+        className="min-h-0 flex-1"
+      >
+        {renderLayout()}
+      </ResizablePanelGroup>
+      <MainStatusBar />
+    </div>
   )
 }
 

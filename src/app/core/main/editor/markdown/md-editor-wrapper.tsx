@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import emitter, { type Events } from '@/lib/emitter'
 import {
   DEFAULT_OUTLINE_WIDTH,
+  getFileOutlineOpenStoreKey,
   normalizeOutlineWidth,
   OUTLINE_WIDTH_STORE_KEY,
 } from '@/lib/outline-preferences'
@@ -27,9 +28,10 @@ interface MdEditorProps {
   tabContentsRef: RefObject<Record<string, string>>
   filePath: string
   isActive: boolean
+  disabled?: boolean
 }
 
-export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) {
+export function MdEditor({ tabContentsRef, filePath, isActive, disabled = false }: MdEditorProps) {
   const {
     saveCurrentArticle,
     isPulling,
@@ -48,12 +50,10 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   const {
     enableOutline,
     outlinePosition,
-    setEnableOutline,
     workspacePath,
   } = useSettingStore(useShallow((state) => ({
     enableOutline: state.enableOutline,
     outlinePosition: state.outlinePosition,
-    setEnableOutline: state.setEnableOutline,
     workspacePath: state.workspacePath,
   })))
 
@@ -70,6 +70,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
   // Bug fix: Track expected content to detect if editor is behind
   const expectedContentRef = useRef<string | null>(null)
   // Outline panel state
+  const [outlineOpen, setOutlineOpen] = useState(enableOutline)
   const [outlineWidth, setOutlineWidth] = useState(DEFAULT_OUTLINE_WIDTH)
   // State for editor instance (to trigger re-render when ready)
   const [editorInstance, setEditorInstance] = useState<any>(null)
@@ -178,6 +179,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         // Event is for a different file, ignore
         return
       }
+      if (!event.targetFilePath && !isActive) return
       setAiStreaming(event.isStreaming)
       if (event.terminate) {
         terminateRef.current = event.terminate
@@ -187,7 +189,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     return () => {
       emitter.off('editor-ai-streaming', handleAiStreaming as any)
     }
-  }, [filePath])
+  }, [filePath, isActive])
 
   // Check store for AI generating state on mount and when filePath changes
   useEffect(() => {
@@ -216,9 +218,27 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     loadOutlineWidth()
   }, [isActive, loadOutlineWidth])
 
+  useEffect(() => {
+    let disposed = false
+    const loadOutlineOpen = async () => {
+      const store = await Store.load('store.json')
+      const storedValue = await store.get<boolean>(getFileOutlineOpenStoreKey(workspacePath, filePath))
+      if (!disposed) setOutlineOpen(typeof storedValue === 'boolean' ? storedValue : enableOutline)
+    }
+    void loadOutlineOpen()
+    return () => { disposed = true }
+  }, [enableOutline, filePath, workspacePath])
+
   const handleToggleOutline = useCallback(() => {
-    void setEnableOutline(!enableOutline)
-  }, [enableOutline, setEnableOutline])
+    setOutlineOpen(current => {
+      const next = !current
+      void Store.load('store.json').then(async store => {
+        await store.set(getFileOutlineOpenStoreKey(workspacePath, filePath), next)
+        await store.save()
+      })
+      return next
+    })
+  }, [filePath, workspacePath])
 
   const handleOutlineWidthChange = useCallback((width: number) => {
     setOutlineWidth(normalizeOutlineWidth(width))
@@ -231,9 +251,12 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     await store.set(OUTLINE_WIDTH_STORE_KEY, normalizedWidth)
   }, [])
 
-  // Resolve initial content from the tab cache or the store's single file read.
+  // Resolve initial content from the shared tab cache, the store's active file,
+  // or the file itself. Split groups can restore several files at once, while
+  // the article store intentionally has only one globally active document.
   useEffect(() => {
     if (!filePath || loadedPathsRef.current.has(filePath)) return
+    let disposed = false
 
     // Bug fix: Check cache first
     if (tabContentsRef.current && tabContentsRef.current[filePath] !== undefined) {
@@ -244,14 +267,39 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     }
 
     const { activeFilePath: storeActivePath } = useArticleStore.getState()
-    if (storeActivePath !== filePath || articleLoading) return
-
-    setInitialContent(currentArticle)
-    if (tabContentsRef.current) {
-      tabContentsRef.current[filePath] = currentArticle
+    if (storeActivePath === filePath) {
+      if (articleLoading) return
+      setInitialContent(currentArticle)
+      if (tabContentsRef.current) {
+        tabContentsRef.current[filePath] = currentArticle
+      }
+      loadedPathsRef.current.add(filePath)
+      contentInitializedRef.current = true
+      return
     }
-    loadedPathsRef.current.add(filePath)
-    contentInitializedRef.current = true
+
+    void (async () => {
+      try {
+        const [{ readTextFile }, { getFilePathOptions }] = await Promise.all([
+          import('@tauri-apps/plugin-fs'),
+          import('@/lib/workspace'),
+        ])
+        const pathOptions = await getFilePathOptions(filePath)
+        const content = await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
+        if (disposed || loadedPathsRef.current.has(filePath)) return
+        if (tabContentsRef.current) tabContentsRef.current[filePath] = content
+        loadedPathsRef.current.add(filePath)
+        contentInitializedRef.current = true
+        setInitialContent(content)
+      } catch {
+        // The active-file store may still be resolving a remote pull. Its
+        // currentArticle subscription below remains the fallback in that case.
+      }
+    })()
+
+    return () => {
+      disposed = true
+    }
   }, [articleLoading, currentArticle, filePath, tabContentsRef])
 
   // Subscribe to currentArticle changes (for remote file pull results)
@@ -288,7 +336,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     }
   }, [currentArticle, filePath, tabContentsRef, initialContent, justPulledFile])
 
-  // Handle content changes - only save if this is the active file
+  // Handle content changes for this editor's document. Split groups may edit a
+  // document before the global active-file transition has finished, so always
+  // use the explicit path override instead of relying on the singleton state.
   const handleContentChange = useCallback((content: string) => {
     // Ignore only the initial empty update; clearing an initialized document must still save.
     if (content.length === 0 && !contentInitializedRef.current) {
@@ -316,8 +366,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
       tabContentsRef.current[filePath] = content
     }
 
-    // Save to disk - only if this is the active file
-    if (filePath && filePath === activeFilePath) {
+    if (filePath) {
       saveCurrentArticle(content, filePath)
     } else if (!filePath && !isCreatingFileRef.current) {
       // Auto-create untitled file
@@ -326,7 +375,7 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         isCreatingFileRef.current = false
       })
     }
-  }, [saveCurrentArticle, filePath, tabContentsRef, activeFilePath])
+  }, [saveCurrentArticle, filePath, tabContentsRef])
 
   // Handle editor ready - store editor instance
   const handleEditorReady = useCallback((editor: any) => {
@@ -389,9 +438,11 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     }
   }
 
+  const isThisEditorPulling = isPulling && activeFilePath === filePath
+
   // Loading state - wait for content to be loaded
   // 如果正在从远程拉取，优先显示拉取遮罩
-  if (isPulling) {
+  if (isThisEditorPulling) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -418,10 +469,23 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
     )
   }
 
+  const showOutline = outlineOpen && !isThisEditorPulling && editorReady && editorInstance
+  const renderOutline = () => editorInstance ? (
+    <Outline
+      editor={editorInstance}
+      isOpen={outlineOpen}
+      position={outlinePosition}
+      documentKey={filePath}
+      width={outlineWidth}
+      onWidthChange={handleOutlineWidthChange}
+      onWidthCommit={handleOutlineWidthCommit}
+    />
+  ) : null
+
   return (
-    <div id="onboarding-target-editor-content" className="flex-1 relative w-full h-full">
+    <div id={isActive ? "onboarding-target-editor-content" : undefined} className="relative flex h-full w-full flex-1 min-w-0">
       {/* Pull loading overlay */}
-      {isPulling && (
+      {isThisEditorPulling && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 text-muted-foreground">
             <div className="relative">
@@ -436,6 +500,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         </div>
       )}
 
+      {showOutline && outlinePosition === 'left' ? renderOutline() : null}
+
+      <div className="relative h-full min-w-0 flex-1">
       {/* Editor - initialContent only set once on mount */}
       <TipTapEditor
         initialContent={initialContent ?? ''}
@@ -443,13 +510,14 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
         placeholder={tEditor('placeholder')}
         activeFilePath={filePath}
         onEditorReady={handleEditorReady}
-        outlineOpen={enableOutline}
+          outlineOpen={outlineOpen}
         outlinePosition={outlinePosition}
         outlineWidth={outlineWidth}
+        outlineInLayout
         onToggleOutline={handleToggleOutline}
         applyLayoutPreferences
         isActive={isActive}
-        editable={!isPulling && !aiStreaming}
+        editable={!disabled && !isThisEditorPulling && !aiStreaming}
         autoScroll={aiStreaming}
         showOverlay={aiStreaming}
         onTerminate={() => {
@@ -461,19 +529,9 @@ export function MdEditor({ tabContentsRef, filePath, isActive }: MdEditorProps) 
           }}
         }
       />
+      </div>
 
-      {enableOutline && !isPulling && editorReady && editorInstance && (
-        <Outline
-          editor={editorInstance}
-          isOpen={enableOutline}
-          position={outlinePosition}
-          documentKey={filePath}
-          width={outlineWidth}
-          onWidthChange={handleOutlineWidthChange}
-          onWidthCommit={handleOutlineWidthCommit}
-          floating
-        />
-      )}
+      {showOutline && outlinePosition === 'right' ? renderOutline() : null}
     </div>
   )
 }

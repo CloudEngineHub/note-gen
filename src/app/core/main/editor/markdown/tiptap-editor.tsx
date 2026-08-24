@@ -138,6 +138,7 @@ import {
   type MarkdownCollaborationController,
 } from '@/lib/self-hosted-sync/markdown-collaboration'
 import './style.css'
+import { MainStatusBarPortal } from '../../main-status-bar'
 
 const MathEditorDialog = dynamic(
   () => import('./math-editor-dialog').then((module) => module.MathEditorDialog),
@@ -1340,11 +1341,13 @@ interface TipTapEditorProps {
   placeholder?: string
   editable?: boolean
   activeFilePath?: string
+  standalone?: boolean
   onReady?: () => void
   onEditorReady?: (editor: TipTapReactEditor) => void
   outlineOpen?: boolean
   outlinePosition?: OutlinePosition
   outlineWidth?: number
+  outlineInLayout?: boolean
   onToggleOutline?: () => void
   autoScroll?: boolean
   showOverlay?: boolean
@@ -1460,11 +1463,13 @@ export function TipTapEditor({
   placeholder,
   editable = true,
   activeFilePath = '',
+  standalone = false,
   onReady,
   onEditorReady,
   outlineOpen,
   outlinePosition = 'right',
   outlineWidth = DEFAULT_OUTLINE_WIDTH,
+  outlineInLayout = false,
   onToggleOutline,
   autoScroll = false,
   showOverlay = false,
@@ -2259,7 +2264,7 @@ export function TipTapEditor({
     let cancelled = false
     let stopPresence: (() => void) | null = null
     const setup = async () => {
-      if (primaryBackupMethod !== 'selfHosted' || !selfHostedRuntimeReady
+      if (standalone || primaryBackupMethod !== 'selfHosted' || !selfHostedRuntimeReady
         || !isActive || isSectionScope || !activeFilePath || !editor) return
       const workspace = await getWorkspacePath()
       const workspaceRoot = workspace.isCustom
@@ -2391,6 +2396,7 @@ export function TipTapEditor({
     isSectionScope,
     primaryBackupMethod,
     selfHostedRuntimeReady,
+    standalone,
     trySetMarkdownContent,
   ])
 
@@ -4831,7 +4837,7 @@ export function TipTapEditor({
   }, [activeFilePath, beginBlockingActivity, editor, isMobile, tImage])
 
   useEffect(() => {
-    if (isSectionVirtualView) return
+    if (isSectionVirtualView || !isActive) return
 
     const handleInsertImage = () => {
       void insertImageAtSelection()
@@ -4841,7 +4847,7 @@ export function TipTapEditor({
     return () => {
       document.removeEventListener('tiptap-insert-image', handleInsertImage)
     }
-  }, [insertImageAtSelection, isSectionVirtualView])
+  }, [insertImageAtSelection, isActive, isSectionVirtualView])
 
   useEffect(() => {
     editorShortcutHandlersRef.current = {
@@ -5080,7 +5086,7 @@ export function TipTapEditor({
 
   // Listen for search trigger from layout (Ctrl+F / Cmd+F)
   useEffect(() => {
-    if (isSectionScope) return
+    if (isSectionScope || !isActive) return
 
     const handleSearchTrigger = () => {
       if (isSectionVirtualView) {
@@ -5106,11 +5112,12 @@ export function TipTapEditor({
     return () => {
       emitter.off('editor-search-trigger' as any, handleSearchTrigger)
     }
-  }, [handleToggleViewMode, isSectionScope, isSectionVirtualView, isSourceView])
+  }, [handleToggleViewMode, isActive, isSectionScope, isSectionVirtualView, isSourceView])
 
   useEffect(() => {
     if (
       isSectionScope
+      || !isActive
       || !activeFilePath
       || !pendingSearchKeyword.trim()
     ) {
@@ -5211,6 +5218,7 @@ export function TipTapEditor({
     setPendingSearchKeyword,
     initialContent,
     handleToggleViewMode,
+    isActive,
     isSectionScope,
     isSectionVirtualView,
     isSourceView,
@@ -5220,7 +5228,7 @@ export function TipTapEditor({
   // All canonical update channels share a sequence so a delayed older event
   // can never overwrite a newer Agent or sync result.
   useEffect(() => {
-    if (isSectionScope) return
+    if (isSectionScope || !isActive) return
     let retryTimer: number | null = null
 
     const handleRemoteContentUpdate = (event: { content: string }) => {
@@ -5286,6 +5294,7 @@ export function TipTapEditor({
     editor,
     activeFilePath,
     classifyCanonicalMarkdown,
+    isActive,
     isSectionScope,
     isSectionVirtualView,
     prepareExternalMarkdownAction,
@@ -5405,7 +5414,7 @@ export function TipTapEditor({
 
   // Handle external content updates (e.g., from Agent tools).
   useEffect(() => {
-    if (isSectionScope) return
+    if (isSectionScope || !isActive) return
     let retryTimer: number | null = null
 
     const handleExternalUpdate = (newContent: string) => {
@@ -5471,6 +5480,7 @@ export function TipTapEditor({
   }, [
     classifyCanonicalMarkdown,
     editor,
+    isActive,
     isSectionScope,
     isSectionVirtualView,
     prepareExternalMarkdownAction,
@@ -5484,7 +5494,7 @@ export function TipTapEditor({
 
   // Handle AI continue writing
   useEffect(() => {
-    if (isSectionVirtualView) return
+    if (isSectionVirtualView || !isActive) return
 
     let abortController: AbortController | null = null
 
@@ -5611,11 +5621,11 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-continue', handleAIContinue)
       abortController?.abort()
     }
-  }, [beginBlockingActivity, editor, isMobile, isSectionScope, isSectionVirtualView])
+  }, [beginBlockingActivity, editor, isActive, isMobile, isSectionScope, isSectionVirtualView])
 
   // Handle slash-command AI generation actions that operate without selected text.
   useEffect(() => {
-    if (isSectionVirtualView) return
+    if (isSectionVirtualView || !isActive) return
 
     let abortController: AbortController | null = null
 
@@ -5784,7 +5794,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-ai-generate', handleAIGenerate)
       abortController?.abort()
     }
-  }, [beginBlockingActivity, editor, isMobile, isSectionVirtualView])
+  }, [beginBlockingActivity, editor, isActive, isMobile, isSectionVirtualView])
 
   // Handle drag and drop from marks
   const handleEditorDrop = useCallback((e: React.DragEvent) => {
@@ -5884,7 +5894,7 @@ export function TipTapEditor({
 
   // Handle math formula insertion from slash menu
   useEffect(() => {
-    if (!editor || isSectionVirtualView) return
+    if (!editor || isSectionVirtualView || !isActive) return
 
     const handleInsertInlineMath = () => {
       setMathType('inline')
@@ -5903,7 +5913,7 @@ export function TipTapEditor({
       document.removeEventListener('tiptap-insert-inline-math', handleInsertInlineMath)
       document.removeEventListener('tiptap-insert-block-math', handleInsertBlockMath)
     }
-  }, [editor, isSectionVirtualView])
+  }, [editor, isActive, isSectionVirtualView])
 
   const handleEditorDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -7042,6 +7052,7 @@ export function TipTapEditor({
             && effectiveViewMode !== 'source'
             && !isSectionVirtualView
             && outlineOpen
+            && !outlineInLayout
               ? {
                 [isOutlineOnLeft(outlinePosition) ? 'paddingLeft' : 'paddingRight']: outlineContentPadding,
               }
@@ -7286,22 +7297,25 @@ export function TipTapEditor({
       )}
 
       {showFooterBar ? (
-        <FooterBar
-          editor={activeSectionEditor ?? editor}
-          outlineOpen={isSectionVirtualView ? false : effectiveOutlineOpen}
-          onToggleOutline={isSectionVirtualView ? undefined : handleOutlineToggle}
-          viewMode={effectiveViewMode}
-          onToggleViewMode={applyLayoutPreferences ? handleToggleViewMode : undefined}
-          sourceMarkdown={usesCanonicalMarkdown ? sourceMarkdown : undefined}
-          getMarkdown={getCurrentMarkdownSnapshot}
-          prepareExternalAction={prepareExternalMarkdownAction}
-          onMarkdownChange={isSourceView
-            ? handleSourceMarkdownChange
-            : isSectionVirtualView
-              ? handleSectionedMarkdownChange
-              : undefined}
-          deferSourceStatistics={isLargeDocument && usesCanonicalMarkdown}
-        />
+        <MainStatusBarPortal active={isActive} inline={isMobile || standalone}>
+          <FooterBar
+            editor={activeSectionEditor ?? editor}
+            outlineOpen={isSectionVirtualView ? false : effectiveOutlineOpen}
+            onToggleOutline={isSectionVirtualView ? undefined : handleOutlineToggle}
+            viewMode={effectiveViewMode}
+            onToggleViewMode={applyLayoutPreferences ? handleToggleViewMode : undefined}
+            sourceMarkdown={usesCanonicalMarkdown ? sourceMarkdown : undefined}
+            getMarkdown={getCurrentMarkdownSnapshot}
+            prepareExternalAction={prepareExternalMarkdownAction}
+            onMarkdownChange={isSourceView
+              ? handleSourceMarkdownChange
+              : isSectionVirtualView
+                ? handleSectionedMarkdownChange
+                : undefined}
+            deferSourceStatistics={isLargeDocument && usesCanonicalMarkdown}
+            embedded={!isMobile && !standalone}
+          />
+        </MainStatusBarPortal>
       ) : null}
 
       {!isSectionVirtualView ? <SlashCommandPortal /> : null}

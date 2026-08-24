@@ -182,7 +182,8 @@
     --component-inactive-color: var(--muted-foreground);
     --component-bg: var(--card);
     --component-shadow: var(--border);
-    --scrollbar-size: 8px;
+    --scrollbar-size: 12px;
+    --scrollbar-track-hover: hsl(var(--muted) / 0.4);
     --scrollbar-thumb: hsl(var(--muted-foreground) / 0.34);
     --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.58);
     --scrollbar-thumb-active: hsl(var(--foreground) / 0.7);
@@ -510,12 +511,17 @@ html, body {
 
 :not(table)::-webkit-scrollbar-track {
   background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+:not(table):hover::-webkit-scrollbar-track {
+  background-color: var(--scrollbar-track-hover);
 }
 
 :not(table)::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background-color: var(--scrollbar-thumb);
-  border-width: 1px;
+  border-width: 4px;
   border-style: solid;
   border-color: transparent;
   background-clip: padding-box;
@@ -530,6 +536,15 @@ html, body {
 :not(table)::-webkit-scrollbar-thumb:active {
   border-width: 1px;
   background-color: var(--scrollbar-thumb-active);
+}
+
+:not(table)::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
+:not(table) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 /* Main side panels contain overscroll without reserving permanent scrollbar space. */
@@ -614,33 +629,28 @@ ol {
 
 .tab-scrollbar-track {
   position: absolute;
+  inset-inline: 2px;
   bottom: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  opacity: 0.65;
-  transition: opacity 0.15s ease;
+  height: var(--scrollbar-size);
+  background-color: transparent;
+  opacity: 0;
+  transition: background-color 0.15s ease, opacity 0.2s ease;
   pointer-events: none;
 }
 
-.tab-scrollbar-wrapper:hover .tab-scrollbar-track {
+.tab-scrollbar-track.is-scrolling {
   opacity: 1;
 }
 
 .tab-scrollbar-thumb {
   position: absolute;
   height: 100%;
-  border-block: 2px solid transparent;
+  border: 4px solid transparent;
   border-radius: 9999px;
   background: var(--scrollbar-thumb);
   background-clip: padding-box;
-  min-width: 20px;
-  transition: background-color 0.15s ease, border-width 0.15s ease;
-}
-
-.tab-scrollbar-wrapper:hover .tab-scrollbar-thumb {
-  border-block-width: 1px;
-  background-color: var(--scrollbar-thumb-hover);
+  min-width: 24px;
+  transition: transform 0.08s linear;
 }
 
 @layer base {

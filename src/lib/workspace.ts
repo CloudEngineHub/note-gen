@@ -6,6 +6,16 @@ function normalizeFsPath(path: string): string {
   return path.trim().replace(/\\/g, '/').replace(/\/+/g, '/')
 }
 
+let runtimeWorkspaceRoot: string | null = null
+
+/**
+ * Pins workspace-dependent helpers to one absolute root in the current webview.
+ * Standalone editor windows use this without changing the persisted main-window workspace.
+ */
+export function setRuntimeWorkspaceRoot(path: string | null): void {
+  runtimeWorkspaceRoot = path?.trim() || null
+}
+
 export function isAbsoluteFsPath(path: string): boolean {
   return path.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(path) || path.startsWith('\\\\')
 }
@@ -16,6 +26,10 @@ export function isAbsoluteFsPath(path: string): boolean {
  * 否则返回默认的 AppData/article 路径
  */
 export async function getWorkspacePath(): Promise<{ path: string, isCustom: boolean }> {
+  if (runtimeWorkspaceRoot) {
+    return { path: runtimeWorkspaceRoot, isCustom: true }
+  }
+
   // 查询本地存储
   const store = await Store.load('store.json')
   const workspacePath = await store.get<string>('workspacePath')

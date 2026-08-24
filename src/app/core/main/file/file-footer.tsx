@@ -43,7 +43,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { useSyncAvailability } from './use-sync-availability'
 import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
-export function FileFooter() {
+export function FileFooter({ embedded = false }: { embedded?: boolean }) {
   const {
     workspacePath,
     workspaceHistory,
@@ -171,7 +171,10 @@ export function FileFooter() {
   }
 
   return (
-    <div className="relative flex h-6 min-h-6 max-h-6 shrink-0 items-center overflow-hidden border-t border-border bg-background text-xs text-muted-foreground">
+    <div className={cn(
+      'relative flex h-6 min-h-6 max-h-6 w-fit shrink-0 items-center bg-background text-xs text-muted-foreground',
+      !embedded && 'border-t border-border',
+    )}>
       <Popover open={open} onOpenChange={setOpen}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -180,7 +183,7 @@ export function FileFooter() {
                 variant="ghost"
                 size="xs"
                 disabled={switchingWorkspace}
-                className="w-full min-w-0 flex-1 justify-start border-0 bg-transparent px-1.5 text-xs font-normal text-muted-foreground focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-ring/30"
+                className="w-auto min-w-0 max-w-[min(20rem,40vw)] shrink-0 justify-start border-0 bg-transparent px-1.5 text-xs font-normal text-muted-foreground focus-visible:border-transparent focus-visible:ring-1 focus-visible:ring-ring/30"
                 aria-label={`${currentWorkspaceName}, ${syncStatusText}`}
               >
                 <span
@@ -198,7 +201,7 @@ export function FileFooter() {
                 ) : (
                   <FolderOpen data-icon="inline-start" />
                 )}
-                <span className="min-w-0 flex-1 truncate text-left">
+                <span className="min-w-0 max-w-48 truncate text-left">
                   {currentWorkspaceName}
                 </span>
                 <ChevronsUpDown data-icon="inline-end" className="opacity-50" />
@@ -215,7 +218,7 @@ export function FileFooter() {
           side="top"
           align="start"
           sideOffset={6}
-          className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1rem)] p-0"
+          className="w-[var(--radix-popover-trigger-width)] min-w-80 max-w-[calc(100vw-1rem)] p-0"
         >
           <Command>
             <CommandInput placeholder={tFile('workspace.searchPlaceholder')} />

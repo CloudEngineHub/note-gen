@@ -501,6 +501,7 @@ export function SyncButton({
           title={isLoading ? '上传中...' : '点击推送'}
         >
           <ArrowUpCircle size={14} />
+          <span className="text-xs">推送</span>
         </button>
       )}
     </div>

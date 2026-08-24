@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useSettingsDialogStore } from '@/stores/settings-dialog'
 import useSettingStore from '@/stores/setting'
 import { useShallow } from 'zustand/react/shallow'
+import { CloudCog } from 'lucide-react'
 
 interface SyncToolsProps {
   editor: Editor
@@ -60,9 +61,10 @@ export function SyncTools({ editor, markdown, getMarkdown, prepareExternalAction
   return (
     <button
       onClick={handleConfigureSync}
-      className="flex items-center gap-0.5 px-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+      className="flex items-center gap-1 rounded px-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       title={t('configureSync')}
     >
+      <CloudCog className="size-3" />
       <span>{t('configureSync')}</span>
     </button>
   )

@@ -76,10 +76,11 @@ export function ExportButton({ editor, markdown, getMarkdown }: ExportButtonProp
         <button
           type="button"
           title="导出"
-          className="p-1 rounded hover:bg-accent focus-visible:outline-none focus-visible:ring-0"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-0"
           disabled={exporting !== null}
         >
           <Download className="size-3" />
+          <span>导出</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent

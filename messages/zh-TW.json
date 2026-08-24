@@ -577,8 +577,8 @@
         "readingTime": "約 {count} 分鐘"
       },
       "sourceMode": {
-        "visual": "所見即所得模式",
-        "source": "Markdown 原始碼模式"
+        "visual": "所見即所得",
+        "source": "原始碼模式"
       },
       "sourceLineNumbers": {
         "title": "原始碼行號",
@@ -4367,11 +4367,42 @@
       }
     }
   },
+  "editorWindow": {
+    "missing": "編輯視窗工作階段不存在或已關閉",
+    "fileMissing": "檔案已被移動或刪除，無法繼續儲存",
+    "opening": "正在開啟筆記…",
+    "saving": "正在儲存",
+    "unsaved": "未儲存",
+    "discardTitle": "放棄未儲存的變更？",
+    "discardDescription": "檔案無法儲存。關閉視窗將遺失目前的變更。",
+    "discardCancel": "繼續編輯",
+    "discardConfirm": "放棄並關閉",
+    "pin": "視窗置頂",
+    "unpin": "取消視窗置頂",
+    "more": "更多視窗操作",
+    "close": "關閉視窗"
+  },
   "tabContext": {
     "close": "關閉",
     "closeOthers": "關閉其他",
     "closeAll": "關閉全部",
     "closeLeft": "關閉左側",
-    "closeRight": "關閉右側"
+    "closeRight": "關閉右側",
+    "splitLeft": "向左拆分",
+    "splitRight": "向右拆分",
+    "splitUp": "向上拆分",
+    "splitDown": "向下拆分",
+    "openInNewWindow": "在新視窗開啟",
+    "moveToNewWindow": "移動到新視窗",
+    "openWindowFailed": "無法開啟獨立編輯視窗",
+    "maximizeGroup": "最大化編輯器群組",
+    "restoreGroup": "還原編輯器群組",
+    "closeGroup": "關閉編輯器群組",
+    "groupActions": "編輯器群組操作",
+    "newTab": "新增分頁",
+    "emptyGroup": "將分頁拖曳到此處，或從檔案清單開啟筆記",
+    "loadingLayout": "正在還原編輯器版面配置…",
+    "undo": "復原",
+    "redo": "重做"
   }
 }

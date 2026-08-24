@@ -14,6 +14,7 @@ import { isMobileDevice } from '@/lib/check'
 import { Button } from '@/components/ui/button'
 import useSettingStore from '@/stores/setting'
 import { useTranslations } from 'next-intl'
+import { cn } from '@/lib/utils'
 
 interface FooterBarProps {
   editor: Editor
@@ -26,6 +27,7 @@ interface FooterBarProps {
   prepareExternalAction?: () => boolean
   onMarkdownChange?: (markdown: string) => void
   deferSourceStatistics?: boolean
+  embedded?: boolean
 }
 
 export function FooterBar({
@@ -39,6 +41,7 @@ export function FooterBar({
   prepareExternalAction,
   onMarkdownChange,
   deferSourceStatistics = false,
+  embedded = false,
 }: FooterBarProps) {
   const isMobile = isMobileDevice()
   const showEditorStats = useSettingStore((state) => state.showEditorStats)
@@ -57,12 +60,13 @@ export function FooterBar({
             <Button
               type="button"
               variant="ghost"
-              size="icon-xs"
-              title={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
-              aria-label={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+              size="xs"
+              title={tSourceMode(viewMode)}
+              aria-label={tSourceMode(viewMode)}
               onClick={onToggleViewMode}
             >
-              {viewMode === 'source' ? <Eye /> : <Code2 />}
+              {viewMode === 'source' ? <Code2 /> : <Eye />}
+              <span>{tSourceMode(viewMode)}</span>
             </Button>
           ) : null}
           {primaryBackupMethod !== 'selfHosted' ? (
@@ -84,7 +88,10 @@ export function FooterBar({
   }
 
   return (
-    <div className="flex h-6 select-none items-center justify-between border-t border-border bg-background px-3 text-xs text-muted-foreground">
+    <div className={cn(
+      'flex h-6 min-w-0 select-none items-center overflow-hidden bg-background text-xs text-muted-foreground',
+      embedded ? 'w-full justify-between gap-2' : 'w-full justify-between border-t border-border px-3',
+    )}>
       {/* Left side: Word count, Copy, Export, Outline */}
       <div className="flex items-center gap-1">
         {showEditorStats && !deferSourceStatistics ? (
@@ -94,12 +101,13 @@ export function FooterBar({
           <Button
             type="button"
             variant="ghost"
-            size="icon-xs"
-            title={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
-            aria-label={viewMode === 'source' ? tSourceMode('visual') : tSourceMode('source')}
+            size="xs"
+            title={tSourceMode(viewMode)}
+            aria-label={tSourceMode(viewMode)}
             onClick={onToggleViewMode}
           >
-            {viewMode === 'source' ? <Eye /> : <Code2 />}
+            {viewMode === 'source' ? <Code2 /> : <Eye />}
+            <span>{tSourceMode(viewMode)}</span>
           </Button>
         ) : null}
         <CopyButton editor={editor} markdown={sourceMarkdown} getMarkdown={getMarkdown} />

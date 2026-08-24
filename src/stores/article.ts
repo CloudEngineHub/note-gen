@@ -1070,7 +1070,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
       return
     }
     if (tab.id !== get().activeTabId && !prepareActiveEditorDeactivation()) return
-    const newTabs = [...currentTabs, tab].slice(-10) // Limit to 10 tabs
+    const newTabs = [...currentTabs, tab]
     set({ openTabs: newTabs, activeTabId: tab.id })
     const store = await getStore();
     await store.set('openTabs', newTabs)

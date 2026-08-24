@@ -577,8 +577,8 @@
         "readingTime": "cerca de {count} min"
       },
       "sourceMode": {
-        "visual": "Editor visual",
-        "source": "Código-fonte Markdown"
+        "visual": "WYSIWYG",
+        "source": "Modo de código-fonte"
       },
       "sourceLineNumbers": {
         "title": "Números de linha",
@@ -4330,11 +4330,42 @@
   "quickRecord": {
     "description": "Clique para selecionar uma ferramenta de registro e criar registros rapidamente"
   },
+  "editorWindow": {
+    "missing": "A sessão da janela do editor não existe ou foi fechada",
+    "fileMissing": "O arquivo foi movido ou excluído e não pode mais ser salvo",
+    "opening": "Abrindo nota…",
+    "saving": "Salvando",
+    "unsaved": "Não salvo",
+    "discardTitle": "Descartar alterações não salvas?",
+    "discardDescription": "Não foi possível salvar o arquivo. Fechar a janela perderá as alterações atuais.",
+    "discardCancel": "Continuar editando",
+    "discardConfirm": "Descartar e fechar",
+    "pin": "Manter Sempre no Topo",
+    "unpin": "Desativar Sempre no Topo",
+    "more": "Mais Ações da Janela",
+    "close": "Fechar Janela"
+  },
   "tabContext": {
     "close": "Fechar",
     "closeOthers": "Fechar Outros",
     "closeAll": "Fechar Tudo",
     "closeLeft": "Fechar à Esquerda",
-    "closeRight": "Fechar à Direita"
+    "closeRight": "Fechar à Direita",
+    "splitLeft": "Dividir à Esquerda",
+    "splitRight": "Dividir à Direita",
+    "splitUp": "Dividir Acima",
+    "splitDown": "Dividir Abaixo",
+    "openInNewWindow": "Abrir em Nova Janela",
+    "moveToNewWindow": "Mover para Nova Janela",
+    "openWindowFailed": "Não foi possível abrir a janela independente do editor",
+    "maximizeGroup": "Maximizar Grupo de Editores",
+    "restoreGroup": "Restaurar Grupo de Editores",
+    "closeGroup": "Fechar Grupo de Editores",
+    "groupActions": "Ações do Grupo de Editores",
+    "newTab": "Nova Aba",
+    "emptyGroup": "Solte uma aba aqui ou abra uma nota na lista de arquivos",
+    "loadingLayout": "Restaurando layout do editor…",
+    "undo": "Desfazer",
+    "redo": "Refazer"
   }
 }

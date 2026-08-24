@@ -4,7 +4,7 @@ import { Kbd } from "@/components/ui/kbd";
 import useArticleStore, { DirTree } from "@/stores/article";
 import { BaseDirectory, exists, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { moveSelfHostedWorkspacePath } from '@/lib/self-hosted-sync/files'
-import { Copy, Database, Download, File, FileCode, FileJson, FileText, FileUp, FolderOpen, ImageIcon, LoaderCircle, RefreshCwOff, Trash2 } from "lucide-react"
+import { Copy, Database, Download, ExternalLink, File, FileCode, FileJson, FileText, FileUp, FolderOpen, ImageIcon, LoaderCircle, RefreshCwOff, Trash2 } from "lucide-react"
 import { useEffect, useRef, useState, useCallback } from "react";
 import { ask } from '@tauri-apps/plugin-dialog';
 import { platform } from '@tauri-apps/plugin-os';
@@ -50,6 +50,7 @@ import {
   prepareActiveEditorDeactivationDurably,
   prepareActiveEditorPathMutationDurably,
 } from '@/lib/editor-deactivation'
+import { canOpenInEditorWindow, openEditorWindow } from '@/lib/editor-windows'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
@@ -148,6 +149,7 @@ export function FileItem({
   const { fileManagerTextSize, primaryBackupMethod } = useSettingStore()
   const t = useTranslations('article.file')
   const tCommon = useTranslations('common')
+  const tTabs = useTranslations('tabContext')
   const isMobile = useIsMobile()
   const [exportingFormat, setExportingFormat] = useState<MarkdownExportFormat | null>(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -189,6 +191,14 @@ export function FileItem({
   // 检查文件是否已计算向量（skills 文件夹下的文件不显示）
   const hasVector = item.isFile && !isInSkillsFolder(path) && vectorIndexedFiles.has(path)
   const canExportMarkdownFile = item.isLocale && item.name !== '' && /\.(md|markdown|txt)$/i.test(item.name)
+  const standaloneTab = {
+    id: `standalone-${path}`,
+    path,
+    name: item.name,
+    isFolder: false,
+    kind: 'file' as const,
+  }
+  const canOpenInNewWindow = item.isLocale && item.name !== '' && canOpenInEditorWindow(standaloneTab)
 
   // 向量计算状态图标
   const renderVectorIcon = () => {
@@ -301,6 +311,14 @@ export function FileItem({
     if (!isSelected) {
       setSelectedFilePaths([path])
     }
+  }
+
+  async function handleOpenInNewWindow() {
+    const opened = await openEditorWindow({
+      ...standaloneTab,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+    })
+    if (!opened) toast({ title: tTabs('openWindowFailed'), variant: 'destructive' })
   }
 
   async function handleDeleteFile() {
@@ -1020,6 +1038,15 @@ export function FileItem({
             <BatchSelectionContextMenu entries={selectionEntries} modKey={modKey} deleteKey={deleteKey} />
           ) : (
             <>
+              <ContextMenuItem
+                inset
+                disabled={!canOpenInNewWindow}
+                onClick={() => void handleOpenInNewWindow()}
+                menuType="file"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                {tTabs('openInNewWindow')}
+              </ContextMenuItem>
               <ContextMenuItem inset onClick={handleShowFileManager} menuType="file">
                 <FolderOpen className="mr-2 h-4 w-4" />
                 {t('context.viewDirectory')}
