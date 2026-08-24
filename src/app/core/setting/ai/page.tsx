@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslations } from 'next-intl';
 import { useLocalStorage } from 'react-use';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Store } from "@tauri-apps/plugin-store";
 import { v4 } from 'uuid';
 import { confirm } from '@tauri-apps/plugin-dialog';
@@ -21,7 +22,7 @@ import { getCachedProviderTemplates, getProviderTemplateMatch, loadProviderTempl
 import { isValidProxyURL } from "@/lib/ai/tauri-client";
 import { excludeBuiltInOpenAIProviders, isMainlandChinaAppStore } from "@/lib/ai/storefront-policy";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Item, ItemActions, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,36 @@ function getCustomPlatformAvatarStyle(config: AiConfig) {
     backgroundColor: `hsl(${hue} 62% 42%)`,
     color: 'white',
   }
+}
+
+function getProviderPromotion(config: AiConfig, template?: AiConfig | null) {
+  return template?.promotion || config.promotion
+}
+
+function getProviderOptionLabel(config: AiConfig, template?: AiConfig | null) {
+  const promotion = getProviderPromotion(config, template)
+  return promotion ? `${config.title} · ${promotion}` : config.title
+}
+
+function ProviderPromotionText({ promotion }: { promotion: string }) {
+  const shouldReduceMotion = useReducedMotion()
+
+  return (
+    <ItemDescription title={promotion}>
+      <motion.span
+        animate={shouldReduceMotion ? undefined : { backgroundPosition: ['0% 50%', '100% 50%'] }}
+        className="bg-clip-text font-bold text-transparent"
+        style={{
+          backgroundImage: 'linear-gradient(90deg, hsl(var(--promotion-gradient-start)) 0%, hsl(var(--promotion-gradient-middle)) 16.667%, hsl(var(--promotion-gradient-end)) 33.333%, hsl(var(--promotion-gradient-start)) 50%, hsl(var(--promotion-gradient-middle)) 66.667%, hsl(var(--promotion-gradient-end)) 83.333%, hsl(var(--promotion-gradient-start)) 100%)',
+          backgroundPosition: '0% 50%',
+          backgroundSize: '200% 100%',
+        }}
+        transition={{ duration: 6, ease: 'linear', repeat: Infinity, repeatType: 'loop' }}
+      >
+        优惠 · {promotion}
+      </motion.span>
+    </ItemDescription>
+  )
 }
 
 export default function AiPage({ mobile = false }: { mobile?: boolean }) {
@@ -419,10 +450,18 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                       }
                     }}
                     options={[
-                      ...sortedUserCustomModels.map(provider => ({ value: provider.key, label: provider.title })),
+                      ...sortedUserCustomModels.map(provider => {
+                        const template = provider.templateSource === 'custom'
+                          ? null
+                          : getProviderTemplateMatch(provider, providerTemplates)
+                        return {
+                          value: provider.key,
+                          label: getProviderOptionLabel(provider, template),
+                        }
+                      }),
                       ...availableProviderTemplates.map(template => ({
                         value: `template:${template.templateKey || template.key}`,
-                        label: template.title,
+                        label: getProviderOptionLabel(template),
                       })),
                     ]}
                   />
@@ -436,8 +475,9 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                       const providerTemplate = provider.templateSource === 'custom'
                         ? null
                         : getProviderTemplateMatch(provider, providerTemplates)
+                      const promotion = getProviderPromotion(provider, providerTemplate)
                       return (
-                        <Item key={provider.key} asChild variant={selected ? 'muted' : 'outline'} size="sm">
+                        <Item className="flex-nowrap" key={provider.key} asChild variant={selected ? 'muted' : 'outline'} size="sm">
                           <button type="button" onClick={() => {
                             setSelectedAiConfig(provider.key)
                             setActiveTab('connection')
@@ -453,8 +493,9 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                                 </AvatarFallback>
                               </Avatar>
                             </ItemMedia>
-                            <ItemContent>
+                            <ItemContent className="min-w-0">
                               <ItemTitle>{provider.title}</ItemTitle>
+                              {promotion ? <ProviderPromotionText promotion={promotion} /> : null}
                             </ItemContent>
                             {count > 0 ? <ItemActions><Badge variant="outline">{count}</Badge></ItemActions> : null}
                           </button>
@@ -471,8 +512,9 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
 
                   {availableProviderTemplates.map(template => {
                     const templateKey = template.templateKey || template.key
+                    const promotion = getProviderPromotion(template)
                     return (
-                      <Item key={templateKey} asChild variant="outline" size="sm">
+                      <Item className="flex-nowrap" key={templateKey} asChild variant="outline" size="sm">
                         <button
                           type="button"
                           disabled={Boolean(addingTemplateKey)}
@@ -484,8 +526,9 @@ export default function AiPage({ mobile = false }: { mobile?: boolean }) {
                               <AvatarFallback>{getPlatformAvatarFallback(template)}</AvatarFallback>
                             </Avatar>
                           </ItemMedia>
-                          <ItemContent>
+                          <ItemContent className="min-w-0">
                             <ItemTitle>{template.title}</ItemTitle>
+                            {promotion ? <ProviderPromotionText promotion={promotion} /> : null}
                           </ItemContent>
                           {addingTemplateKey === templateKey ? (
                             <ItemActions><LoaderCircle className="animate-spin" /></ItemActions>

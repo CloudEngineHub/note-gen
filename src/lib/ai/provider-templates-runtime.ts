@@ -83,6 +83,7 @@ function normalizeProviderTemplatesPayload(payload: unknown): AiConfig[] {
       baseURL: String(item.baseURL).trim(),
       icon: isNonEmptyString(item.icon) ? item.icon.trim() : undefined,
       apiKeyUrl: isValidUrl(item.apiKeyUrl) ? item.apiKeyUrl.trim() : undefined,
+      promotion: isNonEmptyString(item.promotion) ? item.promotion.trim() : undefined,
       enabled: true,
       templateSource: (item.templateSource as AiConfig['templateSource']) || 'remote',
     }))

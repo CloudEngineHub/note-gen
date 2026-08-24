@@ -9,6 +9,15 @@
       "enabled": true
     },
     {
+      "key": "infistar",
+      "title": "Infistar.cc 无限星河",
+      "baseURL": "https://infistar.cc/v1",
+      "apiKeyUrl": "https://www.infistar.cc/register?aff=G55F2Z5Q&ref_source=link",
+      "icon": "https://infistar.cc/favicon.ico",
+      "promotion": "注册送 $10",
+      "enabled": true
+    },
+    {
       "key": "shengsuanyun",
       "title": "胜算云",
       "baseURL": "https://router.shengsuanyun.com/api/v1",

@@ -167,6 +167,7 @@ export interface AiConfig {
   templateSource?: 'builtin' | 'remote' | 'custom'
   icon?: string
   apiKeyUrl?: string
+  promotion?: string
   customHeaders?: Record<string, string>
   proxyMode?: ProxyMode
   proxyURL?: string

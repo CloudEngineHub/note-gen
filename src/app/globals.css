@@ -161,6 +161,9 @@
     --destructive-foreground: 0 0% 98%;
     --warning: 38 92% 50%;
     --warning-foreground: 32 95% 25%;
+    --promotion-gradient-start: 263 70% 50%;
+    --promotion-gradient-middle: 330 75% 48%;
+    --promotion-gradient-end: 24 90% 45%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 240 10% 3.9%;
@@ -213,6 +216,9 @@
     --destructive-foreground: 0 0% 98%;
     --warning: 38 92% 50%;
     --warning-foreground: 48 96% 65%;
+    --promotion-gradient-start: 263 90% 70%;
+    --promotion-gradient-middle: 330 85% 68%;
+    --promotion-gradient-end: 32 95% 62%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
