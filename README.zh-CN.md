@@ -43,6 +43,23 @@
 
 ![NoteGen 桌面端与移动端界面](https://s2.loli.net/2025/12/22/jlpEP2c6ogwHhIA.png)
 
+## ❤️ Sponsor
+
+<p align="center">
+  <a href="https://www.infistar.cc/register?aff=G55F2Z5Q&amp;ref_source=link">
+    <img src="https://files.seeusercontent.com/2026/08/24/ly7P/_20260824172501_66_473.png" alt="Infistar.cc 无限星河" width="100%">
+  </a>
+</p>
+
+### NoteGen × Infistar.cc 无限星河｜全模型 API · 让记录、整理与创作更智能
+
+感谢 Infistar.cc 无限星河赞助并为 NoteGen 提供模型服务支持！
+
+- ⚡ **稳定高效的模型服务：** 提供企业级高并发通道与多节点冗余，价格低至官方渠道 1 折，稳定支持 NoteGen AI 对话、笔记整理、续写润色、翻译总结及 Agent 长任务。
+- 🧠 **一个 API Key 接入主流模型：** 全面支持 ChatGPT、Claude、Gemini、Kimi、GLM、DeepSeek 等模型，兼容 OpenAI 标准接口，可灵活配置主模型、快速补全、写作及知识库模型。
+- 📚 **覆盖知识库与多模态能力：** 支持视觉理解、图片 OCR、Embedding、Rerank、语音识别与语音合成，满足知识库检索和多模态笔记整理需求。
+- 🎁 **NoteGen 用户专属福利：** 通过[专属推广链接](https://www.infistar.cc/register?aff=G55F2Z5Q&ref_source=link)注册并完成首次调用，即可领取 10 美元等值测试额度 / 首充专属优惠！
+
 ## 记录，不必打断当下的思路
 
 一个想法刚出现时，可能只有一句话、一段录音、一张截图，或者一个暂时没时间阅读的链接。保存它们之前，你不必先想好标题、目录和文章结构。
