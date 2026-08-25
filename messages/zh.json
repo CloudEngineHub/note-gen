@@ -3030,7 +3030,8 @@
     "chat": {
       "condensing": "正在压缩上下文...",
       "condensed": {
-        "message": "已压缩 {count} 条历史消息"
+        "message": "已压缩 {count} 条历史消息",
+        "summary": "续接摘要"
       },
       "empty": {
         "title": "开始与 AI 对话",
@@ -3072,7 +3073,7 @@
         "chat": "聊天",
         "placeholder": {
           "default": "你可以提问或将记录整理为文章...",
-          "steering": "追加信息以引导当前任务...",
+          "pending": "输入消息，发送后可在待处理列表中调整...",
           "noApiKey": "未配置 API Key，无法使用 AI 对话功能...",
           "on": "AI 建议 (开启)",
           "off": "AI 建议 (关闭)",
@@ -3103,7 +3104,13 @@
         "modelSelect": {
           "tooltip": "选择 AI 模型",
           "placeholder": "搜索 AI 模型",
-          "noModel": "未找到模型"
+          "noModel": "未找到模型",
+          "nextTurn": "已切换到 {model}，下轮生效",
+          "nextTurnBadge": "下轮生效",
+          "changeWarning": "切换模型可能影响对话连贯性；当前任务仍使用原模型。",
+          "continuityWarning": "切换模型可能影响当前对话的连贯性。",
+          "changedTo": "已切换为 {model}",
+          "changed": "模型已从 {from} 切换为 {to}"
         },
         "promptSelect": {
           "tooltip": "选择 Prompt",
@@ -3195,6 +3202,19 @@
           "resultSummary": "结果摘要",
           "queryParameters": "查询参数",
           "toolResult": "工具结果",
+          "deliveryMode": {
+            "label": "运行中消息处理方式",
+            "queued": "已排队 {count} 条消息",
+            "pending": { "title": "待处理消息", "add": "加入待处理列表", "remove": "删除排队消息", "edit": "编辑消息", "save": "保存", "cancel": "取消", "reorder": "拖动调整顺序", "more": "更多操作" },
+            "modes": {
+              "steer": { "title": "调整方向", "description": "当前回复和工具调用结束后，在下一轮优先应用这条新要求。" },
+              "follow-up": { "title": "排队执行", "description": "当前任务完成后，自动开始这条新任务。" }
+            }
+          },
+          "resume": {
+            "action": "继续任务",
+            "prompt": "请继续完成上一轮尚未完成的任务。先检查已有结果和修改，避免重复执行已完成的步骤。"
+          },
           "permissionMode": {
             "label": "Agent 权限模式",
             "modes": {

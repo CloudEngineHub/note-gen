@@ -153,6 +153,8 @@ const useChatStore = create<ChatState>((set, get) => ({
 
   agentState: {
     activeChatId: undefined,
+    activeModelId: undefined,
+    activeModelName: undefined,
     runId: undefined,
     status: 'idle',
     isRunning: false,
@@ -184,6 +186,8 @@ const useChatStore = create<ChatState>((set, get) => ({
     set({
       agentState: {
         activeChatId: undefined,
+        activeModelId: undefined,
+        activeModelName: undefined,
         runId: undefined,
         status: 'idle',
         isRunning: false,

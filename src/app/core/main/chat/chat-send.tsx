@@ -4,12 +4,13 @@ import useSettingStore from "@/stores/setting"
 import useChatStore from "@/stores/chat"
 import useTagStore from "@/stores/tag"
 import { TooltipButton } from "@/components/tooltip-button"
-import { useImperativeHandle, forwardRef, useRef } from "react"
+import { useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
 import { LinkedResource, isLinkedFolder, type MarkdownFile } from "@/lib/files"
 import { readTextFile } from "@tauri-apps/plugin-fs"
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
 import { AgentHandler } from "@/lib/agent/agent-handler"
+import { agentSessionManager } from '@/lib/agent/agent-session-manager'
 import { isRequestAbortError } from "@/lib/agent/runtime"
 import { agentDebugLog, previewText } from "@/lib/agent/debug-log"
 import { getToolByName } from "@/lib/agent/tools"
@@ -20,7 +21,8 @@ import type { AgentTraceEvent } from "@/lib/agent/types"
 import type { AgentApprovalDecision, AgentSteeringPayload } from "@/lib/agent/types"
 import { serializeChatAttachments, type RuntimeChatAttachment } from '@/lib/chat-attachments'
 import { retainCompletedAgentTraceEvents } from '@/lib/agent/trace-retention'
-import { getAISettings } from '@/lib/ai/utils'
+import { getAISettingsByModelId } from '@/lib/ai/utils'
+import type { AiConfig } from '@/app/core/setting/config'
 import {
   buildChatImageContext,
   buildHistoricalImageContext,
@@ -38,67 +40,17 @@ import {
 } from '@/lib/ai/model-capacity'
 import type { CanvasSelectionContext } from '@/types/canvas'
 import { useIsMobile } from '@/hooks/use-mobile'
-
-function getContextualArticleSnapshot(articleState: {
-  activeFilePath: string
-  currentArticle: string
-}, isMobile: boolean) {
-  const mobileContexts = useChatStore.getState().mobileActiveContexts
-  const includeArticle = !isMobile || Boolean(mobileContexts.articlePath)
-  return {
-    activeFilePath: includeArticle ? articleState.activeFilePath : '',
-    currentArticle: includeArticle ? articleState.currentArticle : '',
-  }
-}
-
-function buildCanvasSelectionContext(context: CanvasSelectionContext | null) {
-  if (!context) return ''
-  const nodeLabels = new Map(context.nodes.map(node => [node.id, node.label]))
-  const nodes = context.nodes.length > 0
-    ? context.nodes.map(node => {
-        const details = [
-          `id=${node.id}`,
-          `type=${node.type}`,
-          `label=${JSON.stringify(node.label)}`,
-          node.description ? `description=${JSON.stringify(node.description)}` : '',
-          node.filePath ? `filePath=${JSON.stringify(node.filePath)}` : '',
-          node.recordId !== undefined ? `recordId=${node.recordId}` : '',
-          node.url ? `url=${JSON.stringify(node.url)}` : '',
-          node.checked !== undefined ? `checked=${node.checked}` : '',
-          node.chart ? `chartData=${JSON.stringify({
-            title: node.chart.title,
-            type: node.chart.type,
-            categoryLabel: node.chart.categoryLabel,
-            series: node.chart.series,
-            data: node.chart.data,
-            primarySeriesId: node.chart.primarySeriesId,
-            sourceFormat: node.chart.sourceFormat,
-          })}` : '',
-        ].filter(Boolean)
-        return `- ${details.join('; ')}`
-      }).join('\n')
-    : '- 无'
-  const edges = context.edges.length > 0
-    ? context.edges.map(edge => (
-        `- id=${edge.id}; source=${edge.source}${nodeLabels.has(edge.source) ? ` (${JSON.stringify(nodeLabels.get(edge.source))})` : ''}; target=${edge.target}${nodeLabels.has(edge.target) ? ` (${JSON.stringify(nodeLabels.get(edge.target))})` : ''}${edge.label ? `; label=${JSON.stringify(edge.label)}` : ''}`
-      )).join('\n')
-    : '- 无'
-  const selectionGuidance = context.scope === 'selection'
-    ? '以下节点是用户为本次对话明确选中的操作对象；连线包含用户选中的连线，以及所选节点之间已有的关联。回答或调用画布工具时优先使用这些精确 ID；除非用户明确要求，不要修改未选中的元素。'
-    : '以下是用户关联的整个画布。回答时请结合节点内容与连线关系；调用画布工具时使用这里提供的精确 ID。'
-  return [
-    context.scope === 'selection' ? '## 用户选择的画布节点与关系' : '## 用户关联的画布',
-    `画布：${context.canvasTitle}（ID: ${context.canvasId}）`,
-    selectionGuidance,
-    '',
-    '节点：',
-    nodes,
-    '',
-    '连线：',
-    edges,
-    '',
-  ].join('\n')
-}
+import { chatAgentStateAdapter } from './chat-agent-state-adapter'
+import { chatAgentResourceAdapter } from './chat-agent-resource-adapter'
+import {
+  buildAgentSteeringContext,
+  buildCanvasSelectionContext,
+  buildMentionedContext,
+  getContextualArticleSnapshot,
+  type AgentQuoteData,
+  type AgentRequestSnapshot,
+} from './agent-session-context'
+import { useChatAgentSession } from './use-chat-agent-session'
 
 function getLastDisplayableAgentContent(
   liveContent: string | undefined,
@@ -134,34 +86,27 @@ function isUnknownProviderError(error: unknown) {
     && /Unknown error/i.test(text)
 }
 
-interface QuoteData {
-  quote: string
-  fullContent: string
-  fileName: string
-  startLine: number
-  endLine: number
-  from: number
-  to: number
-  selectionToken?: string
-  articlePath: string
-}
-
 interface ChatSendProps {
   inputValue: string;
   onSent?: () => void;
   linkedResource?: LinkedResource | null;
   attachedImages?: ImageAttachment[];
   fileAttachments?: RuntimeChatAttachment[];
-  quoteData?: QuoteData | null;
+  quoteData?: AgentQuoteData | null;
   canvasSelectionContext?: CanvasSelectionContext | null;
   selectedSkillIds?: string[];
   mentionedFiles?: MarkdownFile[];
-  mentionedRecords?: QuoteData[];
+  mentionedRecords?: AgentQuoteData[];
   mentionedCanvases?: CanvasSelectionContext[];
   dockStyle?: boolean;
 }
 
-export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
+export interface ChatSendHandle {
+  sendChat: () => void
+  sendPrompt: (prompt: string) => void
+}
+
+export const ChatSend = forwardRef<ChatSendHandle, ChatSendProps>(({
   inputValue,
   onSent,
   linkedResource,
@@ -187,17 +132,34 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   } = useChatStore()
   const abortControllerRef = useRef<AbortController | null>(null)
   const imageAnalysisAbortControllerRef = useRef<AbortController | null>(null)
-  const agentHandlerRef = useRef<AgentHandler | null>(null)
+  const steeringImageAnalysisAbortControllerRef = useRef<AbortController | null>(null)
   const manualStopRequestedRef = useRef(false)
-  const steeringSequenceRef = useRef(0)
-  const steeringChainRef = useRef<Promise<void>>(Promise.resolve())
-  const pendingSteeringRef = useRef<AgentSteeringPayload[]>([])
-  const activeRunRef = useRef(false)
   const repeatedScriptApprovalRef = useRef<{ signature: string; count: number }>({ signature: '', count: 0 })
   const contextOverflowRetryRef = useRef(0)
   const t = useTranslations()
   const isMobile = useIsMobile()
-  const requestText = inputValue.trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt')
+  const { session: agentSession, sessionId: agentSessionId } = useChatAgentSession()
+
+  useEffect(() => agentSession.subscribe(event => {
+    if (event.type === 'streaming_changed') {
+      setLoading(event.isStreaming)
+    }
+  }), [agentSession])
+
+  const createRequestSnapshot = (overrideText?: string): AgentRequestSnapshot => ({
+    inputValue: overrideText ?? inputValue,
+    requestText: (overrideText ?? inputValue).trim() || t('record.chat.input.addAttachment.attachmentOnlyPrompt'),
+    linkedResource,
+    linkedResourcePreview,
+    images: [...attachedImages],
+    fileAttachments: [...fileAttachments],
+    quoteData,
+    canvasSelectionContext,
+    selectedSkillIds: [...selectedSkillIds],
+    mentionedFiles: [...mentionedFiles],
+    mentionedRecords: [...mentionedRecords],
+    mentionedCanvases: [...mentionedCanvases],
+  })
 
   const buildPartialSuccessContent = (result: string, toolCalls: { result?: { success?: boolean; data?: any; error?: string } }[]) => {
     const generatedOutputFiles = toolCalls.flatMap((toolCall) => {
@@ -248,85 +210,6 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
     return trimmed.slice(0, cutoff).trim()
   }
 
-  const buildSteeringContext = async () => {
-    const useArticleStore = (await import('@/stores/article')).default
-    const articleStore = useArticleStore.getState()
-    const activeArticle = getContextualArticleSnapshot(articleStore, isMobile)
-    let context = ''
-
-    if (activeArticle.activeFilePath && activeArticle.currentArticle) {
-      context += `## 当前打开的笔记\n文件路径: ${activeArticle.activeFilePath}\n\n内容:\n${activeArticle.currentArticle}\n\n`
-    }
-
-    if (linkedResource && isLinkedFolder(linkedResource)) {
-      context += `## 用户关联的笔记文件夹\n用户关联了文件夹“${linkedResource.name}”（${linkedResource.relativePath}）。需要查找笔记时优先使用这个 folderPath。\n\n`
-    }
-
-    if (linkedResource && !isLinkedFolder(linkedResource)) {
-      try {
-        const workspace = await getWorkspacePath()
-        const pathOptions = workspace.isCustom ? null : await getFilePathOptions(linkedResource.path)
-        const linkedFileContent = workspace.isCustom
-          ? await readTextFile(linkedResource.path)
-          : await readTextFile(pathOptions!.path, {
-              baseDir: pathOptions!.baseDir,
-            })
-        context += `${linkedResourcePreview ? `${linkedResourcePreview}\n` : ''}## 关联文件完整内容\n${linkedResource.relativePath}\n\n${linkedFileContent}\n\n`
-      } catch (error) {
-        console.error('Failed to read linked file for steering:', error)
-      }
-    }
-
-    if (quoteData) {
-      context += `## 用户引用内容\n文件: ${quoteData.fileName}\n范围: ${quoteData.from}-${quoteData.to}\n\n${quoteData.fullContent}\n\n`
-    }
-
-    context += buildCanvasSelectionContext(canvasSelectionContext)
-    context += await buildMentionedContext()
-
-    return context
-  }
-
-  const buildMentionedContext = async () => {
-    let context = ''
-
-    for (const file of mentionedFiles) {
-      try {
-        const workspace = await getWorkspacePath()
-        const content = workspace.isCustom
-          ? await readTextFile(file.path)
-          : await getFilePathOptions(file.path).then(({ path, baseDir }) =>
-              readTextFile(path, { baseDir })
-            )
-        context += [
-          '## 用户通过 @ 关联的文件',
-          `文件：${file.relativePath}`,
-          '',
-          content,
-          '',
-        ].join('\n')
-      } catch (error) {
-        console.error('Failed to read @ mentioned file:', error)
-      }
-    }
-
-    for (const record of mentionedRecords) {
-      context += [
-        '## 用户通过 @ 关联的记录',
-        `记录：${record.fileName}`,
-        '',
-        record.fullContent,
-        '',
-      ].join('\n')
-    }
-
-    for (const canvas of mentionedCanvases) {
-      context += buildCanvasSelectionContext(canvas)
-    }
-
-    return context
-  }
-
   const startProactiveCompaction = () => {
     const chatState = useChatStore.getState()
     if (
@@ -368,7 +251,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   }
 
   useImperativeHandle(ref, () => ({
-    sendChat: handleSubmit
+    sendChat: () => void handleSubmit(),
+    sendPrompt: (prompt: string) => void handleSubmit(prompt),
   }))
 
   // Agent 确认回调 - 使用内联确认而不是弹窗
@@ -474,7 +358,11 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
   }
 
   // Agent 模式处理
-  async function handleAgentMode(images: ImageAttachment[], userMessage: Chat) {
+  async function handleAgentMode(
+    request: AgentRequestSnapshot,
+    userMessage: Chat,
+    modelSnapshot: { id: string; name: string; config?: AiConfig }
+  ) {
     // 先创建一个占位的 AI 消息
     const placeholderMessage = await insert({
       tagId: currentTagId,
@@ -534,6 +422,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       })
       const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
       const agentHistory = {
+        modelId: modelSnapshot.id,
+        modelName: modelSnapshot.name,
         steps: currentState.agentState.completedSteps || [],
         toolCalls: currentState.agentState.toolCalls,
         traceEvents,
@@ -570,12 +460,16 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         isThinking: false,
         traceEvents,
       })
-      agentHandlerRef.current = null
     }
 
     // 每次都创建新的 AgentHandler，使用当前的 placeholderMessage
     const agentHandler = new AgentHandler({
+      stateAdapter: chatAgentStateAdapter,
+      resourceAdapter: chatAgentResourceAdapter,
       activeChatId: placeholderMessage.id,
+      modelId: modelSnapshot.id,
+      modelName: modelSnapshot.name,
+      aiConfig: modelSnapshot.config,
       conversationId: placeholderMessage.conversationId,
       workspaceId: useSettingStore.getState().workspacePath.trim().replace(/\\/g, '/').replace(/\/+$/, '') || 'default',
       useMemories: !useChatStore.getState().isTemporaryConversation,
@@ -583,21 +477,22 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       activeCanvasId: activeCanvasId || undefined,
       permissionMode: agentPermissionMode,
       requestConfirmation,
-      currentQuote: quoteData
+      currentQuote: request.quoteData
         ? {
-            fileName: quoteData.fileName,
-            articlePath: quoteData.articlePath,
-            startLine: quoteData.startLine,
-            endLine: quoteData.endLine,
-            from: quoteData.from,
-            to: quoteData.to,
-            fullContent: quoteData.fullContent,
-            selectionToken: quoteData.selectionToken,
+            fileName: request.quoteData.fileName,
+            articlePath: request.quoteData.articlePath,
+            startLine: request.quoteData.startLine,
+            endLine: request.quoteData.endLine,
+            from: request.quoteData.from,
+            to: request.quoteData.to,
+            fullContent: request.quoteData.fullContent,
+            selectionToken: request.quoteData.selectionToken,
           }
         : undefined,
-      attachments: fileAttachments,
+      attachments: request.fileAttachments,
       imageAttachments: agentImageAttachments,
-      selectedSkills: selectedSkillIds,
+      selectedSkills: request.selectedSkillIds,
+      onSteeringDelivered: sequences => agentSession.acknowledgeSteering(sequences),
       onFinalAnswerRender: (markdownContent) => {
         // 检测到 Final Answer 时触发渲染
         setAgentState({
@@ -615,7 +510,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           || manualStopRequestedRef.current
           || isRequestAbortError(result)
         if (!effectivelyStopped && pendingCapacityProbe) {
-          const aiConfig = await getAISettings('primaryModel')
+          const aiConfig = modelSnapshot.config
           if (aiConfig) {
             await confirmEstimatedContextWindow(
               aiConfig,
@@ -639,6 +534,8 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         const traceEvents = retainCompletedAgentTraceEvents(completedTraceEvents)
         // 使用 agentState.completedSteps 而不是 steps 参数，因为 completedSteps 包含 duration 信息
         const agentHistory = {
+          modelId: modelSnapshot.id,
+          modelName: modelSnapshot.name,
           steps: agentState.completedSteps || [],
           toolCalls: agentState.toolCalls,
           traceEvents,
@@ -715,8 +612,6 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           scheduleConversationMemoryExtraction(placeholderMessage.conversationId)
         }
 
-        // 清空 ref
-        agentHandlerRef.current = null
       },
       onError: async (error) => {
         const parsedOverflow = parseContextOverflowError(error)
@@ -734,7 +629,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           })
         }
         if (overflow.detected) {
-          const aiConfig = await getAISettings('primaryModel')
+          const aiConfig = modelSnapshot.config
           if (aiConfig) {
             if (overflow.contextWindow) {
               await learnContextWindow(aiConfig, overflow.contextWindow)
@@ -765,11 +660,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       },
     })
 
-    // 保存到 ref
-    agentHandlerRef.current = agentHandler
-    for (const payload of pendingSteeringRef.current.splice(0)) {
-      agentHandler.steer(payload)
-    }
+    agentSession.setActiveRunner(agentHandler)
 
     try {
       // 构建上下文信息
@@ -777,11 +668,11 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
 
       // 1. 图片先由专用视觉模型识别，失败时回退 OCR。
       // 主聊天模型只接收结构化识别结果，不依赖自身的视觉能力。
-      if (images.length > 0) {
+      if (request.images.length > 0) {
         imageAnalysisAbortControllerRef.current?.abort()
         const imageAnalysisAbortController = new AbortController()
         imageAnalysisAbortControllerRef.current = imageAnalysisAbortController
-        let liveAnalyses = createPendingChatImageAnalyses(images, requestText)
+        let liveAnalyses = createPendingChatImageAnalyses(request.images, request.requestText)
         const updatePersistedAnalysis = (analyses: PersistedChatImageAnalysis[], persist: boolean) => {
           const updatedMessage = {
             ...userMessage,
@@ -799,7 +690,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
           isRunning: true,
           isThinking: false,
         })
-        const imageResult = await buildChatImageContext(images, requestText, {
+        const imageResult = await buildChatImageContext(request.images, request.requestText, {
           signal: imageAnalysisAbortController.signal,
           onProgress: (progress) => {
             liveAnalyses = liveAnalyses.map(analysis => (
@@ -827,7 +718,7 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         }
 
         agentDebugLog('chat_context_images_analyzed', {
-          imageCount: images.length,
+          imageCount: request.images.length,
           contextLength: imageResult.context.length,
           preview: previewText(imageResult.context),
         })
@@ -851,46 +742,46 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
         preview: previewText(activeArticle.currentArticle),
       })
       // 3. 关联文件夹作为 Agent 自动检索时的优先范围，不在发送前预先检索。
-      if (linkedResource && isLinkedFolder(linkedResource)) {
+      if (request.linkedResource && isLinkedFolder(request.linkedResource)) {
         context += [
           '## 用户关联的笔记文件夹',
-          `用户关联了文件夹“${linkedResource.name}”（${linkedResource.relativePath}）。`,
+          `用户关联了文件夹“${request.linkedResource.name}”（${request.linkedResource.relativePath}）。`,
           '如果当前请求需要查找用户资料，请优先使用 knowledge_search，并将 folderPath 设置为这个相对路径。不要在没有必要时搜索。',
           '',
         ].join('\n')
       }
 
       // 4. 如果有关联文件（非文件夹），始终注入完整内容作为 Agent 上下文
-      const linkedResourceIsActiveFile = linkedResource && !isLinkedFolder(linkedResource) && (
-        linkedResource.relativePath === activeArticle.activeFilePath ||
-        linkedResource.path === activeArticle.activeFilePath ||
-        linkedResource.name === activeArticle.activeFilePath.split('/').pop()
+      const linkedResourceIsActiveFile = request.linkedResource && !isLinkedFolder(request.linkedResource) && (
+        request.linkedResource.relativePath === activeArticle.activeFilePath ||
+        request.linkedResource.path === activeArticle.activeFilePath ||
+        request.linkedResource.name === activeArticle.activeFilePath.split('/').pop()
       )
 
-      if (linkedResource && !isLinkedFolder(linkedResource) && !linkedResourceIsActiveFile) {
+      if (request.linkedResource && !isLinkedFolder(request.linkedResource) && !linkedResourceIsActiveFile) {
         try {
           const workspace = await getWorkspacePath()
           let linkedFileContent = ''
           if (workspace.isCustom) {
-            linkedFileContent = await readTextFile(linkedResource.path)
+            linkedFileContent = await readTextFile(request.linkedResource.path)
           } else {
-            const { path, baseDir } = await getFilePathOptions(linkedResource.path)
+            const { path, baseDir } = await getFilePathOptions(request.linkedResource.path)
             linkedFileContent = await readTextFile(path, { baseDir })
           }
 
-          if (linkedResourcePreview) {
-            context += `\n${linkedResourcePreview}\n`
+          if (request.linkedResourcePreview) {
+            context += `\n${request.linkedResourcePreview}\n`
           }
 
           if (linkedFileContent) {
-            context += `\n## 关联文件完整内容\n\nThe full content of the linked file "${linkedResource.name}" (${linkedResource.relativePath}) is already included below. Do not call tools to read or check this same file again unless the user explicitly asks to refresh it.\n\n---\n${linkedFileContent}\n---\n`
+            context += `\n## 关联文件完整内容\n\nThe full content of the linked file "${request.linkedResource.name}" (${request.linkedResource.relativePath}) is already included below. Do not call tools to read or check this same file again unless the user explicitly asks to refresh it.\n\n---\n${linkedFileContent}\n---\n`
           }
 
           agentDebugLog('chat_context_linked_file', {
-            name: linkedResource.name,
-            relativePath: linkedResource.relativePath,
+            name: request.linkedResource.name,
+            relativePath: request.linkedResource.relativePath,
             contentLength: linkedFileContent.length,
-            hasPreview: Boolean(linkedResourcePreview),
+            hasPreview: Boolean(request.linkedResourcePreview),
           })
         } catch (error) {
           console.error('Failed to read linked file in Agent mode:', error)
@@ -898,14 +789,14 @@ export const ChatSend = forwardRef<{ sendChat: () => void }, ChatSendProps>(({
       } else if (linkedResourceIsActiveFile) {
         agentDebugLog('chat_context_linked_file_skipped', {
           reason: 'linked file is already the active editor file',
-          name: linkedResource.name,
-          relativePath: linkedResource.relativePath,
+          name: request.linkedResource?.name,
+          relativePath: request.linkedResource?.relativePath,
         })
       }
 
       // 5. 如果有引用内容，添加引用上下文（在构建消息之前）
-      if (quoteData) {
-        const { fileName, startLine, endLine, fullContent, from, to } = quoteData
+      if (request.quoteData) {
+        const { fileName, startLine, endLine, fullContent, from, to } = request.quoteData
         let lineInfo = ''
         const hasValidLineNumbers = startLine !== -1 && endLine !== -1
         const hasValidRange = from >= 0 && to >= from
@@ -989,16 +880,20 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
           endLine,
           from,
           to,
-          quoteLength: quoteData.quote.length,
+          quoteLength: request.quoteData.quote.length,
           contentLength: fullContent.length,
-          quotePreview: previewText(quoteData.quote),
+          quotePreview: previewText(request.quoteData.quote),
           fullContentPreview: previewText(fullContent),
           hasValidRange,
         })
       }
 
-      context += buildCanvasSelectionContext(canvasSelectionContext)
-      context += await buildMentionedContext()
+      context += buildCanvasSelectionContext(request.canvasSelectionContext)
+      context += await buildMentionedContext({
+        files: request.mentionedFiles,
+        records: request.mentionedRecords,
+        canvases: request.mentionedCanvases,
+      })
 
       // 6. 构建消息数组：较早回合使用会话级锚定摘要，最近完整回合保留原文
       const compactionContext = [
@@ -1016,8 +911,9 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         try {
           preparedHistory = await prepareConversationHistory({
             conversationId: chatState.currentConversationId,
+            aiConfig: modelSnapshot.config,
             chats,
-            currentUserInput: requestText,
+            currentUserInput: request.requestText,
             additionalContext: compactionContext,
             imageCount: 0,
           })
@@ -1050,7 +946,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       )
 
       agentDebugLog('chat_messages_built', {
-        userInput: requestText,
+        userInput: request.requestText,
         contextLength: context.length,
         compactionRevision: preparedHistory?.compaction?.revision || null,
         compactionSource: preparedHistory?.capacity.source || null,
@@ -1065,7 +961,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       })
 
       try {
-        await agentHandler.execute(requestText, messages)
+        await agentHandler.execute(request.requestText, messages)
       } catch (error) {
         const parsedOverflow = parseContextOverflowError(error)
         const overflow =
@@ -1089,8 +985,9 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
         const previousCompactionRevision = preparedHistory?.compaction?.revision
         preparedHistory = await prepareConversationHistory({
           conversationId: chatState.currentConversationId,
+          aiConfig: modelSnapshot.config,
           chats: useChatStore.getState().chats,
-          currentUserInput: requestText,
+          currentUserInput: request.requestText,
           additionalContext: compactionContext,
           imageCount: 0,
           force: true,
@@ -1115,7 +1012,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
             coveredThroughChatId: preparedHistory.compaction?.coveredThroughChatId,
           }
         )
-        await agentHandler.execute(requestText, messages)
+        await agentHandler.execute(request.requestText, messages)
       }
     } catch (error) {
       if (deferredOverflowError) {
@@ -1124,107 +1021,137 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       }
       console.error('Agent execution error:', error)
     } finally {
-      // 清空 ref
-      agentHandlerRef.current = null
+      agentSession.setActiveRunner(null)
     }
   }
 
-  // 对话（Agent 模式）
-  async function handleSubmit() {
-    if (!inputValue.trim() && attachedImages.length === 0 && fileAttachments.length === 0) return
+  const insertUserRequest = async (request: AgentRequestSnapshot) => {
+    const imageUrls = request.images.map(image => image.url)
+    return insert({
+      tagId: currentTagId,
+      role: 'user',
+      content: request.inputValue,
+      type: 'chat',
+      inserted: false,
+      images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
+      imageAnalyses: request.images.length > 0
+        ? serializeChatImageAnalyses(createPendingChatImageAnalyses(request.images, request.requestText))
+        : undefined,
+      attachments: request.fileAttachments.length > 0
+        ? serializeChatAttachments(request.fileAttachments)
+        : undefined,
+      quoteData: request.quoteData ? JSON.stringify(request.quoteData) : undefined,
+    })
+  }
 
-    if (activeRunRef.current) {
-      const sequence = ++steeringSequenceRef.current
-      const text = requestText
-      const steeringQuote = quoteData ? {
-        fileName: quoteData.fileName,
-        articlePath: quoteData.articlePath,
-        startLine: quoteData.startLine,
-        endLine: quoteData.endLine,
-        from: quoteData.from,
-        to: quoteData.to,
-        fullContent: quoteData.fullContent,
-        selectionToken: quoteData.selectionToken,
-      } : undefined
+  const prepareSteering = async (
+    request: AgentRequestSnapshot,
+    sequence: number
+  ): Promise<AgentSteeringPayload> => {
+    let additionalContext = ''
+    let steeringImageAttachments: PersistedChatImageAnalysis[] | undefined
 
-      agentHandlerRef.current?.beginSteering()
-      onSent?.()
-
-      steeringChainRef.current = steeringChainRef.current.then(async () => {
-        if (manualStopRequestedRef.current) return
-        let additionalContext = ''
-        let steeringImageAttachments: PersistedChatImageAnalysis[] | undefined
-        try {
-          additionalContext = await buildSteeringContext()
-        } catch (error) {
-          console.error('Failed to build steering context:', error)
-        }
-        if (attachedImages.length > 0) {
-          imageAnalysisAbortControllerRef.current?.abort()
-          const controller = new AbortController()
-          imageAnalysisAbortControllerRef.current = controller
-          const imageResult = await buildChatImageContext(attachedImages, text, {
-            signal: controller.signal,
-          })
-          imageAnalysisAbortControllerRef.current = null
-          additionalContext = [additionalContext, imageResult.context].filter(Boolean).join('\n\n')
-          steeringImageAttachments = imageResult.analyses
-        }
-        const payload: AgentSteeringPayload = {
-          sequence,
-          text,
-          selectedSkills: selectedSkillIds,
-          additionalContext,
-          currentQuote: steeringQuote,
-          attachments: fileAttachments,
-          imageAttachments: steeringImageAttachments,
-        }
-        if (agentHandlerRef.current) {
-          agentHandlerRef.current.steer(payload)
-        } else {
-          pendingSteeringRef.current.push(payload)
-        }
-      })
-      return
+    try {
+      additionalContext = await buildAgentSteeringContext(request, isMobile)
+    } catch (error) {
+      console.error('Failed to build steering context:', error)
     }
 
-    manualStopRequestedRef.current = false
-    contextOverflowRetryRef.current = 0
-    activeRunRef.current = true
-    repeatedScriptApprovalRef.current = { signature: '', count: 0 }
+    if (request.images.length > 0) {
+      steeringImageAnalysisAbortControllerRef.current?.abort()
+      const controller = new AbortController()
+      steeringImageAnalysisAbortControllerRef.current = controller
+      try {
+        const imageResult = await buildChatImageContext(request.images, request.requestText, {
+          signal: controller.signal,
+        })
+        additionalContext = [additionalContext, imageResult.context].filter(Boolean).join('\n\n')
+        steeringImageAttachments = imageResult.analyses
+      } finally {
+        if (steeringImageAnalysisAbortControllerRef.current === controller) {
+          steeringImageAnalysisAbortControllerRef.current = null
+        }
+      }
+    }
+
+    return {
+      sequence,
+      text: request.requestText,
+      selectedSkills: request.selectedSkillIds,
+      additionalContext,
+      currentQuote: request.quoteData ? {
+        fileName: request.quoteData.fileName,
+        articlePath: request.quoteData.articlePath,
+        startLine: request.quoteData.startLine,
+        endLine: request.quoteData.endLine,
+        from: request.quoteData.from,
+        to: request.quoteData.to,
+        fullContent: request.quoteData.fullContent,
+        selectionToken: request.quoteData.selectionToken,
+      } : undefined,
+      attachments: request.fileAttachments,
+      imageAttachments: steeringImageAttachments,
+    }
+  }
+
+  agentSession.configure({
+    execute: async (request) => {
+      const modelId = useSettingStore.getState().primaryModel
+      const aiConfig = await getAISettingsByModelId(modelId)
+      const modelSnapshot = {
+        id: modelId,
+        name: aiConfig?.model || modelId,
+        config: aiConfig,
+      }
+      setAgentState({
+        activeModelId: modelSnapshot.id,
+        activeModelName: modelSnapshot.name,
+      })
+      const userMessage = await insertUserRequest(request)
+      if (userMessage) {
+        if (typeof userMessage.conversationId === 'number') {
+          agentSessionManager.rekey(
+            agentSessionId,
+            `conversation:${userMessage.conversationId}`
+          )
+        }
+        await handleAgentMode(request, userMessage, modelSnapshot)
+      }
+    },
+    prepareSteering,
+    onSteeringError: error => console.error('Failed to prepare steering message:', error),
+  })
+
+  // 对话（Agent 模式）
+  async function handleSubmit(overrideText?: string) {
+    const request = createRequestSnapshot(overrideText)
+    if (!request.inputValue.trim() && request.images.length === 0 && request.fileAttachments.length === 0) return
+    const wasStreaming = agentSession.isStreaming
+    if (!wasStreaming) {
+      manualStopRequestedRef.current = false
+      contextOverflowRetryRef.current = 0
+      repeatedScriptApprovalRef.current = { signature: '', count: 0 }
+      setLoading(true)
+    }
     onSent?.()
 
-    setLoading(true)
     try {
-      const imageUrls = attachedImages.map(img => img.url)
-      const userMessage = await insert({
-        tagId: currentTagId,
-        role: 'user',
-        content: inputValue,
-        type: 'chat',
-        inserted: false,
-        images: imageUrls.length > 0 ? JSON.stringify(imageUrls) : undefined,
-        imageAnalyses: attachedImages.length > 0
-          ? serializeChatImageAnalyses(createPendingChatImageAnalyses(attachedImages, requestText))
-          : undefined,
-        attachments: fileAttachments.length > 0 ? serializeChatAttachments(fileAttachments) : undefined,
-        quoteData: quoteData ? JSON.stringify(quoteData) : undefined,
+      await agentSession.prompt(request, {
+        streamingBehavior: wasStreaming ? 'followUp' : undefined,
       })
-      if (userMessage) {
-        await handleAgentMode(attachedImages, userMessage)
-      }
     } finally {
-      activeRunRef.current = false
-      setLoading(false)
+      if (!wasStreaming) {
+        setLoading(false)
+      }
     }
   }
 
   const handleStop = async () => {
     manualStopRequestedRef.current = true
-    activeRunRef.current = false
-    pendingSteeringRef.current = []
     imageAnalysisAbortControllerRef.current?.abort()
     imageAnalysisAbortControllerRef.current = null
+    steeringImageAnalysisAbortControllerRef.current?.abort()
+    steeringImageAnalysisAbortControllerRef.current = null
 
     // 停止普通对话的流式输出
     if (abortControllerRef.current) {
@@ -1232,11 +1159,7 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
       abortControllerRef.current = null
     }
 
-    // 停止 Agent 执行
-    if (agentHandlerRef.current) {
-      agentHandlerRef.current.stop()
-      // 不立即清空 ref，等待 Agent 的错误处理完成并调用 onComplete
-    }
+    agentSession.abort()
 
     // 重置 loading 状态
     setLoading(false)
@@ -1245,22 +1168,26 @@ ${hasValidRange ? `**仅在用户明确要求修改/改写/补充/插入时才�
   const hasInput = Boolean(inputValue.trim() || attachedImages.length > 0 || fileAttachments.length > 0)
   const showStop = loading && !hasInput
 
-  return <TooltipButton
-    variant={dockStyle ? "ghost" : showStop ? "destructive" : "default"}
-    size={dockStyle ? "icon" : "sm"}
-    icon={showStop ? <Square className="fill-current" /> : <Send />}
-    disabled={!showStop && (!primaryModel || !hasInput)}
-    tooltipText={showStop
-      ? t('record.chat.input.stop')
-      : loading
-        ? t('record.chat.input.steer')
-        : t('record.chat.input.send')}
-    onClick={showStop ? handleStop : handleSubmit}
-    buttonClassName={dockStyle ? cn(
-      "size-8 rounded-full border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
-      showStop && "border-destructive bg-background text-destructive hover:bg-background hover:text-destructive"
-    ) : undefined}
-  />
+  return (
+    <span className="relative inline-flex">
+      <TooltipButton
+        variant={dockStyle ? "ghost" : showStop ? "destructive" : "default"}
+        size={dockStyle ? "icon" : "sm"}
+        icon={showStop ? <Square className="fill-current" /> : <Send />}
+        disabled={!showStop && (!primaryModel || !hasInput)}
+        tooltipText={showStop
+          ? t('record.chat.input.stop')
+          : loading
+            ? t('record.chat.input.agent.deliveryMode.pending.add')
+            : t('record.chat.input.send')}
+        onClick={showStop ? handleStop : () => void handleSubmit()}
+        buttonClassName={dockStyle ? cn(
+          "size-8 rounded-full border border-border/50 bg-[hsl(var(--component-active-bg))] text-foreground shadow-none hover:bg-[hsl(var(--component-active-bg))] hover:text-foreground",
+          showStop && "border-destructive bg-background text-destructive hover:bg-background hover:text-destructive"
+        ) : undefined}
+      />
+    </span>
+  )
 })
 
 ChatSend.displayName = 'ChatSend';

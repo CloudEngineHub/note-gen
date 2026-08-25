@@ -87,6 +87,7 @@ interface AgentPanelWithRagProps {
 }
 
 interface StructuredAgentHistory {
+  modelName?: string
   runId?: string
   status?: AgentRunStatus
   traceEvents?: AgentTraceEvent[]
@@ -229,6 +230,7 @@ export function AgentPanelWithRag({
   if (hasStructuredHistory) {
     return (
       <AgentRunTimeline
+        modelName={structuredHistory?.modelName}
         status={structuredHistory?.status || "completed"}
         isRunning={false}
         traceEvents={structuredHistory?.traceEvents || []}

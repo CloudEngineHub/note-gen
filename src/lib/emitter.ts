@@ -97,6 +97,7 @@ interface Events {
     coveredThroughChatId?: number;
     sourceTokenCount?: number;
     summaryTokenCount?: number;
+    summary?: string;
   };
   'memory-auto-created': {
     conversationId: number;

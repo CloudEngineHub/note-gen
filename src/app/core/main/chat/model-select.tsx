@@ -1,8 +1,7 @@
 import * as React from "react"
 import { useEffect, useState } from "react"
-import { ModelConfig } from "../../setting/config"
-import { Store } from "@tauri-apps/plugin-store"
 import useSettingStore from "@/stores/setting"
+import useChatStore from "@/stores/chat"
 import { BotMessageSquare, BotOff, ChevronRight } from "lucide-react"
 import {
   Popover,
@@ -21,12 +20,13 @@ import { useTranslations } from "next-intl"
 import { TooltipButton } from "@/components/tooltip-button"
 import { Button } from "@/components/ui/button"
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item"
-
-interface GroupedModel {
-  configKey: string
-  configTitle: string
-  model: ModelConfig
-}
+import { Badge } from "@/components/ui/badge"
+import { toast } from "@/hooks/use-toast"
+import {
+  changePrimaryChatModel,
+  collectGroupedChatModels,
+  type GroupedChatModel,
+} from "./model-selection"
 
 interface ModelSelectProps {
   display?: 'icon' | 'status' | 'panel'
@@ -34,16 +34,33 @@ interface ModelSelectProps {
 }
 
 export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectProps) {
-  const [groupedModels, setGroupedModels] = useState<GroupedModel[]>([])
-  const { primaryModel, setPrimaryModel, aiModelList } = useSettingStore()
+  const [groupedModels, setGroupedModels] = useState<GroupedChatModel[]>([])
+  const { primaryModel, aiModelList } = useSettingStore()
+  const { loading, agentState } = useChatStore()
   const [open, setOpen] = React.useState(false)
   const t = useTranslations('record.chat.input.modelSelect')
 
   async function modelSelectChangeHandler(modelId: string) {
-    setPrimaryModel(modelId)
-    const store = await Store.load('store.json');
-    store.set('primaryModel', modelId)
-    await store.save()
+    const nextModel = groupedModels.find(item => item.model.id === modelId)
+    const previousModel = groupedModels.find(item => item.model.id === primaryModel)
+    const result = await changePrimaryChatModel({
+      modelId,
+      modelName: nextModel?.model.model || modelId,
+      previousModelName: previousModel?.model.model || primaryModel,
+    })
+    if (result.changed && result.hasConversationHistory) {
+      toast({
+        title: result.appliesNextTurn
+          ? t('nextTurn', { model: nextModel?.model.model || modelId })
+          : t('changed', {
+              from: previousModel?.model.model || primaryModel,
+              to: nextModel?.model.model || modelId,
+            }),
+        description: result.appliesNextTurn
+          ? t('changeWarning')
+          : t('continuityWarning'),
+      })
+    }
   }
 
   function handleSetOpen(isOpen: boolean) {
@@ -52,47 +69,7 @@ export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectP
 
   // 监听 aiModelList 变化，处理新的模型配置结构
   useEffect(() => {
-    if (aiModelList && aiModelList.length > 0) {
-      const models: GroupedModel[] = []
-      
-      aiModelList.forEach(config => {
-        // 检查配置是否有效
-        if (!config.baseURL) return
-        
-        // 处理新的 models 数组结构
-        if (config.models && config.models.length > 0) {
-          config.models.forEach(model => {
-            // 只显示 chat 类型的模型
-            if (model.modelType === 'chat' && model.model) {
-              models.push({
-                configKey: config.key,
-                configTitle: config.title,
-                model: model
-              })
-            }
-          })
-        } else {
-          // 向后兼容：处理旧的单模型结构
-          if ((config.modelType === 'chat' || !config.modelType) && config.model) {
-            models.push({
-              configKey: config.key,
-              configTitle: config.title,
-              model: {
-                id: config.key,
-                model: config.model,
-                modelType: config.modelType || 'chat',
-                temperature: config.temperature,
-                topP: config.topP,
-                voice: config.voice,
-                enableStream: config.enableStream
-              }
-            })
-          }
-        }
-      })
-      
-      setGroupedModels(models)
-    }
+    setGroupedModels(collectGroupedChatModels(aiModelList))
   }, [aiModelList])
 
   // 按配置分组模型
@@ -102,9 +79,18 @@ export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectP
     }
     acc[item.configTitle].push(item)
     return acc
-  }, {} as Record<string, GroupedModel[]>)
+  }, {} as Record<string, GroupedChatModel[]>)
 
   const selectedModel = groupedModels.find((item) => item.model.id === primaryModel)
+  const appliesNextTurn = Boolean(
+    (loading || agentState.isRunning)
+    && agentState.activeModelId
+    && agentState.activeModelId !== primaryModel
+  )
+  const selectedModelLabel = selectedModel?.model.model || t('noModel')
+  const displayedModelLabel = appliesNextTurn
+    ? `${agentState.activeModelName || agentState.activeModelId} → ${selectedModelLabel}`
+    : selectedModelLabel
 
   return (
     <Popover open={open} onOpenChange={handleSetOpen}>
@@ -119,8 +105,9 @@ export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectP
           >
             {selectedModel ? <BotMessageSquare data-icon="inline-start" /> : <BotOff data-icon="inline-start" />}
             <span className="truncate">
-              {selectedModel ? selectedModel.model.model : t('noModel')}
+              {displayedModelLabel}
             </span>
+            {appliesNextTurn && <Badge variant="secondary">{t('nextTurnBadge')}</Badge>}
           </Button>
         ) : display === 'panel' ? (
           <Item asChild size="sm" className="h-12 flex-nowrap py-0 cursor-pointer hover:bg-muted">
@@ -133,8 +120,9 @@ export function ModelSelect({ display = 'icon', disabled = false }: ModelSelectP
               </ItemContent>
               <ItemActions className="shrink-0">
                 <span className="max-w-40 truncate text-xs text-muted-foreground">
-                  {selectedModel ? selectedModel.model.model : t('noModel')}
+                  {displayedModelLabel}
                 </span>
+                {appliesNextTurn && <Badge variant="secondary">{t('nextTurnBadge')}</Badge>}
                 <ChevronRight />
               </ItemActions>
             </button>

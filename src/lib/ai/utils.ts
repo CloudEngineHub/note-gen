@@ -60,8 +60,23 @@ export async function getSystemPromptContent(): Promise<string> {
  */
 export async function getAISettings(modelType?: string): Promise<AiConfig | undefined> {
   const store = await Store.load('store.json')
-  const aiConfigs = await store.get<AiConfig[]>('aiModelList')
   const modelId = await store.get(modelType || 'primaryModel')
+
+  return typeof modelId === 'string'
+    ? getAISettingsByModelId(modelId, store)
+    : undefined
+}
+
+/**
+ * Resolve a concrete model without reading the mutable primaryModel setting.
+ * Agent turns use this to keep every model call in one run on the same model.
+ */
+export async function getAISettingsByModelId(
+  modelId: string,
+  loadedStore?: Store
+): Promise<AiConfig | undefined> {
+  const store = loadedStore ?? await Store.load('store.json')
+  const aiConfigs = await store.get<AiConfig[]>('aiModelList')
 
   if (!modelId || !aiConfigs) {
     return undefined

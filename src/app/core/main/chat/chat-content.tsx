@@ -1,7 +1,7 @@
 import React from 'react'
 import useChatStore from '@/stores/chat'
 import useTagStore from '@/stores/tag'
-import { X, Loader2, QuoteIcon } from 'lucide-react'
+import { BotMessageSquare, ChevronDown, X, Loader2, QuoteIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Chat } from '@/db/chats'
 import ChatPreview from './chat-preview'
@@ -38,12 +38,17 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller'
+import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { parseModelChangeMarker } from './model-selection'
 
 interface DisplayedConversationCompaction {
   revision: number
   coveredThroughChatId: number
   sourceTokenCount: number
   summaryTokenCount: number
+  summary: string
 }
 
 const ChatContent = React.memo(function ChatContent() {
@@ -52,6 +57,7 @@ const ChatContent = React.memo(function ChatContent() {
   const t = useTranslations()
   const [compactionRunning, setCompactionRunning] = useState(false)
   const [latestCompaction, setLatestCompaction] = useState<DisplayedConversationCompaction | null>(null)
+  const [expandedCompactionRevision, setExpandedCompactionRevision] = useState<number | null>(null)
 
   useEffect(() => {
     init(currentTagId)
@@ -61,6 +67,7 @@ const ChatContent = React.memo(function ChatContent() {
     let cancelled = false
     setCompactionRunning(false)
     setLatestCompaction(null)
+    setExpandedCompactionRevision(null)
 
     if (!currentConversationId) {
       return
@@ -92,6 +99,7 @@ const ChatContent = React.memo(function ChatContent() {
       coveredThroughChatId?: number
       sourceTokenCount?: number
       summaryTokenCount?: number
+      summary?: string
     }) => {
       if (event.conversationId !== currentConversationId) {
         return
@@ -104,12 +112,14 @@ const ChatContent = React.memo(function ChatContent() {
         && typeof event.coveredThroughChatId === 'number'
         && typeof event.sourceTokenCount === 'number'
         && typeof event.summaryTokenCount === 'number'
+        && typeof event.summary === 'string'
       ) {
         setLatestCompaction({
           revision: event.revision,
           coveredThroughChatId: event.coveredThroughChatId,
           sourceTokenCount: event.sourceTokenCount,
           summaryTokenCount: event.summaryTokenCount,
+          summary: event.summary,
         })
       }
     }
@@ -179,13 +189,36 @@ const ChatContent = React.memo(function ChatContent() {
                 </MessageScrollerItem>
                 {activeCompaction?.coveredThroughChatId === chat.id && (
                   <MessageScrollerItem className="w-full">
-                    <div
-                      className="flex w-full items-center gap-3 py-1 text-xs text-muted-foreground"
-                      title={`${activeCompaction.sourceTokenCount} → ${activeCompaction.summaryTokenCount} tokens`}
-                    >
-                      <Separator className="flex-1" />
-                      <span>{t('record.chat.condensed.message', { count: compactedMessageCount })}</span>
-                      <Separator className="flex-1" />
+                    <div className="flex w-full flex-col gap-2 py-1 text-xs text-muted-foreground">
+                      <div
+                        className="flex w-full items-center gap-3"
+                        title={`${activeCompaction.sourceTokenCount} → ${activeCompaction.summaryTokenCount} tokens`}
+                      >
+                        <Separator className="flex-1" />
+                        <button
+                          type="button"
+                          className="flex items-center gap-1 transition-colors hover:text-foreground"
+                          aria-expanded={expandedCompactionRevision === activeCompaction.revision}
+                          onClick={() => setExpandedCompactionRevision(current => (
+                            current === activeCompaction.revision ? null : activeCompaction.revision
+                          ))}
+                        >
+                          <span>{t('record.chat.condensed.message', { count: compactedMessageCount })}</span>
+                          <ChevronDown
+                            className={cn(
+                              "size-3.5 transition-transform",
+                              expandedCompactionRevision === activeCompaction.revision && "rotate-180"
+                            )}
+                          />
+                        </button>
+                        <Separator className="flex-1" />
+                      </div>
+                      {expandedCompactionRevision === activeCompaction.revision && (
+                        <div className="mx-auto w-full max-w-2xl rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed text-foreground whitespace-pre-wrap">
+                          <div className="mb-2 font-medium">{t('record.chat.condensed.summary')}</div>
+                          {activeCompaction.summary}
+                        </div>
+                      )}
                     </div>
                   </MessageScrollerItem>
                 )}
@@ -435,6 +468,35 @@ const Message = React.memo(function Message({ chat }: { chat: Chat }) {
   }, [chat.quoteData])
 
   switch (chat.type) {
+    case 'model_change': {
+      const marker = parseModelChangeMarker(chat.content)
+      if (!marker) return null
+      const compactModelName = marker.toModel.split('/').filter(Boolean).at(-1) || marker.toModel
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Marker role="status" className="min-w-0 py-1">
+              <MarkerIcon><BotMessageSquare /></MarkerIcon>
+              <MarkerContent className="flex-1 truncate">
+                {t('record.chat.input.modelSelect.changedTo', { model: compactModelName })}
+              </MarkerContent>
+              {marker.appliesNextTurn && (
+                <Badge variant="secondary" className="shrink-0">
+                  {t('record.chat.input.modelSelect.nextTurnBadge')}
+                </Badge>
+              )}
+            </Marker>
+          </TooltipTrigger>
+          <TooltipContent>
+            {t('record.chat.input.modelSelect.changed', {
+              from: marker.fromModel,
+              to: marker.toModel,
+            })}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
     case 'clear':
       return <div className="w-full flex justify-center items-center gap-4 px-10">
         <Separator className='flex-1' />

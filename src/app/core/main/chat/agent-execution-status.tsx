@@ -9,6 +9,7 @@ export function AgentExecutionStatus() {
 
   return (
     <AgentRunTimeline
+      modelName={agentState.activeModelName}
       status={agentState.status}
       ragSources={agentState.ragSources || []}
       ragSourceDetails={agentState.ragSourceDetails || []}

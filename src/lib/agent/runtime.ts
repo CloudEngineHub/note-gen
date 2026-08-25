@@ -7,6 +7,7 @@ import { AgentPermissionEngine } from './permission-engine'
 import { AgentPromptAssembler, hasInlineCurrentEditorSelection, hasInlineCurrentEditorState } from './prompt-assembler'
 import { memoryContextService } from '@/lib/context/loader'
 import { AgentRecoveryManager } from './recovery-manager'
+import { PendingMessageQueue } from './pending-message-queue'
 import { createAgentId, AgentTraceRecorder } from './trace-recorder'
 import { agentToolRegistry, buildEditorApprovalPreview } from './tool-registry'
 import { skillManager } from '@/lib/skills'
@@ -711,31 +712,32 @@ export class AgentRuntime {
   private abortController: AbortController | null = null
   private stopped = false
   private steeringRequested = false
-  private steeringQueue: AgentSteeringPayload[] = []
-  private steeringReadyResolver: (() => void) | null = null
+  private readonly steeringQueue = new PendingMessageQueue<AgentSteeringPayload>(
+    'one-at-a-time',
+    (left, right) => left.sequence - right.sequence
+  )
 
   stop() {
     this.stopped = true
-    this.steeringQueue = []
+    this.steeringQueue.clear()
     this.steeringRequested = false
-    this.steeringReadyResolver?.()
-    this.steeringReadyResolver = null
     this.abortController?.abort()
-  }
-
-  beginSteering() {
-    if (!this.stopped) {
-      this.steeringRequested = true
-    }
   }
 
   steer(payload: AgentSteeringPayload) {
     if (this.stopped) return
     this.steeringRequested = true
-    this.steeringQueue.push(payload)
-    this.steeringQueue.sort((a, b) => a.sequence - b.sequence)
-    this.steeringReadyResolver?.()
-    this.steeringReadyResolver = null
+    this.steeringQueue.enqueue(payload)
+  }
+
+  clearSteeringQueue() {
+    this.steeringQueue.clear()
+    this.steeringRequested = false
+  }
+
+  removeSteering(sequence: number) {
+    this.steeringQueue.remove(payload => payload.sequence === sequence)
+    this.steeringRequested = this.steeringQueue.hasItems()
   }
 
   async run(input: AgentRuntimeInput, callbacks: AgentRuntimeCallbacks = {}): Promise<AgentRuntimeResult> {
@@ -762,7 +764,8 @@ export class AgentRuntime {
       imageAttachments: input.imageAttachments,
     }
 
-    const aiConfig = await getAISettings()
+    // A supplied turn snapshot must outlive changes to the global model picker.
+    const aiConfig = input.aiConfig ?? await getAISettings()
     const validatedBaseURL = await validateAIService(aiConfig?.baseURL)
     if (!aiConfig || validatedBaseURL === null) {
       agentDebugLog('ai_service_invalid', { runId })
@@ -1052,16 +1055,12 @@ export class AgentRuntime {
 
     const drainSteering = async () => {
       if (!this.steeringRequested) return false
-      if (this.steeringQueue.length === 0 && !this.stopped) {
-        await new Promise<void>((resolve) => {
-          this.steeringReadyResolver = resolve
-        })
-      }
       if (this.stopped) return false
 
-      const payloads = this.steeringQueue.splice(0)
+      const payloads = this.steeringQueue.drain()
       if (payloads.length === 0) return false
-      this.steeringRequested = false
+      this.steeringRequested = this.steeringQueue.hasItems()
+      callbacks.onSteeringDelivered?.(payloads)
       callbacks.onStatus?.('steering')
 
       for (const payload of payloads) {
@@ -1274,18 +1273,12 @@ export class AgentRuntime {
         let streamedText = ''
         let streamedTokenCount = 0
         let lastModelProgressTraceAt = 0
-        let steeringInterrupted = false
         const streamedToolCalls = new Map<number, StreamingToolCallAccumulator>()
 
         for await (const chunk of stream) {
           if (this.stopped) {
             throw new Error('USER_STOPPED')
           }
-          if (this.steeringRequested) {
-            steeringInterrupted = true
-            break
-          }
-
           const choice = chunk.choices[0]
           if (!choice) {
             continue
@@ -1388,15 +1381,6 @@ export class AgentRuntime {
           }
           return rewritten
         })
-        if (steeringInterrupted) {
-          finalizeInterruptedModelTrace('success', '模型响应已被追加信息引导', true)
-          if (assistantContent) {
-            messages.push({ role: 'assistant', content: assistantContent })
-          }
-          await drainSteering()
-          iteration -= 1
-          continue
-        }
         agentDebugLog('model_call_end', {
           runId,
           iteration,
@@ -1428,7 +1412,7 @@ export class AgentRuntime {
           duration: Date.now() - modelTrace.timestamp,
           output: modelTraceOutput,
           reasoning: assistantReasoning || undefined,
-          isIntermediateResponse: toolUses.length > 0 && Boolean(assistantContent),
+          isIntermediateResponse: (toolUses.length > 0 || this.steeringRequested) && Boolean(assistantContent),
           streamedTokenCount,
         })
         if (responseTrace) callbacks.onTrace?.(responseTrace)
@@ -1444,6 +1428,14 @@ export class AgentRuntime {
 
         if (toolUses.length === 0) {
           const resolvedContent = assistantContent || finalContent
+          if (this.steeringRequested) {
+            callbacks.onCandidateAnswerClear?.()
+            if (resolvedContent) {
+              messages.push({ role: 'assistant', content: resolvedContent })
+            }
+            await drainSteering()
+            continue
+          }
           if (!resolvedContent) {
             throw new Error('AI response did not include a message')
           }
@@ -1546,15 +1538,6 @@ export class AgentRuntime {
             throw new Error('USER_STOPPED')
           }
           const toolName = toolUse.function.name
-          if (this.steeringRequested) {
-            appendToolResult(toolUse.id, toolName, {}, {
-              ok: false,
-              message: '用户追加了新的引导信息，本次尚未开始的工具调用已取消。',
-              error: 'SUPERSEDED_BY_STEERING',
-            })
-            continue
-          }
-
           const tool = toolMap.get(toolName)
           let args: Record<string, unknown>
           try {

@@ -1,4 +1,5 @@
 import type OpenAI from 'openai'
+import type { AiConfig } from '@/app/core/setting/config'
 import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
 import type { AgentImageAttachment } from '@/lib/chat-image-context'
 
@@ -222,6 +223,7 @@ export interface AgentApprovalRequest {
 
 export interface AgentRuntimeInput {
   userInput: string
+  aiConfig?: AiConfig
   messages?: OpenAI.Chat.ChatCompletionMessageParam[]
   imageUrls?: string[]
   activeChatId?: number
@@ -255,6 +257,7 @@ export type AgentApprovalDecision = 'approved' | 'denied' | 'steered'
 
 export interface AgentRuntimeCallbacks {
   onStatus?: (status: AgentRunStatus) => void
+  onSteeringDelivered?: (payloads: AgentSteeringPayload[]) => void
   onTrace?: (event: AgentTraceEvent) => void
   onToolCall?: (toolCall: ToolCall) => void
   onChange?: (change: AgentChange) => void
@@ -335,6 +338,8 @@ export interface ConfirmationRecord {
 
 export interface AgentState {
   activeChatId?: number
+  activeModelId?: string
+  activeModelName?: string
   runId?: string
   status?: AgentRunStatus
   isRunning: boolean

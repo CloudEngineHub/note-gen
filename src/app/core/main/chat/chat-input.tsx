@@ -9,7 +9,7 @@ import useCanvasStore from "@/stores/canvas"
 import { useTranslations } from 'next-intl'
 import { useLocalStorage } from 'react-use';
 import { getFilePathOptions, getWorkspacePath } from "@/lib/workspace"
-import { ChatSend } from "./chat-send"
+import { ChatSend, type ChatSendHandle } from "./chat-send"
 import { isLinkedFolder, LinkedResource, MarkdownFile, LinkedFolder } from "@/lib/files"
 import emitter from "@/lib/emitter"
 import { ChatToolsDrawer } from "@/app/mobile/chat/components/chat-tools-drawer"
@@ -21,6 +21,7 @@ import type { PendingQuote } from "@/stores/chat"
 import { AgentApprovalPanel } from "./agent-approval-panel"
 import { cancelPendingAgentAction, confirmPendingAgentAction } from "./agent-approval-actions"
 import { AgentPermissionModeSelect } from "./agent-permission-mode"
+import { AgentPendingMessageList } from "./agent-pending-message-list"
 import { ContextUsageIndicator } from "./context-usage-indicator"
 import { readFile, readTextFile, writeFile, BaseDirectory, exists, mkdir, stat } from "@tauri-apps/plugin-fs"
 import { ShineBorder } from "@/components/ui/shine-border"
@@ -153,7 +154,7 @@ export const ChatInput = React.memo(function ChatInput() {
   const [isComposing, setIsComposing] = useState(false)
   const t = useTranslations()
   const defaultPlaceholder = t('record.chat.input.placeholder.default')
-  const steeringPlaceholder = t('record.chat.input.placeholder.steering')
+  const pendingPlaceholder = t('record.chat.input.placeholder.pending')
   const [inputHistory, setInputHistory] = useLocalStorage<string[]>('chat-input-history', [])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [tempInput, setTempInput] = useState('')
@@ -170,7 +171,7 @@ export const ChatInput = React.memo(function ChatInput() {
   const [selectedSkills, setSelectedSkills] = useState<SkillMetadata[]>([])
   const [activeTabContexts, setActiveTabContexts] = useState<MentionedContext[]>([])
   const [mentionedContexts, setMentionedContexts] = useState<MentionedContext[]>([])
-  const chatSendRef = useRef<{ sendChat: () => void } | null>(null)
+  const chatSendRef = useRef<ChatSendHandle | null>(null)
   const composerMenuRef = useRef<ChatComposerMenuHandle>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -1023,6 +1024,9 @@ export const ChatInput = React.memo(function ChatInput() {
       setText(prompt)
       textareaRef.current?.focus()
     })
+    emitter.on('quick-prompt-send', (prompt: string) => {
+      chatSendRef.current?.sendPrompt(prompt)
+    })
     return () => {
       onboardingTypingTimerRefs.current.forEach((timerId) => window.clearTimeout(timerId))
       onboardingTypingTimerRefs.current = []
@@ -1031,6 +1035,7 @@ export const ChatInput = React.memo(function ChatInput() {
       emitter.off('folderSelected')
       emitter.off('insert-quote')
       emitter.off('quick-prompt-insert')
+      emitter.off('quick-prompt-send')
     }
   }, [setPendingQuote])
 
@@ -1294,6 +1299,7 @@ ${previewLines.join('\n')}
             </div>
           </div>
         )}
+        <AgentPendingMessageList />
         <ChatContextStrip
           linkedResource={linkedResource}
           activeTabContexts={visibleActiveTabContexts}
@@ -1329,7 +1335,7 @@ ${previewLines.join('\n')}
             disabled={!primaryModel}
             value={text}
             onChange={handleComposerTextChange}
-            placeholder={loading ? steeringPlaceholder : defaultPlaceholder}
+            placeholder={loading ? pendingPlaceholder : defaultPlaceholder}
             onKeyDown={(e) => {
               const textarea = e.target as HTMLTextAreaElement
               const cursorPosition = textarea.selectionStart

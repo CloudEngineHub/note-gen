@@ -2989,7 +2989,8 @@
     "chat": {
       "condensing": "Fasse Kontext zusammen...",
       "condensed": {
-        "message": "Fasse {count} historische Nachrichten zusammen"
+        "message": "{count} frühere Nachrichten zusammengefasst",
+        "summary": "Fortsetzungszusammenfassung"
       },
       "empty": {
         "title": "Beginne den Chat mit der KI",
@@ -3118,7 +3119,7 @@
         "chat": "Chat",
         "placeholder": {
           "default": "Schreibe eine Nachricht...",
-          "steering": "Füge Informationen hinzu, um die aktuelle Aufgabe zu steuern...",
+          "pending": "Nachricht eingeben und anschließend in der Warteliste anpassen...",
           "noApiKey": "Kein API-Key konfiguriert, KI-Chat kann nicht verwendet werden...",
           "on": "KI-Vorschläge an",
           "off": "KI-Vorschläge aus",
@@ -3146,7 +3147,13 @@
         "modelSelect": {
           "tooltip": "KI-Modell auswählen",
           "placeholder": "KI-Modelle durchsuchen",
-          "noModel": "Kein Modell gefunden"
+          "noModel": "Kein Modell gefunden",
+          "nextTurn": "Zu {model} gewechselt; gilt ab der nächsten Runde",
+          "nextTurnBadge": "Nächste Runde",
+          "changeWarning": "Ein Modellwechsel kann die Gesprächskontinuität beeinträchtigen. Die aktuelle Aufgabe verwendet weiterhin das ursprüngliche Modell.",
+          "continuityWarning": "Ein Modellwechsel kann die Kontinuität dieses Gesprächs beeinträchtigen.",
+          "changedTo": "Zu {model} gewechselt",
+          "changed": "Modell von {from} zu {to} gewechselt"
         },
         "promptSelect": {
           "tooltip": "Prompt auswählen",
@@ -3241,6 +3248,19 @@
           "resultSummary": "Ergebniszusammenfassung",
           "queryParameters": "Abfrageparameter",
           "toolResult": "Tool-Ergebnis",
+          "deliveryMode": {
+            "label": "Nachrichten während der Ausführung",
+            "queued": "{count} Nachricht(en) eingereiht",
+            "pending": { "title": "Ausstehende Nachrichten", "add": "Zur Warteliste hinzufügen", "remove": "Nachricht aus Warteschlange löschen", "edit": "Nachricht bearbeiten", "save": "Speichern", "cancel": "Abbrechen", "reorder": "Zum Sortieren ziehen", "more": "Weitere Aktionen" },
+            "modes": {
+              "steer": { "title": "Nächsten Schritt anpassen", "description": "Wendet diese Anweisung im nächsten Schritt zuerst an, nachdem die aktuelle Antwort und die Tool-Aufrufe abgeschlossen sind." },
+              "follow-up": { "title": "Danach ausführen", "description": "Startet dies nach Abschluss der aktuellen Aufgabe als neue Aufgabe." }
+            }
+          },
+          "resume": {
+            "action": "Aufgabe fortsetzen",
+            "prompt": "Setze die unvollständige Aufgabe aus dem vorherigen Lauf fort. Prüfe zuerst vorhandene Ergebnisse und Änderungen und wiederhole keine abgeschlossenen Schritte."
+          },
           "permissionMode": {
             "label": "Agenten-Berechtigungsmodus",
             "modes": {

@@ -377,7 +377,14 @@ export function parseConversationSyncIndex(content: string | null): Conversation
   }
 }
 
-const chatTypes = new Set<ChatType>(['chat', 'note', 'clipboard', 'clear', 'condensed'])
+const chatTypes = new Set<ChatType>([
+  'chat',
+  'note',
+  'clipboard',
+  'clear',
+  'condensed',
+  'model_change',
+])
 const chatRoles = new Set<Role>(['system', 'user'])
 
 function optionalString(value: unknown) {

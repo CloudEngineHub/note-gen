@@ -1,18 +1,20 @@
 import OpenAI from 'openai'
-import useChatStore from '@/stores/chat'
-import { skillManager } from '@/lib/skills'
-import { BUILTIN_SKILL_CREATOR } from '@/lib/skills/creator'
-import { useSkillsStore } from '@/stores/skills'
-import { reloadMcpTools } from './tools'
 import { AgentRuntime, isRequestAbortError } from './runtime'
-import { readCurrentEditorState } from './tools/editor-tools'
-import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentQuoteSnapshot, AgentRuntimeResult, AgentSkillSummary, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
+import type { AgentApprovalDecision, AgentChange, AgentPermissionMode, AgentQuoteSnapshot, AgentRuntimeResult, AgentSteeringPayload, AgentStep, AgentTraceEvent, ToolCall } from './types'
 import type { RuntimeChatAttachment } from '@/lib/chat-attachments'
 import type { AgentImageAttachment } from '@/lib/chat-image-context'
 import { retainCompletedAgentTraceEvents } from './trace-retention'
+import type { AgentStateAdapter } from './agent-state-adapter'
+import type { AgentResourceAdapter } from './agent-resource-adapter'
+import type { AiConfig } from '@/app/core/setting/config'
 
 export interface AgentHandlerConfig {
+  stateAdapter: AgentStateAdapter
+  resourceAdapter: AgentResourceAdapter
   activeChatId?: number
+  modelId?: string
+  modelName?: string
+  aiConfig?: AiConfig
   activeFilePath?: string
   activeCanvasId?: string
   permissionMode?: AgentPermissionMode
@@ -24,6 +26,7 @@ export interface AgentHandlerConfig {
   onObservation?: (observation: string) => void
   onComplete?: (result: string, steps?: AgentStep[], stopped?: boolean) => void
   onError?: (error: string) => void
+  onSteeringDelivered?: (sequences: number[]) => void
   onFinalAnswerRender?: (markdownContent: string) => void
   formatAutoFinalAnswer?: (key: string, values?: Record<string, string>) => string
   requestConfirmation?: (
@@ -48,7 +51,7 @@ export class AgentHandler {
   private runtime: AgentRuntime | null = null
   private stopped = false
   private readonly config: AgentHandlerConfig
-  private steeringPending = false
+  private acceptingSteering = true
   private pendingSteering: AgentSteeringPayload[] = []
   private retrievedKnowledgeSources = new Map<string, {
     filepath: string
@@ -76,12 +79,15 @@ export class AgentHandler {
     contextOrMessages?: string | OpenAI.Chat.ChatCompletionMessageParam[],
     imageUrls?: string[]
   ): Promise<string> {
-    const store = useChatStore.getState()
+    const stateAdapter = this.config.stateAdapter
+    this.acceptingSteering = true
     this.retrievedKnowledgeSources.clear()
 
-    store.resetAgentState()
-    store.setAgentState({
+    stateAdapter.reset()
+    stateAdapter.setState({
       activeChatId: this.config.activeChatId,
+      activeModelId: this.config.modelId,
+      activeModelName: this.config.modelName,
       isRunning: true,
       isThinking: false,
       status: 'preparing_context',
@@ -90,23 +96,20 @@ export class AgentHandler {
     })
 
     this.runtime = new AgentRuntime()
-    if (this.steeringPending) {
-      this.runtime.beginSteering()
-    }
     for (const payload of this.pendingSteering.splice(0)) {
       this.runtime.steer(payload)
     }
 
-    await this.initializeMcp()
-    const { useMcpStore } = await import('@/stores/mcp')
-    const selectedMcpServerIds = [...useMcpStore.getState().selectedServerIds]
-    const skillsInfo = await this.getSkillsInfo()
-    const currentEditorState = this.config.activeFilePath
-      ? await readCurrentEditorState().catch(() => undefined)
-      : undefined
+    await this.config.resourceAdapter.initializeMcp()
+    const selectedMcpServerIds = this.config.resourceAdapter.getSelectedMcpServerIds()
+    const skillsInfo = await this.config.resourceAdapter.getSkillsInfo(this.config.selectedSkills || [])
+    const currentEditorState = await this.config.resourceAdapter.getCurrentEditorState(
+      this.config.activeFilePath
+    )
 
     if (this.stopped) {
-      store.setAgentState({
+      this.acceptingSteering = false
+      stateAdapter.setState({
         isRunning: false,
         isThinking: false,
         status: 'stopped',
@@ -124,6 +127,7 @@ export class AgentHandler {
     try {
       const result = await this.runtime.run({
         userInput,
+        aiConfig: this.config.aiConfig,
         messages,
         imageUrls,
         activeChatId: this.config.activeChatId,
@@ -142,14 +146,17 @@ export class AgentHandler {
         useMemories: this.config.useMemories,
       }, {
         onStatus: (status) => {
-          store.setAgentState({
+          stateAdapter.setState({
             status,
             isRunning: status !== 'completed' && status !== 'failed' && status !== 'stopped',
             isThinking: status === 'thinking',
             currentStepStartTime: status === 'thinking' || status === 'calling_tool'
               ? Date.now()
-              : useChatStore.getState().agentState.currentStepStartTime,
+              : stateAdapter.getState().currentStepStartTime,
           })
+        },
+        onSteeringDelivered: (payloads) => {
+          this.config.onSteeringDelivered?.(payloads.map(payload => payload.sequence))
         },
         onTrace: (event) => {
           this.appendTrace(event)
@@ -170,20 +177,20 @@ export class AgentHandler {
           }
         },
         onCandidateAnswerRender: (content) => {
-          store.setAgentState({
+          stateAdapter.setState({
             activeChatId: this.config.activeChatId,
             isFinalAnswerMode: true,
             finalAnswerContent: content,
           })
         },
         onCandidateAnswerClear: () => {
-          store.setAgentState({
+          stateAdapter.setState({
             isFinalAnswerMode: false,
             finalAnswerContent: undefined,
           })
         },
         onFinalAnswerRender: (content) => {
-          store.setAgentState({
+          stateAdapter.setState({
             activeChatId: this.config.activeChatId,
             isFinalAnswerMode: true,
             finalAnswerContent: content,
@@ -195,12 +202,14 @@ export class AgentHandler {
         },
       })
 
+      this.acceptingSteering = false
       this.finishRun(result)
       this.config.onComplete?.(result.content, result.steps, result.stopped)
       return result.content
     } catch (error) {
+      this.acceptingSteering = false
       if (this.stopped || isRequestAbortError(error)) {
-        const agentState = useChatStore.getState().agentState
+        const agentState = stateAdapter.getState()
         const latestModelOutput = [...(agentState.traceEvents || [])]
           .reverse()
           .find(event => (
@@ -209,7 +218,7 @@ export class AgentHandler {
           ?.output
         const partialContent = agentState.finalAnswerContent
           || (typeof latestModelOutput === 'string' ? latestModelOutput : '')
-        store.setAgentState({
+        stateAdapter.setState({
           isRunning: false,
           isThinking: false,
           status: 'stopped',
@@ -218,7 +227,7 @@ export class AgentHandler {
         return partialContent
       }
 
-      store.setAgentState({
+      stateAdapter.setState({
         isRunning: false,
         isThinking: false,
         status: 'failed',
@@ -231,13 +240,13 @@ export class AgentHandler {
 
   stop() {
     this.stopped = true
-    const state = useChatStore.getState()
-    const pending = state.agentState.pendingConfirmation
+    const state = this.config.stateAdapter.getState()
+    const pending = state.pendingConfirmation
     if (pending) {
-      state.setAgentState({
+      this.config.stateAdapter.setState({
         pendingConfirmation: undefined,
         confirmationHistory: [
-          ...state.agentState.confirmationHistory,
+          ...state.confirmationHistory,
           {
             toolName: pending.toolName,
             params: pending.params,
@@ -250,14 +259,18 @@ export class AgentHandler {
     this.runtime?.stop()
   }
 
-  beginSteering() {
-    const state = useChatStore.getState()
-    const pending = state.agentState.pendingConfirmation
+  steer(payload: AgentSteeringPayload) {
+    if (!this.acceptingSteering) {
+      return false
+    }
+
+    const state = this.config.stateAdapter.getState()
+    const pending = state.pendingConfirmation
     if (pending) {
-      state.setAgentState({
+      this.config.stateAdapter.setState({
         pendingConfirmation: undefined,
         confirmationHistory: [
-          ...state.agentState.confirmationHistory,
+          ...state.confirmationHistory,
           {
             toolName: pending.toolName,
             params: pending.params,
@@ -269,70 +282,28 @@ export class AgentHandler {
         isRunning: true,
       })
     }
-    this.steeringPending = true
-    this.runtime?.beginSteering()
-  }
 
-  steer(payload: AgentSteeringPayload) {
-    this.steeringPending = true
     if (this.runtime) {
       this.runtime.steer(payload)
     } else {
       this.pendingSteering.push(payload)
     }
+    return true
   }
 
-  private async initializeMcp() {
-    try {
-      const { useMcpStore } = await import('@/stores/mcp')
-      const mcpStore = useMcpStore.getState()
-      if (!mcpStore.initialized) {
-        await mcpStore.initMcpData()
-      }
-      await reloadMcpTools()
-    } catch (error) {
-      console.error('[Agent Handler] Failed to initialize MCP:', error)
-    }
+  clearSteeringQueue() {
+    this.pendingSteering = []
+    this.runtime?.clearSteeringQueue()
   }
 
-  private async getSkillsInfo(): Promise<AgentSkillSummary[]> {
-    const skillsStore = useSkillsStore.getState()
-
-    if (!skillsStore.enabled) {
-      return []
-    }
-
-    const creator = {
-      id: BUILTIN_SKILL_CREATOR.id,
-      name: BUILTIN_SKILL_CREATOR.name,
-      description: BUILTIN_SKILL_CREATOR.description,
-    }
-
-    try {
-      await skillsStore.initSkills()
-      const enabledSkills = await skillManager.getEnabledSkills()
-      const selectedSkillIds = new Set(this.config.selectedSkills || [])
-      const visibleSkills = skillsStore.autoMatch
-        ? enabledSkills
-        : enabledSkills.filter(skill => selectedSkillIds.has(skill.metadata.id))
-
-      return [creator, ...visibleSkills
-        .filter((skill) => skill.metadata.id !== BUILTIN_SKILL_CREATOR.id)
-        .map((skill) => ({
-          id: skill.metadata.id,
-          name: skill.metadata.name,
-          description: skill.metadata.description,
-          scope: skill.metadata.scope,
-        }))]
-    } catch (error) {
-      console.error('[Agent Handler] Failed to load skills:', error)
-      return [creator]
-    }
+  removeSteering(sequence: number) {
+    this.pendingSteering = this.pendingSteering.filter(payload => payload.sequence !== sequence)
+    this.runtime?.removeSteering(sequence)
   }
 
   private appendTrace(event: AgentTraceEvent) {
-    const current = useChatStore.getState().agentState
-    useChatStore.getState().setAgentState({
+    const current = this.config.stateAdapter.getState()
+    this.config.stateAdapter.setState({
       runId: event.runId,
       traceEvents: [
         ...(current.traceEvents || []).filter((item) => item.id !== event.id),
@@ -344,15 +315,8 @@ export class AgentHandler {
   }
 
   private upsertToolCall(toolCall: ToolCall) {
-    const currentState = useChatStore.getState()
-    const existing = currentState.agentState.toolCalls.find((item) => item.id === toolCall.id)
-    if (existing) {
-      currentState.updateAgentToolCall(toolCall.id, toolCall)
-    } else {
-      currentState.addAgentToolCall(toolCall)
-    }
-
-    currentState.setAgentState({
+    this.config.stateAdapter.upsertToolCall(toolCall)
+    this.config.stateAdapter.setState({
       currentAction: `${toolCall.toolName}(${JSON.stringify(toolCall.params)})`,
     })
 
@@ -447,7 +411,7 @@ export class AgentHandler {
         ? [this.retrievedKnowledgeSources.get(sourceKey)!]
         : []
     ))
-    useChatStore.getState().setAgentState({
+    this.config.stateAdapter.setState({
       ragSources: ragSourceDetails.map(detail => detail.filename),
       ragSourceDetails,
     })
@@ -458,28 +422,27 @@ export class AgentHandler {
       return
     }
 
-    const skill = skillManager.getSkill(skillId)
-    const builtIn = skillId === BUILTIN_SKILL_CREATOR.id ? BUILTIN_SKILL_CREATOR : undefined
-    const current = useChatStore.getState().agentState.loadedSkills || []
+    const skill = this.config.resourceAdapter.getSkillSummary(skillId)
+    const current = this.config.stateAdapter.getState().loadedSkills || []
     if (current.some((item) => item.id === skillId)) {
       return
     }
 
-    useChatStore.getState().setAgentState({
+    this.config.stateAdapter.setState({
       loadedSkills: [
         ...current,
         {
           id: skillId,
-          name: skill?.metadata.name || builtIn?.name || skillId,
-          description: skill?.metadata.description || builtIn?.description,
+          name: skill?.name || skillId,
+          description: skill?.description,
         },
       ],
     })
   }
 
   private appendStep(step: AgentStep) {
-    const current = useChatStore.getState().agentState
-    useChatStore.getState().setAgentState({
+    const current = this.config.stateAdapter.getState()
+    this.config.stateAdapter.setState({
       completedSteps: [...current.completedSteps, step],
       currentObservation: step.observation,
       currentThought: step.thought,
@@ -487,8 +450,8 @@ export class AgentHandler {
   }
 
   private appendChange(change: AgentChange) {
-    const current = useChatStore.getState().agentState
-    useChatStore.getState().setAgentState({
+    const current = this.config.stateAdapter.getState()
+    this.config.stateAdapter.setState({
       changes: [
         ...(current.changes || []).filter((item) => item.id !== change.id),
         change,
@@ -497,8 +460,7 @@ export class AgentHandler {
   }
 
   private finishRun(result: AgentRuntimeResult) {
-    const store = useChatStore.getState()
-    store.setAgentState({
+    this.config.stateAdapter.setState({
       runId: result.runId,
       isRunning: false,
       isThinking: false,

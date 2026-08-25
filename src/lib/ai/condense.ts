@@ -13,6 +13,7 @@ import {
   validateAIService,
 } from './utils'
 import { estimateTokens } from './token-counter'
+import type { AiConfig } from '@/app/core/setting/config'
 import {
   getNextEstimatedModelCapacity,
   learnContextWindow,
@@ -54,6 +55,7 @@ export interface PreparedConversationHistory {
 
 export interface PrepareConversationHistoryInput {
   conversationId: number
+  aiConfig?: AiConfig
   chats: Chat[]
   currentUserInput: string
   additionalContext?: string
@@ -366,7 +368,7 @@ async function prepareConversationHistoryInternal(
 ): Promise<PreparedConversationHistory> {
   await initConversationCompactionsDb()
 
-  const aiConfig = await getAISettings('primaryModel')
+  const aiConfig = input.aiConfig ?? await getAISettings('primaryModel')
   let capacity = await resolveModelCapacity(aiConfig)
   let outputReserve = getConversationOutputReserve(aiConfig, capacity)
   const completed = getCompletedConversationHistory(input.chats)
@@ -765,6 +767,7 @@ async function prepareConversationHistoryInternal(
     coveredThroughChatId: saved.coveredThroughChatId,
     sourceTokenCount: saved.sourceTokenCount,
     summaryTokenCount: saved.summaryTokenCount,
+    summary: saved.summary,
   })
 
   return {

@@ -3007,7 +3007,8 @@
     "chat": {
       "condensing": "Condensing context...",
       "condensed": {
-        "message": "Condensed {count} historical messages"
+        "message": "Condensed {count} historical messages",
+        "summary": "Continuation summary"
       },
       "empty": {
         "title": "Start chatting with AI",
@@ -3136,7 +3137,7 @@
         "chat": "Chat",
         "placeholder": {
           "default": "Type a message...",
-          "steering": "Add information to steer the current task...",
+          "pending": "Type a message, then adjust it in the pending list...",
           "noApiKey": "No API Key configured, can't use AI chat...",
           "on": "AI suggestions on",
           "off": "AI suggestions off",
@@ -3164,7 +3165,13 @@
         "modelSelect": {
           "tooltip": "Select AI model",
           "placeholder": "Search AI models",
-          "noModel": "No model found"
+          "noModel": "No model found",
+          "nextTurn": "Switched to {model}; applies next turn",
+          "nextTurnBadge": "Next turn",
+          "changeWarning": "Changing models may affect conversation continuity. The current task will keep using its original model.",
+          "continuityWarning": "Changing models may affect continuity in this conversation.",
+          "changedTo": "Switched to {model}",
+          "changed": "Model changed from {from} to {to}"
         },
         "promptSelect": {
           "tooltip": "Select prompt",
@@ -3259,6 +3266,19 @@
           "resultSummary": "Result summary",
           "queryParameters": "Query parameters",
           "toolResult": "Tool result",
+          "deliveryMode": {
+            "label": "Message delivery while running",
+            "queued": "{count} message(s) queued",
+            "pending": { "title": "Pending messages", "add": "Add to pending list", "remove": "Delete queued message", "edit": "Edit message", "save": "Save", "cancel": "Cancel", "reorder": "Drag to reorder", "more": "More actions" },
+            "modes": {
+              "steer": { "title": "Adjust next turn", "description": "Apply this instruction first on the next turn, after the current response and tool calls finish." },
+              "follow-up": { "title": "Run next", "description": "Start this as a new task after the current task finishes." }
+            }
+          },
+          "resume": {
+            "action": "Continue task",
+            "prompt": "Continue the unfinished task from the previous run. Check existing results and changes first, and avoid repeating completed steps."
+          },
           "permissionMode": {
             "label": "Agent permission mode",
             "modes": {

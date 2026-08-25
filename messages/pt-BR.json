@@ -3014,7 +3014,7 @@
         "chat": "Bate-papo",
         "placeholder": {
           "default": "Digite uma mensagem...",
-          "steering": "Adicione informações para orientar a tarefa atual...",
+          "pending": "Digite uma mensagem e ajuste-a na lista de pendências após enviar...",
           "noApiKey": "Nenhuma Chave de API configurada, não é possível usar o chat de IA...",
           "on": "Sugestões de IA ativadas",
           "off": "Sugestões de IA desativadas",
@@ -3041,7 +3041,13 @@
         "modelSelect": {
           "tooltip": "Selecionar modelo de IA",
           "placeholder": "Pesquisar modelos de IA",
-          "noModel": "Nenhum modelo encontrado"
+          "noModel": "Nenhum modelo encontrado",
+          "nextTurn": "Alterado para {model}; será aplicado no próximo turno",
+          "nextTurnBadge": "Próximo turno",
+          "changeWarning": "A troca de modelo pode afetar a continuidade da conversa. A tarefa atual continuará usando o modelo original.",
+          "continuityWarning": "A troca de modelo pode afetar a continuidade desta conversa.",
+          "changedTo": "Alterado para {model}",
+          "changed": "Modelo alterado de {from} para {to}"
         },
         "promptSelect": {
           "tooltip": "Selecionar prompt",
@@ -3127,6 +3133,19 @@
           "resultSummary": "Resumo do resultado",
           "queryParameters": "Parâmetros da consulta",
           "toolResult": "Resultado da ferramenta",
+          "deliveryMode": {
+            "label": "Mensagens durante a execução",
+            "queued": "{count} mensagem(ns) na fila",
+            "pending": { "title": "Mensagens pendentes", "add": "Adicionar à lista de pendências", "remove": "Excluir mensagem da fila", "edit": "Editar mensagem", "save": "Salvar", "cancel": "Cancelar", "reorder": "Arraste para reordenar", "more": "Mais ações" },
+            "modes": {
+              "steer": { "title": "Ajustar o próximo turno", "description": "Aplica esta instrução primeiro no próximo turno, após a resposta atual e as chamadas de ferramentas terminarem." },
+              "follow-up": { "title": "Executar depois", "description": "Inicia isto como uma nova tarefa após a conclusão da tarefa atual." }
+            }
+          },
+          "resume": {
+            "action": "Continuar tarefa",
+            "prompt": "Continue a tarefa inacabada da execução anterior. Verifique primeiro os resultados e alterações existentes e não repita etapas já concluídas."
+          },
           "permissionMode": {
             "label": "Modo de permissão do Agent",
             "modes": {
@@ -3304,7 +3323,8 @@
       },
       "condensing": "正在压缩上下文...",
       "condensed": {
-        "message": "已压缩 {count} 条历史消息"
+        "message": "{count} mensagens anteriores resumidas",
+        "summary": "Resumo para continuação"
       },
       "quote": {
         "lineSingle": "引用自 {fileName} 第 {line} 行",

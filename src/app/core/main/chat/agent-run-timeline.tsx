@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Play,
   Sparkles,
   Wrench,
 } from "lucide-react"
@@ -23,8 +24,12 @@ import {
 import { estimateTokens } from "@/lib/ai/token-counter"
 import ChatPreview from "./chat-preview"
 import { useTranslations } from "next-intl"
+import { Button } from "@/components/ui/button"
+import emitter from "@/lib/emitter"
+import useChatStore from "@/stores/chat"
 
 interface AgentRunTimelineProps {
+  modelName?: string
   status?: AgentRunStatus
   isRunning?: boolean
   traceEvents?: AgentTraceEvent[]
@@ -282,6 +287,7 @@ function eventFromToolCall(toolCall: ToolCall): AgentTraceEvent {
 }
 
 export function AgentRunTimeline({
+  modelName,
   status = "idle",
   isRunning = false,
   traceEvents = [],
@@ -291,6 +297,7 @@ export function AgentRunTimeline({
   loadedSkills = [],
 }: AgentRunTimelineProps) {
   const t = useTranslations('record.chat')
+  const chatLoading = useChatStore(state => state.loading)
   const [expandedEvents, setExpandedEvents] = React.useState<string[]>([])
   const [processOpen, setProcessOpen] = React.useState(false)
 
@@ -351,6 +358,7 @@ export function AgentRunTimeline({
     "已处理",
     processDuration === undefined ? undefined : formatProcessedDuration(processDuration),
     modelExecutionCount > 0 ? `· 执行 ${modelExecutionCount} 次` : undefined,
+    modelName ? `· ${modelName}` : undefined,
   ].filter(Boolean).join(" ")
 
   const processContent = (
@@ -488,7 +496,7 @@ export function AgentRunTimeline({
   )
 
   return (
-    <div>
+    <div className="space-y-2">
       {isRunning ? processContent : (
         <Collapsible open={processOpen} onOpenChange={setProcessOpen}>
           <CollapsibleTrigger asChild>
@@ -505,6 +513,22 @@ export function AgentRunTimeline({
 
           <CollapsibleContent>{processContent}</CollapsibleContent>
         </Collapsible>
+      )}
+      {!isRunning && status === "stopped" && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5"
+          disabled={chatLoading}
+          onClick={() => emitter.emit(
+            'quick-prompt-send',
+            t('input.agent.resume.prompt')
+          )}
+        >
+          <Play className="size-3.5" />
+          {t('input.agent.resume.action')}
+        </Button>
       )}
     </div>
   )
