@@ -16,6 +16,7 @@ mod file_open;
 mod fonts;
 mod fuzzy_search;
 mod keywords;
+mod local_mcp;
 mod mcp;
 mod mcp_runtime;
 mod notion_import;
@@ -49,6 +50,12 @@ use device::get_device_id;
 use fonts::list_system_fonts;
 use fuzzy_search::{fuzzy_search, fuzzy_search_parallel};
 use keywords::rank_keywords;
+use local_mcp::{
+    create_local_mcp_connection, get_local_mcp_status, get_or_create_local_mcp_connection,
+    list_local_mcp_connections, rename_local_mcp_connection, reset_local_mcp_access_token,
+    reset_local_mcp_connection_token, resolve_local_mcp_request, revoke_local_mcp_connection,
+    set_local_mcp_enabled, set_local_mcp_port, set_local_mcp_ready, LocalMcpState,
+};
 use mcp::{
     send_mcp_message, send_mcp_notification, start_mcp_stdio_server, stop_mcp_server,
     McpServerManager,
@@ -97,6 +104,7 @@ fn main() {
         .manage(SkillProcessManager::default())
         .manage(RemoteSkillManager::default())
         .manage(WebClipperState::new())
+        .manage(LocalMcpState::new())
         // 系统级插件
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_os::init())
@@ -175,6 +183,18 @@ fn main() {
             set_web_clipper_enabled,
             set_web_clipper_ready,
             resolve_web_clipper_request,
+            create_local_mcp_connection,
+            get_local_mcp_status,
+            get_or_create_local_mcp_connection,
+            list_local_mcp_connections,
+            rename_local_mcp_connection,
+            reset_local_mcp_access_token,
+            reset_local_mcp_connection_token,
+            resolve_local_mcp_request,
+            revoke_local_mcp_connection,
+            set_local_mcp_enabled,
+            set_local_mcp_port,
+            set_local_mcp_ready,
             self_hosted_crypto::self_hosted_generate_workspace_key,
             self_hosted_crypto::self_hosted_generate_device_key_pair,
             self_hosted_crypto::self_hosted_encrypt,

@@ -6,6 +6,7 @@ node_modules
 ./dist
 dist-ssr
 plans/
+docs/
 src-tauri/gen/*
 !src-tauri/gen/android/
 src-tauri/gen/android/**

@@ -351,7 +351,7 @@ export const createFileTool: Tool = {
         : undefined
 
       // 验证内容参数
-      if (!params.content || typeof params.content !== 'string') {
+      if (typeof params.content !== 'string') {
         return {
           success: false,
           error: '缺少必需参数 content 或参数类型错误',

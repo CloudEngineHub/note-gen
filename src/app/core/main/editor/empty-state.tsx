@@ -98,6 +98,8 @@ export function EmptyState({
       
       if (selected && typeof selected === 'string') {
         const store = await Store.load('store.json')
+        const { waitForLocalMcpWorkspaceWrites } = await import('@/lib/local-mcp/workspace-guard')
+        await waitForLocalMcpWorkspaceWrites()
         await store.set('workspacePath', selected)
         await store.save()
         

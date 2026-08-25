@@ -121,6 +121,8 @@ export async function restoreSavedIOSFolderAccess(): Promise<void> {
   if (workspaceAccess?.bookmarkBase64) {
     const restoredWorkspace = await restoreIOSSyncFolder(workspaceAccess.bookmarkBase64)
     await store.set(IOS_WORKSPACE_FOLDER_ACCESS_KEY, restoredWorkspace)
+    const { waitForLocalMcpWorkspaceWrites } = await import('@/lib/local-mcp/workspace-guard')
+    await waitForLocalMcpWorkspaceWrites()
     await store.set('workspacePath', restoredWorkspace.path)
     changed = true
   }

@@ -1289,6 +1289,8 @@ const useSettingStore = create<SettingState>((set, get) => ({
     const { getSyncPushQueue } = await import('@/lib/sync/sync-push-queue')
     const syncPushQueue = getSyncPushQueue()
     await syncPushQueue.prepareForWorkspaceSwitch()
+    const { waitForLocalMcpWorkspaceWrites } = await import('@/lib/local-mcp/workspace-guard')
+    await waitForLocalMcpWorkspaceWrites()
 
     try {
       const { invalidateMemoryCache } = await import('@/lib/memory/cache-version')
