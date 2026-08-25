@@ -8,6 +8,7 @@ description: >-
 on:
   issues:
     types: [opened]
+  roles: all
 
 permissions: read-all
 
