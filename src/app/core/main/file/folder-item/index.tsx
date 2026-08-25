@@ -630,6 +630,12 @@ export function FolderItem({
     try {
       const batchResult = await moveFileManagerEntries(renamePaths, path)
       if (batchResult.failed.length > 0) {
+        if (batchResult.failed.some(failure => failure.reason === 'conflict')) {
+          await loadCollapsibleFiles(path, {
+            force: true,
+            skipRemoteSync: true,
+          })
+        }
         if (batchResult.failed.some(failure => failure.reason === 'rollback-failed')) {
           await loadFileTree({ skipRemoteSync: true })
         }

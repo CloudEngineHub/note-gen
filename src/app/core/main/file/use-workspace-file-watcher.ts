@@ -72,14 +72,15 @@ export function useWorkspaceFileWatcher() {
           if ((mode === 'both' || mode === 'any') && relativePaths.length >= 2) {
             const oldPath = relativePaths[0]
             const newPath = relativePaths[relativePaths.length - 1]
-            const removed = state.reconcileLocalFile(oldPath, false)
-            const inserted = state.reconcileLocalFile(newPath, true)
-            if (removed && inserted) return
-          } else if (mode === 'from' && relativePaths.length === 1) {
-            if (state.reconcileLocalFile(relativePaths[0], false)) return
-          } else if (mode === 'to' && relativePaths.length === 1) {
-            if (state.reconcileLocalFile(relativePaths[0], true)) return
+            state.reconcileLocalFile(oldPath, false)
+            state.reconcileLocalFile(newPath, true)
           }
+
+          // Windows reports rename operations as separate `from`/`to` events, while
+          // other platforms may provide both paths together. The event itself does
+          // not reliably identify whether the moved entry is a file or directory,
+          // so the optimistic reconciliation above is only immediate feedback. Let
+          // the directory scan below make the file tree match the filesystem.
         }
 
         const parentPaths = new Set(relativePaths.map(path => {

@@ -537,7 +537,9 @@ export function FileManager({
 
     const batchResult = await moveFileManagerEntries(sourcePaths, '')
     if (batchResult.failed.length > 0) {
-      if (batchResult.failed.some(failure => failure.reason === 'rollback-failed')) {
+      if (batchResult.failed.some(failure => (
+        failure.reason === 'conflict' || failure.reason === 'rollback-failed'
+      ))) {
         await loadFileTree({ skipRemoteSync: true })
       }
       toast({
