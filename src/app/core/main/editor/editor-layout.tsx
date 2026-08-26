@@ -532,6 +532,8 @@ export function EditorLayout() {
   const handleCloseTab = useCallback((groupId: string, tabId: string) => {
     const group = layoutRef.current.groups[groupId]
     if (!group) return
+    const tab = openTabs.find(item => item.id === tabId)
+    if (group.tabIds.length === 1 && tab?.kind === 'blank') return
     const wasActiveGroup = layoutRef.current.activeGroupId === groupId
     if (group.activeTabId === tabId && layoutRef.current.activeGroupId === groupId && !canDeactivateActiveEditor()) return
     let next = removeTabFromEditorGroup(layoutRef.current, groupId, tabId)

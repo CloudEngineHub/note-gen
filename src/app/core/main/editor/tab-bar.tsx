@@ -88,6 +88,7 @@ function SortableTabWithMenu({
   const isRecordTab = tab.kind === 'record' || isRecordTabPath(tab.path)
   const isCanvasTab = tab.kind === 'canvas' || isCanvasTabPath(tab.path)
   const canDetach = canOpenInEditorWindow(tab)
+  const canClose = tabs.length > 1 || tab.kind !== 'blank'
   const recordTypeLabel = isRecordTab ? recordTypeT(tab.markType || 'text') : ''
 
   return (
@@ -104,7 +105,7 @@ function SortableTabWithMenu({
           title={isRecordTab ? `${recordTypeLabel}: ${tab.name}` : tab.kind === 'blank' ? tab.name : tab.path}
           onClick={() => onTabSwitch(tab.id)}
           onAuxClick={event => {
-            if (event.button !== 1) return
+            if (event.button !== 1 || !canClose) return
             event.preventDefault()
             onCloseTab(tab.id)
           }}
@@ -124,27 +125,31 @@ function SortableTabWithMenu({
             <FileText className={cn('size-4 shrink-0', isActive && 'text-primary')} />
           )}
           <span className="truncate">{tab.name}</span>
-          <button
-            className="ml-1 shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="ml-1 size-5 opacity-0 transition-opacity group-hover:opacity-100"
             aria-label={t('close')}
+            disabled={!canClose}
             onPointerDown={event => event.stopPropagation()}
             onClick={event => {
               event.stopPropagation()
               onCloseTab(tab.id)
             }}
           >
-            <X className="size-3" />
-          </button>
+            <X />
+          </Button>
           {isActive && <div className="absolute inset-x-0 bottom-0 h-0.5 bg-primary" />}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuGroup>
-          <ContextMenuItem onClick={() => onCloseTab(tab.id)}>{t('close')}<ContextMenuShortcut>{modKey}W</ContextMenuShortcut></ContextMenuItem>
+          <ContextMenuItem disabled={!canClose} onClick={() => onCloseTab(tab.id)}>{t('close')}<ContextMenuShortcut>{modKey}W</ContextMenuShortcut></ContextMenuItem>
           <ContextMenuItem disabled={tabs.length < 2} onClick={() => onCloseOtherTabs(tab.id)}>{t('closeOthers')}</ContextMenuItem>
           <ContextMenuItem disabled={currentIndex === 0} onClick={() => onCloseLeftTabs(tab.id)}>{t('closeLeft')}</ContextMenuItem>
           <ContextMenuItem disabled={currentIndex === tabs.length - 1} onClick={() => onCloseRightTabs(tab.id)}>{t('closeRight')}</ContextMenuItem>
-          <ContextMenuItem onClick={onCloseAllTabs}>{t('closeAll')}</ContextMenuItem>
+          <ContextMenuItem disabled={!canClose} onClick={onCloseAllTabs}>{t('closeAll')}</ContextMenuItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
@@ -188,6 +193,7 @@ export function TabBar({
   }, [setTabListDropRef])
   const activeTab = tabs.find(tab => tab.id === activeTabId)
   const canSplit = tabs.length > 1 && Boolean(activeTab)
+  const canCloseActiveTab = Boolean(activeTab && (tabs.length > 1 || activeTab.kind !== 'blank'))
   const activeCanvasId = activeTab && (activeTab.kind === 'canvas' || isCanvasTabPath(activeTab.path))
     ? activeTab.canvasId || getCanvasIdFromTabPath(activeTab.path)
     : null
@@ -279,11 +285,12 @@ export function TabBar({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isActiveGroup || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'w' || !activeTabId) return
       event.preventDefault()
+      if (!canCloseActiveTab) return
       onCloseTab(activeTabId)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeTabId, isActiveGroup, onCloseTab])
+  }, [activeTabId, canCloseActiveTab, isActiveGroup, onCloseTab])
 
   const sortableIds = useMemo(() => tabs.map(tab => `editor-tab:${groupId}:${tab.id}`), [groupId, tabs])
   const runUndoRedo = (redo: boolean) => {
