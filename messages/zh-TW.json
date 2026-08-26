@@ -3548,8 +3548,8 @@
       "confirmPull": "確認拉取"
     },
     "emptyState": {
-      "title": "開始創作",
-      "subtitle": "選擇一個文件開始編輯，或創建新的筆記",
+      "title": "先記錄，再整理",
+      "subtitle": "隨時記下想法，讓 AI 幫你整理成清晰的筆記",
       "customize": {
         "title": "自訂",
         "menuLabel": "顯示與排序",

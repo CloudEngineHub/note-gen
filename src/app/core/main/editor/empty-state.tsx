@@ -38,7 +38,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { Empty } from '@/components/ui/empty'
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty'
 import { Kbd } from '@/components/ui/kbd'
 import { ActivityPanel } from '@/components/activity/activity-panel'
 import { useActivityData } from '@/components/activity/use-activity-data'
@@ -56,8 +63,8 @@ import {
 const NEW_TAB_VISIBILITY_STORE_KEY = 'newTabSectionVisibility'
 
 const NEW_TAB_SECTION_IDS = [
-  'actions',
   'onboarding',
+  'actions',
   'activity',
   'activityDetail',
 ] as const
@@ -431,9 +438,75 @@ export function EmptyState({
     persistPreferences(next)
   }
 
+  const customizationMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <SlidersHorizontal data-icon="inline-start" />
+          {t('customize.title')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
+        <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-1rem)]">
+          <DropdownMenuLabel>{t('customize.menuLabel')}</DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <SortableContext items={preferences.order} strategy={verticalListSortingStrategy}>
+              {preferences.order.map(sectionId => (
+                <SortableCustomizationItem
+                  key={sectionId}
+                  id={sectionId}
+                  label={sectionLabels[sectionId]}
+                  dragLabel={t('customize.dragHandle', { section: sectionLabels[sectionId] })}
+                  checked={preferences.visibility[sectionId]}
+                  onCheckedChange={checked => handleSectionVisibilityChange(sectionId, checked)}
+                />
+              ))}
+            </SortableContext>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            {onboardingComplete && (
+              <DropdownMenuItem onSelect={() => void handleResetOnboarding()}>
+                {t('customize.resetOnboarding')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={handleResetPreferences}>
+              {t('customize.reset')}
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DndContext>
+    </DropdownMenu>
+  )
+
+  if (renderedSectionIds.length === 0) {
+    return (
+      <Empty className="h-full overflow-y-auto rounded-none bg-muted/20 px-6 py-10">
+        <EmptyHeader className="max-w-xl flex-row gap-5 text-left">
+          <EmptyMedia className="mb-0">
+            <Image
+              src="/app-icon.png"
+              alt="NoteGen logo"
+              width={96}
+              height={96}
+              priority
+              className="size-24 shrink-0 rounded-3xl shadow-sm dark:invert"
+            />
+          </EmptyMedia>
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            <EmptyTitle className="text-4xl font-semibold">NoteGen</EmptyTitle>
+            <p className="text-base font-medium">{t('title')}</p>
+            <EmptyDescription className="max-w-sm leading-6">{t('subtitle')}</EmptyDescription>
+          </div>
+        </EmptyHeader>
+        <EmptyContent>{customizationMenu}</EmptyContent>
+      </Empty>
+    )
+  }
+
   return (
     <Empty className="h-full justify-start overflow-y-auto rounded-none bg-muted/20 p-0 text-left text-pretty">
-      <div className="@container/new-tab w-full">
+      <div className="@container/new-tab flex min-h-full w-full flex-col justify-center">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-[clamp(1rem,4cqi,2.5rem)] py-[clamp(1.5rem,5cqi,2.5rem)]">
           <header className="flex flex-col items-start gap-4 @md/new-tab:flex-row @md/new-tab:justify-between @md/new-tab:gap-6">
             <div className="flex max-w-xl flex-col gap-2">
@@ -446,48 +519,13 @@ export function EmptyState({
                   priority
                   className="size-10 shrink-0 rounded-lg dark:invert @lg/new-tab:size-11"
                 />
-                <h1 className="min-w-0 text-2xl font-semibold tracking-tight @3xl/new-tab:text-3xl">{t('title')}</h1>
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <h1 className="font-heading text-2xl font-semibold tracking-tight @3xl/new-tab:text-3xl">NoteGen</h1>
+                  <p className="text-sm font-medium @3xl/new-tab:text-base">{t('title')}</p>
+                </div>
               </div>
-              <p className="text-sm leading-6 text-muted-foreground">{t('subtitle')}</p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <SlidersHorizontal data-icon="inline-start" />
-                  {t('customize.title')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSectionDragEnd}>
-                <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-1rem)]">
-                  <DropdownMenuLabel>{t('customize.menuLabel')}</DropdownMenuLabel>
-                  <DropdownMenuGroup>
-                    <SortableContext items={preferences.order} strategy={verticalListSortingStrategy}>
-                      {preferences.order.map(sectionId => (
-                        <SortableCustomizationItem
-                          key={sectionId}
-                          id={sectionId}
-                          label={sectionLabels[sectionId]}
-                          dragLabel={t('customize.dragHandle', { section: sectionLabels[sectionId] })}
-                          checked={preferences.visibility[sectionId]}
-                          onCheckedChange={checked => handleSectionVisibilityChange(sectionId, checked)}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    {onboardingComplete && (
-                      <DropdownMenuItem onSelect={() => void handleResetOnboarding()}>
-                        {t('customize.resetOnboarding')}
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onSelect={handleResetPreferences}>
-                      {t('customize.reset')}
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                </DropdownMenuContent>
-              </DndContext>
-            </DropdownMenu>
+            {customizationMenu}
           </header>
 
         <div className="flex flex-col gap-6">

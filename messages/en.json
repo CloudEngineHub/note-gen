@@ -3710,8 +3710,8 @@
       "confirmPull": "Confirm Pull"
     },
     "emptyState": {
-      "title": "Start Creating",
-      "subtitle": "Select a file to start editing, or create a new note",
+      "title": "Capture first, organize later",
+      "subtitle": "Jot down ideas anytime, and let AI turn them into clear notes",
       "customize": {
         "title": "Customize",
         "menuLabel": "Show and reorder",

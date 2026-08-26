@@ -3692,8 +3692,8 @@
       "confirmPull": "Abrufen bestätigen"
     },
     "emptyState": {
-      "title": "Beginne mit der Erstellung",
-      "subtitle": "Wähle eine Datei aus, um mit der Bearbeitung zu beginnen, oder erstelle eine neue Notiz",
+      "title": "Erst festhalten, dann ordnen",
+      "subtitle": "Halte Gedanken jederzeit fest und lass sie von der KI in klare Notizen verwandeln",
       "customize": {
         "title": "Anpassen",
         "menuLabel": "Anzeigen und sortieren",

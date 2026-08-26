@@ -3541,8 +3541,8 @@
       "confirmPull": "Confirmar Busca"
     },
     "emptyState": {
-      "title": "Começar a Criar",
-      "subtitle": "Selecione um arquivo para começar a editar ou crie uma nova nota",
+      "title": "Registre primeiro, organize depois",
+      "subtitle": "Anote suas ideias a qualquer momento e deixe a IA organizá-las em notas claras",
       "customize": {
         "title": "Personalizar",
         "menuLabel": "Mostrar e reordenar",

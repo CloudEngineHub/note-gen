@@ -3733,8 +3733,8 @@
       "confirmPull": "确认拉取"
     },
     "emptyState": {
-      "title": "开始创作",
-      "subtitle": "选择一个文件开始编辑，或创建新的笔记",
+      "title": "先记录，再整理",
+      "subtitle": "随时记下想法，让 AI 帮你整理成清晰的笔记",
       "customize": {
         "title": "自定义",
         "menuLabel": "显示与排序",
