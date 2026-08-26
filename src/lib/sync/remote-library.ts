@@ -27,6 +27,7 @@ import { recordSyncTiming } from './sync-timing'
 
 const MARKDOWN_FILE_PATTERN = /\.md$/i
 const ONE_DRIVE_FILE_TRANSFER_CONCURRENCY = 3
+const pendingLocalLibraryDownloads = new Map<string, Promise<boolean>>()
 
 async function runWithConcurrency<T>(
   items: T[],
@@ -295,6 +296,22 @@ export async function isLocalLibraryFile(path: string): Promise<boolean> {
   return pathOptions.baseDir
     ? await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
     : await exists(pathOptions.path)
+}
+
+export async function ensureLocalLibraryFile(path: string): Promise<boolean> {
+  if (await isLocalLibraryFile(path)) return true
+
+  const pendingDownload = pendingLocalLibraryDownloads.get(path)
+  if (pendingDownload) return await pendingDownload
+
+  const download = downloadRemoteLibraryFile(path)
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      pendingLocalLibraryDownloads.delete(path)
+    })
+  pendingLocalLibraryDownloads.set(path, download)
+  return await download
 }
 
 export async function pullAllRemoteLibraryFiles(

@@ -39,6 +39,7 @@ import { handleImageUpload, saveImageToWorkspace } from '@/lib/image-handler'
 import useArticleStore from '@/stores/article'
 import { cn, convertImage, convertImageByWorkspace } from '@/lib/utils'
 import { resolveImagePathFromMarkdown } from '@/lib/markdown-image-path'
+import { ensureLocalLibraryFile } from '@/lib/sync/remote-library'
 import {
   getDefaultArticleAbsolutePath,
   getFilePathOptions,
@@ -2115,6 +2116,9 @@ export function TipTapEditor({
                   currentFilePath,
                   relativeSource
                 )
+                if (await ensureLocalLibraryFile(fullRelativePath)) {
+                  useArticleStore.getState().markFileLocal(fullRelativePath)
+                }
                 return await convertImageByWorkspace(fullRelativePath)
               })
             },

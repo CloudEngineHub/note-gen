@@ -6,6 +6,10 @@ function normalizeFsPath(path: string): string {
   return path.trim().replace(/\\/g, '/').replace(/\/+/g, '/')
 }
 
+function isWindowsLikePath(path: string): boolean {
+  return /^[a-zA-Z]:\//.test(path) || path.startsWith('//')
+}
+
 let runtimeWorkspaceRoot: string | null = null
 
 /**
@@ -140,15 +144,19 @@ export async function toWorkspaceRelativePath(path: string): Promise<string> {
   const defaultDirRegex = /^(article[\\\/])/
   // 如果是默认工作区，移除"article/"前缀
   if (!workspace.isCustom && defaultDirRegex.test(path)) {
-    return path.replace(/article[\\\/]/g, '')
+    return path.replace(defaultDirRegex, '')
   }
   
   // 如果是自定义工作区，移除工作区路径前缀
   const normalizedPath = normalizeFsPath(path)
   const normalizedWorkspacePath = normalizeFsPath(workspace.path).replace(/\/$/, '')
+  const comparePath = isWindowsLikePath(normalizedPath) ? normalizedPath.toLowerCase() : normalizedPath
+  const compareWorkspacePath = isWindowsLikePath(normalizedWorkspacePath)
+    ? normalizedWorkspacePath.toLowerCase()
+    : normalizedWorkspacePath
   if (workspace.isCustom && (
-    normalizedPath === normalizedWorkspacePath ||
-    normalizedPath.startsWith(`${normalizedWorkspacePath}/`)
+    comparePath === compareWorkspacePath ||
+    comparePath.startsWith(`${compareWorkspacePath}/`)
   )) {
     // 确保路径分隔符处理正确
     const relativePath = normalizedPath.substring(normalizedWorkspacePath.length)

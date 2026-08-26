@@ -1,12 +1,10 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { writeFile, exists, mkdir } from '@tauri-apps/plugin-fs'
-import { dirname } from '@tauri-apps/api/path'
 import { v4 as uuidv4 } from 'uuid'
-import { uploadImage } from './imageHosting'
-import { getFilePathOptions, toWorkspaceRelativePath, getWorkspacePath } from './workspace'
+import { isImageHostingReady, uploadImage } from './imageHosting'
+import { getFilePathOptions, isAbsoluteFsPath, toWorkspaceRelativePath } from './workspace'
 import { convertImageByWorkspace } from './utils'
 import { toMarkdownImagePath } from './markdown-image-path'
-import { getNormalizedImageHosting } from './image-hosting-config'
 import { getWritingAssetsDirName } from './writing-assets-path'
 import useArticleStore from '@/stores/article'
 import { uploadLocalLibraryFile } from '@/lib/sync/remote-library'
@@ -108,35 +106,21 @@ async function saveImageLocally(file: File, markdownPath: string): Promise<{
   const ext = file.name.split('.').pop() || 'png'
   const filename = `${uuidv4()}.${ext}`.replace(/\s/g, '_')
 
-  // 获取工作区路径信息
-  const workspace = await getWorkspacePath()
   const store = await Store.load('store.json')
   const assetsDirName = getWritingAssetsDirName(await store.get<string>('assetsPath'))
-
-  // 检查 markdownPath 是否只包含文件名（不包含路径分隔符）
-  let markdownDir: string = ''
-
-  // 如果 markdownPath 包含路径分隔符，才解析目录
-  if (markdownPath.includes('/') || markdownPath.includes('\\')) {
-    if (workspace.isCustom) {
-      // 自定义工作区
-      const fullDir = await dirname(markdownPath)
-      // 提取相对于工作区的部分
-      if (fullDir.startsWith(workspace.path)) {
-        markdownDir = fullDir.substring(workspace.path.length).replace(/^\//, '')
-      } else {
-        markdownDir = '' // 不在 workspace 内，使用根目录
-      }
-    } else {
-      // 默认工作区（AppData/article）
-      // 解析 markdown 文件路径，获取其相对于 article 的路径
-      const pathOptions = await getFilePathOptions(markdownPath)
-      // 移除 article/ 前缀获取相对路径
-      const relativeMarkdownPath = pathOptions.path.replace(/^article\//, '')
-      markdownDir = await dirname(relativeMarkdownPath)
-    }
-  }
-  // 如果 markdownDir 是空字符串，说明是根目录
+  const workspaceRelativeMarkdownPath = await toWorkspaceRelativePath(markdownPath)
+  const normalizedMarkdownPath = workspaceRelativeMarkdownPath
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '')
+    .replace(/\/+/g, '/')
+  // 工作区外的绝对路径不能参与相对层级计算，保持原有的根目录回退行为。
+  const markdownPathForStorage = isAbsoluteFsPath(normalizedMarkdownPath)
+    ? normalizedMarkdownPath.split('/').pop() || ''
+    : normalizedMarkdownPath
+  const markdownDir = markdownPathForStorage.includes('/')
+    ? markdownPathForStorage.slice(0, markdownPathForStorage.lastIndexOf('/'))
+    : ''
 
   // 构建图片的相对路径
   // 如果 markdownDir 是空字符串（根目录），图片直接保存在 images 目录
@@ -163,7 +147,7 @@ async function saveImageLocally(file: File, markdownPath: string): Promise<{
 
   return {
     imageRelativePath: workspaceRelativeImagePath,
-    markdownRelativePath: toMarkdownImagePath(markdownPath, workspaceRelativeImagePath),
+    markdownRelativePath: toMarkdownImagePath(markdownPathForStorage, workspaceRelativeImagePath),
   }
 }
 
@@ -216,19 +200,7 @@ async function ensureDirectoryExists(dirPath: string): Promise<void> {
  * 检查是否配置了图床
  */
 export async function isImageHostingConfigured(): Promise<boolean> {
-  const store = await Store.load('store.json')
-  const useImageRepo = await store.get<boolean>('useImageRepo')
-  const savedMainImageHosting = await store.get<string>('mainImageHosting')
-  const normalizedImageHosting = getNormalizedImageHosting(savedMainImageHosting)
-  const mainImageHosting = useImageRepo ? normalizedImageHosting.value : savedMainImageHosting
-  const isConfigured = !!(useImageRepo && mainImageHosting && mainImageHosting !== 'none')
-
-  if (useImageRepo && normalizedImageHosting.shouldPersist) {
-    await store.set('mainImageHosting', normalizedImageHosting.value)
-    await store.save()
-  }
-
-  return isConfigured
+  return await isImageHostingReady()
 }
 
 /**
