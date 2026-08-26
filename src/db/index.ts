@@ -111,8 +111,8 @@ async function initializeAllDatabases() {
   await initTagsDb();
   await initVectorDb();
   await initMemoriesDb();
-  await initActivityDb();
   await initCanvasesDb();
+  await initActivityDb();
   await initKnowledgeDb();
   await initSelfHostedSyncDb();
   const { bootstrapStructuredKnowledgeRegistry } = await import('@/lib/knowledge-index');

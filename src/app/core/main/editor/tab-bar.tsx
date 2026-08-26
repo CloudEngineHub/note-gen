@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Columns2, ExternalLink, FileText, Folder, Maximize2, MoreHorizontal, Palette, Plus, Redo2, Rows2, Undo2, X } from 'lucide-react'
+import { Columns2, ExternalLink, FilePlus2, FileText, Folder, Maximize2, MoreHorizontal, Palette, Plus, Redo2, Rows2, Undo2, X } from 'lucide-react'
 import { platform } from '@tauri-apps/plugin-os'
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
@@ -32,7 +32,8 @@ export interface TabInfo {
   path: string
   name: string
   isFolder: boolean
-  kind?: 'file' | 'record' | 'canvas'
+  kind?: 'file' | 'record' | 'canvas' | 'blank'
+  autoCreated?: boolean
   markId?: number
   markType?: Mark['type']
   canvasId?: string
@@ -100,7 +101,7 @@ function SortableTabWithMenu({
             'group relative flex h-12 max-w-56 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-sm transition-colors',
             isActive ? 'bg-muted/40 font-medium text-foreground' : 'text-muted-foreground hover:text-foreground',
           )}
-          title={isRecordTab ? `${recordTypeLabel}: ${tab.name}` : tab.path}
+          title={isRecordTab ? `${recordTypeLabel}: ${tab.name}` : tab.kind === 'blank' ? tab.name : tab.path}
           onClick={() => onTabSwitch(tab.id)}
           onAuxClick={event => {
             if (event.button !== 1) return
@@ -111,7 +112,9 @@ function SortableTabWithMenu({
           {...attributes}
           {...listeners}
         >
-          {isRecordTab ? (
+          {tab.kind === 'blank' ? (
+            <FilePlus2 className={cn('size-4 shrink-0', isActive && 'text-primary')} />
+          ) : isRecordTab ? (
             <span className={cn(getMarkTypeListBadgeClasses(tab.markType || 'text'), 'shrink-0 text-[10px]')}>{recordTypeLabel}</span>
           ) : isCanvasTab ? (
             <Palette className={cn('size-4 shrink-0', isActive && 'text-primary')} />
@@ -279,7 +282,7 @@ export function TabBar({
 
   return (
     <div className="flex h-12 shrink-0 items-center border-b bg-background">
-      {isActiveGroup && showEditorUndoRedo && activeTab?.kind !== 'record' && (
+      {isActiveGroup && showEditorUndoRedo && activeTab && activeTab.kind !== 'record' && activeTab.kind !== 'blank' && (
         <div className="flex shrink-0 items-center gap-0.5 border-r px-1">
           <TooltipButton icon={<Undo2 />} tooltipText={`${t('undo')} (${modKey}Z)`} side="bottom" buttonClassName="size-7" disabled={!canUndo} onClick={() => runUndoRedo(false)} />
           <TooltipButton icon={<Redo2 />} tooltipText={`${t('redo')} (${modKey}Shift+Z)`} side="bottom" buttonClassName="size-7" disabled={!canRedo} onClick={() => runUndoRedo(true)} />

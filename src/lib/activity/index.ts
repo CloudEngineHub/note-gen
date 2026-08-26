@@ -4,13 +4,15 @@ import { getAllActivityEvents } from '@/db/activity'
 import { buildActivityHeatmap, summarizeActivityEntries } from './aggregate'
 import type { ActivityCalendarData, ActivityDaySummary, ActivityEntry, ActivityHeatmapWeek } from './types'
 
+const ACTIVITY_HEATMAP_HISTORY_WEEKS = 260
+
 function getBrowserTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }
 
 function getDefaultRange() {
   const today = new Date()
-  const startDate = startOfWeek(subWeeks(today, 25), { weekStartsOn: 0 })
+  const startDate = startOfWeek(subWeeks(today, ACTIVITY_HEATMAP_HISTORY_WEEKS - 1), { weekStartsOn: 0 })
   const endDate = endOfWeek(today, { weekStartsOn: 0 })
 
   return {
@@ -39,6 +41,7 @@ function buildTotals(days: ActivityDaySummary[]) {
     totals.recordCount += day.counts.record
     totals.chatCount += day.counts.chat
     totals.writingCount += day.counts.writing
+    totals.canvasCount += day.counts.canvas
     if (day.totalCount > 0) {
       totals.activeDays += 1
     }
@@ -49,6 +52,7 @@ function buildTotals(days: ActivityDaySummary[]) {
     recordCount: 0,
     chatCount: 0,
     writingCount: 0,
+    canvasCount: 0,
   })
 }
 

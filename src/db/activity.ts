@@ -1,10 +1,11 @@
 import { getDb } from './index'
 import { getAllChats } from './chats'
+import { getCanvasProjects } from './canvases'
 import { getAllMarks } from './marks'
 import { getAllMarkdownFiles } from '@/lib/files'
 import { shouldCreateWritingSession, truncateActivityText } from '@/lib/activity/events'
 
-export type ActivityEventSource = 'record' | 'chat' | 'writing'
+export type ActivityEventSource = 'record' | 'chat' | 'writing' | 'canvas'
 
 export interface ActivityEvent {
   id: number
@@ -107,6 +108,19 @@ async function getLatestWritingEventTimestamp(path: string) {
   return result[0]?.createdAt
 }
 
+async function getLatestCanvasEventTimestamp(path: string) {
+  const db = await getDb()
+  const result = await db.select<{ createdAt: number }[]>(
+    `select createdAt from activity_events
+     where source = 'canvas' and path = $1
+     order by createdAt desc
+     limit 1`,
+    [path]
+  )
+
+  return result[0]?.createdAt
+}
+
 export async function recordWritingActivity(params: {
   path: string
   title: string
@@ -132,11 +146,34 @@ export async function recordWritingActivity(params: {
   })
 }
 
+export async function recordCanvasActivity(params: {
+  id: string
+  title: string
+  createdAt?: number
+}) {
+  const createdAt = params.createdAt ?? Date.now()
+  const lastCreatedAt = await getLatestCanvasEventTimestamp(params.id)
+
+  if (!shouldCreateWritingSession(lastCreatedAt, createdAt)) {
+    return null
+  }
+
+  return await insertActivityEvent({
+    source: 'canvas',
+    title: truncateActivityText(params.title, 64),
+    description: truncateActivityText(params.title, 140),
+    path: params.id,
+    dedupeKey: `canvas:${params.id}:${createdAt}`,
+    createdAt,
+  })
+}
+
 async function backfillActivityEvents() {
-  const [marks, chats, files] = await Promise.all([
+  const [marks, chats, files, canvases] = await Promise.all([
     getAllMarks(),
     getAllChats(),
     getAllMarkdownFiles(true),
+    getCanvasProjects(),
   ])
 
   for (const mark of marks) {
@@ -180,6 +217,17 @@ async function backfillActivityEvents() {
       path: file.relativePath,
       dedupeKey: `writing-backfill:${file.relativePath}:${modifiedAt}`,
       createdAt: modifiedAt,
+    })
+  }
+
+  for (const canvas of canvases) {
+    await insertActivityEvent({
+      source: 'canvas',
+      title: truncateActivityText(canvas.title, 64),
+      description: truncateActivityText(canvas.title, 140),
+      path: canvas.id,
+      dedupeKey: `canvas:${canvas.id}:${canvas.updatedAt}`,
+      createdAt: canvas.updatedAt,
     })
   }
 }

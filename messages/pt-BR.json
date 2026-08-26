@@ -3454,7 +3454,6 @@
     "view": "Visualizar",
     "logout": "Sair",
     "setting": "Configurações",
-    "activity": "Atividade",
     "files": "Notas",
     "outline": "Sumário",
     "hideLeftSidebar": "Ocultar Barra Lateral Esquerda",
@@ -3468,10 +3467,9 @@
   },
   "activity": {
     "title": "Calendário de Atividade",
-    "description": "Veja seus registros, conversas e atividade de escrita por dia. Esta primeira versão é calculada a partir dos registros existentes, conversas do usuário e horários de modificação das notas.",
+    "description": "Veja seus registros, conversas, escrita e atividade de desenho por dia.",
     "drawer": {
       "title": "Atividade",
-      "description": "Veja rapidamente o status de hoje e a tendência recente da sua atividade.",
       "today": "Hoje"
     },
     "loading": "Carregando dados de atividade...",
@@ -3482,12 +3480,14 @@
       "activeDays": "Dias Ativos",
       "records": "Registros",
       "chats": "Conversas",
-      "writing": "Escrita"
+      "writing": "Escrita",
+      "canvas": "Desenho"
     },
     "labels": {
       "record": "Registro",
       "writing": "Escrita",
-      "chat": "Conversa"
+      "chat": "Conversa",
+      "canvas": "Desenho"
     },
     "heatmap": {
       "title": "Últimas 26 Semanas",
@@ -3543,6 +3543,19 @@
     "emptyState": {
       "title": "Começar a Criar",
       "subtitle": "Selecione um arquivo para começar a editar ou crie uma nova nota",
+      "customize": {
+        "title": "Personalizar",
+        "menuLabel": "Mostrar e reordenar",
+        "dragHandle": "Arraste para reordenar: {section}",
+        "reset": "Restaurar padrões",
+        "resetOnboarding": "Reiniciar onboarding",
+        "sections": {
+          "actions": "Ações rápidas",
+          "onboarding": "Primeiros passos",
+          "activity": "Atividade",
+          "activityDetail": "Detalhes do dia"
+        }
+      },
       "tip": "💡 Dica: Você também pode selecionar arquivos no gerenciador de arquivos à esquerda",
       "actions": {
         "newNote": {
@@ -3565,8 +3578,6 @@
       "onboarding": {
         "title": "Onboarding",
         "subtitle": "Siga estas três tarefas para conhecer o fluxo principal do NoteGen.",
-        "dismiss": "Pular introducao",
-        "reopen": "Mostrar onboarding novamente",
         "start": "Começar",
         "viewHint": "Ver dica",
         "continue": "Continuar",
@@ -4051,7 +4062,7 @@
         "range": "Últimas {count} semanas",
         "rangePlaceholder": "Últimas 16 semanas",
         "drawerEmpty": "Escolha um dia para ver os detalhes da atividade.",
-        "drawerSummary": "Houve {total} atividades nesse dia, incluindo {record} registros, {writing} escritas e {chat} conversas."
+        "drawerSummary": "Houve {total} atividades nesse dia, incluindo {record} registros, {writing} escritas, {chat} conversas e {canvas} desenhos."
       },
       "sync": {
         "title": "Sincronização",

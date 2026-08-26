@@ -1,16 +1,19 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import type { ActivityDaySummary, ActivityEntry } from '@/lib/activity/types'
 
 interface ActivityDayDetailProps {
   day?: ActivityDaySummary
   compact?: boolean
+  flat?: boolean
   labels: {
     empty: string
     records: string
     writing: string
     chats: string
+    canvas: string
   }
 }
 
@@ -18,6 +21,7 @@ const badgeClassMap = {
   record: 'border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-900 dark:bg-rose-950/70 dark:text-rose-200',
   writing: 'border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200',
   chat: 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-900 dark:bg-sky-950/70 dark:text-sky-200',
+  canvas: 'border-border bg-muted text-foreground',
 } as const
 
 function getSourceLabel(source: ActivityEntry['source'], labels: ActivityDayDetailProps['labels']) {
@@ -25,6 +29,7 @@ function getSourceLabel(source: ActivityEntry['source'], labels: ActivityDayDeta
     record: labels.records,
     chat: labels.chats,
     writing: labels.writing,
+    canvas: labels.canvas,
   }[source]
 }
 
@@ -109,12 +114,12 @@ function groupEntriesByBucket(entries: ActivityEntry[]) {
   }))
 }
 
-export function ActivityDayDetail({ day, compact = false, labels }: ActivityDayDetailProps) {
+export function ActivityDayDetail({ day, compact = false, flat = false, labels }: ActivityDayDetailProps) {
   const hourGroups = day ? groupEntriesByBucket(day.entries) : []
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <section className="@container/activity-detail flex flex-col gap-4">
+      <div className="flex flex-col items-start gap-3 @md/activity-detail:flex-row @md/activity-detail:items-center @md/activity-detail:justify-between">
         <h3 className="text-base font-semibold">{day?.day || new Date().toISOString().slice(0, 10)}</h3>
         {day ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -126,6 +131,9 @@ export function ActivityDayDetail({ day, compact = false, labels }: ActivityDayD
             </Badge>
             <Badge variant="outline" className={`border ${badgeClassMap.chat}`}>
               {labels.chats}: {day.counts.chat}
+            </Badge>
+            <Badge variant="outline" className={`border ${badgeClassMap.canvas}`}>
+              {labels.canvas}: {day.counts.canvas}
             </Badge>
           </div>
         ) : null}
@@ -151,7 +159,11 @@ export function ActivityDayDetail({ day, compact = false, labels }: ActivityDayD
                   {group.entries.map((entry) => (
                     <div
                       key={entry.id}
-                      className={compact ? 'rounded-xl bg-muted/35 px-3 py-2.5' : 'rounded-xl border border-border/60 p-3'}
+                      className={cn(
+                        flat && 'py-2',
+                        !flat && compact && 'rounded-xl bg-muted/35 px-3 py-2.5',
+                        !flat && !compact && 'rounded-xl border border-border/60 p-3',
+                      )}
                     >
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-2">

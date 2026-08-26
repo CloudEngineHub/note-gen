@@ -3623,7 +3623,6 @@
     "view": "View",
     "logout": "Logout",
     "setting": "Settings",
-    "activity": "Activity",
     "files": "Notes",
     "outline": "Outline",
     "showLeftSidebar": "Show Left Sidebar",
@@ -3637,10 +3636,9 @@
   },
   "activity": {
     "title": "Activity Calendar",
-    "description": "Review your daily records, chats, and writing activity in one place. This first version is derived from existing records, user chats, and note modification times.",
+    "description": "Review your daily records, chats, writing, and canvas activity in one place.",
     "drawer": {
       "title": "Activity",
-      "description": "Quickly review today's status and your recent activity trend.",
       "today": "Today"
     },
     "loading": "Loading activity data...",
@@ -3651,12 +3649,14 @@
       "activeDays": "Active Days",
       "records": "Records",
       "chats": "Chats",
-      "writing": "Writing"
+      "writing": "Writing",
+      "canvas": "Canvas"
     },
     "labels": {
       "record": "Record",
       "writing": "Writing",
-      "chat": "Chat"
+      "chat": "Chat",
+      "canvas": "Canvas"
     },
     "heatmap": {
       "title": "Last 26 Weeks",
@@ -3712,6 +3712,19 @@
     "emptyState": {
       "title": "Start Creating",
       "subtitle": "Select a file to start editing, or create a new note",
+      "customize": {
+        "title": "Customize",
+        "menuLabel": "Show and reorder",
+        "dragHandle": "Drag to reorder: {section}",
+        "reset": "Restore defaults",
+        "resetOnboarding": "Restart onboarding",
+        "sections": {
+          "actions": "Quick actions",
+          "onboarding": "Getting started",
+          "activity": "Activity",
+          "activityDetail": "Daily details"
+        }
+      },
       "tip": "💡 Tip: You can also select files from the left sidebar",
       "actions": {
         "newNote": {
@@ -3734,8 +3747,6 @@
       "onboarding": {
         "title": "Onboarding",
         "subtitle": "Walk through these three tasks to learn the core NoteGen flow.",
-        "dismiss": "Skip onboarding",
-        "reopen": "Show onboarding again",
         "start": "Start",
         "viewHint": "Show hint",
         "continue": "Continue",
@@ -4220,7 +4231,7 @@
         "range": "Last {count} weeks",
         "rangePlaceholder": "Last 16 weeks",
         "drawerEmpty": "Choose a day to inspect its activity details.",
-        "drawerSummary": "{total} activities that day, including {record} records, {writing} writing events, and {chat} chats."
+        "drawerSummary": "{total} activities that day, including {record} records, {writing} writing events, {chat} chats, and {canvas} canvas events."
       },
       "sync": {
         "title": "Sync",

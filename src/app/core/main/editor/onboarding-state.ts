@@ -2,7 +2,6 @@ export type OnboardingStepId = 'create-record' | 'organize-note' | 'ai-polish'
 export type OnboardingCompletionFeedbackMode = 'inline' | 'dialog'
 
 export interface OnboardingProgress {
-  dismissed: boolean
   steps: Record<OnboardingStepId, boolean>
 }
 
@@ -14,7 +13,6 @@ const ONBOARDING_STEP_ORDER: OnboardingStepId[] = [
 
 export function createDefaultOnboardingProgress(): OnboardingProgress {
   return {
-    dismissed: false,
     steps: {
       'create-record': false,
       'organize-note': false,
@@ -36,7 +34,6 @@ export function normalizeOnboardingProgress(value: unknown): OnboardingProgress 
     : {}
 
   return {
-    dismissed: candidate.dismissed === true,
     steps: {
       'create-record': candidateSteps['create-record'] === true,
       'organize-note': candidateSteps['organize-note'] === true,
@@ -78,7 +75,7 @@ export function isOnboardingComplete(progress: OnboardingProgress): boolean {
 }
 
 export function shouldShowOnboardingTasks(progress: OnboardingProgress): boolean {
-  return !progress.dismissed && !isOnboardingComplete(progress)
+  return !isOnboardingComplete(progress)
 }
 
 export function getCompletionFeedbackMode(

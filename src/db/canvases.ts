@@ -59,6 +59,11 @@ function enqueueCanvasSync(reason: string) {
   enqueueAutoDataSync('records', reason)
 }
 
+async function recordCanvasProjectActivity(id: string, title: string, createdAt: number) {
+  const { recordCanvasActivity } = await import('./activity')
+  await recordCanvasActivity({ id, title, createdAt })
+}
+
 function enqueueCanvasKnowledgeIndex(id: string) {
   void import('@/lib/knowledge-index').then(({ enqueueKnowledgeSourceIndex }) => {
     enqueueKnowledgeSourceIndex(`canvas:${id}`)
@@ -164,6 +169,7 @@ export async function insertCanvasProject(input: {
   )
   enqueueCanvasSync('canvas-created')
   enqueueCanvasKnowledgeIndex(input.id)
+  await recordCanvasProjectActivity(input.id, input.title, updatedAt)
   return getCanvasProject(input.id)
 }
 
@@ -178,6 +184,8 @@ export async function updateCanvasDocument(id: string, document: CanvasDocument)
   enqueueCanvasSync('canvas-updated')
   await invalidateCanvasKnowledgeIndex(id)
   enqueueCanvasKnowledgeIndex(id)
+  const project = await getCanvasProject(id)
+  await recordCanvasProjectActivity(id, project?.title || id, updatedAt)
   return updatedAt
 }
 
@@ -199,6 +207,7 @@ export async function renameCanvasProject(id: string, title: string) {
   enqueueCanvasSync('canvas-renamed')
   await invalidateCanvasKnowledgeIndex(id)
   enqueueCanvasKnowledgeIndex(id)
+  await recordCanvasProjectActivity(id, title, updatedAt)
   return updatedAt
 }
 

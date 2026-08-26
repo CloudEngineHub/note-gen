@@ -146,7 +146,9 @@ export function SmartFileLink({ editor, activeFilePath }: SmartFileLinkProps) {
   const pathMode = !!context && isMarkdownPathInput(context.targetText)
   const quickSuggestions = useMemo(() => {
     if (!context || !currentRelativePath || pathMode) return []
-    const recentPaths = useArticleStore.getState().openTabs.map(tab => tab.path)
+    const recentPaths = useArticleStore.getState().openTabs
+      .filter(tab => tab.kind !== 'blank')
+      .map(tab => tab.path)
     return rankMarkdownFileSuggestions({
       files,
       currentFilePath: currentRelativePath,

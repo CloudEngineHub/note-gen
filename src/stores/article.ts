@@ -468,7 +468,7 @@ export interface EditorViewState {
   largeDocumentVisualOverride?: boolean
 }
 
-export type EditorTabKind = 'file' | 'record' | 'canvas'
+export type EditorTabKind = 'file' | 'record' | 'canvas' | 'blank'
 
 export interface OpenTabInfo {
   id: string
@@ -476,12 +476,14 @@ export interface OpenTabInfo {
   name: string
   isFolder: boolean
   kind?: EditorTabKind
+  autoCreated?: boolean
   markId?: number
   markType?: Mark['type']
   canvasId?: string
 }
 
 const RECORD_TAB_PATH_PREFIX = 'record://mark/'
+const BLANK_TAB_PATH_PREFIX = 'blank://'
 
 function isRecordOpenTabPath(path: string): boolean {
   return path.startsWith(RECORD_TAB_PATH_PREFIX)
@@ -491,12 +493,20 @@ function isCanvasOpenTabPath(path: string): boolean {
   return path.startsWith('canvas://project/')
 }
 
+function isBlankOpenTabPath(path: string): boolean {
+  return path.startsWith(BLANK_TAB_PATH_PREFIX)
+}
+
+function isVirtualOpenTabPath(path: string): boolean {
+  return isBlankOpenTabPath(path) || isRecordOpenTabPath(path) || isCanvasOpenTabPath(path)
+}
+
 function isRecordOpenTab(tab?: OpenTabInfo | null): boolean {
   return !!tab && (tab.kind === 'record' || isRecordOpenTabPath(tab.path))
 }
 
 function getActiveFilePathForTab(tab?: OpenTabInfo | null): string {
-  return tab && !isRecordOpenTab(tab) && !isCanvasOpenTabPath(tab.path) ? tab.path : ''
+  return tab && tab.kind !== 'blank' && !isRecordOpenTab(tab) && !isVirtualOpenTabPath(tab.path) ? tab.path : ''
 }
 
 // 查找文件夹节点
@@ -971,7 +981,7 @@ const useArticleStore = create<NoteState>((set, get) => ({
 
   activeFilePath: '',
   setActiveFilePath: async (path: string, autoSync = true, options) => {
-    const nextPath = isRecordOpenTabPath(path) || isCanvasOpenTabPath(path) ? '' : path
+    const nextPath = isVirtualOpenTabPath(path) ? '' : path
     if (
       nextPath !== get().activeFilePath
       && !options?.deactivationAlreadyPrepared
@@ -2792,14 +2802,32 @@ const useArticleStore = create<NoteState>((set, get) => ({
     if (!scopedList && legacyList) {
       await store.set(key, legacyList)
     }
-    const activeFilePath = await store.get<string>(await getWorkspaceStoreKey('activeFilePath'))
+    const activeFilePathKey = await getWorkspaceStoreKey('activeFilePath')
+    const storedActiveFilePath = await store.get<string>(activeFilePathKey)
       ?? await store.get<string>('activeFilePath')
+    const activeFilePath = storedActiveFilePath && !isVirtualOpenTabPath(storedActiveFilePath)
+      ? storedActiveFilePath
+      : ''
+    const collapsibleList = res
+      ? uniq(res.filter(item => (
+        !isVirtualOpenTabPath(item)
+        && !item.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template|jpg|jpeg|png|gif|bmp|webp|svg)$/i)
+      )))
+      : []
     set({
-      collapsibleList: res ? uniq(res.filter(item => !item.match(/\.(md|txt|markdown|py|js|ts|jsx|tsx|css|scss|less|html|xml|json|yaml|yml|sh|bash|java|c|cpp|h|go|rs|sql|rb|php|vue|svelte|astro|toml|ini|conf|cfg|gitignore|env|example|template|jpg|jpeg|png|gif|bmp|webp|svg)$/i))) : [],
+      collapsibleList,
       collapsibleListInitialized: true
     })
 
-    if (activeFilePath && !isRecordOpenTabPath(activeFilePath)) {
+    if (storedActiveFilePath && isVirtualOpenTabPath(storedActiveFilePath)) {
+      await store.set('activeFilePath', '')
+      await store.set(activeFilePathKey, '')
+    }
+    if (res && collapsibleList.length !== res.length) {
+      await store.set(key, collapsibleList)
+    }
+
+    if (activeFilePath) {
       const currentState = get()
 
       // 检查是否是文件夹（所有支持的文件扩展名都是文件，不是文件夹）

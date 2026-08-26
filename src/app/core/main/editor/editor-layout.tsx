@@ -153,7 +153,7 @@ interface EditorGroupPaneProps {
   onToggleMaximize: (groupId: string) => void
   onCloseGroup: (groupId: string) => void
   renderActiveContent: (tab: TabInfo, active: boolean, groupId: string) => React.ReactNode
-  renderEmpty: (mode: 'new-tab' | 'empty-group') => React.ReactNode
+  renderEmpty: (mode: 'new-tab' | 'empty-group', enableShortcuts?: boolean) => React.ReactNode
 }
 
 function EditorGroupPane({
@@ -202,10 +202,13 @@ function EditorGroupPane({
             className="min-h-0 min-w-0 flex-1 overflow-hidden"
             style={{ display: tab.id === activeTab?.id ? 'flex' : 'none' }}
           >
-            {renderActiveContent(tab, isActiveGroup && tab.id === activeTab?.id, group.id)}
+            {tab.kind !== 'blank'
+              && renderActiveContent(tab, isActiveGroup && tab.id === activeTab?.id, group.id)}
+            {tab.kind === 'blank' && tab.id === activeTab?.id
+              && renderEmpty('new-tab', isActiveGroup)}
           </div>
         ))}
-        {!activeTab && renderEmpty(groupTabs.length > 0 ? 'new-tab' : 'empty-group')}
+        {!activeTab && renderEmpty(groupTabs.length > 0 ? 'new-tab' : 'empty-group', isActiveGroup)}
         <EditorDropZone groupId={group.id} direction="left" visible={dragging} className="inset-y-0 left-0 z-20 w-1/4" />
         <EditorDropZone groupId={group.id} direction="right" visible={dragging} className="inset-y-0 right-0 z-20 w-1/4" />
         <EditorDropZone groupId={group.id} direction="up" visible={dragging} className="inset-x-1/4 top-0 z-20 h-1/4" />
@@ -383,6 +386,7 @@ export function EditorLayout() {
 
   const isRecordEditorTab = useCallback((tab: TabInfo) => tab.kind === 'record' || isRecordTabPath(tab.path), [])
   const isCanvasEditorTab = useCallback((tab: TabInfo) => tab.kind === 'canvas' || isCanvasTabPath(tab.path), [])
+  const isBlankEditorTab = useCallback((tab: TabInfo) => tab.kind === 'blank', [])
   const getRecordIdForTab = useCallback((tab: TabInfo) => tab.markId ?? getRecordIdFromTabPath(tab.path), [])
   const isFolderPath = useCallback((path: string) => !(path.split(/[\\/]/).pop() || '').includes('.'), [])
 
@@ -417,7 +421,7 @@ export function EditorLayout() {
     void (async () => {
       const invalidIds = new Set<string>()
       for (const tab of openTabs) {
-        if (isRecordEditorTab(tab) || isCanvasEditorTab(tab)) continue
+        if (isRecordEditorTab(tab) || isCanvasEditorTab(tab) || isBlankEditorTab(tab)) continue
         const existsInTree = Boolean(findPathInTree(tab.path, fileTree))
         if (tab.isFolder ? !existsInTree : !existsInTree && !await checkPathExists(tab.path)) {
           invalidIds.add(tab.id)
@@ -429,7 +433,7 @@ export function EditorLayout() {
       await setOpenTabs(currentTabs.filter(tab => !invalidIds.has(tab.id)))
     })()
     return () => { disposed = true }
-  }, [checkPathExists, fileTree, isCanvasEditorTab, isRecordEditorTab, layoutReady, openTabs, setOpenTabs])
+  }, [checkPathExists, fileTree, isBlankEditorTab, isCanvasEditorTab, isRecordEditorTab, layoutReady, openTabs, setOpenTabs])
 
   useEffect(() => {
     const restoredActiveTab = openTabs.find(tab => tab.id === activeTabId)
@@ -451,7 +455,11 @@ export function EditorLayout() {
       return true
     }
     const persistActiveTab = Promise.resolve(setActiveTabId(tab.id))
-    if (isRecordEditorTab(tab)) {
+    if (isBlankEditorTab(tab)) {
+      clearActiveMark()
+      setActiveCanvasId(null)
+      await Promise.all([persistActiveTab, setActiveFilePath('')])
+    } else if (isRecordEditorTab(tab)) {
       setActiveMarkId(getRecordIdForTab(tab))
       setActiveCanvasId(null)
       await Promise.all([persistActiveTab, setActiveFilePath('')])
@@ -465,7 +473,7 @@ export function EditorLayout() {
       await Promise.all([persistActiveTab, setActiveFilePath(tab.path)])
     }
     return true
-  }, [canDeactivateActiveEditor, clearActiveMark, getRecordIdForTab, isCanvasEditorTab, isRecordEditorTab, setActiveCanvasId, setActiveFilePath, setActiveMarkId, setActiveTabId, setLayout])
+  }, [canDeactivateActiveEditor, clearActiveMark, getRecordIdForTab, isBlankEditorTab, isCanvasEditorTab, isRecordEditorTab, setActiveCanvasId, setActiveFilePath, setActiveMarkId, setActiveTabId, setLayout])
 
   useEffect(() => {
     if (!activeFilePath || isRecordTabPath(activeFilePath)) return
@@ -621,9 +629,49 @@ export function EditorLayout() {
     }))
   }, [setLayout])
 
-  const handleNewTab = useCallback((groupId: string) => {
-    void activateTab(groupId, null)
-  }, [activateTab])
+  const handleNewTab = useCallback((groupId: string, autoCreated = false) => {
+    if (!canDeactivateActiveEditor()) return
+    const id = `blank-${crypto.randomUUID()}`
+    const tab: TabInfo = {
+      id,
+      path: `blank://${id}`,
+      name: tGroups('newTab'),
+      isFolder: false,
+      kind: 'blank',
+      autoCreated,
+    }
+    void addTab(tab)
+    if (!useArticleStore.getState().openTabs.some(item => item.id === id)) return
+    setLayout(current => {
+      const group = current.groups[groupId]
+      if (!group || group.tabIds.includes(id)) return current
+      return {
+        ...current,
+        activeGroupId: groupId,
+        groups: {
+          ...current.groups,
+          [groupId]: {
+            ...group,
+            tabIds: [...group.tabIds, id],
+            activeTabId: id,
+          },
+        },
+      }
+    })
+    void activateTab(groupId, tab)
+  }, [activateTab, addTab, canDeactivateActiveEditor, setLayout, tGroups])
+
+  useEffect(() => {
+    if (!layoutReady || openTabs.length > 0) return
+    handleNewTab(layoutRef.current.activeGroupId, true)
+  }, [handleNewTab, layoutReady, openTabs.length])
+
+  useEffect(() => {
+    if (!layoutReady || !openTabs.some(tab => tab.kind !== 'blank')) return
+    const nextTabs = openTabs.filter(tab => tab.kind !== 'blank' || !tab.autoCreated)
+    if (nextTabs.length === openTabs.length) return
+    void setOpenTabs(nextTabs)
+  }, [layoutReady, openTabs, setOpenTabs])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setDragging(false)
@@ -735,11 +783,6 @@ export function EditorLayout() {
   })
 
   const handleStartOnboardingStep = useCallback(async (step: OnboardingStepId) => {
-    if (onboardingProgress.dismissed) {
-      const next = { ...onboardingProgress, dismissed: false }
-      setOnboardingProgress(next)
-      await persistOnboardingProgress(next)
-    }
     setCurrentOnboardingTask(step)
     setActiveOnboardingStep(step)
     setCompletedOnboardingStep(null)
@@ -756,24 +799,14 @@ export function EditorLayout() {
     const candidate = findRecentOnboardingFile({
       preferredPath: onboardingResumeFilePath,
       activeFilePath,
-      openTabPaths: openTabs.filter(tab => !isRecordEditorTab(tab)).map(tab => tab.path),
+      openTabPaths: openTabs.filter(tab => !isRecordEditorTab(tab) && !isBlankEditorTab(tab)).map(tab => tab.path),
       fileTree,
     })
     if (!rightSidebarVisible) await toggleRightSidebar()
     if (candidate) await setActiveFilePath(candidate)
     await new Promise(resolve => window.setTimeout(resolve, 120))
     setOnboardingPromptDraft(onboardingAgentPrompt)
-  }, [activeFilePath, fileTree, isRecordEditorTab, onboardingAgentPrompt, onboardingProgress, onboardingResumeFilePath, openTabs, persistOnboardingProgress, rightSidebarVisible, setActiveFilePath, setLeftSidebarTab, setOnboardingPromptDraft, toggleRightSidebar])
-
-  const handleDismissOnboarding = useCallback(async () => {
-    const next = { ...onboardingProgress, dismissed: true }
-    setOnboardingProgress(next)
-    setCurrentOnboardingTask(null)
-    setActiveOnboardingStep(null)
-    setCompletedOnboardingStep(null)
-    setShowOrganizeNextStepDialog(false)
-    await persistOnboardingProgress(next)
-  }, [onboardingProgress, persistOnboardingProgress])
+  }, [activeFilePath, fileTree, isBlankEditorTab, isRecordEditorTab, onboardingAgentPrompt, onboardingResumeFilePath, openTabs, rightSidebarVisible, setActiveFilePath, setLeftSidebarTab, setOnboardingPromptDraft, toggleRightSidebar])
 
   const handleContinueToNextStep = useCallback(() => {
     const step = getActiveOnboardingStep(onboardingProgress)
@@ -781,23 +814,36 @@ export function EditorLayout() {
     if (step) void handleStartOnboardingStep(step)
   }, [handleStartOnboardingStep, onboardingProgress])
 
-  const renderEmpty = useCallback((mode: 'new-tab' | 'empty-group') => {
+  const handleResetOnboarding = useCallback(async () => {
+    const next = createDefaultOnboardingProgress()
+    setOnboardingProgress(next)
+    setCurrentOnboardingTask(null)
+    setActiveOnboardingStep(null)
+    setCompletedOnboardingStep(null)
+    setOnboardingResumeFilePath('')
+    setShowOrganizeNextStepDialog(false)
+    setOnboardingPromptDraft(null)
+    await persistOnboardingProgress(next)
+  }, [persistOnboardingProgress, setOnboardingPromptDraft])
+
+  const renderEmpty = useCallback((mode: 'new-tab' | 'empty-group', enableShortcuts = true) => {
     const isOnlyGroup = getEditorGroupIds(layout.root).length === 1
     if (mode === 'empty-group' && !isOnlyGroup) {
       return <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">{tGroups('emptyGroup')}</div>
     }
     return (
       <EmptyState
+        enableShortcuts={enableShortcuts}
         onboardingProgress={onboardingProgress}
         activeOnboardingStep={currentOnboardingTask}
         visibleOnboardingStep={activeOnboardingStep}
         completedOnboardingStep={completedOnboardingStep}
         onStartOnboardingStep={handleStartOnboardingStep}
         onContinueToNextStep={handleContinueToNextStep}
-        onDismissOnboarding={handleDismissOnboarding}
+        onResetOnboarding={handleResetOnboarding}
       />
     )
-  }, [activeOnboardingStep, completedOnboardingStep, currentOnboardingTask, handleContinueToNextStep, handleDismissOnboarding, handleStartOnboardingStep, layout.root, onboardingProgress, tGroups])
+  }, [activeOnboardingStep, completedOnboardingStep, currentOnboardingTask, handleContinueToNextStep, handleResetOnboarding, handleStartOnboardingStep, layout.root, onboardingProgress, tGroups])
 
   const renderLayoutNode = useCallback((node: EditorLayoutNode): React.ReactNode => {
     if (node.type === 'group') {

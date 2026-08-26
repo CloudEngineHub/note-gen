@@ -3461,7 +3461,6 @@
     "view": "查看",
     "logout": "登出",
     "setting": "設置",
-    "activity": "活躍度",
     "files": "筆記",
     "outline": "大綱",
     "hideLeftSidebar": "隱藏左側邊欄",
@@ -3475,10 +3474,9 @@
   },
   "activity": {
     "title": "活躍度日曆",
-    "description": "按天查看你的記錄、對話與寫作活躍情況。第一版基於現有記錄、使用者對話與筆記修改時間進行統計。",
+    "description": "按天查看你的記錄、對話、寫作與繪圖活躍情況。",
     "drawer": {
       "title": "活躍度",
-      "description": "快速查看今天狀態和最近一段時間的活躍趨勢。",
       "today": "今天"
     },
     "loading": "正在載入活躍度資料...",
@@ -3489,12 +3487,14 @@
       "activeDays": "活躍天數",
       "records": "記錄次數",
       "chats": "對話次數",
-      "writing": "寫作活躍"
+      "writing": "寫作活躍",
+      "canvas": "繪圖活躍"
     },
     "labels": {
       "record": "記錄",
       "writing": "寫作",
-      "chat": "對話"
+      "chat": "對話",
+      "canvas": "繪圖"
     },
     "heatmap": {
       "title": "最近 26 週熱力圖",
@@ -3550,6 +3550,19 @@
     "emptyState": {
       "title": "開始創作",
       "subtitle": "選擇一個文件開始編輯，或創建新的筆記",
+      "customize": {
+        "title": "自訂",
+        "menuLabel": "顯示與排序",
+        "dragHandle": "拖曳排序：{section}",
+        "reset": "還原預設",
+        "resetOnboarding": "重設新手引導",
+        "sections": {
+          "actions": "快捷入口",
+          "onboarding": "新手引導",
+          "activity": "活躍度",
+          "activityDetail": "當天明細"
+        }
+      },
       "tip": "💡 提示：你也可以從左側文件管理器中選擇文件",
       "actions": {
         "newNote": {
@@ -3572,8 +3585,6 @@
       "onboarding": {
         "title": "新手引導",
         "subtitle": "跟著這三步體驗 NoteGen 的核心工作流。",
-        "dismiss": "跳過新手引導",
-        "reopen": "重新顯示新手引導",
         "start": "開始引導",
         "viewHint": "查看提示",
         "continue": "繼續下一步",
@@ -4058,7 +4069,7 @@
         "range": "最近 {count} 週",
         "rangePlaceholder": "最近 16 週",
         "drawerEmpty": "選擇一個日期查看當天的活動詳情。",
-        "drawerSummary": "當天共 {total} 條活動，含 {record} 條記錄、{writing} 條寫作、{chat} 條對話。"
+        "drawerSummary": "當天共 {total} 條活動，含 {record} 條記錄、{writing} 條寫作、{chat} 條對話、{canvas} 條繪圖。"
       },
       "sync": {
         "title": "同步",
@@ -4455,7 +4466,7 @@
     "restoreGroup": "還原編輯器群組",
     "closeGroup": "關閉編輯器群組",
     "groupActions": "編輯器群組操作",
-    "newTab": "新增分頁",
+    "newTab": "新分頁",
     "emptyGroup": "將分頁拖曳到此處，或從檔案清單開啟筆記",
     "loadingLayout": "正在還原編輯器版面配置…",
     "undo": "復原",

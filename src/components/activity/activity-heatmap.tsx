@@ -45,7 +45,7 @@ export function ActivityHeatmap({
 
   return (
     <TooltipProvider>
-      <div className="w-full overflow-visible px-1 py-1">
+      <div className="flex w-full justify-end overflow-visible px-1 py-1">
         <div className={cn(adaptive ? 'grid w-full grid-flow-col auto-cols-fr gap-1' : 'inline-flex gap-1.5', compact && !adaptive && 'gap-1')}>
           {weeks.map((week, weekIndex) => (
             <div key={weekIndex} className={cn(adaptive ? 'grid grid-rows-7 gap-1' : 'flex flex-col gap-1.5', compact && !adaptive && 'gap-1')}>

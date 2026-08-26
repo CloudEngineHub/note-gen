@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { platform } from '@tauri-apps/plugin-os'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { isMobileDevice } from '@/lib/check'
-import { Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog, CalendarDays } from 'lucide-react'
+import { Settings, Minus, Square, X, PanelLeft, PanelRight, SquarePen, Cog } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PinToggle } from './pin-toggle'
@@ -39,12 +39,7 @@ import { useSettingsDialogStore } from '@/stores/settings-dialog'
 
 type Platform = 'macos' | 'windows' | 'linux' | 'unknown'
 
-interface TitleBarProps {
-  onActivityClick?: () => void
-  activityOpen?: boolean
-}
-
-export function TitleBar({ onActivityClick, activityOpen = false }: TitleBarProps) {
+export function TitleBar() {
   const [currentPlatform, setCurrentPlatform] = useState<Platform>('unknown')
   const [isMobile, setIsMobile] = useState(true)
   const { open: settingsOpen, openSettings, closeSettings } = useSettingsDialogStore()
@@ -293,22 +288,6 @@ export function TitleBar({ onActivityClick, activityOpen = false }: TitleBarProp
             </TooltipContent>
           </Tooltip>
           
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 ${activityOpen ? 'bg-primary/10 text-primary hover:bg-primary/15' : ''}`}
-                onClick={onActivityClick}
-              >
-                <CalendarDays className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{t('navigation.activity')}</p>
-            </TooltipContent>
-          </Tooltip>
-
           <PinToggle />
           
           <Tooltip>

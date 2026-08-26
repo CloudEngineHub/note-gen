@@ -3605,7 +3605,6 @@
     "view": "Ansicht",
     "logout": "Abmelden",
     "setting": "Einstellungen",
-    "activity": "Aktivität",
     "files": "Notizen",
     "outline": "Gliederung",
     "showLeftSidebar": "Linke Seitenleiste anzeigen",
@@ -3619,10 +3618,9 @@
   },
   "activity": {
     "title": "Aktivitätskalender",
-    "description": "Überprüfe deine täglichen Aufzeichnungen, Chats und Schreibaktivitäten an einem Ort. Diese erste Version wird aus vorhandenen Aufzeichnungen, Benutzer-Chats und Notiz-Änderungszeiten abgeleitet.",
+    "description": "Überprüfe deine täglichen Aufzeichnungen, Chats, Schreib- und Zeichenaktivitäten an einem Ort.",
     "drawer": {
       "title": "Aktivität",
-      "description": "Überprüfe schnell den heutigen Status und deinen aktuellen Aktivitätstrend.",
       "today": "Heute"
     },
     "loading": "Aktivitätsdaten werden geladen...",
@@ -3633,12 +3631,14 @@
       "activeDays": "Aktive Tage",
       "records": "Aufzeichnungen",
       "chats": "Chats",
-      "writing": "Schreiben"
+      "writing": "Schreiben",
+      "canvas": "Zeichnen"
     },
     "labels": {
       "record": "Aufzeichnung",
       "writing": "Schreiben",
-      "chat": "Chat"
+      "chat": "Chat",
+      "canvas": "Zeichnen"
     },
     "heatmap": {
       "title": "Letzte 26 Wochen",
@@ -3694,6 +3694,19 @@
     "emptyState": {
       "title": "Beginne mit der Erstellung",
       "subtitle": "Wähle eine Datei aus, um mit der Bearbeitung zu beginnen, oder erstelle eine neue Notiz",
+      "customize": {
+        "title": "Anpassen",
+        "menuLabel": "Anzeigen und sortieren",
+        "dragHandle": "Zum Sortieren ziehen: {section}",
+        "reset": "Standard wiederherstellen",
+        "resetOnboarding": "Onboarding zurücksetzen",
+        "sections": {
+          "actions": "Schnellaktionen",
+          "onboarding": "Erste Schritte",
+          "activity": "Aktivität",
+          "activityDetail": "Tagesdetails"
+        }
+      },
       "tip": "💡 Tipp: Du kannst auch Dateien in der linken Seitenleiste auswählen",
       "actions": {
         "newNote": {
@@ -3716,8 +3729,6 @@
       "onboarding": {
         "title": "Onboarding",
         "subtitle": "Gehe diese drei Aufgaben durch, um den Kernablauf von NoteGen kennenzulernen.",
-        "dismiss": "Onboarding überspringen",
-        "reopen": "Onboarding wieder anzeigen",
         "start": "Starten",
         "viewHint": "Hinweis anzeigen",
         "continue": "Weiter",
@@ -4212,7 +4223,7 @@
         "range": "Letzte {count} Wochen",
         "rangePlaceholder": "Letzte 16 Wochen",
         "drawerEmpty": "Wähle einen Tag, um seine Aktivitätsdetails zu überprüfen.",
-        "drawerSummary": "{total} Aktivitäten an diesem Tag, einschließlich {record} Aufzeichnungen, {writing} Schreibereignissen und {chat} Chats."
+        "drawerSummary": "{total} Aktivitäten an diesem Tag, einschließlich {record} Aufzeichnungen, {writing} Schreibereignissen, {chat} Chats und {canvas} Zeichenereignissen."
       },
       "sync": {
         "title": "Sync",

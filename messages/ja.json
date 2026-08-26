@@ -3442,7 +3442,6 @@
     "view": "表示",
     "logout": "ログアウト",
     "setting": "設定",
-    "activity": "アクティビティ",
     "files": "ノート",
     "outline": "アウトライン",
     "hideLeftSidebar": "左サイドバーを非表示",
@@ -3456,10 +3455,9 @@
   },
   "activity": {
     "title": "アクティビティカレンダー",
-    "description": "記録、対話、執筆の活動を日ごとに確認できます。初版では既存の記録、ユーザー対話、ノート更新時刻をもとに集計します。",
+    "description": "記録、対話、執筆、描画の活動を日ごとに確認できます。",
     "drawer": {
       "title": "アクティビティ",
-      "description": "今日の状態と最近の活動傾向をすばやく確認できます。",
       "today": "今日"
     },
     "loading": "アクティビティデータを読み込み中...",
@@ -3470,12 +3468,14 @@
       "activeDays": "活動日数",
       "records": "記録回数",
       "chats": "対話回数",
-      "writing": "執筆活動"
+      "writing": "執筆活動",
+      "canvas": "描画活動"
     },
     "labels": {
       "record": "記録",
       "writing": "執筆",
-      "chat": "対話"
+      "chat": "対話",
+      "canvas": "描画"
     },
     "heatmap": {
       "title": "直近 26 週間",
@@ -3560,6 +3560,19 @@
     "emptyState": {
       "title": "作成を開始",
       "subtitle": "ファイルを選択して編集を開始するか、新しいノートを作成してください",
+      "customize": {
+        "title": "カスタマイズ",
+        "menuLabel": "表示と並べ替え",
+        "dragHandle": "ドラッグして並べ替え：{section}",
+        "reset": "初期設定に戻す",
+        "resetOnboarding": "初回ガイドをリセット",
+        "sections": {
+          "actions": "クイックアクション",
+          "onboarding": "はじめに",
+          "activity": "アクティビティ",
+          "activityDetail": "当日の詳細"
+        }
+      },
       "tip": "💡 ヒント：左側のファイルマネージャーからファイルを選択することもできます",
       "actions": {
         "newNote": {
@@ -3582,8 +3595,6 @@
       "onboarding": {
         "title": "初回ガイド",
         "subtitle": "この 3 つのタスクで NoteGen の基本フローを体験できます。",
-        "dismiss": "オンボーディングをスキップ",
-        "reopen": "初回ガイドを再表示",
         "start": "開始",
         "viewHint": "ヒントを見る",
         "continue": "次へ進む",
@@ -4068,7 +4079,7 @@
         "range": "直近 {count} 週間",
         "rangePlaceholder": "直近 16 週間",
         "drawerEmpty": "日付を選択すると、その日の活動詳細を確認できます。",
-        "drawerSummary": "この日は合計 {total} 件の活動があり、記録 {record} 件、執筆 {writing} 件、対話 {chat} 件です。"
+        "drawerSummary": "この日は合計 {total} 件の活動があり、記録 {record} 件、執筆 {writing} 件、対話 {chat} 件、描画 {canvas} 件です。"
       },
       "sync": {
         "title": "同期",

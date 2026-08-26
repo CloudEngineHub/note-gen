@@ -3646,7 +3646,6 @@
     "view": "查看",
     "logout": "登出",
     "setting": "设置",
-    "activity": "活跃度",
     "files": "笔记",
     "outline": "大纲",
     "showLeftSidebar": "显示左侧边栏",
@@ -3660,10 +3659,9 @@
   },
   "activity": {
     "title": "活跃度日历",
-    "description": "按天查看你的记录、对话和写作活跃情况。第一版基于现有记录、用户对话和笔记修改时间进行统计。",
+    "description": "按天查看你的记录、对话、写作和绘图活跃情况。",
     "drawer": {
       "title": "活跃度",
-      "description": "快速查看今天状态和最近一段时间的活跃趋势。",
       "today": "今天"
     },
     "loading": "正在加载活跃度数据...",
@@ -3674,12 +3672,14 @@
       "activeDays": "活跃天数",
       "records": "记录次数",
       "chats": "对话次数",
-      "writing": "写作活跃"
+      "writing": "写作活跃",
+      "canvas": "绘图活跃"
     },
     "labels": {
       "record": "记录",
       "writing": "写作",
-      "chat": "对话"
+      "chat": "对话",
+      "canvas": "绘图"
     },
     "heatmap": {
       "title": "最近 26 周热力图",
@@ -3735,6 +3735,19 @@
     "emptyState": {
       "title": "开始创作",
       "subtitle": "选择一个文件开始编辑，或创建新的笔记",
+      "customize": {
+        "title": "自定义",
+        "menuLabel": "显示与排序",
+        "dragHandle": "拖动排序：{section}",
+        "reset": "恢复默认",
+        "resetOnboarding": "重置新手引导",
+        "sections": {
+          "actions": "快捷入口",
+          "onboarding": "新手引导",
+          "activity": "活跃度",
+          "activityDetail": "当天明细"
+        }
+      },
       "tip": "💡 提示：你也可以从左侧文件管理器中选择文件",
       "actions": {
         "newNote": {
@@ -3757,8 +3770,6 @@
       "onboarding": {
         "title": "新手引导",
         "subtitle": "跟着这三步体验 NoteGen 的核心工作流。",
-        "dismiss": "跳过新手引导",
-        "reopen": "重新显示新手引导",
         "start": "开始引导",
         "viewHint": "查看提示",
         "continue": "继续下一步",
@@ -4243,7 +4254,7 @@
         "range": "最近 {count} 周",
         "rangePlaceholder": "最近 16 周",
         "drawerEmpty": "选择一个日期查看当天的活动详情。",
-        "drawerSummary": "当天共 {total} 条活动，含 {record} 条记录、{writing} 条写作、{chat} 条对话。"
+        "drawerSummary": "当天共 {total} 条活动，含 {record} 条记录、{writing} 条写作、{chat} 条对话、{canvas} 条绘图。"
       },
       "sync": {
         "title": "同步",
@@ -4648,7 +4659,7 @@
     "restoreGroup": "恢复编辑器组",
     "closeGroup": "关闭编辑器组",
     "groupActions": "编辑器组操作",
-    "newTab": "新建标签页",
+    "newTab": "新标签页",
     "emptyGroup": "将标签页拖到此处，或从文件列表打开笔记",
     "loadingLayout": "正在恢复编辑器布局…",
     "undo": "撤销",
