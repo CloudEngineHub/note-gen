@@ -251,11 +251,10 @@ export function BubbleMenu({
       return false
     }
 
-    // EditorContent 是绝对定位参照层，外层 viewport 才是真正的滚动容器。
+    // 使用视口坐标定位，避免长文档滚动后 EditorContent 与滚动容器的坐标系发生偏移。
     const editorElement = editor.view.dom
-    const positionContainer = editorElement.parentElement
     const scrollContainer = editorElement.closest<HTMLElement>('.editor-scroll-container')
-    if (!positionContainer || !scrollContainer) {
+    if (!scrollContainer) {
       hideMenu()
       return false
     }
@@ -263,27 +262,24 @@ export function BubbleMenu({
     try {
       const startCoords = editor.view.coordsAtPos(from)
       const endCoords = editor.view.coordsAtPos(to)
-      const positionBounds = positionContainer.getBoundingClientRect()
       const scrollBounds = scrollContainer.getBoundingClientRect()
 
-      // 转换为绝对定位参照层内的坐标
-      const anchorTop = Math.min(startCoords.top, endCoords.top) - positionBounds.top + positionContainer.scrollTop
-      const anchorBottom = Math.max(startCoords.bottom, endCoords.bottom) - positionBounds.top + positionContainer.scrollTop
-      const relativeLeft = startCoords.left - positionBounds.left + positionContainer.scrollLeft
+      const anchorTop = Math.min(startCoords.top, endCoords.top)
+      const anchorBottom = Math.max(startCoords.bottom, endCoords.bottom)
       const menuHeight = menuRef.current?.offsetHeight || 40
       const gap = 8
 
       const currentMenuWidth = menuRef.current?.offsetWidth || 360
-      const minimumLeft = scrollBounds.left - positionBounds.left + positionContainer.scrollLeft + 8
-      const maximumLeft = scrollBounds.right - positionBounds.left + positionContainer.scrollLeft - currentMenuWidth - 8
-      const left = Math.max(minimumLeft, Math.min(relativeLeft, Math.max(minimumLeft, maximumLeft)))
+      const minimumLeft = scrollBounds.left + 8
+      const maximumLeft = scrollBounds.right - currentMenuWidth - 8
+      const left = Math.max(minimumLeft, Math.min(startCoords.left, Math.max(minimumLeft, maximumLeft)))
 
-      const spaceAbove = Math.min(startCoords.top, endCoords.top) - scrollBounds.top
+      const spaceAbove = anchorTop - scrollBounds.top
       const preferredTop = spaceAbove >= menuHeight + gap
         ? anchorTop - menuHeight - gap
         : anchorBottom + gap
-      const visibleTop = scrollBounds.top - positionBounds.top + positionContainer.scrollTop + 8
-      const visibleBottom = scrollBounds.bottom - positionBounds.top + positionContainer.scrollTop - 8
+      const visibleTop = scrollBounds.top + 8
+      const visibleBottom = scrollBounds.bottom - 8
       const maxTop = Math.max(visibleTop, visibleBottom - menuHeight)
       const top = Math.max(visibleTop, Math.min(preferredTop, maxTop))
       setPosition({ top, left })
@@ -649,7 +645,7 @@ export function BubbleMenu({
     <div
       ref={menuRef}
       data-editor-bubble-menu
-      className="absolute z-50 max-w-[calc(100%_-_1rem)] transition-[top,left] duration-150 ease-out"
+      className="fixed z-50 max-w-[calc(100%_-_1rem)] transition-[top,left] duration-150 ease-out"
       style={{
         top: position.top,
         left: position.left
