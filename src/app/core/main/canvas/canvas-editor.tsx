@@ -223,6 +223,26 @@ interface CanvasEditorProps {
   isActive?: boolean
 }
 
+function isFiniteCanvasViewport(viewport: CanvasDocument['viewport']) {
+  return Number.isFinite(viewport.x)
+    && Number.isFinite(viewport.y)
+    && Number.isFinite(viewport.zoom)
+    && viewport.zoom > 0
+}
+
+function getSafeCanvasViewport(
+  viewport: CanvasDocument['viewport'],
+  fallbackZoom: number,
+): CanvasDocument['viewport'] {
+  return {
+    x: Number.isFinite(viewport.x) ? viewport.x : 0,
+    y: Number.isFinite(viewport.y) ? viewport.y : 0,
+    zoom: Number.isFinite(viewport.zoom) && viewport.zoom > 0
+      ? viewport.zoom
+      : fallbackZoom,
+  }
+}
+
 interface CanvasSnapshot {
   nodes: FlowCanvasNode[]
   edges: Edge[]
@@ -400,6 +420,8 @@ function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: Canvas
   const pendingFocus = useCanvasStore(state => state.pendingFocus)
   const setPendingFocus = useCanvasStore(state => state.setPendingFocus)
   const viewport = useViewport()
+  const viewportIsFinite = isFiniteCanvasViewport(viewport)
+  const safeViewportZoom = viewportIsFinite ? viewport.zoom : canvasDefaultZoom
   const activeBrushColor = tool === 'highlighter' ? highlighterColor : penColor
   const activeBrushSize = tool === 'highlighter' ? highlighterSize : penSize
   const activeBrushStyle = useMemo(() => ({
@@ -620,20 +642,34 @@ function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: Canvas
   const displayEdges = previewSnapshot?.edges || edges
 
   useEffect(() => {
-    if (!document) return
+    if (!document || !isActive) return
     const preferenceKey = `${canvasId}:${canvasDefaultZoom}`
     if (appliedDefaultZoomRef.current === preferenceKey) return
     appliedDefaultZoomRef.current = preferenceKey
     suppressViewportPersistRef.current = true
+    const currentViewport = getViewport()
+    const safeViewport = isFiniteCanvasViewport(currentViewport)
+      ? currentViewport
+      : getSafeCanvasViewport(document.viewport, canvasDefaultZoom)
     void setViewport(
-      { ...getViewport(), zoom: canvasDefaultZoom },
+      { ...safeViewport, zoom: canvasDefaultZoom },
       { duration: 120 },
     ).finally(() => {
       requestAnimationFrame(() => {
         suppressViewportPersistRef.current = false
       })
     })
-  }, [canvasDefaultZoom, canvasId, document, getViewport, setViewport])
+  }, [canvasDefaultZoom, canvasId, document, getViewport, isActive, setViewport])
+
+  useEffect(() => {
+    if (!document || !isActive || viewportIsFinite) return
+    suppressViewportPersistRef.current = true
+    void setViewport(getSafeCanvasViewport(document.viewport, canvasDefaultZoom)).finally(() => {
+      requestAnimationFrame(() => {
+        suppressViewportPersistRef.current = false
+      })
+    })
+  }, [canvasDefaultZoom, document, isActive, setViewport, viewportIsFinite])
 
   useEffect(() => {
     if (!document) {
@@ -2087,7 +2123,7 @@ function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: Canvas
   }, [activeBrushColor, activeBrushStyle, canvasId, pushHistory, setNodes, tool])
 
   const persistViewport = useCallback((viewport: CanvasDocument['viewport']) => {
-    if (!document || suppressViewportPersistRef.current) return
+    if (!document || suppressViewportPersistRef.current || !isFiniteCanvasViewport(viewport)) return
     const currentViewport = pendingDocumentRef.current?.viewport || document.viewport
     if (
       currentViewport.x === viewport.x
@@ -2367,21 +2403,24 @@ function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: Canvas
         selectionMode={SelectionMode.Partial}
         snapToGrid={canvasSnapToGrid}
         snapGrid={[canvasGridGap, canvasGridGap]}
-        defaultViewport={{ ...document.viewport, zoom: canvasDefaultZoom }}
+        defaultViewport={{
+          ...getSafeCanvasViewport(document.viewport, canvasDefaultZoom),
+          zoom: canvasDefaultZoom,
+        }}
         zoomOnScroll={canvasWheelBehavior === 'zoom'}
         zoomOnPinch
         panOnScroll={canvasWheelBehavior === 'pan'}
         onlyRenderVisibleElements={!isExporting && nodes.length >= 150}
         colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
         >
-          {canvasGridVisible && (
+          {isActive && viewportIsFinite && canvasGridVisible && (
             <Background
               variant={canvasGridStyle === 'lines' ? BackgroundVariant.Lines : BackgroundVariant.Dots}
               gap={canvasGridGap}
               size={1}
             />
           )}
-          {canvasMinimapVisible && <MiniMap pannable zoomable />}
+          {isActive && canvasMinimapVisible && <MiniMap pannable zoomable />}
               </ReactFlow>
             </div>
           </ContextMenuTrigger>
@@ -2955,10 +2994,13 @@ function CanvasEditorInner({ canvasId, mobile = false, isActive = true }: Canvas
           <CanvasFooter
             showGrid={canvasGridVisible}
             snapToGrid={canvasSnapToGrid}
-            zoom={viewport.zoom}
+            zoom={safeViewportZoom}
             onToggleGrid={() => void setCanvasGridVisible(!canvasGridVisible)}
             onToggleSnap={() => void setCanvasSnapToGrid(!canvasSnapToGrid)}
-            onZoomChange={zoom => void setViewport({ ...getViewport(), zoom }, { duration: 120 })}
+            onZoomChange={zoom => void setViewport({
+              ...getSafeCanvasViewport(getViewport(), canvasDefaultZoom),
+              zoom,
+            }, { duration: 120 })}
             onFitView={() => void fitView({ padding: 0.2, duration: 300 })}
             onLayout={() => void layoutNodes()}
             onExport={(format, pixelRatio) => void exportCanvas(format, pixelRatio)}
