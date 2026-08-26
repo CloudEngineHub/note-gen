@@ -43,7 +43,7 @@ import { useSkillsStore } from '@/stores/skills'
 import { useSyncAvailability } from './use-sync-availability'
 import { prepareActiveEditorDeactivationDurably } from '@/lib/editor-deactivation'
 
-export function FileFooter({ embedded = false }: { embedded?: boolean }) {
+export function FileFooter() {
   const {
     workspacePath,
     workspaceHistory,
@@ -171,10 +171,7 @@ export function FileFooter({ embedded = false }: { embedded?: boolean }) {
   }
 
   return (
-    <div className={cn(
-      'relative flex h-6 min-h-6 max-h-6 w-fit shrink-0 items-center bg-background text-xs text-muted-foreground',
-      !embedded && 'border-t border-border',
-    )}>
+    <div className="relative flex h-6 min-h-6 max-h-6 w-fit shrink-0 items-center bg-background text-xs text-muted-foreground">
       <Popover open={open} onOpenChange={setOpen}>
         <Tooltip>
           <TooltipTrigger asChild>

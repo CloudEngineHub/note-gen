@@ -11,7 +11,7 @@ export function MainStatusBar() {
   return (
     <footer className="scrollbar-hide flex h-6 min-h-6 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-t border-border bg-background px-1 text-xs text-muted-foreground">
       <div className="h-full min-w-0 shrink-0">
-        <FileFooter embedded />
+        <FileFooter />
       </div>
       <div
         id={EDITOR_STATUS_SLOT_ID}

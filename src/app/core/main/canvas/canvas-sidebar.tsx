@@ -682,14 +682,6 @@ export function CanvasSidebar() {
 
       </div>
 
-      {(projects.length > 0 || deletedProjects.length > 0) && (
-        <div className="flex h-6 shrink-0 items-center overflow-hidden border-t border-border bg-background px-2 text-xs text-muted-foreground">
-          <span>{trashMode
-            ? t('manager.trashCount', { count: visibleProjects.length })
-            : t('manager.count', { count: visibleProjects.length })}</span>
-        </div>
-      )}
-
       <AlertDialog open={Boolean(pendingDelete)} onOpenChange={open => !open && setPendingDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

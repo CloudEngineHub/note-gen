@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl'
 import React from "react"
 import { TagManage } from './tag-manage'
 import { MarkList } from './mark-list'
-import { MarkToolbar } from './mark-toolbar'
 import useMarkStore from "@/stores/mark"
 import { Button } from "@/components/ui/button"
 import { clearTrash } from "@/db/marks"
@@ -50,8 +49,6 @@ export function NoteSidebar() {
           <TagManage />
         </div>
       )}
-      
-      <MarkToolbar />
     </div>
   )
 }
