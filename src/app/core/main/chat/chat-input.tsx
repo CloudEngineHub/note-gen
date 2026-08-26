@@ -1261,8 +1261,8 @@ ${previewLines.join('\n')}
         className={cn(
           "group relative z-10 flex w-full flex-col overflow-hidden border",
           isMobile
-            ? "mobile-dock-surface gap-1 rounded-[1.35rem] p-1.5 transition-[background-color,border-color,transform] duration-200 focus-within:border-border/80"
-            : "gap-1 rounded-xl bg-background p-1 transition-colors focus-within:border-primary",
+            ? "mobile-dock-surface gap-1 rounded-[1.35rem] p-1.5 transition-[background-color,border-color,transform] duration-200"
+            : "gap-1 rounded-xl bg-background p-1 transition-colors",
           isImageDragOver && (
             isMobile
               ? "border-primary/50 bg-[hsl(var(--component-active-bg))]"
