@@ -896,6 +896,28 @@ function normalizePastedTableFragment(
   return Fragment.fromArray(nodes)
 }
 
+function isInlineCodeOnlySelection(selection: Selection, slice: Slice): boolean {
+  if (!selection.$from.sameParent(selection.$to)) return false
+
+  let hasText = false
+  let containsOnlyInlineCode = true
+
+  slice.content.descendants(node => {
+    if (node.isText) {
+      hasText = true
+      if (!node.marks.some(mark => mark.type.name === 'code')) {
+        containsOnlyInlineCode = false
+      }
+    } else if (node.isInline) {
+      containsOnlyInlineCode = false
+    }
+
+    return containsOnlyInlineCode
+  })
+
+  return hasText && containsOnlyInlineCode
+}
+
 // 自定义扩展：处理粘贴 Markdown 文本
 const PasteMarkdown = Extension.create({
   name: 'pasteMarkdown',
@@ -4335,7 +4357,8 @@ export function TipTapEditor({
     if (!editor || !editor.view || !editor.view.dom) return
 
     const handleCopy = (event: ClipboardEvent) => {
-      const { from, to } = editor.state.selection
+      const { selection } = editor.state
+      const { from, to } = selection
 
       // If there's no selection, let browser handle the default copy
       if (from === to) {
@@ -4347,15 +4370,23 @@ export function TipTapEditor({
         return
       }
 
-      // Get the selected content as Markdown
+      // Preserve Markdown for mixed selections, but expose inline code itself when copied alone.
       const slice = editor.state.doc.slice(from, to)
-      // Wrap in doc node for proper serialization
-      const json = { type: 'doc', content: slice.content.toJSON() }
-      const markdown = editor.markdown.serialize(json)
+      const selectionJson = slice.content.toJSON()
+      const clipboardText = isInlineCodeOnlySelection(selection, slice)
+        ? slice.content.textBetween(0, slice.content.size, '\n')
+        // A same-block slice already contains inline nodes. Wrapping them in a doc
+        // makes the Markdown renderer join every text node as a separate block.
+        : selection.$from.sameParent(selection.$to)
+          ? editor.markdown.renderNodes(selectionJson)
+          : editor.markdown.serialize({
+              type: 'doc',
+              content: selectionJson,
+            })
 
       // Write Markdown to clipboard
       if (event.clipboardData) {
-        event.clipboardData.setData('text/plain', markdown)
+        event.clipboardData.setData('text/plain', clipboardText)
         event.preventDefault()
       }
     }
