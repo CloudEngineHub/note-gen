@@ -1,5 +1,8 @@
 import { buildMcpAgentToolCatalog } from '@/lib/mcp/agent-tools'
-import { DEFAULT_SYSTEM_PROMPT } from '@/lib/ai/system-prompt'
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  RESPONSE_FORMATTING_PROMPT,
+} from '@/lib/ai/system-prompt'
 import type { AgentContextSnapshot, AgentTool } from './types'
 import { estimateTokens } from '@/lib/ai/token-counter'
 
@@ -292,6 +295,7 @@ export class AgentPromptAssembler {
       formatSkills(context),
       formatMcpCatalog(context),
       memoryContext,
+      RESPONSE_FORMATTING_PROMPT,
     ].filter((section) => section.trim().length > 0)
 
     return sections.join('\n\n')

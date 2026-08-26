@@ -5,9 +5,11 @@ import {
   type DragEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
+import { useTranslations } from 'next-intl'
 import './chat.css'
 import { advanceStreamingSmoother } from './streaming-smoother'
 import { cn } from '@/lib/utils'
@@ -28,7 +30,12 @@ function isMacOS() {
 }
 
 export default function ChatPreview({ text, streaming = false, containerClassName }: ChatPreviewProps) {
+  const t = useTranslations('record.chat.messageControl')
   const { contentTextScale } = useSettingStore()
+  const streamdownTranslations = useMemo(() => ({
+    copied: t('copied'),
+    copyCode: t('copy'),
+  }), [t])
   const [displayedText, setDisplayedText] = useState('')
   const animationRef = useRef<number | null>(null)
   const displayedTextRef = useRef('')
@@ -196,6 +203,7 @@ export default function ChatPreview({ text, streaming = false, containerClassNam
         <StreamdownRenderer
           markdown={displayedText}
           streaming={streaming || (hasStreamedRef.current && displayedText.length < text.length)}
+          translations={streamdownTranslations}
         />
       </div>
     </div>

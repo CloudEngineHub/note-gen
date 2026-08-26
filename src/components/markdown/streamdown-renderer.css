@@ -57,39 +57,3 @@
   max-width: 100%;
   white-space: pre;
 }
-
-.streamdown-document .hljs {
-  background: hsl(var(--muted) / 0.5);
-  color: hsl(var(--foreground));
-}
-
-.dark .streamdown-document .hljs-comment,
-.dark .streamdown-document .hljs-punctuation {
-  color: hsl(var(--muted-foreground));
-}
-
-.dark .streamdown-document .hljs-attr,
-.dark .streamdown-document .hljs-attribute,
-.dark .streamdown-document .hljs-meta,
-.dark .streamdown-document .hljs-selector-attr,
-.dark .streamdown-document .hljs-selector-class,
-.dark .streamdown-document .hljs-selector-id,
-.dark .streamdown-document .hljs-string,
-.dark .streamdown-document .hljs-regexp {
-  color: hsl(var(--primary));
-}
-
-.dark .streamdown-document .hljs-variable,
-.dark .streamdown-document .hljs-literal,
-.dark .streamdown-document .hljs-number,
-.dark .streamdown-document .hljs-doctag {
-  color: hsl(var(--destructive));
-}
-
-.dark .streamdown-document .hljs-built_in,
-.dark .streamdown-document .hljs-keyword,
-.dark .streamdown-document .hljs-name,
-.dark .streamdown-document .hljs-selector-tag,
-.dark .streamdown-document .hljs-tag {
-  color: hsl(var(--secondary-foreground));
-}

@@ -372,7 +372,10 @@ export async function renderMarkdownToHtml(markdown: string, sourcePath?: string
 
   try {
     flushSync(() => {
-      root.render(createElement(StreamdownRenderer, { markdown }))
+      root.render(createElement(StreamdownRenderer, {
+        interactiveCodeBlocks: false,
+        markdown,
+      }))
     })
     await waitForAnimationFrame()
 
