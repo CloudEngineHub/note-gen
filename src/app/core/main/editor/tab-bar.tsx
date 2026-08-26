@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Columns2, ExternalLink, FilePlus2, FileText, Folder, Maximize2, MoreHorizontal, Palette, Plus, Redo2, Rows2, Undo2, X } from 'lucide-react'
+import { ExternalLink, FilePlus2, FileText, Folder, Maximize2, MoreHorizontal, Palette, PanelBottom, PanelLeft, PanelRight, PanelTop, Plus, Redo2, Undo2, X } from 'lucide-react'
 import { platform } from '@tauri-apps/plugin-os'
 import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { useDroppable } from '@dnd-kit/core'
@@ -148,10 +148,10 @@ function SortableTabWithMenu({
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
-          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'left')}><Columns2 />{t('splitLeft')}</ContextMenuItem>
-          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'right')}><Columns2 />{t('splitRight')}</ContextMenuItem>
-          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'up')}><Rows2 />{t('splitUp')}</ContextMenuItem>
-          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'down')}><Rows2 />{t('splitDown')}</ContextMenuItem>
+          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'left')}><PanelLeft />{t('splitLeft')}</ContextMenuItem>
+          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'right')}><PanelRight />{t('splitRight')}</ContextMenuItem>
+          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'up')}><PanelTop />{t('splitUp')}</ContextMenuItem>
+          <ContextMenuItem disabled={tabs.length < 2} onClick={() => onSplitTab(tab.id, 'down')}><PanelBottom />{t('splitDown')}</ContextMenuItem>
         </ContextMenuGroup>
         <ContextMenuSeparator />
         <ContextMenuGroup>
@@ -264,6 +264,18 @@ export function TabBar({
   }, [tabs, updateScrollIndicator])
 
   useEffect(() => {
+    const target = tabListRef.current
+    if (!target) return
+    const handleWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return
+      event.preventDefault()
+      if (target.scrollWidth > target.clientWidth) target.scrollLeft += event.deltaY
+    }
+    target.addEventListener('wheel', handleWheel, { passive: false })
+    return () => target.removeEventListener('wheel', handleWheel)
+  }, [])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isActiveGroup || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'w' || !activeTabId) return
       event.preventDefault()
@@ -293,11 +305,6 @@ export function TabBar({
           ref={setTabListRef}
           className="tab-scrollbar flex h-full min-w-0 items-center overflow-x-auto"
           onScroll={() => updateScrollIndicator(true)}
-          onWheel={event => {
-            const target = tabListRef.current
-            if (!target || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return
-            target.scrollLeft += event.deltaY
-          }}
         >
           <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
             {tabs.map(tab => (
@@ -326,15 +333,15 @@ export function TabBar({
       </div>
       {isActiveGroup && (
         <div className="flex shrink-0 items-center gap-0.5 px-1">
-          <TooltipButton icon={<Columns2 />} tooltipText={t('splitRight')} side="bottom" buttonClassName="size-7" disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'right')} />
+          <TooltipButton icon={<PanelRight />} tooltipText={t('splitRight')} side="bottom" buttonClassName="size-7" disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'right')} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" aria-label={t('groupActions')}><MoreHorizontal /></Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="!w-max min-w-40 whitespace-nowrap">
               <DropdownMenuGroup>
-                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'left')}><Columns2 />{t('splitLeft')}</DropdownMenuItem>
-                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'right')}><Columns2 />{t('splitRight')}</DropdownMenuItem>
-                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'up')}><Rows2 />{t('splitUp')}</DropdownMenuItem>
-                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'down')}><Rows2 />{t('splitDown')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'left')}><PanelLeft />{t('splitLeft')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'right')}><PanelRight />{t('splitRight')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'up')}><PanelTop />{t('splitUp')}</DropdownMenuItem>
+                <DropdownMenuItem disabled={!canSplit} onClick={() => activeTabId && onSplitTab(activeTabId, 'down')}><PanelBottom />{t('splitDown')}</DropdownMenuItem>
                 <DropdownMenuItem onClick={onToggleMaximize}><Maximize2 />{isMaximized ? t('restoreGroup') : t('maximizeGroup')}</DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
