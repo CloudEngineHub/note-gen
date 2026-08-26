@@ -55,7 +55,7 @@ export default function RootLayout({
               </NextIntlProvider>
             </TooltipProvider>
           </Suspense>
-          <Toaster closeButton richColors position="bottom-right" />
+          <Toaster closeButton richColors position="top-center" />
         </body>
       </html>
     </>
