@@ -1332,7 +1332,7 @@
         "clientIdDescription": "Versões de teste exigem o Client ID de um aplicativo registrado no Microsoft Entra. A versão final incluirá o ID do NoteGen.",
         "folder": "Local de sincronização",
         "folderValue": "OneDrive / Apps / NoteGen",
-        "folderDescription": "O NoteGen acessa somente a própria pasta de aplicativo e não lê outros arquivos do OneDrive.",
+        "folderDescription": "O NoteGen armazena e sincroniza dados somente na própria pasta do aplicativo.",
         "notConnected": "OneDrive não conectado",
         "connected": "Conectado",
         "disconnected": "Não conectado",

@@ -1446,7 +1446,7 @@
         "clientIdDescription": "测试版本需要填写 Microsoft Entra 中注册的应用 Client ID。正式版本将由 NoteGen 内置。",
         "folder": "同步位置",
         "folderValue": "OneDrive / Apps / NoteGen",
-        "folderDescription": "NoteGen 只访问自己的应用文件夹，不会读取 OneDrive 中的其他文件。",
+        "folderDescription": "NoteGen 仅在自己的应用文件夹中保存和同步数据。",
         "notConnected": "尚未连接 OneDrive",
         "connected": "已连接",
         "disconnected": "未连接",

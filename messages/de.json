@@ -1404,7 +1404,7 @@
         "clientIdDescription": "Test-Builds erfordern die Client ID einer in Microsoft Entra registrierten App. Release-Builds enthalten die NoteGen-App-ID.",
         "folder": "Sync-Ort",
         "folderValue": "OneDrive / Apps / NoteGen",
-        "folderDescription": "NoteGen greift nur auf seinen eigenen App-Ordner zu und kann keine anderen Dateien in deinem OneDrive lesen.",
+        "folderDescription": "NoteGen speichert und synchronisiert Daten nur in seinem eigenen App-Ordner.",
         "notConnected": "OneDrive ist nicht verbunden",
         "connected": "Verbunden",
         "disconnected": "Nicht verbunden",

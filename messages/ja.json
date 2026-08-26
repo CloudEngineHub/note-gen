@@ -1387,7 +1387,7 @@
         "clientIdDescription": "テスト版では Microsoft Entra に登録したアプリの Client ID が必要です。正式版には NoteGen のアプリ ID が組み込まれます。",
         "folder": "同期先",
         "folderValue": "OneDrive / Apps / NoteGen",
-        "folderDescription": "NoteGen は専用のアプリフォルダーだけにアクセスし、OneDrive 内の他のファイルは読み取りません。",
+        "folderDescription": "NoteGen は専用のアプリフォルダー内でのみデータを保存、同期します。",
         "notConnected": "OneDrive は未接続です",
         "connected": "接続済み",
         "disconnected": "未接続",

@@ -10,7 +10,10 @@ import type { CloudFolderConfig } from '@/types/sync'
 
 const GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0'
 const AUTHORITY_BASE_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0'
-const ONE_DRIVE_SCOPE = 'offline_access Files.ReadWrite.AppFolder'
+// Files.ReadWrite.AppFolder delegated access is limited to personal Microsoft
+// accounts. Use Files.ReadWrite so work and school OneDrive accounts can also
+// create and access the app root; all Graph paths remain scoped to approot.
+const ONE_DRIVE_SCOPE = 'offline_access Files.ReadWrite'
 const ONE_DRIVE_TOKEN_KEY = 'oneDriveAuthTokens'
 const SIMPLE_UPLOAD_LIMIT = 10 * 1024 * 1024
 const UPLOAD_CHUNK_SIZE = 5 * 1024 * 1024
@@ -448,7 +451,9 @@ async function refreshAccessToken(config: CloudFolderConfig, tokens: OneDriveAut
     client_id: clientId,
     grant_type: 'refresh_token',
     refresh_token: tokens.refreshToken,
-    scope: ONE_DRIVE_SCOPE,
+    // Preserve the scope granted by the original connection. This keeps
+    // existing AppFolder-only accounts working without expanding access.
+    scope: tokens.scope || ONE_DRIVE_SCOPE,
   }))
   if (!response.ok || !data.access_token) {
     throw new Error(data.error_description || data.error || 'OneDrive authorization expired')
