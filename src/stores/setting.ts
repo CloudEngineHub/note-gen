@@ -118,6 +118,9 @@ interface SettingState {
   closeBehavior: CloseBehavior
   setCloseBehavior: (behavior: CloseBehavior) => Promise<void>
 
+  autostartMinimized: boolean
+  setAutostartMinimized: (enabled: boolean) => Promise<void>
+
   developerMode: boolean
   setDeveloperMode: (enabled: boolean) => void
 
@@ -1000,6 +1003,14 @@ const useSettingStore = create<SettingState>((set, get) => ({
     set({ closeBehavior })
     const store = await Store.load('store.json')
     await store.set('closeBehavior', closeBehavior)
+    await store.save()
+  },
+
+  autostartMinimized: false,
+  setAutostartMinimized: async (autostartMinimized) => {
+    set({ autostartMinimized })
+    const store = await Store.load('store.json')
+    await store.set('autostartMinimized', autostartMinimized)
     await store.save()
   },
 

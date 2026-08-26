@@ -28,6 +28,8 @@ pub fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     // 创建系统托盘
     let _tray = create_tray(&app_handle)?;
 
+    window::apply_startup_visibility(&app_handle);
+
     file_open::handle_initial_open_files(&app_handle);
 
     web_clipper::start_server(&app_handle);

@@ -94,6 +94,7 @@ export const ALWAYS_SYNC_EXCLUDED_FIELDS: string[] = [
   'autoConversationSyncEnabled',
   'autoVectorEnabled',
   'closeBehavior',
+  'autostartMinimized',
   // 开发者能力只控制当前设备，不能由其他设备远程开启。
   'developerMode',
   'developerPerformanceInfo',

@@ -6,7 +6,7 @@ import {
   enable as enableAutostart,
   isEnabled as isAutostartEnabled,
 } from '@tauri-apps/plugin-autostart'
-import { AppWindow, Rocket } from 'lucide-react'
+import { AppWindow, PanelTopClose, Rocket } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { toast } from '@/hooks/use-toast'
@@ -33,7 +33,12 @@ import { SettingSection } from '../components/setting-base'
 
 export function SystemBehaviorSettings() {
   const t = useTranslations('settings.general.behavior')
-  const { closeBehavior, setCloseBehavior } = useSettingStore()
+  const {
+    autostartMinimized,
+    closeBehavior,
+    setAutostartMinimized,
+    setCloseBehavior,
+  } = useSettingStore()
   const [autostart, setAutostart] = useState(false)
   const [autostartLoading, setAutostartLoading] = useState(true)
 
@@ -71,6 +76,30 @@ export function SystemBehaviorSettings() {
       console.error('Failed to update autostart state:', error)
       toast({
         title: t('autostart.error'),
+        variant: 'destructive',
+      })
+    } finally {
+      setAutostartLoading(false)
+    }
+  }
+
+  async function handleAutostartMinimizedChange(enabled: boolean) {
+    setAutostartLoading(true)
+    try {
+      if (enabled && autostart) {
+        await disableAutostart()
+        await enableAutostart()
+      }
+      await setAutostartMinimized(enabled)
+    } catch (error) {
+      console.error('Failed to update minimized autostart state:', error)
+      try {
+        setAutostart(await isAutostartEnabled())
+      } catch (stateError) {
+        console.error('Failed to refresh autostart state:', stateError)
+      }
+      toast({
+        title: t('autostartMinimized.error'),
         variant: 'destructive',
       })
     } finally {
@@ -118,6 +147,22 @@ export function SystemBehaviorSettings() {
               disabled={autostartLoading}
               aria-label={t('autostart.title')}
               onCheckedChange={(enabled) => void handleAutostartChange(enabled)}
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="outline" aria-disabled={!autostart}>
+          <ItemMedia variant="icon"><PanelTopClose /></ItemMedia>
+          <ItemContent>
+            <ItemTitle>{t('autostartMinimized.title')}</ItemTitle>
+            <ItemDescription>{t('autostartMinimized.desc')}</ItemDescription>
+          </ItemContent>
+          <ItemActions className="ml-auto mobile-setting-inline-action">
+            <Switch
+              checked={autostartMinimized}
+              disabled={!autostart || autostartLoading}
+              aria-label={t('autostartMinimized.title')}
+              onCheckedChange={(enabled) => void handleAutostartMinimizedChange(enabled)}
             />
           </ItemActions>
         </Item>

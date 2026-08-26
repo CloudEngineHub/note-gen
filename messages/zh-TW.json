@@ -4214,7 +4214,8 @@
       "collapseHeading": "折疊 {title}",
       "untitledHeading": "未命名 H{level}",
       "resizeHandle": "拖曳調整大綱寬度",
-      "editHeading": "編輯標題 {title}"
+      "editHeading": "編輯標題 {title}",
+      "dragHeading": "移動 {title} 及其子章節"
     },
     "translation": {
       "fail": "翻譯失敗",

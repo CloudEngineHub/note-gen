@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 use tauri_plugin_store::StoreExt;
 
+pub const AUTOSTART_ARG: &str = "--autostart";
+
 pub fn setup_window_events(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window("main") {
         let window_clone = window.clone();
@@ -46,7 +48,36 @@ fn get_close_behavior(app_handle: &AppHandle) -> String {
         .unwrap_or_else(|| "minimize".to_string())
 }
 
-pub fn handle_single_instance(app: &AppHandle, _argv: Vec<String>, _cwd: String) {
+fn get_autostart_minimized(app_handle: &AppHandle) -> bool {
+    app_handle
+        .store("store.json")
+        .ok()
+        .and_then(|store| store.get("autostartMinimized"))
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn is_autostart_launch(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == AUTOSTART_ARG)
+}
+
+pub fn apply_startup_visibility(app_handle: &AppHandle) {
+    let args = std::env::args().collect::<Vec<_>>();
+    if !is_autostart_launch(&args) || !get_autostart_minimized(app_handle) {
+        return;
+    }
+
+    if let Some(window) = app_handle.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+pub fn handle_single_instance(app: &AppHandle, argv: Vec<String>, _cwd: String) {
+    if is_autostart_launch(&argv) && get_autostart_minimized(app) {
+        crate::file_open::handle_single_instance_open_files(app, argv);
+        return;
+    }
+
     if let Some(window) = app.get_webview_window("main") {
         let is_visible = window.is_visible().unwrap_or(false);
         let is_minimized = window.is_minimized().unwrap_or(false);
@@ -70,7 +101,7 @@ pub fn handle_single_instance(app: &AppHandle, _argv: Vec<String>, _cwd: String)
         }
     }
 
-    crate::file_open::handle_single_instance_open_files(app, _argv);
+    crate::file_open::handle_single_instance_open_files(app, argv);
 }
 
 #[cfg(target_os = "macos")]

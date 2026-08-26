@@ -4407,7 +4407,8 @@
       "collapseHeading": "折叠 {title}",
       "untitledHeading": "未命名 H{level}",
       "resizeHandle": "拖拽调整大纲宽度",
-      "editHeading": "编辑标题 {title}"
+      "editHeading": "编辑标题 {title}",
+      "dragHeading": "移动 {title} 及其子章节"
     },
     "translation": {
       "fail": "翻译失败",

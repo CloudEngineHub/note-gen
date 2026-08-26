@@ -91,7 +91,11 @@ fn main() {
             window::handle_single_instance,
         ))
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .arg(window::AUTOSTART_ARG)
+                .build(),
+        )
         // 核心插件
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())

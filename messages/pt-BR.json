@@ -4191,6 +4191,21 @@
       "enhance": "Aprimorar busca",
       "searching": "Buscando arquivos relacionados..."
     },
+    "outline": {
+      "title": "Sumário",
+      "open": "Abrir sumário",
+      "close": "Fechar sumário",
+      "empty": "Nenhum título",
+      "noResults": "Nenhum título correspondente",
+      "searchPlaceholder": "Pesquisar títulos",
+      "clearSearch": "Limpar pesquisa",
+      "expandHeading": "Expandir {title}",
+      "collapseHeading": "Recolher {title}",
+      "untitledHeading": "H{level} sem título",
+      "resizeHandle": "Arraste para redimensionar o sumário",
+      "editHeading": "Editar título {title}",
+      "dragHeading": "Mover {title} com suas subseções"
+    },
     "bubbleMenu": {
       "ai": "IA",
       "polish": "Polir",
