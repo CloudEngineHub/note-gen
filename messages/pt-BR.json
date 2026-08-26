@@ -46,6 +46,11 @@
           "desc": "Inicie o NoteGen automaticamente após entrar no sistema",
           "error": "Não foi possível atualizar a inicialização automática"
         },
+        "autostartMinimized": {
+          "title": "Ocultar janela após inicialização automática",
+          "desc": "Ocultar a janela somente ao iniciar com o sistema e manter o NoteGen em execução na bandeja",
+          "error": "Não foi possível atualizar a configuração da janela na inicialização"
+        },
         "closePrompt": {
           "title": "Fechar o NoteGen?",
           "desc": "Você pode manter o NoteGen disponível na bandeja do sistema ou sair completamente do aplicativo.",

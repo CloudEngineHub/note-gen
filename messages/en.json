@@ -46,6 +46,11 @@
           "desc": "Start NoteGen automatically after you sign in",
           "error": "Could not update the startup setting"
         },
+        "autostartMinimized": {
+          "title": "Hide window after startup launch",
+          "desc": "Hide the window only when launched at system startup and keep NoteGen running in the tray",
+          "error": "Could not update the startup window setting"
+        },
         "closePrompt": {
           "title": "Close NoteGen?",
           "desc": "You can keep NoteGen available in the system tray or quit the app completely.",

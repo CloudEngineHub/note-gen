@@ -46,6 +46,11 @@
           "desc": "Starte NoteGen automatisch, nachdem du dich angemeldet hast",
           "error": "Autostart-Einstellung konnte nicht aktualisiert werden"
         },
+        "autostartMinimized": {
+          "title": "Fenster nach Autostart ausblenden",
+          "desc": "Das Fenster nur beim Systemstart ausblenden und NoteGen im Infobereich weiterlaufen lassen",
+          "error": "Die Fenstereinstellung für den Autostart konnte nicht aktualisiert werden"
+        },
         "closePrompt": {
           "title": "NoteGen schließen?",
           "desc": "Du kannst NoteGen im System-Tray verfügbar halten oder die App komplett beenden.",

@@ -46,6 +46,11 @@
           "desc": "登入系統後自動啟動 NoteGen",
           "error": "無法更新開機啟動設定"
         },
+        "autostartMinimized": {
+          "title": "自動啟動後隱藏主視窗",
+          "desc": "僅透過開機啟動時隱藏視窗，並在系統匣中保持執行",
+          "error": "無法更新自動啟動後隱藏設定"
+        },
         "closePrompt": {
           "title": "關閉 NoteGen？",
           "desc": "你可以將 NoteGen 保留在系統匣，或完全退出應用。",

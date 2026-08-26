@@ -46,6 +46,11 @@
           "desc": "登录系统后自动启动 NoteGen",
           "error": "无法更新开机启动设置"
         },
+        "autostartMinimized": {
+          "title": "自启后隐藏主窗口",
+          "desc": "仅通过开机启动时隐藏窗口，并在系统托盘中保持运行",
+          "error": "无法更新自启后隐藏设置"
+        },
         "closePrompt": {
           "title": "关闭 NoteGen？",
           "desc": "你可以将 NoteGen 保留在系统托盘，或彻底退出应用。",
