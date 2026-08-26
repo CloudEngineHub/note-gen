@@ -200,7 +200,7 @@ export function moveEditorTab(
   if (!source || !target || !source.tabIds.includes(tabId)) return layout
 
   let nextSourceIds = [...source.tabIds]
-  let nextTargetIds = target.tabIds.filter(id => id !== tabId)
+  const nextTargetIds = target.tabIds.filter(id => id !== tabId)
   if (!copy) nextSourceIds = nextSourceIds.filter(id => id !== tabId)
 
   const insertionIndex = Math.max(0, Math.min(targetIndex ?? nextTargetIds.length, nextTargetIds.length))
