@@ -1,12 +1,22 @@
 name: 'publish'
+run-name: 'Publish NoteGen from dev'
 
 on:
-  push:
-    branches:
-      - release
+  workflow_dispatch:
 
 jobs:
+  validate-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require dev branch
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/dev" ]; then
+            echo "::error::Select the dev branch when running this workflow."
+            exit 1
+          fi
+
   build-android:
+    needs: validate-source
     outputs:
       appVersion: ${{ steps.get_version.outputs.version }}
     runs-on: ubuntu-latest
@@ -209,6 +219,7 @@ jobs:
           rm -f src-tauri/android-release.keystore
 
   publish-tauri:
+    needs: validate-source
     outputs:
       appVersion: ${{ steps.set_output.outputs.appVersion }}
     permissions:

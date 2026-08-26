@@ -26,7 +26,7 @@
 
 <p>
   <a href="https://github.com/codexu/note-gen/actions/workflows/release.yml">
-    <img alt="发布状态" src="https://img.shields.io/github/actions/workflow/status/codexu/note-gen/release.yml?branch=release&label=release&style=flat-square&logo=githubactions&logoColor=white">
+    <img alt="发布状态" src="https://img.shields.io/github/actions/workflow/status/codexu/note-gen/release.yml?branch=dev&label=release&style=flat-square&logo=githubactions&logoColor=white">
   </a>
   <a href="https://github.com/codexu/note-gen/releases">
     <img alt="最新版本" src="https://img.shields.io/github/v/release/codexu/note-gen?style=flat-square&color=155eef">

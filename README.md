@@ -26,7 +26,7 @@ A local-first Markdown app that helps you collect scattered information and orga
 
 <p>
   <a href="https://github.com/codexu/note-gen/actions/workflows/release.yml">
-    <img alt="Release workflow" src="https://img.shields.io/github/actions/workflow/status/codexu/note-gen/release.yml?branch=release&label=release&style=flat-square&logo=githubactions&logoColor=white">
+    <img alt="Release workflow" src="https://img.shields.io/github/actions/workflow/status/codexu/note-gen/release.yml?branch=dev&label=release&style=flat-square&logo=githubactions&logoColor=white">
   </a>
   <a href="https://github.com/codexu/note-gen/releases">
     <img alt="Latest release" src="https://img.shields.io/github/v/release/codexu/note-gen?style=flat-square&color=155eef">
