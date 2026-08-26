@@ -3453,7 +3453,6 @@ export function TipTapEditor({
       document.dispatchEvent(new CustomEvent('tiptap-link-edit', {
         detail: { editor, from, to, label, href },
       }))
-      editor.commands.setTextSelection({ from, to })
     }
 
     const openLink = async (href: string) => {

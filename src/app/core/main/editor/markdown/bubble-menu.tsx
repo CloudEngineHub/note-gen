@@ -153,9 +153,11 @@ export function BubbleMenu({
   const [showTranslateSubmenu, setShowTranslateSubmenu] = useState(false)
   const [customTranslateLang, setCustomTranslateLang] = useState('')
   const [linkEditor, setLinkEditor] = useState<LinkEditorState | null>(null)
+  const isLinkEditorOpen = linkEditor !== null
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isInteractingWithMenu, setIsInteractingWithMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const linkUrlInputRef = useRef<HTMLInputElement>(null)
   const aiSubmenuRef = useRef<HTMLDivElement>(null)
   const translateSubmenuRef = useRef<HTMLDivElement>(null)
   const hasUserSelectionIntentRef = useRef(false)
@@ -249,10 +251,11 @@ export function BubbleMenu({
       return false
     }
 
-    // 获取编辑器元素和滚动容器
+    // EditorContent 是绝对定位参照层，外层 viewport 才是真正的滚动容器。
     const editorElement = editor.view.dom
-    const scrollContainer = editorElement.parentElement
-    if (!editorElement || !scrollContainer) {
+    const positionContainer = editorElement.parentElement
+    const scrollContainer = editorElement.closest<HTMLElement>('.editor-scroll-container')
+    if (!positionContainer || !scrollContainer) {
       hideMenu()
       return false
     }
@@ -260,27 +263,27 @@ export function BubbleMenu({
     try {
       const startCoords = editor.view.coordsAtPos(from)
       const endCoords = editor.view.coordsAtPos(to)
-      const containerBounds = scrollContainer.getBoundingClientRect()
+      const positionBounds = positionContainer.getBoundingClientRect()
+      const scrollBounds = scrollContainer.getBoundingClientRect()
 
-      // 转换为滚动容器内的相对坐标
-      const anchorTop = Math.min(startCoords.top, endCoords.top) - containerBounds.top + scrollContainer.scrollTop
-      const anchorBottom = Math.max(startCoords.bottom, endCoords.bottom) - containerBounds.top + scrollContainer.scrollTop
-      const relativeLeft = startCoords.left - containerBounds.left + scrollContainer.scrollLeft
+      // 转换为绝对定位参照层内的坐标
+      const anchorTop = Math.min(startCoords.top, endCoords.top) - positionBounds.top + positionContainer.scrollTop
+      const anchorBottom = Math.max(startCoords.bottom, endCoords.bottom) - positionBounds.top + positionContainer.scrollTop
+      const relativeLeft = startCoords.left - positionBounds.left + positionContainer.scrollLeft
       const menuHeight = menuRef.current?.offsetHeight || 40
       const gap = 8
 
-      // 边界检测：left 在 [0, 容器宽度 - 菜单宽度] 范围内
       const currentMenuWidth = menuRef.current?.offsetWidth || 360
-      // maxLeft 不能为负数
-      const maxLeft = Math.max(8, containerBounds.width - currentMenuWidth - 8)
-      const left = Math.max(8, Math.min(relativeLeft, maxLeft))
+      const minimumLeft = scrollBounds.left - positionBounds.left + positionContainer.scrollLeft + 8
+      const maximumLeft = scrollBounds.right - positionBounds.left + positionContainer.scrollLeft - currentMenuWidth - 8
+      const left = Math.max(minimumLeft, Math.min(relativeLeft, Math.max(minimumLeft, maximumLeft)))
 
-      const spaceAbove = Math.min(startCoords.top, endCoords.top) - containerBounds.top
+      const spaceAbove = Math.min(startCoords.top, endCoords.top) - scrollBounds.top
       const preferredTop = spaceAbove >= menuHeight + gap
         ? anchorTop - menuHeight - gap
         : anchorBottom + gap
-      const visibleTop = scrollContainer.scrollTop + 8
-      const visibleBottom = scrollContainer.scrollTop + scrollContainer.clientHeight - 8
+      const visibleTop = scrollBounds.top - positionBounds.top + positionContainer.scrollTop + 8
+      const visibleBottom = scrollBounds.bottom - positionBounds.top + positionContainer.scrollTop - 8
       const maxTop = Math.max(visibleTop, visibleBottom - menuHeight)
       const top = Math.max(visibleTop, Math.min(preferredTop, maxTop))
       setPosition({ top, left })
@@ -437,6 +440,7 @@ export function BubbleMenu({
       ) return
 
       hasUserSelectionIntentRef.current = true
+      editor.commands.setTextSelection({ from: detail.from, to: detail.to })
       setLinkEditor({
         from: detail.from,
         to: detail.to,
@@ -457,6 +461,11 @@ export function BubbleMenu({
     if (!show) return
     updatePosition()
   }, [linkEditor, show, updatePosition])
+
+  useLayoutEffect(() => {
+    if (!show || !isLinkEditorOpen) return
+    linkUrlInputRef.current?.focus({ preventScroll: true })
+  }, [isLinkEditorOpen, show])
 
   // AI子菜单边界检测
   useEffect(() => {
@@ -548,7 +557,7 @@ export function BubbleMenu({
 
   // Update position on scroll
   useEffect(() => {
-    const scrollContainer = editor.view.dom.parentElement
+    const scrollContainer = editor.view.dom.closest<HTMLElement>('.editor-scroll-container')
     if (!scrollContainer) return
 
     const handleScroll = () => {
@@ -679,12 +688,12 @@ export function BubbleMenu({
               </FieldLabel>
               <InputGroup>
                 <InputGroupInput
+                  ref={linkUrlInputRef}
                   id={linkUrlInputId}
                   value={linkEditor.url}
                   onChange={(event) => setLinkEditor(current => current && ({ ...current, url: event.target.value }))}
                   placeholder={t('bubbleMenu.linkPlaceholder')}
                   aria-label={t('bubbleMenu.linkUrl')}
-                  autoFocus
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
