@@ -4389,7 +4389,8 @@
       "collapseHeading": "Collapse {title}",
       "untitledHeading": "Untitled H{level}",
       "resizeHandle": "Drag to resize outline",
-      "editHeading": "Edit heading {title}"
+      "editHeading": "Edit heading {title}",
+      "dragHeading": "Move {title} with its subsections"
     },
     "translation": {
       "fail": "Translation failed",

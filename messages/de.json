@@ -4381,7 +4381,8 @@
       "collapseHeading": "{title} zuklappen",
       "untitledHeading": "Unbenannte H{level}",
       "resizeHandle": "Zum Anpassen der Gliederungsgröße ziehen",
-      "editHeading": "Überschrift {title} bearbeiten"
+      "editHeading": "Überschrift {title} bearbeiten",
+      "dragHeading": "{title} samt Unterabschnitten verschieben"
     },
     "translation": {
       "fail": "Übersetzung fehlgeschlagen",

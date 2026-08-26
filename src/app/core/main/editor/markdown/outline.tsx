@@ -1,7 +1,33 @@
 'use client'
 
 import { Editor } from '@tiptap/react'
-import { ChevronDown, ChevronRight, Heading1, Heading2, Heading3, Search, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Heading1,
+  Heading2,
+  Heading3,
+  Search,
+  X,
+} from 'lucide-react'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   useCallback,
   useEffect,
@@ -57,6 +83,12 @@ interface OutlineProps {
 interface OutlineMeta {
   ancestorIdsById: Map<string, string[]>
   hasChildrenById: Map<string, boolean>
+  parentIdById: Map<string, string | null>
+}
+
+interface OutlineDragData {
+  level: number
+  parentId: string | null
 }
 
 function getNormalizedSearchText(value: string) {
@@ -133,15 +165,24 @@ function OutlineHeadingEditInput({
   )
 }
 
-function OutlineItems({
-  headings,
-  totalHeadingCount,
+function isOutlineDragData(value: unknown): value is OutlineDragData {
+  if (!value || typeof value !== 'object') return false
+
+  const data = value as Partial<OutlineDragData>
+  return typeof data.level === 'number'
+    && (typeof data.parentId === 'string' || data.parentId === null)
+}
+
+function SortableOutlineItem({
+  heading,
   activeHeadingId,
   collapsedHeadingIds,
   hasChildrenById,
+  parentId,
   normalizedSearchQuery,
   editingHeadingId,
   editingHeadingText,
+  dragDisabled,
   onSelect,
   onToggleCollapse,
   onStartEdit,
@@ -149,14 +190,15 @@ function OutlineItems({
   onCommitEdit,
   onCancelEdit,
 }: {
-  headings: HeadingItem[]
-  totalHeadingCount: number
+  heading: HeadingItem
   activeHeadingId: string | null
   collapsedHeadingIds: Set<string>
   hasChildrenById: Map<string, boolean>
+  parentId: string | null
   normalizedSearchQuery: string
   editingHeadingId: string | null
   editingHeadingText: string
+  dragDisabled: boolean
   onSelect: (id: string) => void
   onToggleCollapse: (id: string) => void
   onStartEdit: (id: string) => void
@@ -165,109 +207,230 @@ function OutlineItems({
   onCancelEdit: () => void
 }) {
   const t = useTranslations('editor')
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: heading.id,
+    disabled: dragDisabled,
+    data: { level: heading.level, parentId } satisfies OutlineDragData,
+  })
+  const isActive = activeHeadingId === heading.id
+  const hasChildren = hasChildrenById.get(heading.id) || false
+  const canCollapse = COLLAPSIBLE_HEADING_LEVELS.has(heading.level) && hasChildren && !normalizedSearchQuery
+  const isCollapsed = collapsedHeadingIds.has(heading.id)
+  const isSearchContext =
+    Boolean(normalizedSearchQuery) &&
+    !getNormalizedSearchText(heading.text).includes(normalizedSearchQuery)
+  const isEditing = editingHeadingId === heading.id
+  const headingContentClass = cn(
+    'flex min-w-0 flex-1 items-start gap-2 rounded py-1.5 pr-2 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-colors',
+    isActive
+      ? '[&_svg]:text-accent-foreground/80 group-hover:[&_svg]:text-accent-foreground'
+      : '[&_svg]:text-muted-foreground group-hover:[&_svg]:text-foreground'
+  )
+
+  return (
+    <li
+      ref={setNodeRef}
+      id={`outline-${heading.id}`}
+      data-outline-id={heading.id}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.55 : 1,
+      }}
+    >
+      <div
+        className={cn(
+          'group flex min-w-0 items-start rounded text-sm transition-colors',
+          isActive
+            ? 'bg-accent text-accent-foreground'
+            : 'hover:bg-muted',
+          heading.level === 1 ? 'font-semibold' : '',
+          isSearchContext && !isActive ? 'text-muted-foreground' : ''
+        )}
+        style={{ paddingLeft: `${Math.min(heading.level - 1, 5) * 12 + 8}px` }}
+      >
+        {canCollapse ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'mt-0.5 size-6 shrink-0',
+              isActive
+                ? 'text-accent-foreground/80 hover:text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            aria-expanded={!isCollapsed}
+            aria-label={
+              isCollapsed
+                ? t('outline.expandHeading', { title: heading.text })
+                : t('outline.collapseHeading', { title: heading.text })
+            }
+            title={
+              isCollapsed
+                ? t('outline.expandHeading', { title: heading.text })
+                : t('outline.collapseHeading', { title: heading.text })
+            }
+            onClick={() => onToggleCollapse(heading.id)}
+          >
+            {isCollapsed ? <ChevronRight /> : <ChevronDown />}
+          </Button>
+        ) : COLLAPSIBLE_HEADING_LEVELS.has(heading.level) ? (
+          <span className="size-6 shrink-0" />
+        ) : (
+          null
+        )}
+
+        <Button
+          ref={setActivatorNodeRef}
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="mt-0.5 shrink-0 cursor-grab touch-none text-muted-foreground opacity-50 transition-opacity hover:opacity-100 active:cursor-grabbing disabled:cursor-default disabled:opacity-0"
+          aria-label={t('outline.dragHeading', { title: heading.text })}
+          title={t('outline.dragHeading', { title: heading.text })}
+          disabled={dragDisabled}
+          onClick={(event) => event.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical />
+        </Button>
+
+        {isEditing ? (
+          <div className={headingContentClass}>
+            {getHeadingIcon(heading.level)}
+            <OutlineHeadingEditInput
+              value={editingHeadingText}
+              placeholder={t('outline.untitledHeading', { level: heading.level })}
+              ariaLabel={t('outline.editHeading', { title: heading.text })}
+              onChange={onEditTextChange}
+              onCommit={() => onCommitEdit(heading.id)}
+              onCancel={onCancelEdit}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onSelect(heading.id)}
+            onDoubleClick={() => onStartEdit(heading.id)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== 'F2') return
+
+              event.preventDefault()
+              onStartEdit(heading.id)
+            }}
+            className={headingContentClass}
+            aria-current={isActive ? 'true' : undefined}
+          >
+            {getHeadingIcon(heading.level)}
+            <span className={getOutlineHeadingTextClass()}>{heading.text}</span>
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function OutlineItems({
+  headings,
+  totalHeadingCount,
+  activeHeadingId,
+  collapsedHeadingIds,
+  hasChildrenById,
+  parentIdById,
+  normalizedSearchQuery,
+  editingHeadingId,
+  editingHeadingText,
+  dragDisabled,
+  onSelect,
+  onToggleCollapse,
+  onStartEdit,
+  onEditTextChange,
+  onCommitEdit,
+  onCancelEdit,
+  onDragEnd,
+}: {
+  headings: HeadingItem[]
+  totalHeadingCount: number
+  activeHeadingId: string | null
+  collapsedHeadingIds: Set<string>
+  hasChildrenById: Map<string, boolean>
+  parentIdById: Map<string, string | null>
+  normalizedSearchQuery: string
+  editingHeadingId: string | null
+  editingHeadingText: string
+  dragDisabled: boolean
+  onSelect: (id: string) => void
+  onToggleCollapse: (id: string) => void
+  onStartEdit: (id: string) => void
+  onEditTextChange: (value: string) => void
+  onCommitEdit: (id: string) => void
+  onCancelEdit: () => void
+  onDragEnd: (event: DragEndEvent) => void
+}) {
+  const t = useTranslations('editor')
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const activeData = args.active.data.current
+    if (!isOutlineDragData(activeData)) return []
+
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter((container) => {
+        const targetData = container.data.current
+        return isOutlineDragData(targetData)
+          && targetData.level === activeData.level
+          && targetData.parentId === activeData.parentId
+      }),
+    })
+  }, [])
 
   return headings.length === 0 ? (
     <div className="flex min-h-24 items-center justify-center px-4 py-6 text-center text-sm text-muted-foreground">
       {totalHeadingCount === 0 ? t('outline.empty') : t('outline.noResults')}
     </div>
   ) : (
-    <ul className="flex flex-col gap-1 p-2">
-      {headings.map((heading) => {
-        const isActive = activeHeadingId === heading.id
-        const hasChildren = hasChildrenById.get(heading.id) || false
-        const canCollapse = COLLAPSIBLE_HEADING_LEVELS.has(heading.level) && hasChildren && !normalizedSearchQuery
-        const isCollapsed = collapsedHeadingIds.has(heading.id)
-        const isSearchContext =
-          Boolean(normalizedSearchQuery) &&
-          !getNormalizedSearchText(heading.text).includes(normalizedSearchQuery)
-        const isEditing = editingHeadingId === heading.id
-        const headingContentClass = cn(
-          'flex min-w-0 flex-1 items-start gap-2 rounded py-1.5 pr-2 text-left outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-colors',
-          isActive
-            ? '[&_svg]:text-accent-foreground/80 group-hover:[&_svg]:text-accent-foreground'
-            : '[&_svg]:text-muted-foreground group-hover:[&_svg]:text-foreground'
-        )
-
-        return (
-          <li key={heading.id} id={`outline-${heading.id}`} data-outline-id={heading.id}>
-            <div
-              className={cn(
-                'group flex min-w-0 items-start rounded text-sm transition-colors',
-                isActive
-                  ? 'bg-accent text-accent-foreground'
-                  : 'hover:bg-muted',
-                heading.level === 1 ? 'font-semibold' : '',
-                isSearchContext && !isActive ? 'text-muted-foreground' : ''
-              )}
-              style={{ paddingLeft: `${Math.min(heading.level - 1, 5) * 12 + 8}px` }}
-            >
-              {canCollapse ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'mt-0.5 size-6 shrink-0',
-                    isActive
-                      ? 'text-accent-foreground/80 hover:text-accent-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
-                  aria-expanded={!isCollapsed}
-                  aria-label={
-                    isCollapsed
-                      ? t('outline.expandHeading', { title: heading.text })
-                      : t('outline.collapseHeading', { title: heading.text })
-                  }
-                  title={
-                    isCollapsed
-                      ? t('outline.expandHeading', { title: heading.text })
-                      : t('outline.collapseHeading', { title: heading.text })
-                  }
-                  onClick={() => onToggleCollapse(heading.id)}
-                >
-                  {isCollapsed ? <ChevronRight /> : <ChevronDown />}
-                </Button>
-              ) : COLLAPSIBLE_HEADING_LEVELS.has(heading.level) ? (
-                <span className="size-6 shrink-0" />
-              ) : (
-                null
-              )}
-
-              {isEditing ? (
-                <div className={headingContentClass}>
-                  {getHeadingIcon(heading.level)}
-                  <OutlineHeadingEditInput
-                    value={editingHeadingText}
-                    placeholder={t('outline.untitledHeading', { level: heading.level })}
-                    ariaLabel={t('outline.editHeading', { title: heading.text })}
-                    onChange={onEditTextChange}
-                    onCommit={() => onCommitEdit(heading.id)}
-                    onCancel={onCancelEdit}
-                  />
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => onSelect(heading.id)}
-                  onDoubleClick={() => onStartEdit(heading.id)}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'Enter' && event.key !== 'F2') return
-
-                    event.preventDefault()
-                    onStartEdit(heading.id)
-                  }}
-                  className={headingContentClass}
-                  aria-current={isActive ? 'true' : undefined}
-                >
-                  {getHeadingIcon(heading.level)}
-                  <span className={getOutlineHeadingTextClass()}>{heading.text}</span>
-                </button>
-              )}
-            </div>
-          </li>
-        )
-      })}
-    </ul>
+    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={onDragEnd}>
+      <SortableContext
+        items={headings.map((heading) => heading.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <ul className="flex flex-col gap-1 p-2">
+          {headings.map((heading) => (
+            <SortableOutlineItem
+              key={heading.id}
+              heading={heading}
+              activeHeadingId={activeHeadingId}
+              collapsedHeadingIds={collapsedHeadingIds}
+              hasChildrenById={hasChildrenById}
+              parentId={parentIdById.get(heading.id) ?? null}
+              normalizedSearchQuery={normalizedSearchQuery}
+              editingHeadingId={editingHeadingId}
+              editingHeadingText={editingHeadingText}
+              dragDisabled={dragDisabled}
+              onSelect={onSelect}
+              onToggleCollapse={onToggleCollapse}
+              onStartEdit={onStartEdit}
+              onEditTextChange={onEditTextChange}
+              onCommitEdit={onCommitEdit}
+              onCancelEdit={onCancelEdit}
+            />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
   )
 }
 
@@ -438,6 +601,7 @@ export function Outline({
   const outlineMeta = useMemo<OutlineMeta>(() => {
     const ancestorIdsById = new Map<string, string[]>()
     const hasChildrenById = new Map<string, boolean>()
+    const parentIdById = new Map<string, string | null>()
     const stack: HeadingItem[] = []
 
     for (const heading of headings) {
@@ -445,7 +609,9 @@ export function Outline({
         stack.pop()
       }
 
-      ancestorIdsById.set(heading.id, stack.map((item) => item.id))
+      const ancestorIds = stack.map((item) => item.id)
+      ancestorIdsById.set(heading.id, ancestorIds)
+      parentIdById.set(heading.id, ancestorIds.at(-1) ?? null)
       hasChildrenById.set(heading.id, hasChildrenById.get(heading.id) || false)
 
       const parent = stack[stack.length - 1]
@@ -456,7 +622,7 @@ export function Outline({
       stack.push(heading)
     }
 
-    return { ancestorIdsById, hasChildrenById }
+    return { ancestorIdsById, hasChildrenById, parentIdById }
   }, [headings])
 
   const normalizedSearchQuery = useMemo(() => getNormalizedSearchText(searchQuery), [searchQuery])
@@ -594,6 +760,48 @@ export function Outline({
     cancelHeadingEdit()
     setHeadings(extractHeadings())
   }, [cancelHeadingEdit, editingHeadingText, editor, extractHeadings])
+
+  const moveHeadingSection = useCallback((event: DragEndEvent) => {
+    if (!event.over || event.active.id === event.over.id || !editor.isEditable) return
+
+    const activeId = String(event.active.id)
+    const overId = String(event.over.id)
+    const currentHeadings = headingsRef.current
+    const activeIndex = currentHeadings.findIndex((heading) => heading.id === activeId)
+    const overIndex = currentHeadings.findIndex((heading) => heading.id === overId)
+    if (activeIndex < 0 || overIndex < 0) return
+
+    const activeHeading = currentHeadings[activeIndex]
+    const overHeading = currentHeadings[overIndex]
+    const activeParentId = outlineMeta.parentIdById.get(activeId) ?? null
+    const overParentId = outlineMeta.parentIdById.get(overId) ?? null
+    if (activeHeading.level !== overHeading.level || activeParentId !== overParentId) return
+
+    const findSectionEnd = (headingIndex: number) => {
+      const heading = currentHeadings[headingIndex]
+      const nextBoundary = currentHeadings
+        .slice(headingIndex + 1)
+        .find((candidate) => candidate.level <= heading.level)
+      return nextBoundary?.pos ?? editor.state.doc.content.size
+    }
+
+    const activeFrom = activeHeading.pos
+    const activeTo = findSectionEnd(activeIndex)
+    const insertPos = activeIndex < overIndex
+      ? findSectionEnd(overIndex)
+      : overHeading.pos
+    const slice = editor.state.doc.slice(activeFrom, activeTo)
+    const transaction = editor.state.tr.deleteRange(activeFrom, activeTo)
+    const mappedInsertPos = transaction.mapping.map(insertPos)
+    const beforeInsert = transaction.doc
+
+    transaction.replaceRange(mappedInsertPos, mappedInsertPos, slice)
+    if (transaction.doc.eq(beforeInsert)) return
+
+    editor.view.dispatch(transaction.setMeta('uiEvent', 'drop'))
+    setCollapsedHeadingIds(new Set())
+    editor.commands.focus(Math.min(mappedInsertPos + 1, editor.state.doc.content.size))
+  }, [editor, outlineMeta])
 
   useEffect(() => {
     cancelHeadingEdit()
@@ -856,15 +1064,18 @@ export function Outline({
           activeHeadingId={activeHeadingId}
           collapsedHeadingIds={collapsedHeadingIds}
           hasChildrenById={outlineMeta.hasChildrenById}
+          parentIdById={outlineMeta.parentIdById}
           normalizedSearchQuery={normalizedSearchQuery}
           editingHeadingId={editingHeadingId}
           editingHeadingText={editingHeadingText}
+          dragDisabled={Boolean(normalizedSearchQuery) || Boolean(editingHeadingId) || !editor.isEditable}
           onSelect={scrollToHeading}
           onToggleCollapse={toggleHeadingCollapsed}
           onStartEdit={startHeadingEdit}
           onEditTextChange={setEditingHeadingText}
           onCommitEdit={commitHeadingEdit}
           onCancelEdit={cancelHeadingEdit}
+          onDragEnd={moveHeadingSection}
         />
       </div>
     </>
