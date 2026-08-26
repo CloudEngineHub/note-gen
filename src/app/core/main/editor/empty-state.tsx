@@ -506,22 +506,22 @@ export function EmptyState({
 
   return (
     <Empty className="h-full justify-start overflow-y-auto rounded-none bg-muted/20 p-0 text-left text-pretty">
-      <div className="@container/new-tab flex min-h-full w-full flex-col justify-center">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-[clamp(1rem,4cqi,2.5rem)] py-[clamp(1.5rem,5cqi,2.5rem)]">
+      <div className="@container/new-tab flex min-h-full w-full flex-col justify-center-safe">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-[clamp(1rem,4cqi,2.5rem)] py-[clamp(1.5rem,5cqi,2.5rem)]">
           <header className="flex flex-col items-start gap-4 @md/new-tab:flex-row @md/new-tab:justify-between @md/new-tab:gap-6">
             <div className="flex max-w-xl flex-col gap-2">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <Image
                   src="/app-icon.png"
                   alt="NoteGen logo"
-                  width={44}
-                  height={44}
+                  width={36}
+                  height={36}
                   priority
-                  className="size-10 shrink-0 rounded-lg dark:invert @lg/new-tab:size-11"
+                  className="size-9 shrink-0 rounded-lg dark:invert"
                 />
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <h1 className="font-heading text-2xl font-semibold tracking-tight @3xl/new-tab:text-3xl">NoteGen</h1>
-                  <p className="text-sm font-medium @3xl/new-tab:text-base">{t('title')}</p>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <h1 className="font-heading text-xl leading-none font-semibold tracking-tight">NoteGen</h1>
+                  <p className="text-sm leading-none font-medium">{t('title')}</p>
                 </div>
               </div>
             </div>
