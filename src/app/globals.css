@@ -186,10 +186,10 @@
     --component-bg: var(--card);
     --component-shadow: var(--border);
     --scrollbar-size: 12px;
-    --scrollbar-track-hover: hsl(var(--muted) / 0.4);
-    --scrollbar-thumb: hsl(var(--muted-foreground) / 0.34);
-    --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.58);
-    --scrollbar-thumb-active: hsl(var(--foreground) / 0.7);
+    --scrollbar-track-hover: hsl(var(--muted) / 0.28);
+    --scrollbar-thumb: hsl(var(--muted-foreground) / 0.26);
+    --scrollbar-thumb-hover: hsl(var(--muted-foreground) / 0.48);
+    --scrollbar-thumb-active: hsl(var(--foreground) / 0.62);
     --component-active-bg: var(--secondary);
     --component-line-inactive-color: var(--border);
     --component-active-color-default: var(--accent-foreground);
@@ -520,10 +520,6 @@ html, body {
   transition: background-color 0.15s ease;
 }
 
-:not(table):hover::-webkit-scrollbar-track {
-  background-color: var(--scrollbar-track-hover);
-}
-
 :not(table)::-webkit-scrollbar-thumb {
   border-radius: 9999px;
   background-color: var(--scrollbar-thumb);
@@ -532,6 +528,10 @@ html, body {
   border-color: transparent;
   background-clip: padding-box;
   transition: background-color 0.15s ease, border-width 0.15s ease;
+}
+
+:not(table)::-webkit-scrollbar-track:hover {
+  background-color: var(--scrollbar-track-hover);
 }
 
 :not(table)::-webkit-scrollbar-thumb:hover {
@@ -639,7 +639,7 @@ ol {
   bottom: 0;
   height: 4px;
   background-color: transparent;
-  opacity: 0;
+  opacity: 1;
   transition: background-color 0.15s ease, opacity 0.2s ease;
   pointer-events: none;
 }
