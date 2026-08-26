@@ -133,7 +133,7 @@ export const ChatInput = React.memo(function ChatInput() {
   const activeContextPaths = React.useMemo(() => {
     if (!isMobile) {
       const activeTabPath = openTabs.find(tab => tab.id === activeTabId)?.path || activeFilePath
-      return activeTabPath ? [activeTabPath] : []
+      return activeTabPath && !activeTabPath.startsWith('blank://') ? [activeTabPath] : []
     }
 
     return [
